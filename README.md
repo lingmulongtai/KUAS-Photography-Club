@@ -49,3 +49,57 @@ KUAS Photography Club は、写真撮影を通じて「楽しむ」と「つな�
 
 ---
 最終更新: 2025-10-29
+
+---
+
+# KUAS Photography Club (English Version)
+
+KUAS Photography Club is a community of photography enthusiasts dedicated to having fun and connecting with others through photography. Regardless of nationality or year of enrollment, we aim to expand our network through our shared passion for photography while working toward club status next year (currently a circle club).
+
+- Recognized by the Student Association: 2025/05/21
+- Member Count: 55 members (as of 2025/10/29)
+- Meeting: Every Monday, 16:20 / 18:00 (Uzumasa Campus Room S311)
+
+## Activity Purpose
+- Have fun and enjoy photography
+- Foster connection and exchange between international students and Japanese students
+- Prepare for club status upgrade next year by acquiring shared club equipment (shared cameras)
+  - Members without cameras can enjoy photography easily with club-owned cameras
+
+## Activity Overview (Photo Trip)
+- We organize photo trips approximately twice a month to explore beautiful scenery and events around campus and nearby prefectures
+- Examples: fireworks festivals, temples and shrines, aquariums, street photography, etc.
+- We hold weekly meetings to share ideas and prepare for photo trips
+
+## About This Repository
+This repository is a place to create, store, and update operational documents for KUAS Photography Club. We will continuously improve the content together with our members.
+
+Main documents planned for this repository:
+- Guidelines (activity policy, participation rules, safety precautions)
+- Photo trip planning templates (itinerary, packing list, budget, risk management)
+- Promotion and announcement templates (flyer text, SNS post drafts)
+- Equipment management (shared camera operational policy and lending rules)
+- Accounting-related documents (cost-sharing policy and templates)
+
+Recommended folder structure (planned):
+- `guidelines/` … guideline documents
+- `templates/` … templates for planning, promotion, accounting, etc.
+- `equipment/` … equipment list and lending rules
+- `docs/` … reference materials, records, etc.
+
+## Join / Contact Us
+- For membership, campus visits, or participation in photo trips, please feel free to reach out to the management team during our meetings
+- Contact methods:
+  - Instagram: [@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
+  - Teams/Email: [2025m011@kuas.ac.jp](mailto:2025m011@kuas.ac.jp)
+
+## How to Contribute (Document Editing)
+- If you find typos, have suggestions to add, or have ideas for improvements, please feel free to contact us via Issues or Pull Requests
+- If you're unsure about how to use GitHub, please consult with the management team during meetings
+
+## License / Usage Policy
+- The license for documents in this repository is under consideration (to be added later)
+- These documents are managed with the assumption of use within the circle. For external use, please consult with the management team
+
+---
+Last Updated: 2025-10-29
