@@ -5,8 +5,8 @@
 
 - 適用範囲: サークルが主催・共催・承認するあらゆる活動（ミーティング、撮影会、オンライン運用を含む）
 - 連絡先:
-  - Instagram: @kuas_photographyclub
-  - Teams/メール: 2025m011@kuas.ac.jp
+  - Instagram: [@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
+  - Teams/メール: [2025m011@kuas.ac.jp](mailto:2025m011@kuas.ac.jp)
 - 定例ミーティング: 毎週 月曜 16:20 / 18:00（太秦キャンパス S311 教室）
 
 ---
