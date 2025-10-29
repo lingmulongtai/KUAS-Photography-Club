@@ -52,54 +52,53 @@ KUAS Photography Club は、写真撮影を通じて「楽しむ」と「つな�
 
 ---
 
-# KUAS Photography Club (English Version)
+# KUAS Photography Club (English)
 
-KUAS Photography Club is a community of photography enthusiasts dedicated to having fun and connecting with others through photography. Regardless of nationality or year of enrollment, we aim to expand our network through our shared passion for photography while working toward club status next year (currently a circle club).
+The KUAS Photography Club is a group for students who love photography. Our main goals are to have fun, connect with others, and share our passion for taking pictures. We welcome students of all nationalities and academic years. We are currently an informal group, but we aim to become an official university club next year.
 
-- Recognized by the Student Association: 2025/05/21
-- Member Count: 55 members (as of 2025/10/29)
-- Meeting: Every Monday, 16:20 / 18:00 (Uzumasa Campus Room S311)
+- **Official Recognition:** Approved by the Student Union on May 21, 2025
+- **Members:** 55 (as of October 29, 2025)
+- **Meetings:** Mondays at 16:20 and 18:00 in Room S311, Uzumasa Campus
 
-## Activity Purpose
-- Have fun and enjoy photography
-- Foster connection and exchange between international students and Japanese students
-- Prepare for club status upgrade next year by acquiring shared club equipment (shared cameras)
-  - Members without cameras can enjoy photography easily with club-owned cameras
+## Our Goals
+- To enjoy photography above all else.
+- To foster a community for both international and Japanese students.
+- To prepare for official club status by acquiring shared equipment, such as cameras that all members can use.
+  - Our goal is to purchase club cameras so that members who don't own one can still participate freely.
 
-## Activity Overview (Photo Trip)
-- We organize photo trips approximately twice a month to explore beautiful scenery and events around campus and nearby prefectures
-- Examples: fireworks festivals, temples and shrines, aquariums, street photography, etc.
-- We hold weekly meetings to share ideas and prepare for photo trips
+## What We Do (Photo Trips)
+- We organize photo outings about twice a month to capture beautiful scenery and events, both on campus and in neighboring prefectures.
+- **Examples:** Fireworks festivals, temples, shrines, aquariums, and street photography.
+- We hold weekly meetings to plan these trips and share ideas.
 
 ## About This Repository
-This repository is a place to create, store, and update operational documents for KUAS Photography Club. We will continuously improve the content together with our members.
+This repository is where we create, store, and update documents for the KUAS Photography Club. We plan to improve these documents over time with feedback from our members.
 
-Main documents planned for this repository:
-- Guidelines (activity policy, participation rules, safety precautions)
-- Photo trip planning templates (itinerary, packing list, budget, risk management)
-- Promotion and announcement templates (flyer text, SNS post drafts)
-- Equipment management (shared camera operational policy and lending rules)
-- Accounting-related documents (cost-sharing policy and templates)
+**Planned Documents:**
+- **Guidelines:** Our club's policies, rules, and safety precautions.
+- **Templates:** For planning photo trips, managing budgets, and creating promotional materials.
+- **Equipment:** Rules for borrowing and managing shared cameras.
+- **Finances:** Policies for sharing costs and managing funds.
 
-Recommended folder structure (planned):
-- `guidelines/` … guideline documents
-- `templates/` … templates for planning, promotion, accounting, etc.
-- `equipment/` … equipment list and lending rules
-- `docs/` … reference materials, records, etc.
+**Recommended Folder Structure:**
+- `guidelines/`: Guideline documents.
+- `templates/`: Templates for planning, announcements, and finances.
+- `equipment/`: Equipment lists and lending rules.
+- `docs/`: Reference materials and records.
 
-## Join / Contact Us
-- For membership, campus visits, or participation in photo trips, please feel free to reach out to the management team during our meetings
-- Contact methods:
-  - Instagram: [@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
-  - Teams/Email: [2025m011@kuas.ac.jp](mailto:2025m011@kuas.ac.jp)
+## Get Involved
+- If you'd like to join, visit a meeting, or participate in a photo trip, just speak to one of the organizers at our weekly meetings.
+- **Contact Us:**
+  - **Instagram:** [@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
+  - **Teams/Email:** [2025m011@kuas.ac.jp](mailto:2025m011@kuas.ac.jp)
 
-## How to Contribute (Document Editing)
-- If you find typos, have suggestions to add, or have ideas for improvements, please feel free to contact us via Issues or Pull Requests
-- If you're unsure about how to use GitHub, please consult with the management team during meetings
+## How to Contribute
+- If you find a typo or have a suggestion, feel free to open an Issue or a Pull Request.
+- If you're not sure how to use GitHub, ask an organizer for help during a meeting.
 
-## License / Usage Policy
-- The license for documents in this repository is under consideration (to be added later)
-- These documents are managed with the assumption of use within the circle. For external use, please consult with the management team
+## License & Usage
+- The license for this repository is still under consideration.
+- These documents are intended for internal club use. Please consult with an organizer before using them for any other purpose.
 
 ---
 Last Updated: 2025-10-29
