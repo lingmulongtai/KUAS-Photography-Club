@@ -1,130 +1,135 @@
 # Diretrizes do Clube de Fotografia da KUAS
-Última atualização: 29 de outubro de 2025
+Última atualização: 31 de outubro de 2025
 
-Estas diretrizes foram estabelecidas para garantir que as atividades do Clube de Fotografia da KUAS (Clube de Fotografia da Universidade de Ciências Avançadas de Quioto) sejam seguras, divertidas e abertas a todos.
+Estas diretrizes são as nossas regras importantes para garantir que as atividades do Clube de Fotografia da KUAS sejam seguras, agradáveis e abertas a todos. Vamos trabalhar juntos para criar um ambiente onde todos os membros se respeitem e possam participar com tranquilidade, independentemente da nacionalidade, ano letivo ou experiência.
 
-- **Âmbito de aplicação**: Todas as atividades organizadas, coorganizadas ou aprovadas pelo clube (incluindo reuniões, passeios fotográficos e operações online).
-- **Contato**:
+- **Âmbito de aplicação:** Estas regras aplicam-se a todas as atividades organizadas, coorganizadas ou aprovadas pelo clube, incluindo reuniões, passeios fotográficos e comunicações online.
+- **Contato:**
   - Instagram: @kuas_photographyclub
   - Teams/E-mail: 2025m011@kuas.ac.jp
-- **Reuniões regulares**: Todas as segundas-feiras às 16:20 / 18:00 (Campus de Uzumasa, sala S311).
+- **Reuniões regulares:** Segundas-feiras às 16:20 e 18:00 na sala S311, Campus de Uzumasa.
 
 ---
 
-## 1. Política de atividades
-- Priorizamos a diversão, mas sempre com o máximo respeito pelos outros, pela comunidade e pela natureza.
-- Iniciantes são bem-vindos. A fotografia com smartphone também é bem-vinda!
-- Respeitamos a diversidade e valorizamos uma atitude de compreensão em relação às diferenças linguísticas e culturais.
-- O nosso objetivo é subir para a categoria de "clube oficial" no próximo ano, mantendo a continuidade das atividades e a transparência na gestão.
+## 1. A nossa filosofia
+- Priorizar a diversão, valorizando a consideração pelos outros, pela comunidade e pela natureza.
+- Tanto iniciantes como fotógrafos experientes são bem-vindos! Claro, a fotografia com smartphone também é aceitável.
+- Respeitar a diversidade e valorizar uma atitude de aprender com as diferenças linguísticas e culturais.
+- Trabalhar em conjunto para desenvolver as nossas atividades com o objetivo de nos tornarmos um clube universitário oficial no próximo ano.
+- Se desejar juntar-se, por favor, contate primeiro o presidente do clube. Organizaremos uma breve reunião para apresentar o clube.
 
 ## 2. Regras de participação
-- **Inscrição**: Para os passeios fotográficos, é necessário confirmar a presença com antecedência (através de um formulário ou chat).
-- **Pontualidade**: Se for chegar atrasado ao ponto de encontro, deve avisar com antecedência.
-- **Faltas**: Faltas repetidas sem justificação podem levar a um ajuste na sua participação em atividades futuras.
-- **Proibições**: É proibido o consumo de álcool, atividades ilegais e comportamentos perigosos (tanto dentro como fora do campus). O consumo de drogas é estritamente proibido.
-- **Menores de idade**: A participação de menores de idade será regida pelos regulamentos da universidade e pela legislação em vigor.
+- **Inscrição:** Se desejar participar num passeio fotográfico, por favor, avise-nos com antecedência através do formulário ou do chat.
+- **Seja pontual:** Se achar que vai chegar atrasado à hora do encontro, por favor, contate-nos com antecedência.
+- **Assiduidade:** Se faltar várias vezes sem aviso prévio, poderemos ter de discutir a sua participação futura.
+- **Conduta:** O consumo de álcool, atividades ilegais e comportamento perigoso são estritamente proibidos (dentro e fora do campus).
+- **Menores de idade:** Cumpriremos as regras e leis da universidade para os membros menores de idade.
 
 ## 3. Política de assiduidade e cancelamento
-- **Prazo de cancelamento**: Regra geral, até às 21:00 do dia anterior. Em caso de emergência (doença, etc.), comunique o mais rapidamente possível.
-- **Despesas antecipadas**: Se tiverem sido efetuados pagamentos antecipados (transporte, bilhetes, etc.), o cancelamento fora do prazo pode implicar o pagamento dessas despesas.
-- **Incorporação no próprio dia**: Em princípio, não é permitida por motivos de segurança. Em casos excecionais, devem ser seguidas as indicações da organização.
+- **Cancelamentos:** Por favor, tente avisar-nos até às 21:00 do dia anterior. Se tiver uma doença súbita ou uma emergência, por favor, avise-nos o mais rapidamente possível.
+- **Taxas pré-pagas:** Se cancelar após o prazo para um evento com taxas pré-pagas, poderá ser-lhe pedido que cubra o custo.
+- **Juntar-se a meio:** Por razões de segurança, geralmente não é permitido juntar-se a um evento depois de este ter começado. Se tiver um motivo inevitável, por favor, consulte os organizadores.
 
 ## 4. Guia de segurança
-- **Segurança nas deslocações**:
-  - Recomenda-se a utilização de transportes públicos. Se utilizar bicicleta ou carro, recomenda-se o cumprimento da legislação e a subscrição de um seguro.
-  - Os locais e horários de encontro e de fim serão partilhados com antecedência. Será aplicado um sistema de pares (deslocação em grupos de dois ou mais).
-- **Atividades noturnas e com mau tempo**:
-  - É proibido andar sozinho à noite. Recomenda-se o uso de roupa de alta visibilidade e de uma lanterna.
-  - As atividades serão suspensas ou adiadas em caso de mau tempo ou de alertas meteorológicos. Cada um deve preparar-se para prevenir insolações ou hipotermia.
-- **Regras locais e prevenção de riscos**:
-  - Respeitar estritamente as zonas de acesso e de fotografia proibidas. Seguir as regras das instalações sobre a utilização de tripés e flashes.
-  - Não serão tiradas fotografias em terrenos perigosos, como margens de rios, linhas de comboio, estradas ou falésias.
-- **Contato de emergência**:
-  - Polícia: 110 / Bombeiros e ambulâncias: 119. A organização partilhará um número de contato de emergência (telemóvel) no dia da atividade.
-  - Em caso de acidente ou problema, informe imediatamente o membro da organização mais próximo.
-- **Seguro**:
-  - Recomenda-se a contratação de um seguro para estudantes. Serão seguidos os procedimentos necessários de acordo com os regulamentos da universidade.
-- **Drones**:
-  - Requerem licenças e o cumprimento da lei. Em princípio, são proibidos. Só serão permitidos com a autorização da organização e depois de concluídos todos os trâmites necessários.
+- **Segurança nas deslocações:**
+  - Recomendamos a utilização de transportes públicos.
+  - Se for de boleia no carro de um membro, vamos cooperar para aliviar o fardo do condutor, partilhando custos como gasolina e portagens. Por favor, compreenda que isto se baseia na gentileza pessoal do condutor e dê prioridade à condução segura.
+  - Partilharemos os locais e horários de encontro e de fim com antecedência. Por segurança, funcionaremos com um sistema de pares (grupos de dois ou mais).
+- **Atividades noturnas e com mau tempo:**
+  - Evite sair sozinho à noite. É mais seguro usar roupas de cores claras e levar uma luz.
+  - Em caso de mau tempo ou alertas, as atividades serão canceladas ou adiadas. Por favor, prepare-se para o tempo quente e frio.
+- **Etiqueta no local e prevenção de riscos:**
+  - Nunca entre em áreas de "Entrada Proibida" ou "Fotografia Proibida". Siga as regras da instalação para o uso de tripés e flashes.
+  - Não tiramos fotografias em locais perigosos como perto de rios, linhas de comboio, estradas ou falésias.
+- **Contato de emergência:**
+  - Polícia: 110 / Bombeiros e Ambulâncias: 119. Os organizadores partilharão os seus números de telemóvel para contato de emergência no dia.
+  - Em caso de acidente ou problema, por favor, reporte imediatamente ao organizador mais próximo.
+- **Seguro:**
+  - Recomendamos que os estudantes façam o seu próprio seguro. Seguiremos os regulamentos da universidade para quaisquer procedimentos necessários.
+- **Drones:**
+  - O uso de drones requer licenças e conhecimento legal. Geralmente, são proibidos. Só podem ser operados com permissão especial dos organizadores e após a conclusão de todos os procedimentos.
 
 ## 5. Etiqueta fotográfica
-- **Espaços públicos e instalações**:
-  - Verificar com antecedência se a fotografia, a utilização de tripés e a distinção entre uso comercial e não comercial são permitidas. Seguir as instruções do pessoal.
-  - Evitar comportamentos que possam interferir com atos religiosos, como orações, cultos ou visitas a templos.
-- **Fotografia de pessoas**:
-  - Para as fotografias em que uma pessoa possa ser claramente identificada, é essencial obter o seu consentimento prévio (o consentimento verbal é aceitável, mas é preferível um registo escrito ou por chat).
-  - Para fotografar menores de idade, é necessário o consentimento dos pais ou tutores. Evitar tirar fotografias em situações que exijam especial consideração.
-- **Privacidade e consideração**:
-  - Antes de publicar uma fotografia, mascarar ou ocultar qualquer informação pessoal que possa aparecer, como matrículas de veículos, moradas, cartões de estudante ou informações médicas.
-- **Publicações nas redes sociais**:
-  - Ter atenção à utilização da geolocalização (recomenda-se não publicar a localização exata de residências ou estabelecimentos de ensino).
-  - Não partilhar fotografias que infrinjam as diretrizes de fotografia de instalações ou eventos.
-- **Uso comercial**:
-  - Em princípio, não é permitida a utilização comercial das imagens obtidas nas atividades do clube. As exceções só serão permitidas com a aprovação da organização e depois de geridos os direitos correspondentes.
+- **Em espaços públicos e instalações:**
+  - Verifique com antecedência se a fotografia e os tripés são permitidos e siga as instruções do pessoal da instalação.
+  - Evite ações que possam perturbar os outros, como durante orações ou outras cerimónias.
+- **Fotografar pessoas:**
+  - Ao tirar uma fotografia que identifique claramente alguém, peça sempre primeiro a sua permissão (o consentimento verbal é aceitável).
+  - Para fotografar menores, é necessário o consentimento dos pais. Também é importante ser atencioso e abster-se de tirar fotografias dependendo da situação.
+- **Considerações de privacidade:**
+  - Se informações pessoais como matrículas, moradas ou cartões de estudante estiverem visíveis, por favor, oculte-as antes de publicar.
+- **Publicar nas redes sociais:**
+  - Tenha cuidado com as informações de localização (é mais seguro não divulgar os endereços detalhados da sua casa ou escola).
+  - Siga as regras do local onde tirou as fotografias e não partilhe quaisquer fotografias que sejam proibidas de publicar.
+- **Uso comercial:**
+  - As fotografias tiradas durante as atividades do clube geralmente não se destinam a uso comercial. Em casos especiais, pode ser possível com a aprovação dos organizadores e após a regularização de todos os direitos.
+- **Consideração e cooperação:**
+  - Mostre respeito pelos outros membros, residentes locais e pessoal das instalações, e abstenha-se de causar problemas.
+  - Se a etiqueta fotográfica de um membro não melhorar apesar dos avisos, podemos pedir-lhe que se abstenha temporariamente de participar nas atividades para garantir a segurança e o conforto de todos os outros participantes.
 
-## 6. Direitos de autor, de imagem e tratamento das fotografias
-- **Direitos de autor**:
-  - Pertencem ao fotógrafo. Para a sua utilização secundária na promoção do clube, será obtida a autorização prévia do fotógrafo e o seu nome será creditado.
-- **Direitos de imagem e privacidade**:
-  - Os direitos das pessoas fotografadas serão respeitados. Em caso de reclamação, a publicação será imediatamente retirada e serão tomadas medidas para evitar que volte a acontecer.
-- **Partilha de dados**:
-  - Quando forem solicitadas fotografias para publicação oficial (redes sociais, exposições, etc.), serão especificadas as condições do pedido (utilização, duração, política de edição).
-  - Ao utilizar um armazenamento partilhado, o âmbito da publicação, o período de conservação e a política de eliminação serão claramente indicados.
-- **Exemplo de crédito**:
-  - © Nome do fotógrafo / Clube de Fotografia da KUAS (Ano)
+## 6. Direitos de autor, direitos de imagem e tratamento de fotografias
+- **Direitos de autor:**
+  - Pertencem à pessoa que tirou a fotografia. Se o clube desejar usar uma fotografia para fins promocionais, obteremos primeiro a permissão do fotógrafo e dar-lhe-emos o devido crédito.
+- **Direitos de imagem e privacidade:**
+  - Respeitaremos os sentimentos das pessoas nas fotografias. Se recebermos um pedido para remover uma fotografia, responderemos prontamente e garantiremos que não volta a acontecer.
+- **Partilha de dados:**
+  - Quando solicitarmos fotografias para uso oficial (como nas redes sociais ou em exposições), indicaremos claramente como e por quanto tempo serão usadas.
+  - Para o armazenamento partilhado, especificaremos quem pode ver os ficheiros e por quanto tempo serão armazenados.
+- **Exemplo de crédito:**
+  - © Nome do Fotógrafo / Clube de Fotografia da KUAS (Ano)
 
 ## 7. Seleção e publicação de obras
-- **Publicação oficial** (redes sociais, exposições, folhetos, etc.): a seleção será feita pela equipa de organização (verificando a qualidade técnica, a segurança e os direitos).
-- **O âmbito do retoque e da edição** será feito respeitando a intenção do fotógrafo e com base num acordo prévio.
-- **Exemplos de conteúdo não permitido**: fotografias em zonas de acesso proibido, identificação de pessoas sem o seu consentimento, expressões discriminatórias ou de assédio, incentivo a comportamentos perigosos.
+- **Publicação oficial:** A equipa organizadora selecionará as fotografias para uso oficial (redes sociais, exposições, folhetos, etc.) após verificar a qualidade técnica, a segurança e as questões de direitos.
+- **Edição:** Respeitaremos os desejos do fotógrafo e consultá-lo-emos antes de fazer quaisquer alterações.
+- **Exemplos de conteúdo não permitido:** Fotografias tiradas em áreas restritas, fotografias que identifiquem pessoas sem permissão, expressões discriminatórias ou de assédio, ou conteúdo que incentive comportamentos perigosos.
 
-## 8. Contabilidade e partilha de despesas
-- **Princípio básico**:
-  - As despesas de transporte, bilhetes, refeições, etc., são suportadas por cada um (pode haver ajudas parciais consoante o plano).
-- **Casos que requerem pagamento antecipado**:
-  - Será partilhada uma estimativa dos custos antes da inscrição. Serão especificadas as regras de cancelamento e a possibilidade de reembolso.
-- **Donativos e patrocínios**:
-  - A aceitação e a política de visualização serão avaliadas pela organização e comunicadas de forma transparente aos membros.
-- **Compra de material**:
-  - A compra de material partilhado será decidida numa reunião, sob proposta da organização.
+## 8. Contabilidade и partilha de custos
+- **Regra básica:**
+  - Os membros pagam as suas próprias despesas, como transporte, taxas de entrada e refeições (alguns eventos podem oferecer subsídios parciais).
+- **Para eventos pré-pagos:**
+  - Informá-lo-emos sobre o custo estimado antes de se inscrever. Também especificaremos a política de cancelamento e a disponibilidade de reembolsos.
+- **Donativos e patrocinadores:**
+  - Os organizadores decidirão se os aceitam e informarão os membros de forma transparente.
+- **Compra de equipamento:**
+  - Ao comprar equipamento para todos, os organizadores farão uma proposta e a decisão será tomada através de discussão numa reunião.
 
 ## 9. Funcionamento das reuniões
-- **Reuniões regulares**: Todas as segundas-feiras às 16:20 / 18:00 (S311). A ordem de trabalhos será partilhada com antecedência.
-- **Atas**: Os pontos principais, as decisões, os responsáveis e os prazos serão registados e partilhados com os membros.
-- **Tomada de decisões**:
-  - As questões importantes serão decididas por consenso dos membros da organização presentes. Se não se chegar a um consenso, recorrer-se-á a uma votação por maioria (aprovada com mais de metade dos votos).
-- **Exemplos de funções**:
-  - Presidente/Vice-Presidente, Tesoureiro, Responsável pelo material, Responsável pela comunicação, Líder de planeamento, Responsável pela segurança, etc.
+- **Reuniões regulares:** Segundas-feiras às 16:20 / 18:00 (S311). A ordem de trabalhos será partilhada com antecedência.
+- **Atas:** Registaremos o que foi discutido, o que foi decidido e quem é o responsável, e partilharemos com os membros.
+- **Tomada de decisões:**
+  - As questões importantes são decididas por acordo entre os organizadores presentes. Se as opiniões estiverem divididas, podemos decidir por voto maioritário.
+- **Exemplos de funções:**
+  - Presidente/Vice-Presidente, Tesoureiro, Gestor de Equipamento, Relações Públicas, Líder de Evento, Gestor de Segurança, etc.
 
-## 10. Meios de contato e sistema de contato de emergência
-- **Contato habitual**: Instagram, Teams/E-mail (as comunicações importantes serão feitas por Teams/E-mail).
-- **Contato no próprio dia**: Para encontros e emergências, será utilizado o chat de grupo designado pela organização.
-- **Em caso de impossibilidade de contato**:
-  - Se alguém não chegar após o tempo de espera designado, será dada prioridade à segurança e a atividade no local será cancelada ou modificada.
+## 10. Sistema de comunicação e contato de emergência
+- **Comunicação normal:** Usamos o Instagram, Teams/E-mail. Os avisos importantes também serão enviados por Teams/E-mail.
+- **Comunicação no próprio dia:** Para encontros e emergências, usamos o chat de grupo designado pelos organizadores.
+- **Se alguém estiver incontactável:**
+  - Se alguém não chegar à hora do encontro e estiver incontactável, podemos cancelar ou alterar as atividades no local por razões de segurança.
 
-## 11. Prevenção do assédio e código de conduta
-- São proibidos a discriminação, o assédio, as ameaças, o contato inadequado, o voyeurismo e a aproximação insistente.
-- Se surgir algum problema, contate a organização. Se necessário, entraremos em contato com os serviços de aconselhamento da universidade ou outros organismos relevantes.
-- **Proibição de retaliação**: São estritamente proibidas as ações que prejudiquem os membros que tenham consultado ou denunciado um problema.
+## 11. Prevenção de assédio e código de conduta
+- A discriminação, o assédio, as ameaças, o contato físico inadequado, o voyeurismo e a perseguição são proibidos.
+- Se tiver algum problema, fale com um organizador. Se necessário, também o podemos ligar aos serviços de aconselhamento da universidade.
+- Nunca permitiremos que seja causado qualquer dano a alguém que nos consulte.
 
-## 12. Tratamento de dados pessoais
-- O objetivo da recolha, o período de conservação e o âmbito da partilha serão claramente definidos, e a sua utilização para outros fins será proibida.
-- As informações das contas e as listas de contatos serão geridas por pessoas com os privilégios mínimos necessários. Em caso de fuga de dados, informaremos e agiremos rapidamente.
+## 12. Tratamento de informações pessoais
+- Seremos claros sobre o propósito das informações pessoais que recolhemos e não as usaremos por qualquer outro motivo.
+- As listas de contatos são geridas por um número limitado de pessoas. Se alguma informação vazar, reportaremos e resolveremos imediatamente.
 
-## 13. Revisão das diretrizes
-- As revisões serão propostas pela organização e decididas após a recolha de opiniões numa reunião.
-- As alterações importantes serão comunicadas no README e nos canais de comunicação, indicando a data de entrada em vigor.
+## 13. Revisão destas diretrizes
+- Ao rever estas diretrizes, os organizadores farão uma proposta e a decisão será tomada após ouvir as opiniões de todos numa reunião.
+- Anunciaremos quaisquer alterações importantes no README e nos nossos canais de chat.
 
 ---
 
-## Apêndice A: Lista de verificação de segurança (antes da partida)
-- Verificar o tempo e os alertas, e preparar-se para o calor ou o frio.
-- Confirmar a hora, o local de encontro e os dados de contato.
-- Verificar o percurso de transporte e os últimos serviços, bem como as regras locais (permissão para tirar fotografias, utilização de tripés e flashes).
-- Preparar baterias sobresselentes, cartões de memória, capas para a chuva, lanternas, bebidas, cartão do seguro, etc.
-- Confirmar se é necessário consentimento para fotografar pessoas ou em determinados locais, e como proceder.
+## Apêndice A: Lista de verificação de segurança pré-viagem
+- Verifique a previsão do tempo! Está preparado para o calor/frio?
+- Verifique novamente o local, a hora e as informações de contato do encontro.
+- Confirme o seu meio de transporte de ida e volta, a hora do último comboio/autocarro e as regras locais (A fotografia é permitida? Tripés?).
+- Tem tudo o que precisa, como baterias sobresselentes, cartões SD, capa de chuva, uma luz, bebidas e o seu cartão de seguro?
+- Verifique as permissões и regras para fotografar pessoas ou instalações.
 
-## Apêndice B: Diretrizes para publicação nas redes sociais
-- Verificar os direitos e a privacidade (obter o consentimento, mascarar as informações pessoais).
-- Escolher textos e fotografias que não incentivem comportamentos perigosos.
-- Considerar a necessidade de adicionar a geolocalização (não se recomenda a divulgação de pormenores sobre a localização de residências ou estabelecimentos de ensino).
+## Apêndice B: Lista de verificação para publicação nas redes sociais
+- Está a respeitar os direitos e a privacidade? (Consentimento do sujeito, nenhuma informação pessoal visível)
+- O seu conteúdo promove comportamentos perigosos?
+- Pense cuidadosamente antes de publicar informações de localização (especialmente para a sua casa ou escola).

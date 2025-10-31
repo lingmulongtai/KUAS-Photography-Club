@@ -1,130 +1,135 @@
 # Panduan Klub Fotografi KUAS
-Terakhir diperbarui: 29 Oktober 2025
+Terakhir diperbarui: 31 Oktober 2025
 
-Panduan ini dibuat untuk memastikan bahwa kegiatan Klub Fotografi KUAS (Klub Fotografi Universitas Sains Lanjutan Kyoto) aman, menyenangkan, dan terbuka untuk semua orang.
+Panduan ini adalah aturan penting kami untuk memastikan bahwa kegiatan Klub Fotografi KUAS aman, menyenangkan, dan terbuka untuk semua orang. Mari kita bekerja sama untuk menciptakan lingkungan di mana semua anggota saling menghormati dan dapat berpartisipasi dengan tenang, tanpa memandang kebangsaan, tingkat kelas, atau pengalaman.
 
-- **Lingkup Aplikasi**: Semua kegiatan yang diselenggarakan, disponsori bersama, atau disetujui oleh klub (termasuk pertemuan, sesi foto, dan operasi online).
-- **Kontak**:
+- **Lingkup Aplikasi:** Aturan-aturan ini berlaku untuk semua kegiatan yang diselenggarakan, disponsori bersama, atau disetujui oleh klub, termasuk pertemuan, sesi foto, dan komunikasi online.
+- **Kontak:**
   - Instagram: @kuas_photographyclub
   - Teams/Email: 2025m011@kuas.ac.jp
-- **Pertemuan Rutin**: Setiap Senin pukul 16:20 / 18:00 (Kampus Uzumasa, Ruang S311).
+- **Pertemuan Rutin:** Senin pukul 16:20 & 18:00 di Ruang S311, Kampus Uzumasa.
 
 ---
 
-## 1. Kebijakan Kegiatan
-- Kami memprioritaskan kesenangan sambil tetap memperhatikan orang lain, komunitas, dan alam.
-- Pemula dipersilakan. Fotografi dengan smartphone juga sangat diterima.
-- Kami menghormati keragaman dan menghargai sikap saling memahami perbedaan bahasa dan budaya.
-- Kami bertujuan untuk menjadi "klub resmi" tahun depan dengan mempertahankan kegiatan yang berkelanjutan dan transparansi operasional.
+## 1. Filosofi Kami
+- Memprioritaskan kesenangan sambil menghargai pertimbangan terhadap orang lain, komunitas, dan alam.
+- Pemula dan fotografer berpengalaman sama-sama diterima! Tentu saja, fotografi dengan smartphone juga boleh.
+- Menghormati keragaman dan menghargai sikap belajar dari perbedaan bahasa dan budaya.
+- Bekerja sama untuk mengembangkan kegiatan kami dengan tujuan menjadi klub universitas resmi tahun depan.
+- Jika Anda ingin bergabung, silakan hubungi ketua klub terlebih dahulu. Kami akan mengadakan pertemuan singkat untuk memperkenalkan klub.
 
 ## 2. Aturan Partisipasi
-- **Pendaftaran**: Untuk sesi foto, harap konfirmasikan kehadiran Anda terlebih dahulu (melalui formulir/obrolan).
-- **Tepat Waktu**: Jika Anda akan terlambat, harap hubungi kami sebelumnya.
-- **Absen**: Absen berulang kali tanpa pemberitahuan dapat mengakibatkan penyesuaian partisipasi Anda di masa mendatang.
-- **Larangan**: Dilarang minum alkohol, melakukan tindakan ilegal, dan perilaku berbahaya (baik di dalam maupun di luar kampus). Penggunaan narkoba sangat dilarang.
-- **Anak di Bawah Umur**: Partisipasi anak di bawah umur akan diatur oleh peraturan universitas dan hukum yang berlaku.
+- **Pendaftaran:** Jika Anda ingin berpartisipasi dalam sesi foto, harap beri tahu kami sebelumnya melalui formulir atau obrolan.
+- **Tepat Waktu:** Jika Anda merasa akan terlambat dari waktu pertemuan, harap hubungi kami sebelumnya.
+- **Kehadiran:** Jika Anda absen beberapa kali tanpa pemberitahuan, kami mungkin perlu mendiskusikan partisipasi Anda di masa mendatang.
+- **Perilaku:** Minum alkohol, kegiatan ilegal, dan perilaku berbahaya sangat dilarang (baik di dalam maupun di luar kampus).
+- **Anak di Bawah Umur:** Kami akan mematuhi aturan dan hukum universitas untuk anggota di bawah umur.
 
 ## 3. Kebijakan Kehadiran dan Pembatalan
-- **Batas Waktu Pembatalan**: Pada prinsipnya, hingga pukul 21:00 sehari sebelumnya. Dalam keadaan darurat (sakit, dll.), harap segera hubungi kami.
-- **Biaya di Muka**: Jika ada biaya yang telah dibayar di muka (transportasi, tiket masuk, dll.), pembatalan setelah batas waktu dapat mengakibatkan Anda harus menanggung biaya tersebut.
-- **Bergabung di Hari H**: Pada prinsipnya tidak diizinkan demi alasan keamanan. Dalam kasus luar biasa, harap ikuti instruksi dari panitia.
+- **Pembatalan:** Harap usahakan untuk memberi tahu kami sebelum pukul 21:00 sehari sebelumnya. Jika Anda tiba-tiba sakit atau dalam keadaan darurat, harap beri tahu kami sesegera mungkin.
+- **Biaya di Muka:** Jika Anda membatalkan setelah batas waktu untuk acara dengan biaya di muka, Anda mungkin akan diminta untuk menanggung biaya tersebut.
+- **Bergabung di Tengah Jalan:** Demi keamanan, bergabung dengan acara setelah dimulai umumnya tidak diizinkan. Jika Anda memiliki alasan yang tidak dapat dihindari, silakan berkonsultasi dengan penyelenggara.
 
 ## 4. Panduan Keamanan
-- **Keamanan Perjalanan**:
-  - Disarankan menggunakan transportasi umum. Jika menggunakan sepeda atau mobil, disarankan untuk mematuhi peraturan dan memiliki asuransi.
-  - Lokasi dan waktu pertemuan dan bubar akan dibagikan sebelumnya. Kami akan menerapkan sistem pertemanan (bergerak dalam kelompok dua orang atau lebih).
-- **Malam Hari dan Cuaca Buruk**:
-  - Dilarang beraktivitas sendirian di malam hari. Disarankan mengenakan pakaian yang mudah terlihat dan membawa senter.
-  - Kegiatan akan dibatalkan atau ditunda jika cuaca buruk atau ada peringatan cuaca. Setiap orang harus bersiap untuk mencegah sengatan panas atau hipotermia.
-- **Etiket Lokal dan Pencegahan Bahaya**:
-  - Patuhi dengan ketat area terlarang dan area dilarang memotret. Ikuti aturan fasilitas mengenai penggunaan tripod dan flash.
-  - Dilarang memotret di medan berbahaya seperti tepi sungai, rel kereta api, jalan raya, atau tebing.
-- **Kontak Darurat**:
-  - Polisi: 110 / Pemadam Kebakaran & Ambulans: 119. Panitia akan membagikan nomor kontak darurat (ponsel) pada hari kegiatan.
-  - Jika terjadi kecelakaan atau masalah, segera laporkan ke anggota panitia terdekat.
-- **Asuransi**:
-  - Disarankan untuk memiliki asuransi mahasiswa. Prosedur yang diperlukan akan diikuti sesuai dengan peraturan universitas.
-- **Drone**:
-  - Memerlukan izin dan kepatuhan hukum. Pada prinsipnya, dilarang. Hanya diizinkan dengan persetujuan panitia dan setelah semua prosedur yang diperlukan selesai.
+- **Keamanan Perjalanan:**
+  - Kami merekomendasikan penggunaan transportasi umum.
+  - Jika Anda menumpang mobil anggota, mari bekerja sama untuk meringankan beban pengemudi dengan berbagi biaya seperti bensin dan tol. Harap dipahami bahwa ini didasarkan pada kebaikan pribadi pengemudi dan utamakan keselamatan berkendara.
+  - Kami akan membagikan lokasi dan waktu pertemuan dan bubar sebelumnya. Demi keamanan, kami akan beroperasi dengan sistem pertemanan (kelompok dua orang atau lebih).
+- **Malam Hari dan Cuaca Buruk:**
+  - Hindari pergi sendirian di malam hari. Lebih aman mengenakan pakaian berwarna terang dan membawa lampu.
+  - Jika cuaca buruk atau ada peringatan, kegiatan akan dibatalkan atau ditunda. Harap persiapkan diri Anda untuk cuaca panas dan dingin.
+- **Etiket di Lokasi dan Pencegahan Bahaya:**
+  - Jangan pernah memasuki area "Dilarang Masuk" atau "Dilarang Memotret". Ikuti aturan fasilitas untuk penggunaan tripod dan flash.
+  - Kami tidak mengambil foto di lokasi berbahaya seperti di dekat sungai, rel kereta api, jalan raya, atau tebing.
+- **Kontak Darurat:**
+  - Polisi: 110 / Pemadam Kebakaran & Ambulans: 119. Penyelenggara akan membagikan nomor ponsel mereka untuk kontak darurat pada hari itu.
+  - Jika terjadi kecelakaan atau masalah, harap segera laporkan ke penyelenggara terdekat.
+- **Asuransi:**
+  - Kami merekomendasikan agar mahasiswa memiliki asuransi sendiri. Kami akan mengikuti peraturan universitas untuk setiap prosedur yang diperlukan.
+- **Drone:**
+  - Penggunaan drone memerlukan izin dan pengetahuan hukum. Umumnya dilarang. Drone hanya dapat dioperasikan dengan izin khusus dari penyelenggara dan setelah semua prosedur selesai.
 
 ## 5. Etiket Fotografi
-- **Ruang Publik dan Fasilitas**:
-  - Periksa terlebih dahulu apakah fotografi, penggunaan tripod, dan perbedaan antara penggunaan komersial dan non-komersial diizinkan. Ikuti instruksi dari staf.
-  - Hindari perilaku yang dapat mengganggu kegiatan keagamaan seperti doa, ibadah, atau kunjungan ke kuil.
-- **Fotografi Orang**:
-  - Untuk foto di mana seseorang dapat diidentifikasi dengan jelas, wajib mendapatkan persetujuan sebelumnya (persetujuan lisan dapat diterima, tetapi catatan tertulis atau obrolan lebih disukai).
-  - Untuk memotret anak di bawah umur, diperlukan persetujuan orang tua atau wali. Hindari mengambil foto dalam situasi yang memerlukan pertimbangan khusus.
-- **Privasi dan Pertimbangan**:
-  - Sebelum mempublikasikan foto, samarkan atau sembunyikan informasi pribadi apa pun yang mungkin muncul, seperti plat nomor kendaraan, alamat, kartu mahasiswa, atau informasi medis.
-- **Postingan Media Sosial**:
-  - Berhati-hatilah dengan penggunaan geolokasi (disarankan untuk tidak mempublikasikan lokasi persis rumah atau sekolah).
-  - Jangan membagikan foto yang melanggar pedoman fotografi fasilitas atau acara.
-- **Penggunaan Komersial**:
-  - Pada prinsipnya, penggunaan komersial gambar yang diperoleh selama kegiatan klub tidak diizinkan. Pengecualian hanya diizinkan dengan persetujuan panitia dan setelah hak-hak yang relevan dikelola.
+- **Di Ruang Publik dan Fasilitas:**
+  - Periksa terlebih dahulu apakah fotografi dan tripod diizinkan, dan ikuti instruksi staf fasilitas.
+  - Hindari tindakan yang dapat mengganggu orang lain, seperti saat sholat atau upacara lainnya.
+- **Memotret Orang:**
+  - Saat mengambil foto yang dengan jelas mengidentifikasi seseorang, selalu minta izin terlebih dahulu (persetujuan lisan boleh).
+  - Untuk memotret anak di bawah umur, diperlukan persetujuan orang tua. Penting juga untuk mempertimbangkan dan menahan diri dari mengambil foto tergantung pada situasinya.
+- **Pertimbangan Privasi:**
+  - Jika informasi pribadi seperti plat nomor, alamat, atau kartu mahasiswa terlihat, harap sembunyikan sebelum memposting.
+- **Memposting di Media Sosial:**
+  - Berhati-hatilah dengan informasi lokasi (lebih aman untuk tidak mengungkapkan alamat rumah atau sekolah secara detail).
+  - Ikuti aturan tempat Anda mengambil foto dan jangan membagikan foto apa pun yang dilarang untuk diposting.
+- **Penggunaan Komersial:**
+  - Foto yang diambil selama kegiatan klub umumnya bukan untuk penggunaan komersial. Dalam kasus khusus, hal ini dimungkinkan dengan persetujuan penyelenggara dan setelah semua hak diselesaikan.
+- **Pertimbangan dan Kerja Sama:**
+  - Tunjukkan rasa hormat kepada sesama anggota, penduduk lokal, dan staf fasilitas, dan jangan menimbulkan masalah.
+  - Jika etiket fotografi seorang anggota tidak membaik meskipun sudah diingatkan, kami mungkin akan meminta mereka untuk sementara waktu tidak berpartisipasi dalam kegiatan untuk memastikan keselamatan dan kenyamanan semua peserta lainnya.
 
-## 6. Hak Cipta, Hak Potret, dan Penanganan Foto
-- **Hak Cipta**:
-  - Milik fotografer. Untuk penggunaan sekunder dalam promosi klub, izin fotografer akan diperoleh sebelumnya dan namanya akan dikreditkan.
-- **Hak Potret dan Privasi**:
-  - Hak-hak orang yang difoto akan dihormati. Jika ada keluhan, publikasi akan segera dihapus dan langkah-langkah akan diambil untuk mencegah terulangnya kembali.
-- **Berbagi Data**:
-  - Ketika foto diminta untuk publikasi resmi (media sosial, pameran, dll.), persyaratan permintaan (penggunaan, durasi, kebijakan pengeditan) akan ditentukan.
-  - Saat menggunakan penyimpanan bersama, ruang lingkup publikasi, periode penyimpanan, dan kebijakan penghapusan akan ditunjukkan dengan jelas.
-- **Contoh Kredit**:
+## 6. Hak Cipta, Hak Gambar, dan Penanganan Foto
+- **Hak Cipta:**
+  - Milik orang yang mengambil foto. Jika klub ingin menggunakan foto untuk tujuan promosi, kami akan mendapatkan izin dari fotografer terlebih dahulu dan memberikan kredit kepada mereka.
+- **Hak Gambar dan Privasi:**
+  - Kami akan menghormati perasaan orang-orang dalam foto. Jika kami menerima permintaan untuk menghapus foto, kami akan segera merespons dan memastikan hal itu tidak terjadi lagi.
+- **Berbagi Data:**
+  - Ketika kami meminta foto untuk penggunaan resmi (seperti di media sosial atau pameran), kami akan menyatakan dengan jelas bagaimana dan untuk berapa lama foto tersebut akan digunakan.
+  - Untuk penyimpanan bersama, kami akan menentukan siapa yang dapat melihat file dan berapa lama file tersebut akan disimpan.
+- **Contoh Kredit:**
   - © Nama Fotografer / Klub Fotografi KUAS (Tahun)
 
 ## 7. Pemilihan dan Publikasi Karya
-- **Publikasi Resmi** (media sosial, pameran, pamflet, dll.): pemilihan akan dilakukan oleh tim penyelenggara (memeriksa kualitas teknis, keamanan, dan hak).
-- **Cakupan retouching dan pengeditan** akan dilakukan dengan menghormati niat fotografer dan berdasarkan kesepakatan sebelumnya.
-- **Contoh Konten yang Tidak Diizinkan**: foto di area terlarang, identifikasi orang tanpa persetujuan mereka, ekspresi diskriminatif atau melecehkan, dorongan untuk perilaku berbahaya.
+- **Publikasi Resmi:** Tim penyelenggara akan memilih foto untuk penggunaan resmi (media sosial, pameran, pamflet, dll.) setelah memeriksa kualitas teknis, keamanan, dan masalah hak.
+- **Pengeditan:** Kami akan menghormati keinginan fotografer dan berkonsultasi dengan mereka sebelum melakukan perubahan apa pun.
+- **Contoh Konten yang Tidak Diizinkan:** Foto yang diambil di area terlarang, foto yang mengidentifikasi orang tanpa izin, ekspresi diskriminatif atau melecehkan, atau konten yang mendorong perilaku berbahaya.
 
 ## 8. Akuntansi dan Pembagian Biaya
-- **Prinsip Dasar**:
-  - Biaya transportasi, tiket masuk, makanan, dll., ditanggung oleh masing-masing (mungkin ada bantuan sebagian tergantung pada rencana).
-- **Kasus yang Memerlukan Pembayaran di Muka**:
-  - Estimasi biaya akan dibagikan sebelum pendaftaran. Aturan pembatalan dan kemungkinan pengembalian dana akan ditentukan.
-- **Donasi dan Sponsor**:
-  - Penerimaan dan kebijakan tampilan akan dievaluasi oleh panitia dan dikomunikasikan secara transparan kepada anggota.
-- **Pembelian Peralatan**:
-  - Pembelian peralatan bersama akan diputuskan dalam pertemuan, atas usulan dari panitia.
+- **Aturan Dasar:**
+  - Anggota membayar biaya mereka sendiri seperti transportasi, biaya masuk, dan makanan (beberapa acara mungkin menawarkan subsidi sebagian).
+- **Untuk Acara dengan Pembayaran di Muka:**
+  - Kami akan memberi tahu Anda tentang perkiraan biaya sebelum Anda mendaftar. Kami juga akan menentukan kebijakan pembatalan dan ketersediaan pengembalian dana.
+- **Donasi dan Sponsor:**
+  - Penyelenggara akan memutuskan apakah akan menerimanya dan akan memberi tahu anggota secara transparan.
+- **Pembelian Peralatan:**
+  - Saat membeli peralatan untuk semua, penyelenggara akan membuat proposal, dan keputusan akan dibuat melalui diskusi dalam pertemuan.
 
 ## 9. Operasional Pertemuan
-- **Pertemuan Rutin**: Setiap Senin pukul 16:20 / 18:00 (S311). Agenda akan dibagikan sebelumnya.
-- **Notulen**: Poin-poin utama, keputusan, penanggung jawab, dan tenggat waktu akan dicatat dan dibagikan kepada anggota.
-- **Pengambilan Keputusan**:
-  - Masalah-masalah penting akan diputuskan melalui konsensus di antara anggota panitia yang hadir. Jika konsensus tidak tercapai, akan diadakan pemungutan suara mayoritas (disetujui dengan lebih dari separuh suara).
-- **Contoh Peran**:
-  - Ketua/Wakil Ketua, Bendahara, Manajer Peralatan, Manajer Komunikasi, Pemimpin Perencanaan, Manajer Keamanan, dll.
+- **Pertemuan Rutin:** Senin pukul 16:20 / 18:00 (S311). Agenda akan dibagikan sebelumnya.
+- **Notulen:** Kami akan mencatat apa yang dibahas, apa yang diputuskan, dan siapa yang bertanggung jawab, dan membagikannya kepada anggota.
+- **Pengambilan Keputusan:**
+  - Masalah-masalah penting diputuskan melalui kesepakatan di antara penyelenggara yang hadir. Jika pendapat terbagi, kami dapat memutuskan dengan suara mayoritas.
+- **Contoh Peran:**
+  - Ketua/Wakil Ketua, Bendahara, Manajer Peralatan, Humas, Pemimpin Acara, Manajer Keamanan, dll.
 
-## 10. Sarana Kontak dan Sistem Kontak Darurat
-- **Kontak Reguler**: Instagram, Teams/Email (komunikasi penting akan dilakukan melalui Teams/Email).
-- **Kontak pada Hari H**: Untuk pertemuan dan keadaan darurat, akan digunakan obrolan grup yang ditunjuk oleh panitia.
-- **Jika Tidak Dapat Dihubungi**:
-  - Jika seseorang tidak tiba setelah waktu tunggu yang ditentukan, prioritas akan diberikan pada keselamatan dan kegiatan di lokasi akan dibatalkan atau diubah.
+## 10. Sistem Komunikasi dan Kontak Darurat
+- **Komunikasi Normal:** Kami menggunakan Instagram, Teams/Email. Pemberitahuan penting juga akan dikirim melalui Teams/Email.
+- **Komunikasi pada Hari H:** Untuk pertemuan dan keadaan darurat, kami menggunakan obrolan grup yang ditunjuk oleh penyelenggara.
+- **Jika Seseorang Tidak Dapat Dihubungi:**
+  - Jika seseorang tidak tiba pada waktu pertemuan dan tidak dapat dihubungi, kami dapat membatalkan atau mengubah kegiatan di tempat demi keamanan.
 
 ## 11. Pencegahan Pelecehan dan Kode Etik
-- Diskriminasi, pelecehan, ancaman, kontak yang tidak pantas, voyeurisme, dan pendekatan yang memaksa dilarang.
-- Jika terjadi masalah, hubungi panitia. Jika perlu, kami akan menghubungkan Anda dengan layanan konseling universitas atau badan terkait lainnya.
-- **Larangan Pembalasan**: Tindakan yang merugikan anggota yang telah berkonsultasi atau melaporkan masalah sangat dilarang.
+- Diskriminasi, pelecehan, ancaman, kontak fisik yang tidak pantas, voyeurisme, dan penguntitan dilarang.
+- Jika Anda memiliki masalah, bicaralah dengan penyelenggara. Jika perlu, kami juga dapat menghubungkan Anda dengan layanan konseling universitas.
+- Kami tidak akan pernah membiarkan kerugian menimpa siapa pun yang berkonsultasi dengan kami.
 
-## 12. Penanganan Data Pribadi
-- Tujuan pengumpulan, periode penyimpanan, dan ruang lingkup berbagi akan didefinisikan dengan jelas, dan penggunaannya untuk tujuan lain akan dilarang.
-- Informasi akun dan daftar kontak akan dikelola oleh orang-orang dengan hak istimewa minimum yang diperlukan. Jika terjadi pelanggaran data, kami akan segera melaporkan dan mengambil tindakan.
+## 12. Penanganan Informasi Pribadi
+- Kami akan jelas tentang tujuan informasi pribadi yang kami kumpulkan dan tidak akan menggunakannya untuk alasan lain.
+- Daftar kontak dikelola oleh sejumlah orang terbatas. Jika ada informasi yang bocor, kami akan segera melaporkan dan menanganinya.
 
-## 13. Amandemen Panduan
-- Amandemen akan diusulkan oleh panitia dan diputuskan setelah mengumpulkan pendapat dalam pertemuan.
-- Perubahan penting akan diumumkan di README dan di saluran komunikasi, dengan menunjukkan tanggal berlakunya.
+## 13. Revisi Panduan Ini
+- Saat merevisi panduan ini, penyelenggara akan membuat proposal, dan keputusan akan dibuat setelah mendengarkan pendapat semua orang dalam pertemuan.
+- Kami akan mengumumkan setiap perubahan besar di README dan di saluran obrolan kami.
 
 ---
 
-## Lampiran A: Daftar Periksa Keamanan (Sebelum Berangkat)
-- Periksa cuaca dan peringatan, dan bersiaplah untuk panas atau dingin.
-- Konfirmasikan waktu, lokasi pertemuan, dan detail kontak.
-- Periksa rute transportasi dan layanan terakhir, serta aturan lokal (izin fotografi, penggunaan tripod dan flash).
-- Siapkan baterai cadangan, kartu memori, penutup hujan, senter, minuman, kartu asuransi, dll.
-- Konfirmasikan apakah Anda memerlukan persetujuan untuk memotret orang atau di lokasi tertentu, dan bagaimana melanjutkannya.
+## Lampiran A: Daftar Periksa Keamanan Pra-Perjalanan
+- Periksa ramalan cuaca! Apakah Anda siap untuk panas/dingin?
+- Periksa kembali lokasi, waktu, dan informasi kontak pertemuan.
+- Konfirmasikan moda transportasi Anda ke dan dari, waktu kereta/bus terakhir, dan aturan lokal (Apakah fotografi diizinkan? Tripod?).
+- Apakah Anda memiliki semua yang Anda butuhkan, seperti baterai cadangan, kartu SD, penutup hujan, lampu, minuman, dan kartu asuransi Anda?
+- Periksa izin dan aturan untuk memotret orang atau fasilitas.
 
-## Lampiran B: Pedoman untuk Memposting di Media Sosial
-- Periksa hak dan privasi (dapatkan persetujuan, samarkan informasi pribadi).
-- Pilih teks dan foto yang tidak mendorong perilaku berbahaya.
-- Pertimbangkan perlunya menambahkan geolokasi (tidak disarankan untuk memberikan detail lokasi rumah atau sekolah).
+## Lampiran B: Daftar Periksa untuk Memposting di Media Sosial
+- Apakah Anda menghormati hak dan privasi? (Persetujuan subjek, tidak ada informasi pribadi yang terlihat)
+- Apakah konten Anda mempromosikan perilaku berbahaya?
+- Pikirkan baik-baik sebelum memposting informasi lokasi (terutama untuk rumah atau sekolah Anda).

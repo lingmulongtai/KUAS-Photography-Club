@@ -1,125 +1,153 @@
-# KUAS Photography Club Guidelines (English)
-Last Updated: October 29, 2025
+# KUAS Photography Club Guidelines
+Last Updated: 2025-10-31
 
-These guidelines are designed to ensure that all activities of the KUAS Photography Club are safe, enjoyable, and welcoming to everyone.
+These guidelines are our important rules to ensure that the activities of the KUAS Photography Club are safe, enjoyable, and open to everyone. Let's work together to create an environment where all members respect each other and can participate with peace of mind, regardless of nationality, grade, or experience.
 
 - **Scope:** These rules apply to all club-organized, co-organized, or approved activities, including meetings, photo trips, and online communications.
 - **Contact:**
   - Instagram: @kuas_photographyclub
   - Teams/Email: 2025m011@kuas.ac.jp
-- **Meetings:** Mondays at 16:20 and 18:00 in Room S311, Uzumasa Campus.
+- **Regular Meetings:** Mondays at 16:20 and 18:00 in Room S311, Uzumasa Campus.
 
 ---
 
-## 1. Our Mission
-- To prioritize fun while respecting others, the community, and the environment.
-- To welcome beginners and smartphone photographers.
-- To foster a diverse and inclusive atmosphere where we respect and learn from our linguistic and cultural differences.
-- To maintain consistent activity and transparent operations with the goal of becoming an official university club next year.
+## 1. Our Philosophy
+- To prioritize fun while valuing consideration for others, the community, and nature.
+- Beginners and experienced photographers are both very welcome! Of course, smartphone photography is also okay.
+- To respect diversity and value an attitude of learning from linguistic and cultural differences.
+- To work together to grow our activities with the goal of becoming an official university club next year.
+- If you wish to join, please contact the club president first. We will arrange a brief meeting to introduce the club.
 
-## 2. Rules for Participation
-- **Registration:** Please confirm your attendance for photo trips in advance via a form or chat.
-- **Punctuality:** If you are going to be late, please notify us beforehand.
-- **Attendance:** Repeated unexcused absences may affect your eligibility for future events.
-- **Conduct:** Alcohol consumption, illegal activities, and dangerous behavior are strictly prohibited. Drug use is forbidden.
-- **Minors:** University regulations and local laws will be strictly followed for all underage participants.
+## 2. Participation Rules
+- **Registration:** If you want to join a photo trip, please let us know in advance via form or chat.
+- **Be on time:** If you think you'll be late for the meeting time, please be sure to contact us in advance.
+- **Attendance:** If you are absent multiple times without notice, we may need to discuss your future participation.
+- **Conduct:** Alcohol, illegal activities, and dangerous behavior are strictly prohibited (both on and off campus).
+- **Minors:** We will follow university rules and laws for underage members.
 
-## 3. Cancellations
-- **Deadline:** Please cancel by 21:00 the day before an event. For emergencies, such as illness, contact us as soon as possible.
-- **Pre-paid Costs:** If you cancel after a deadline for an event with pre-paid expenses (e.g., tickets, transportation), you may be asked to cover the cost.
-- **Late Arrivals:** For safety reasons, joining an event after it has started is generally not permitted. In exceptional cases, please follow the organizers' instructions.
+## 3. Attendance & Cancellation Policy
+- **Cancellations:** Please try to notify us by 9:00 PM the day before. If you have a sudden illness or emergency, please let us know as soon as you can.
+- **Pre-paid Costs:** If you cancel after the deadline for an event with pre-paid expenses, you may be asked to cover the cost.
+- **Joining midway:** For safety reasons, joining an event after it has started is generally not allowed. If you have an unavoidable reason, please consult with the organizers.
 
-## 4. Safety
-- **Travel:**
-  - We recommend using public transportation. If you use a bicycle or car, please obey all traffic laws and consider getting insurance.
-  - We will share meeting and dismissal times and locations in advance. We use a buddy system (groups of two or more) for safety.
+## 4. Safety Guide
+- **Travel Safety:**
+  - We recommend using public transportation.
+  - If you ride in a member's car, let's cooperate to lighten the driver's burden by sharing costs like gas and tolls. Please understand that this is based on the driver's personal kindness and prioritize safe driving.
+  - We will share meeting/dismissal locations and times in advance. For safety, we will operate on a buddy system (groups of two or more).
 - **Night & Bad Weather:**
-  - Do not go out alone at night. Wear bright clothing and carry a light.
-  - Events will be canceled or postponed in the case of severe weather. Please come prepared for both hot and cold conditions.
-- **Etiquette & Hazard Avoidance:**
-  - Respect all "No Entry" and "No Photography" signs. Follow facility rules for tripods and flashes.
-  - Do not take photos in dangerous areas, such as near rivers, railroad tracks, roads, or cliffs.
-- **Emergencies:**
-  - **Police: 110 / Fire & Ambulance: 119.** Organizers will share their mobile numbers for emergency contact.
-  - Report any accidents or issues to the nearest organizer immediately.
+  - Avoid going out alone at night. It's safer to wear bright clothing and carry a light.
+  - In case of severe weather or warnings, activities will be canceled or postponed. Please prepare for both hot and cold weather yourself.
+- **On-site Manners & Hazard Avoidance:**
+  - Never enter "No Entry" or "No Photography" areas. Follow the facility's rules for using tripods and flashes.
+  - We do not take photos in dangerous locations such as near rivers, railroad tracks, roads, or cliffs.
+- **Emergency Contact:**
+  - Police: 110 / Fire & Ambulance: 119. The organizers will share their mobile numbers for emergency contact on the day.
+  - If an accident or trouble occurs, please report it to the nearest organizer immediately.
 - **Insurance:**
-  - We recommend that students have their own insurance. We will follow university procedures for any necessary insurance claims.
+  - We recommend that students get their own insurance. We will follow university regulations for any necessary procedures.
 - **Drones:**
-  - Drones are generally prohibited, as they require special permits and adherence to strict regulations. They may only be used with prior approval from the organizers and after all legal requirements have been met.
+  - Using drones requires permits and legal knowledge. They are generally prohibited. They can only be used with special permission from the organizers and after all procedures are completed.
 
 ## 5. Photography Etiquette
-- **Public Spaces:**
-  - Always check whether photography, tripods, and commercial use are permitted. Follow the instructions of staff.
-  - Do not interfere with religious services or ceremonies.
+- **In Public Spaces & Facilities:**
+  - Check in advance if photography and tripods are allowed, and follow the instructions of the facility staff.
+  - Avoid actions that could disturb others, such as during prayers or other ceremonies.
 - **Photographing People:**
-  - Obtain consent before taking photos that clearly identify an individual. Verbal consent is acceptable, but written permission (or a chat record) is preferred.
-  - You must have parental consent to photograph minors. Be mindful of sensitive situations and refrain from taking photos when appropriate.
-- **Privacy:**
-  - Mask or blur personal information, such as license plates, addresses, student IDs, or medical information, before publishing photos.
-- **Social Media:**
-  - Be cautious with location data. We recommend not sharing the specific locations of your home or school.
-  - Do not post photos that violate the guidelines of a facility or event.
+  - When taking a photo that clearly identifies someone, always ask for their permission first (verbal consent is okay).
+  - For photographing minors, parental consent is required. It's also important to be considerate and refrain from taking photos depending on the situation.
+- **Privacy Considerations:**
+  - If personal information like license plates, addresses, or student IDs are visible, please mask them before publishing.
+- **Posting on Social Media:**
+  - Be careful with location information (it's safer not to disclose detailed home or school locations).
+  - Follow the rules of the location where you took the photos and do not share photos that are prohibited from being posted.
 - **Commercial Use:**
-  - Photos taken during club activities may not be used for commercial purposes without approval from the organizers and after securing all necessary rights.
+  - Photos taken during club activities are generally not for commercial use. In special cases, it may be possible with the approval of the organizers and after all rights have been cleared.
+- **Consideration & Cooperation:**
+  - Show respect for other members, local residents, and facility staff, and refrain from causing any trouble.
+  - If a member's photography etiquette does not improve despite reminders, we may ask them to temporarily refrain from participating in activities to ensure the safety and comfort of all other participants.
 
-## 6. Copyright & Portrait Rights
+## 6. Copyright, Portrait Rights, and Handling of Photos
 - **Copyright:**
-  - The copyright of a photo belongs to the photographer. If the club wishes to use a photo for promotional purposes, we will obtain the photographer's permission and provide credit.
-- **Portrait & Privacy Rights:**
-  - We respect the rights of our subjects. If we receive a complaint, we will promptly remove the photo and take steps to prevent a recurrence.
+  - Belongs to the person who took the photo. If the club wants to use a photo for promotional purposes, we will get the photographer's permission beforehand and give them credit.
+- **Portrait Rights & Privacy:**
+  - We respect the feelings of the people in the photos. If we receive a request to delete a photo, we will respond promptly and take care to prevent it from happening again.
 - **Data Sharing:**
-  - When we request photos for official use (e.g., social media, exhibitions), we will clearly state the purpose, duration of use, and editing policy.
-  - We will define access controls, retention periods, and deletion policies for any shared storage.
+  - When we ask for photos for official use (like on social media or in exhibitions), we will clearly state how and for how long they will be used.
+  - For shared storage, we will specify who can see the files and how long they will be stored.
 - **Credit Example:**
   - © Photographer's Name / KUAS Photography Club (Year)
 
-## 7. Photo Selection & Publication
-- **Official Use:** The organizing team will select photos for official use (e.g., social media, flyers) based on technical quality, safety, and rights clearance.
-- **Editing:** We will respect the photographer's artistic vision and obtain their consent before making any edits.
-- **Prohibited Content:** We will not publish photos taken in restricted areas, photos that identify individuals without their consent, content that is discriminatory or harassing, or images that encourage dangerous behavior.
+## 7. Selection and Publication of Works
+- **Official Publication:** The organizing team will select photos for official use (social media, exhibitions, flyers, etc.) after checking for technical quality, safety, and rights issues.
+- **Editing:** We will respect the photographer's wishes and consult with them before making any edits.
+- **NG Examples:** Photos taken in restricted areas, photos that identify individuals without permission, expressions that are discriminatory or harassing, or content that encourages dangerous behavior.
 
-## 8. Finances & Cost Sharing
-- **General Rule:** Members are responsible for their own expenses, such as transportation, admission fees, and food. Some events may be partially subsidized.
-- **Pre-paid Events:** For events requiring pre-payment, we will provide a cost estimate and a clear cancellation policy in advance.
-- **Donations & Sponsorships:** The acceptance of donations or sponsorships will be reviewed by the organizers and reported transparently to all members.
-- **Equipment Purchases:** Purchases of shared equipment will be proposed by the organizers and approved at a club meeting.
+<!--
+## 8. Equipment (Shared Camera) Loan Rules
+- **Purpose:**
+  - To support members who do not have a camera so they can also enjoy photography.
+- **Eligibility & Period:**
+  - Available to official members, generally for "return the day after the photo shoot." Longer loans require approval from the organizers.
+- **Pick-up & Return:**
+  - You will be asked to fill out a condition checklist. Let's also check the accessories (battery, charger, SD card, strap, etc.) together.
+- **Handling:**
+  - Always use the strap. Use a rain cover in the rain, and be careful around sand, seawater, and in hot and humid places.
+- **Damage or Loss:**
+  - Please report it to the organizers immediately. If it was broken intentionally or lost due to gross negligence, you may be asked to cover the repair costs.
+- **Maintenance:**
+  - Cleaning and updates are done by the organizers. The organizers will also decide on the replacement of items like protective films.
+- **Memory Cards:**
+  - Please do not save personal information. We ask that you back up and delete your data upon return.
+-->
 
-## 9. Meetings
-- **Schedule:** Mondays at 16:20 and 18:00 in Room S311. Agendas will be shared in advance.
-- **Minutes:** Key points, decisions, and action items will be recorded and shared with members.
+## 8. Accounting & Cost Sharing
+- **Basic Rule:**
+  - Members pay for their own expenses like transportation, admission fees, and meals (some events may offer partial subsidies).
+- **For Pre-paid Events:**
+  - We will inform you of the estimated cost before you sign up. We will also specify the cancellation policy and refund availability.
+- **Donations & Sponsors:**
+  - The organizers will decide whether to accept them and will report to the members with transparency.
+- **Equipment Purchases:**
+  - When buying equipment for everyone to use, the organizers will make a proposal, and the decision will be made by discussion at a meeting.
+
+## 9. How Meetings Are Run
+- **Regular Meetings:** Mondays at 16:20 / 18:00 (S311). The agenda will be shared in advance.
+- **Minutes:** We will record what was discussed, what was decided, and who is in charge, and share it with the members.
 - **Decision-Making:**
-  - Important decisions will be made by consensus among the attending organizers. If a consensus cannot be reached, a majority vote will be held.
-- **Roles:**
-  - Examples include President, Vice President, Treasurer, Equipment Manager, PR Manager, Event Coordinator, and Safety Manager.
+  - Important matters are decided by the agreement of the attending organizers. If opinions are divided, we may decide by a majority vote.
+- **Role Examples:**
+  - President/Vice President, Treasurer, Equipment Manager, PR, Event Leader, Safety Manager, etc.
 
-## 10. Communication
-- **General:** We use Instagram and Teams/Email for regular announcements. Important information will be sent via Teams/Email.
-- **On-Site:** We use a designated group chat for communication during events.
-- **Unresponsive Members:** If a member does not arrive by the designated time and is unreachable, we may alter or cancel the activity for safety reasons.
+## 10. Communication & Emergency Contact System
+- **Normal Communication:** We use Instagram, Teams/Email. Important notices will also be sent via Teams/Email.
+- **On-the-day Communication:** For meetings and emergencies, we use the group chat designated by the organizers.
+- **If Someone is Unreachable:**
+  - If someone does not arrive by the meeting time and is unreachable, we may cancel or change the on-site activities for safety reasons.
 
-## 11. Harassment & Code of Conduct
-- We prohibit all forms of discrimination, harassment, threats, inappropriate physical contact, voyeurism, and stalking.
-- If you experience or witness any issues, please contact an organizer. We can connect you with university counseling services or other relevant authorities if needed.
-- **No Retaliation:** We have a zero-tolerance policy for retaliation against anyone who reports an issue or concern.
+## 11. Harassment Prevention & Code of Conduct
+- Discrimination, harassment, threats, inappropriate physical contact, voyeurism, and stalking are prohibited.
+- If you have any problems, please talk to an organizer. If necessary, we can also connect you with university counseling services.
+- We will never allow any disadvantages to come to someone who consults us.
 
-## 12. Personal Information
-- We will be transparent about what personal information we collect, how long we store it, and who we share it with. We will not use it for any other purpose.
-- Access to contact lists and other personal data will be restricted to authorized members. We will promptly report and address any data breaches.
+## 12. Handling of Personal Information
+- We will be clear about the purpose of the personal information we collect and will not use it for any other reason.
+- Contact lists are managed by a limited number of people. If information is leaked, we will report and deal with it immediately.
 
-## 13. Amending These Guidelines
-- Amendments will be proposed by the organizers and finalized after discussion at a club meeting.
-- Major changes will be announced in the README and on our communication channels, with a clear effective date.
+## 13. Revision of These Guidelines
+- When reviewing these guidelines, the organizers will make a proposal, and the decision will be made after listening to everyone's opinions at a meeting.
+- We will announce any important changes in the README and on our chat channels.
 
 ---
 
-## Appendix A: Pre-Trip Checklist
-- Check the weather forecast and come prepared for hot or cold conditions.
-- Confirm the meeting time, location, and contact information.
-- Plan your transportation and check the rules of your destination (e.g., photography, tripods, flashes).
-- Pack spare batteries, memory cards, a rain cover, a light, water, and your insurance card.
-- Confirm whether you need consent to photograph people or at certain locations.
+## Appendix A: Pre-Trip Safety Checklist
+- Check the weather forecast! Are you prepared for the heat/cold?
+- Double-check the meeting place, time, and contact information.
+- Confirm your transportation for the round trip, the time of the last train/bus, and the local rules (Is photography okay? Tripods?).
+- Do you have everything you need, like spare batteries, SD cards, a rain cover, a light, drinks, and your insurance card?
+- Check the permissions and rules for photographing people or facilities.
 
-## Appendix B: Social Media Guidelines
-- Respect privacy and copyright. Get consent and mask personal information.
-- Do not post content that encourages dangerous behavior.
-- Be mindful of location data. We recommend not sharing specific addresses.
+## Appendix B: Social Media Posting Checklist
+- Are you respecting rights and privacy? (Consent from the person, no personal information visible)
+- Is your content promoting dangerous behavior?
+- Think carefully before posting location information (especially for your home or school).
