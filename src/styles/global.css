@@ -50,9 +50,9 @@ h4 {
 h1,
 h2 {
   font-family: var(--display);
-  font-weight: 800;
-  line-height: 1.25;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
 }
 
 h3 {
@@ -72,7 +72,7 @@ a {
 }
 
 a:hover {
-  color: var(--mark);
+  color: var(--accent);
 }
 
 :focus-visible {
@@ -81,8 +81,8 @@ a:hover {
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--brand);
+  color: var(--ink);
 }
 
 button,
@@ -115,8 +115,8 @@ textarea {
 /* ---------- type helpers ---------- */
 
 .edge {
-  font: 500 12px/1.4 var(--mono);
-  letter-spacing: 0.16em;
+  font: 700 12px/1.4 var(--latin);
+  letter-spacing: 0.22em;
   color: var(--accent);
   text-transform: uppercase;
 }
@@ -198,13 +198,15 @@ textarea {
 }
 
 .prose strong {
-  color: var(--mark);
+  color: var(--ink);
+  font-weight: 700;
+  background: linear-gradient(transparent 62%, var(--brand-pale) 62%);
 }
 
 .prose code {
   font-family: var(--mono);
   font-size: 0.9em;
-  background: var(--rebate);
+  background: var(--brand-pale);
   padding: 0.1em 0.35em;
   border-radius: 2px;
 }
@@ -248,7 +250,7 @@ table.data td {
 }
 
 table.data thead th {
-  font: 500 11px/1.4 var(--mono);
+  font: 700 11px/1.4 var(--latin);
   letter-spacing: 0.14em;
   color: var(--muted);
   text-transform: uppercase;
@@ -268,33 +270,34 @@ table.data th.num {
   justify-content: center;
   gap: 10px;
   appearance: none;
-  border: 1px solid var(--line-strong);
+  border: 1.5px solid var(--ink);
   background: transparent;
   color: var(--ink);
-  font: 500 14px/1 var(--mono);
-  letter-spacing: 0.04em;
-  padding: 13px 18px;
-  border-radius: var(--radius);
+  font: 700 14px/1 var(--body);
+  letter-spacing: 0.06em;
+  padding: 14px 22px;
+  border-radius: 999px;
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
 }
 
 .btn:hover {
+  background: var(--ink);
   border-color: var(--ink);
-  color: var(--ink);
+  color: var(--on-dark);
 }
 
 .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--brand);
+  border-color: var(--brand);
   color: var(--on-accent);
 }
 
 .btn--primary:hover {
-  background: var(--mark);
-  border-color: var(--mark);
-  color: var(--on-accent);
+  background: var(--brand-ink);
+  border-color: var(--brand-ink);
+  color: var(--on-dark);
 }
 
 .btn:disabled {
@@ -311,14 +314,14 @@ table.data th.num {
 }
 
 .link-arrow {
-  font: 500 14px/1.4 var(--mono);
-  letter-spacing: 0.04em;
+  font: 700 14px/1.4 var(--body);
+  letter-spacing: 0.06em;
   color: var(--accent);
   text-decoration: none;
 }
 
 .link-arrow:hover {
-  color: var(--mark);
+  color: var(--ink);
 }
 
 /* ---------- WebGL stage + HUD (shared by every demo) ---------- */
@@ -420,7 +423,7 @@ table.data th.num {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 16px;
-  font: 500 13px/1.4 var(--mono);
+  font: 700 13px/1.4 var(--body);
 }
 
 .controls label {
@@ -455,7 +458,7 @@ table.data th.num {
   display: inline-block;
   font: 400 14px/1.4 var(--hand);
   color: var(--mark);
-  border: 1px dashed rgba(251, 243, 213, 0.45);
+  border: 1px dashed var(--accent);
   border-radius: 2px;
   padding: 2px 8px;
   transform: rotate(-1.5deg);
