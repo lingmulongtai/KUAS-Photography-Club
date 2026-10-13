@@ -57,7 +57,8 @@ npm run build    # dist/ に書き出し
 - **撮影会を追加**：`src/content/trips/` に Markdown を1つ追加し、写真を `public/photos/<撮影会名>/` に置く（書き方は既存のファイルを参照）。撮影者名は `by` に書くと、ガイドライン第6章のクレジットが自動で付きます
 - **サンプルの差し替え**：`sample: true` の撮影会と写真はサンプルです。手順は `tools/sample-photos/README.md`
 - **仮の文章**：手書き風の点線メモがついている文章は、運営で書き換えてください
-- **入部フォームの送信先**：`src/data/club.ts` の `joinForm.endpoint` に Formspree などの URL を入れると、フォームの内容がそこに届きます（空のままだとメールアプリが開きます）
+- **申し込み・お問い合わせフォーム**：Google フォームか Microsoft Forms で作り、共有リンクを `src/data/club.ts` の `forms.join`（見学・入部）と `forms.contact`（撮影依頼・協賛など）に貼る。サイト自体は個人情報を集めません。リンクが空のあいだは「準備中」と出て、Instagram とメールに案内します
+- **月ごとのスケジュール**：`src/content/schedule/` に `2026-12.md` のような Markdown を1つ追加（書き方は既存のファイルを参照）。金曜の定例ミーティングは自動で入ります
 - **Instagram の投稿**：`src/data/instagram.ts` に載せたい投稿を追加
 - **ガイドライン**：`guidelines/` の Markdown を編集すると、サイトにもそのまま反映されます
 
@@ -123,10 +124,10 @@ This repository is where we create, store, and update documents for the KUAS Pho
 - `docs/`: Reference materials and records.
 
 ## Website
-This repository also holds the club website, a static Astro + three.js site: a 3D Kyoto on the top page whose sky follows the time in Kyoto, photo trip reports shown as rolls of film, hands-on lessons on shutter speed, aperture, focal length and developing, an about page, a join form and the guidelines in 11 languages.
+This repository also holds the club website, a static Astro + three.js site: a 3D Kyoto on the top page whose sky follows the time in Kyoto, photo trip reports shown as rolls of film, hands-on lessons on shutter speed, aperture, focal length and developing, a monthly schedule, an about page, join and contact pages that link to the club's own forms, and the guidelines in 11 languages.
 
 - Develop: `npm install`, then `npm run dev` (Node.js 22.12+). `npm run check` type-checks, `npm run build` writes `dist/`.
-- Club facts and the join form endpoint: `src/data/club.ts`. Trips: one Markdown file per trip in `src/content/trips/`, photos in `public/photos/`.
+- Club facts and the links to the club's Google/Microsoft Forms: `src/data/club.ts`. Monthly schedules: one Markdown file per month in `src/content/schedule/`. Trips: one Markdown file per trip in `src/content/trips/`, photos in `public/photos/`.
 - Sample trips and photos are marked `sample: true`; see `tools/sample-photos/README.md` to replace them.
 - Deploy: import the repository in Vercel (framework preset: Astro). Pushes to `main` deploy automatically. Update `site` in `astro.config.mjs` once the URL is final.
 
