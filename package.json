@@ -1,0 +1,22 @@
+{
+  "name": "kuas-photography-club",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "KUAS Photography Club website",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "astro": "7.3.4",
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@types/three": "0.186.0",
+    "typescript": "5.9.3"
+  }
+}
