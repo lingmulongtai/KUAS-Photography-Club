@@ -1,0 +1,86 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import ScheduleMonth from '../components/ScheduleMonth.astro';
+import { getSchedule, kindLabel, type EventKind } from '../lib/schedule';
+import { club } from '../data/club';
+
+const months = await getSchedule();
+const kinds = Object.keys(kindLabel) as EventKind[];
+---
+<Base title="スケジュール" description={`写真部の月ごとの予定。定例ミーティング（${club.meetings.day} ${club.meetings.times.join(' / ')}・${club.campus} ${club.meetings.room}）と撮影会・イベントの日程です。`}>
+  <PageHero
+    edge="SCHEDULE ▸ MONTHLY"
+    title="スケジュール"
+    lead={`定例ミーティングは${club.meetings.day} ${club.meetings.times.join(' / ')}、${club.campus} ${club.meetings.room} 教室です。撮影会やイベントの予定は毎月ここに載せます。`}
+  />
+
+  <div class="wrap">
+    <ul class="legend" aria-label="予定の種類">
+      {kinds.map((k) => <li class={`k-${k}`}><i></i>{kindLabel[k]}</li>)}
+    </ul>
+    {months.map((m) => <ScheduleMonth month={m} />)}
+    {months.length === 0 && <p class="muted">まだ予定はありません。</p>}
+  </div>
+</Base>
+
+<script>
+  // mark today, dim what is past and jump to this month
+  const now = new Date(Date.now() + 9 * 3600000);
+  const today = now.toISOString().slice(0, 10);
+  const thisMonth = today.slice(0, 7);
+  document.querySelectorAll<HTMLElement>('[data-date]').forEach((el) => {
+    const d = el.dataset.date!;
+    if (d === today) el.classList.add('today');
+    else if (d < today) el.classList.add('past');
+  });
+  const current = document.querySelector<HTMLElement>(`[data-month="${thisMonth}"]`);
+  current?.classList.add('is-now');
+  if (current && !location.hash) current.scrollIntoView({ block: 'start' });
+</script>
+
+<style>
+  .legend {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--c);
+  }
+
+  .k-meeting {
+    --c: var(--brand);
+  }
+
+  .k-trip {
+    --c: #1b363d;
+  }
+
+  .k-event {
+    --c: #e0a23b;
+  }
+
+  .k-deadline {
+    --c: #c2412d;
+  }
+
+  .k-other {
+    --c: #8aa1a7;
+  }
+</style>
