@@ -1,0 +1,50 @@
+---
+import Base from '../layouts/Base.astro';
+import DemoDarkroom from '../components/learn/DemoDarkroom.astro';
+---
+<Base title="ページが見つかりません">
+  <section class="wrap nf">
+    <div class="copy">
+      <p class="edge">404 ▸ NOT DEVELOPED</p>
+      <h1>このページは、<br />まだ現像されていません。</h1>
+      <p class="lead">お探しのページは見つかりませんでした。アドレスが変わったか、まだ作られていないのかもしれません。</p>
+      <div class="ctas">
+        <a class="btn btn--primary" href="/">トップへ戻る <span class="arrow" aria-hidden="true">→</span></a>
+        <a class="btn" href="/trips/">撮影会の記録</a>
+      </div>
+    </div>
+    <DemoDarkroom />
+  </section>
+</Base>
+
+<style>
+  .nf {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+    gap: 40px 56px;
+    align-items: center;
+    padding-block: clamp(48px, 8vw, 96px);
+  }
+
+  .copy {
+    display: grid;
+    gap: 18px;
+    justify-items: start;
+  }
+
+  h1 {
+    font-size: var(--step-4);
+  }
+
+  .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  @media (max-width: 860px) {
+    .nf {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
