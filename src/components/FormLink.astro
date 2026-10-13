@@ -1,0 +1,120 @@
+---
+/**
+ * A call to open one of the club's external forms (Google Forms / Microsoft Forms).
+ * Until the club pastes a link into src/data/club.ts, it points people to Instagram and email instead.
+ */
+import { club } from '../data/club';
+
+interface Props {
+  href: string;
+  label: string;
+  /** What to tell people before the form exists. */
+  pending?: string;
+}
+const { href, label, pending = 'フォームは準備中です。それまでは Instagram の DM かメールでご連絡ください。' } = Astro.props;
+---
+<div class="form-link">
+  {href ? (
+    <a class="btn btn--primary big" href={href} target="_blank" rel="noopener">
+      {label} <span class="arrow" aria-hidden="true">↗</span>
+    </a>
+  ) : (
+    <p class="pending">{pending}</p>
+  )}
+  <ul class="alt">
+    <li>
+      <span class="k">Instagram</span>
+      <a href={club.instagram.url} target="_blank" rel="noopener">@{club.instagram.handle} に DM を送る</a>
+    </li>
+    <li>
+      <span class="k">メール</span>
+      <span class="select">{club.email}</span>
+      <button class="copy" type="button" data-copy={club.email}>コピー</button>
+    </li>
+  </ul>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.form-link .copy').forEach((b) =>
+    b.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(b.dataset.copy ?? '');
+        b.textContent = 'コピーしました';
+      } catch {
+        const el = b.previousElementSibling;
+        if (el) window.getSelection()?.selectAllChildren(el);
+        b.textContent = '選択しました';
+      }
+      setTimeout(() => (b.textContent = 'コピー'), 2000);
+    }),
+  );
+</script>
+
+<style>
+  .form-link {
+    display: grid;
+    gap: 22px;
+    justify-items: start;
+  }
+
+  .big {
+    padding: 20px 30px;
+    font-size: 17px;
+  }
+
+  .pending {
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    background: var(--raise);
+    border: 1.5px dashed var(--brand-deep);
+    font-weight: 700;
+  }
+
+  .alt {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .alt li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    padding: 14px 16px;
+    background: var(--raise);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .k {
+    font: 700 12px/1 var(--latin);
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    min-width: 6.5em;
+  }
+
+  .select {
+    user-select: all;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+  }
+
+  .copy {
+    appearance: none;
+    border: 1.5px solid var(--line-strong);
+    background: transparent;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font: 700 12px/1 var(--body);
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .copy:hover {
+    border-color: var(--ink);
+  }
+</style>
