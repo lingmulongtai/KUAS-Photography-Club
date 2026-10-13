@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { press, setText, type Demo } from '../gl/stage';
 
 const FRAME_H = 0.36; // keep the head and the top of the shoulders (36 cm) filling the frame height
@@ -12,76 +12,41 @@ export const diagonalFov = (mm: number) => 2 * Math.atan(SENSOR_DIAG / 2 / (mm /
 /** Distance that keeps FRAME_H filling the frame at this focal length. */
 export const distanceFor = (mm: number) => FRAME_H / 2 / Math.tan(verticalFov(mm) / 2);
 
-const sm = (e0: number, e1: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
-};
-const g2 = (x: number, y: number, cx: number, cy: number, sx: number, sy: number) => Math.exp(-(((x - cx) / sx) ** 2) - ((y - cy) / sy) ** 2);
+/** The head scan: a bust facing +z, about 8.6 × 7.9 × 5.2 units. 0.05 m per unit makes the shoulders 43 cm wide. */
+const HEAD_URL = '/models/head/head.glb';
+const HEAD_NORMAL_URL = '/models/head/normal.jpg';
+const HEAD_SCALE = 0.05;
+const HEAD_HALF_H = 3.97 * HEAD_SCALE;
 
-/**
- * A plaster-cast head, sculpted by displacing a sphere: jaw, brow, eye sockets,
- * cheekbones, nose, lips and chin. Size in metres (about 23 cm chin to crown).
- */
-function headGeometry() {
-  const geo = new THREE.SphereGeometry(1, 160, 120);
-  const p = geo.attributes.position as THREE.BufferAttribute;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < p.count; i++) {
-    v.fromBufferAttribute(p, i);
-    let { x, y, z } = v;
-    const front = sm(0.18, 0.62, z);
-    const ax = Math.abs(x);
-    let d = 0;
-    // nose: a ridge that grows toward the tip, wider at the nostrils
-    const along = Math.min(1, Math.max(0, (0.24 - y) / 0.46));
-    const wx = 0.06 + 0.07 * along;
-    d += 0.42 * along * Math.exp(-((x / wx) ** 2)) * sm(-0.34, -0.2, y);
-    d += 0.08 * g2(x, y, 0, -0.2, 0.09, 0.07);
-    d += 0.05 * g2(ax, y, 0.1, -0.24, 0.06, 0.05);
-    // brow ridge and eye sockets with the eyes inside
-    d += 0.08 * Math.exp(-(((y - 0.3) / 0.07) ** 2)) * Math.exp(-((x / 0.55) ** 2));
-    d -= 0.13 * g2(ax, y, 0.3, 0.15, 0.14, 0.1);
-    d += 0.07 * g2(ax, y, 0.3, 0.14, 0.07, 0.05);
-    // cheekbones and the hollow under them
-    d += 0.06 * g2(ax, y, 0.46, -0.02, 0.15, 0.11);
-    d -= 0.04 * g2(ax, y, 0.4, -0.3, 0.12, 0.12);
-    // lips, mouth line and chin
-    d += 0.08 * g2(x, y, 0, -0.43, 0.21, 0.08);
-    d -= 0.04 * g2(x, y, 0, -0.45, 0.2, 0.014);
-    d += 0.12 * g2(x, y, 0, -0.74, 0.19, 0.1);
-    d *= front;
-    // jaw narrows toward the chin; skull is deeper at the back
-    const jaw = sm(0.05, -0.85, y);
-    x *= 1 - 0.3 * jaw;
-    if (z < 0) z *= 1.1;
-    // faces are flatter than spheres: pull the cheeks back, keep the middle
-    else z *= 1 - 0.1 * jaw - 0.18 * front * sm(0.15, 0.6, Math.abs(x));
-    const k = 1 + d;
-    p.setXYZ(i, x * k * 0.078, y * k * 0.115, z * k * 0.098);
-  }
-  geo.computeVertexNormals();
-  return geo;
-}
-
-function bustGeometry() {
-  const ear = (side: number) => {
-    const g = new THREE.SphereGeometry(1, 24, 16);
-    g.scale(0.011, 0.03, 0.021);
-    g.rotateY(side * 0.35);
-    g.translate(side * 0.077, 0.004, -0.008);
-    return g;
-  };
-  const neck = new THREE.CylinderGeometry(0.048, 0.056, 0.14, 40).translate(0, -0.135, -0.012);
-  const chest = new THREE.SphereGeometry(1, 64, 32);
-  chest.scale(0.2, 0.095, 0.105);
-  chest.translate(0, -0.22, -0.01);
-  const plinth = new THREE.BoxGeometry(0.2, 0.1, 0.15).translate(0, -0.35, -0.01);
-  const parts = [headGeometry(), ear(1), ear(-1), neck, chest, plinth].map((g) => {
-    const n = g.index ? g.toNonIndexed() : g;
-    n.deleteAttribute('uv');
-    return n;
+/** Load the scanned bust and dress it as a white plaster cast. */
+async function loadBust(maxAniso: number) {
+  const [{ GLTFLoader }, normal] = await Promise.all([
+    import('three/addons/loaders/GLTFLoader.js'),
+    new THREE.TextureLoader().loadAsync(HEAD_NORMAL_URL),
+  ]);
+  const gltf = await new GLTFLoader().loadAsync(HEAD_URL);
+  normal.flipY = false;
+  normal.anisotropy = maxAniso;
+  const plaster = new THREE.MeshPhysicalMaterial({
+    color: '#efe9df',
+    roughness: 0.62,
+    metalness: 0,
+    normalMap: normal,
+    normalScale: new THREE.Vector2(0.4, 0.4),
+    sheen: 0.35,
+    sheenRoughness: 0.8,
+    sheenColor: new THREE.Color('#fff2e2'),
   });
-  return mergeGeometries(parts);
+  const bust = new THREE.Group();
+  gltf.scene.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const m = new THREE.Mesh(o.geometry, plaster);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    bust.add(m);
+  });
+  bust.scale.setScalar(HEAD_SCALE);
+  return bust;
 }
 
 /** Shoji screens behind the bust, to show how the background grows with focal length. */
@@ -143,34 +108,64 @@ export interface FocalState {
  */
 export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onChange?: (s: FocalState) => void): Demo {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 0.95;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#1a1714');
   const cam = new THREE.PerspectiveCamera(40, 1, 0.02, 80);
 
-  const plaster = new THREE.MeshStandardMaterial({ color: '#ece6db', roughness: 0.82, metalness: 0 });
-  const bust = new THREE.Mesh(bustGeometry(), plaster);
-  bust.position.y = 1.5;
-  scene.add(bust);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.16;
+  pmrem.dispose();
+
+  // the bust's base sits on a small socle on a pedestal
+  const BUST_Y = 1.45;
+  const baseY = BUST_Y - HEAD_HALF_H;
+  const stone = new THREE.MeshStandardMaterial({ color: '#2b2622', roughness: 0.55 });
+  const socle = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.05, 0.17), new THREE.MeshStandardMaterial({ color: '#d9d2c6', roughness: 0.7 }));
+  socle.position.set(0, baseY - 0.025, 0.005);
+  const standH = baseY - 0.05;
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(0.3, standH, 0.3), stone);
+  stand.position.set(0, standH / 2, 0);
+  socle.castShadow = socle.receiveShadow = true;
+  stand.receiveShadow = true;
 
   const wall = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), new THREE.MeshStandardMaterial({ map: shojiTexture(), roughness: 0.95 }));
   wall.position.set(0, 2.2, -3.2);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshStandardMaterial({ map: floorTexture(), roughness: 0.7 }));
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set(0, 0, 0);
-  const standH = bust.position.y - 0.4;
-  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, standH, 32), new THREE.MeshStandardMaterial({ color: '#2a2420', roughness: 0.6 }));
-  stand.position.set(0, standH / 2, -0.01);
-  scene.add(wall, floor, stand);
+  scene.add(wall, floor, stand, socle);
 
-  const key = new THREE.DirectionalLight('#fff4e6', 2.8);
-  key.position.set(-2.2, 2.6, 1.6);
-  key.target = bust;
-  const rim = new THREE.DirectionalLight('#cfe0ff', 1.4);
-  rim.position.set(1.8, 2.6, -2);
-  rim.target = bust;
-  const fill = new THREE.HemisphereLight('#d9dde6', '#3a3028', 0.7);
-  scene.add(key, rim, fill);
+  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  loadBust(aniso)
+    .then((bust) => {
+      bust.position.y = BUST_Y;
+      scene.add(bust);
+    })
+    .catch((err) => console.warn('Could not load the head scan', err));
+
+  // Rembrandt-style key from the front left, a cool rim from behind, soft fill
+  const focus = new THREE.Vector3(0, BUST_Y + HEAD_HALF_H + 0.035 - FRAME_H / 2, 0.04);
+  const key = new THREE.DirectionalLight('#fff1e0', 3.4);
+  key.position.set(-2.3, 2.7, 1.3);
+  key.target.position.copy(focus);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.radius = 3;
+  key.shadow.bias = -0.0004;
+  key.shadow.normalBias = 0.002;
+  const sc = key.shadow.camera;
+  sc.left = sc.bottom = -0.32;
+  sc.right = sc.top = 0.32;
+  sc.near = 1.5;
+  sc.far = 4.5;
+  const rim = new THREE.DirectionalLight('#cfe0ff', 1.6);
+  rim.position.set(1.8, 2.4, -2);
+  rim.target.position.copy(focus);
+  const fill = new THREE.HemisphereLight('#d9dde6', '#3a3028', 0.2);
+  scene.add(key, key.target, rim, rim.target, fill);
 
   const buttons = Array.from(el.querySelectorAll<HTMLButtonElement>('[data-mm]'));
   const slider = document.getElementById(el.dataset.slider ?? '') as HTMLInputElement | null;
@@ -201,7 +196,6 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
   });
   el.addEventListener('pointerleave', () => (ptrX = ptrY = 0));
 
-  const focus = new THREE.Vector3(0, bust.position.y - 0.03, 0);
   let yaw = 0;
   let pitch = 0;
 
