@@ -194,32 +194,20 @@ const COMP_FS = /* glsl */ `
   void main(){
     vec2 p = vUv;
     vec3 c = texture2D(tScene, p).rgb;
-    vec3 b = vec3(0.);
-    for (int i = 0; i < 8; i++){
-      float a = float(i) * .785;
-      vec2 o = vec2(cos(a), sin(a)) * (uRes.y / 110.) / uRes;
-      b += max(texture2D(tScene, p + o).rgb - .6, 0.);
-    }
-    c += b * vec3(1., .35, .15) * .22;
-    float l1 = exp(-pow(distance(p * vec2(1.6, 1.), vec2(-.05, .35 + .2 * sin(uTime * .3))), 2.) * 5.);
-    float l2 = exp(-pow(distance(p * vec2(1.6, 1.), vec2(1.65, .78 + .15 * cos(uTime * .23))), 2.) * 7.);
-    float fl = .75 + .25 * sin(uTime * .9 + p.y * 2.);
-    vec3 leak = (vec3(1., .32, .1) * l1 * .9 + vec3(1., .7, .28) * l2 * .55) * fl;
-    c = 1. - (1. - c) * (1. - leak);
-    float v = smoothstep(1.15, .3, length((p - .5) * vec2(1.25, 1.)));
-    c *= mix(.45, 1., v);
-    c += (hash12(p * uRes + fract(uTime * 7.3) * 311.) - .5) * .09;
+    float v = smoothstep(1.2, .35, length((p - .5) * vec2(1.25, 1.)));
+    c *= mix(.72, 1., v);
+    c += (hash12(p * uRes + fract(uTime * 7.3) * 311.) - .5) * .035;
     gl_FragColor = vec4(c, 1.);
   }
 `;
 
 /**
- * Film strips floating in the dark with light leaks and grain.
+ * Film strips floating in the dark, with a soft vignette and fine grain.
  * `strips` holds up to three photo lists: the front strip and two dimmer ones behind it.
  */
 export function createFilmStrip(renderer: THREE.WebGLRenderer, el: HTMLElement, strips: FilmPhoto[][]): Demo {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color().setRGB(0.082, 0.059, 0.047, THREE.LinearSRGBColorSpace);
+  scene.background = new THREE.Color().setRGB(0.07, 0.085, 0.09, THREE.LinearSRGBColorSpace);
   const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
   cam.position.set(0, 0, 9);
   const LEN = 18;
