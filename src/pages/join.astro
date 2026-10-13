@@ -1,9 +1,9 @@
 ---
 import Base from '../layouts/Base.astro';
 import PageHero from '../components/PageHero.astro';
-import JoinForm from '../components/JoinForm.astro';
+import FormLink from '../components/FormLink.astro';
 import SlotNote from '../components/SlotNote.astro';
-import { club, joinForm } from '../data/club';
+import { club, forms } from '../data/club';
 
 const faq = [
   { q: 'カメラを持っていなくても大丈夫？', a: '大丈夫です。メンバーの多くはスマホで撮っています。サークルでは、カメラを持っていない人も使える共有カメラの購入を目指しています。' },
@@ -17,7 +17,7 @@ const faq = [
   <PageHero
     edge="JOIN ▸ EVERY FRIDAY ▸ ROOM S306"
     title="見学・入部"
-    lead="経験もカメラもいりません。まずは金曜日のミーティングをのぞきに来てください。フォームから連絡をもらえれば、運営が当日案内します。"
+    lead="経験もカメラもいりません。まずは金曜日のミーティングをのぞきに来てください。フォームから申し込んでもらえれば、運営が当日案内します。"
   />
 
   <section class="wrap facts" aria-label="ミーティングの案内">
@@ -25,7 +25,7 @@ const faq = [
       <p class="edge">WHEN</p>
       <p class="big">{club.meetings.day}</p>
       <p class="num amber">{club.meetings.times.join(' / ')}</p>
-      <p class="small muted">どちらか都合のいい時間に</p>
+      <p class="small muted">授業のあと、そのまま来てください</p>
     </div>
     <div class="fact">
       <p class="edge">WHERE</p>
@@ -45,16 +45,13 @@ const faq = [
     <div class="wrap cols">
       <div class="form-col">
         <div class="section-head">
-          <p class="edge">FORM</p>
-          <h2>見学の申し込み</h2>
-          <p class="small muted">
-            {joinForm.endpoint
-              ? '送信すると、運営からメールで連絡します。'
-              : `送信ボタンを押すと、入力した内容でメールアプリが開きます（宛先 ${club.email}）。`}
-            Instagram の DM でも受け付けています。
+          <p class="edge">APPLY</p>
+          <h2>見学・入部の申し込み</h2>
+          <p class="muted">
+            申し込みはサークルのフォームで受け付けています。名前と連絡先、見学したい日を書いて送ってください。運営から連絡します。
           </p>
         </div>
-        <JoinForm />
+        <FormLink href={forms.join} label="申し込みフォームを開く" />
       </div>
 
       <aside class="side">
@@ -62,16 +59,16 @@ const faq = [
           <p class="edge">FLOW</p>
           <h2>入部までの流れ</h2>
           <ol>
-            <li><b>連絡する</b><span>フォームか Instagram の DM で、見学したい日を教えてください。</span></li>
+            <li><b>申し込む</b><span>フォームか Instagram の DM で、見学したい日を教えてください。</span></li>
             <li><b>ミーティングを見学</b><span>金曜のミーティングで、運営が活動の説明をします。</span></li>
             <li><b>撮影会に参加</b><span>気になる撮影会に、まずは1回参加してみてください。</span></li>
             <li><b>入部</b><span>連絡用のチャットに参加して、メンバーになります。<SlotNote note="実際の手続きに合わせて書き換えてください" /></span></li>
           </ol>
         </div>
         <div class="contact">
-          <p class="edge">CONTACT</p>
-          <a class="btn" href={club.instagram.url} target="_blank" rel="noopener">Instagram @{club.instagram.handle} <span class="arrow" aria-hidden="true">↗</span></a>
-          <p class="small">メール・Teams：<span class="num select">{club.email}</span></p>
+          <p class="edge">FOR OTHERS</p>
+          <p class="small">撮影のご依頼・協賛・取材など、学外の方からのご連絡は専用の窓口へ。</p>
+          <a class="link-arrow" href="/contact/">お問い合わせページへ →</a>
         </div>
       </aside>
     </div>
@@ -183,11 +180,6 @@ const faq = [
     display: grid;
     gap: 12px;
     justify-items: start;
-  }
-
-  .select {
-    user-select: all;
-    overflow-wrap: anywhere;
   }
 
   .faq {
