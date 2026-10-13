@@ -1,0 +1,293 @@
+import * as THREE from 'three';
+import { ENV_GLSL, type Env } from './env';
+import { AVENUES, CITY, LANDMARKS, RIVER_HALF_WIDTH, VIEW, heightAt, inRect, isRiver, riverX } from './layout';
+
+export function rng(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Building kinds: wooden machiya, concrete mid-rise, pale tiled block. */
+const MACHIYA = 0;
+const MIDRISE = 1;
+const PALE = 2;
+
+interface Building {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  h: number;
+  kind: number;
+  /** roof ridge along x (true) or z (false); only for machiya */
+  ridgeX: boolean;
+}
+
+const nearAvenue = (v: number, list: readonly number[], within: number) => list.some((a) => Math.abs(v - a) < within);
+
+function districtOf(x: number, z: number) {
+  if (Math.abs(x - 4) < 70 && z > 150 && z < 250) return 'station';
+  if (x > -110 && x < 125 && z > -70 && z < 110) return 'downtown';
+  return 'town';
+}
+
+function blockFree(x: number, z: number) {
+  if (heightAt(x, z) > 0.25) return false;
+  if (Math.abs(x - riverX(z)) < RIVER_HALF_WIDTH + 3.2) return false;
+  if (inRect(x, z, LANDMARKS.gosho, 1)) return false;
+  if (inRect(x, z, LANDMARKS.nijo, 1)) return false;
+  if (Math.abs(x - LANDMARKS.kyotoStation.x) < 30 && Math.abs(z - LANDMARKS.kyotoStation.z) < 8) return false;
+  if (Math.hypot(x - LANDMARKS.toji.x, z - LANDMARKS.toji.z) < 12) return false;
+  return true;
+}
+
+function heightFor(kind: number, district: string, r: () => number, onAvenue: boolean) {
+  if (kind === MACHIYA) return 0.6 + r() * 0.3;
+  let h = 1.1 + r() * 1.4;
+  if (onAvenue) h += 0.8 + r() * 0.9;
+  if (district === 'downtown') h += r() * 0.8;
+  if (district === 'station') h += 0.8 + r() * 1.5;
+  return Math.min(h, district === 'station' ? 6 : 4.5);
+}
+
+/** Lay buildings along the edges of each block; far blocks get a few coarse volumes instead. */
+export function planBuildings(quality: number): Building[] {
+  const r = rng(20250521);
+  const out: Building[] = [];
+  const B = CITY.block;
+  const cam = VIEW.camera;
+  const detailRadius = 150 + 140 * quality;
+
+  for (let bx = CITY.minX; bx < CITY.maxX; bx += B) {
+    for (let bz = CITY.minZ; bz < CITY.maxZ; bz += B) {
+      const cx = bx + B / 2;
+      const cz = bz + B / 2;
+      if (!blockFree(cx, cz)) continue;
+      const district = districtOf(cx, cz);
+      const dist = Math.hypot(cx - cam.x, cz - cam.z);
+      const avNS = nearAvenue(bx, AVENUES.northSouth, 1) || nearAvenue(bx + B, AVENUES.northSouth, 1);
+      const avEW = nearAvenue(bz, AVENUES.eastWest, 1) || nearAvenue(bz + B, AVENUES.eastWest, 1);
+      const machiyaShare = district === 'town' ? 0.82 : district === 'downtown' ? 0.4 : 0.15;
+
+      if (dist > detailRadius) {
+        // coarse: four volumes per block
+        for (let q = 0; q < 4; q++) {
+          const kind = r() < machiyaShare * 0.7 ? MACHIYA : r() < 0.7 ? MIDRISE : PALE;
+          const x = bx + (q % 2 ? 0.72 : 0.28) * B + (r() - 0.5);
+          const z = bz + (q < 2 ? 0.28 : 0.72) * B + (r() - 0.5);
+          out.push({ x, z, w: 3.8 + r() * 1.4, d: 3.8 + r() * 1.4, h: heightFor(kind, district, r, avNS || avEW) * (kind === MACHIYA ? 1.1 : 1), kind, ridgeX: r() < 0.5 });
+        }
+        continue;
+      }
+
+      const inset = 1.1;
+      const span = B - inset * 2;
+      // four edges: [startX, startZ, dirX, dirZ, outward normal is implied]
+      const edges: [number, number, number, number, boolean][] = [
+        [bx + inset, bz + inset, 1, 0, avEW && nearAvenue(bz, AVENUES.eastWest, 1)],
+        [bx + inset, bz + B - inset, 1, 0, avEW && nearAvenue(bz + B, AVENUES.eastWest, 1)],
+        [bx + inset, bz + inset, 0, 1, avNS && nearAvenue(bx, AVENUES.northSouth, 1)],
+        [bx + B - inset, bz + inset, 0, 1, avNS && nearAvenue(bx + B, AVENUES.northSouth, 1)],
+      ];
+      edges.forEach(([sx, sz, dx, dz, onAvenue], e) => {
+        let t = e >= 2 ? 1.9 : 0; // leave the corners to the x-edges
+        const end = e >= 2 ? span - 1.9 : span;
+        while (t < end) {
+          const kind = onAvenue ? (r() < 0.75 ? MIDRISE : PALE) : r() < machiyaShare ? MACHIYA : r() < 0.6 ? MIDRISE : PALE;
+          let w = kind === MACHIYA ? 0.75 + r() * 0.7 : 1.6 + r() * 2.2;
+          w = Math.min(w, end - t);
+          if (w < 0.5) break;
+          const depth = kind === MACHIYA ? 2.6 + r() * 1.6 : 2 + r() * 2;
+          const along = t + w / 2;
+          // offset inward from the street
+          const inward = (e === 1 || e === 3 ? -1 : 1) * depth / 2;
+          const x = dx ? sx + along : sx + inward;
+          const z = dz ? sz + along : sz + inward;
+          const bw = dx ? w * 0.96 : depth;
+          const bd = dz ? w * 0.96 : depth;
+          if (!isRiver(x, z)) out.push({ x, z, w: bw, d: bd, h: heightFor(kind, district, r, onAvenue), kind, ridgeX: dx === 1 });
+          t += w;
+        }
+      });
+      // a few buildings inside larger downtown blocks
+      if (district !== 'town' && r() < 0.6) {
+        out.push({ x: cx + (r() - 0.5) * 2, z: cz + (r() - 0.5) * 2, w: 3 + r() * 2, d: 3 + r() * 2, h: heightFor(MIDRISE, district, r, false), kind: MIDRISE, ridgeX: true });
+      }
+    }
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+
+const BUILDING_VS = /* glsl */ `
+  attribute float aInfo;
+  varying vec3 vWorld;
+  varying vec3 vLocal;
+  varying vec3 vN;
+  varying float vInfo;
+  void main(){
+    vec3 size = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
+    vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.);
+    vWorld = wp.xyz;
+    vLocal = (position + vec3(.5, 0., .5)) * size;
+    vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
+    vInfo = aInfo;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+
+const BUILDING_FS = /* glsl */ `
+  ${ENV_GLSL}
+  varying vec3 vWorld;
+  varying vec3 vLocal;
+  varying vec3 vN;
+  varying float vInfo;
+  void main(){
+    float kind = floor(vInfo);
+    float seed = fract(vInfo);
+    vec3 n = normalize(vN);
+    vec3 alb;
+    if (kind < .5) alb = mix(vec3(.07, .05, .036), vec3(.12, .09, .065), seed);
+    else if (kind < 1.5) alb = mix(vec3(.16, .15, .14), vec3(.27, .25, .22), seed);
+    else alb = mix(vec3(.36, .35, .33), vec3(.5, .48, .45), seed);
+
+    vec3 emit = vec3(0.);
+    if (n.y < .5){
+      vec2 fuv = abs(n.x) > .5 ? vec2(vLocal.z, vLocal.y) : vec2(vLocal.x, vLocal.y);
+      bool machiya = kind < .5;
+      vec2 cell = machiya ? vec2(.42, .31) : vec2(.29, .31 + .06 * seed);
+      vec2 g = fuv / cell;
+      vec2 id = floor(g);
+      vec2 f = fract(g);
+      float win = smoothstep(.1, .2, f.x) * smoothstep(.9, .8, f.x) * smoothstep(.2, .32, f.y) * smoothstep(.92, .8, f.y);
+      if (machiya) win *= .7;
+      float px = max(fwidth(g.x), fwidth(g.y));
+      float detail = 1. - smoothstep(.35, .95, px);
+      float r = hash13(vec3(id, seed * 91. + n.x * 7. + n.z * 13.));
+      float lit = step(r, uLit * (machiya ? .75 : 1.15));
+      float warm = step(.28, hash13(vec3(id + 3.1, seed * 17.)));
+      vec3 wc = mix(vec3(.7, .82, 1.), vec3(1., .6, .28), warm);
+      if (machiya) wc = vec3(1., .55, .22);
+      float avg = .42 * uLit;
+      float pattern = mix(avg, win * lit, detail);
+      emit = wc * pattern * uCity * 2.4;
+      alb = mix(alb, alb * .5 + vec3(.01, .012, .016), win * detail * .85);
+      // shop fronts on the ground floor glow a little brighter
+      if (!machiya && id.y < .5) emit += vec3(1., .78, .5) * win * detail * uCity * step(.4, r) * 1.6;
+    } else {
+      alb *= kind < .5 ? .6 : .85;
+    }
+    float ao = mix(.45, 1., smoothstep(0., .9, vLocal.y));
+    vec3 col = shade(alb, n) * ao;
+    gl_FragColor = vec4(applyFog(col, emit, vWorld), 1.);
+  }
+`;
+
+const SIMPLE_FS = /* glsl */ `
+  ${ENV_GLSL}
+  uniform vec3 uAlbedo;
+  uniform float uVary;
+  varying vec3 vWorld;
+  varying vec3 vN;
+  varying float vSeed;
+  void main(){
+    vec3 n = normalize(vN);
+    vec3 alb = uAlbedo * (1. - uVary * .5 + uVary * vSeed);
+    gl_FragColor = vec4(applyFog(shade(alb, n), vec3(0.), vWorld), 1.);
+  }
+`;
+
+const SIMPLE_VS = /* glsl */ `
+  attribute float aSeed;
+  uniform float uWobble;
+  varying vec3 vWorld;
+  varying vec3 vN;
+  varying float vSeed;
+  void main(){
+    vec3 p = position;
+    // lumpy canopy for trees
+    p += normal * uWobble * (sin(p.x * 5.1 + aSeed * 40.) * sin(p.y * 4.3 + aSeed * 17.) * sin(p.z * 3.7));
+    vec4 wp = modelMatrix * instanceMatrix * vec4(p, 1.);
+    vWorld = wp.xyz;
+    vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
+    vSeed = aSeed;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+
+function roofGeometry() {
+  // gable roof, ridge along x, eaves overhanging, base at y=0
+  const g = new THREE.BufferGeometry();
+  const o = 0.5;
+  const v = [
+    // slope facing -z
+    -o, 0, -o, o, 0, -o, o, 1, 0,
+    -o, 0, -o, o, 1, 0, -o, 1, 0,
+    // slope facing +z
+    o, 0, o, -o, 0, o, -o, 1, 0,
+    o, 0, o, -o, 1, 0, o, 1, 0,
+    // gable ends
+    -o, 0, o, -o, 0, -o, -o, 1, 0,
+    o, 0, -o, o, 0, o, o, 1, 0,
+  ];
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+export function buildCity(env: Env, quality: number) {
+  const group = new THREE.Group();
+  const plan = planBuildings(quality);
+  const r = rng(7);
+
+  // buildings
+  const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  const bMat = new THREE.ShaderMaterial({ uniforms: { ...env }, vertexShader: BUILDING_VS, fragmentShader: BUILDING_FS });
+  const buildings = new THREE.InstancedMesh(box, bMat, plan.length);
+  const info = new Float32Array(plan.length);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  plan.forEach((b, i) => {
+    m.compose(p.set(b.x, 0, b.z), q.identity(), s.set(b.w, b.h, b.d));
+    buildings.setMatrixAt(i, m);
+    info[i] = b.kind + Math.min(0.999, r());
+  });
+  box.setAttribute('aInfo', new THREE.InstancedBufferAttribute(info, 1));
+  buildings.computeBoundingSphere();
+  group.add(buildings);
+
+  // machiya roofs
+  const houses = plan.filter((b) => b.kind === MACHIYA);
+  const roofGeo = roofGeometry();
+  const roofSeed = new Float32Array(houses.length);
+  const roofMat = new THREE.ShaderMaterial({
+    uniforms: { ...env, uAlbedo: { value: new THREE.Color(0.05, 0.053, 0.058) }, uVary: { value: 0.6 }, uWobble: { value: 0 } },
+    vertexShader: SIMPLE_VS,
+    fragmentShader: SIMPLE_FS,
+    side: THREE.DoubleSide,
+  });
+  const roofs = new THREE.InstancedMesh(roofGeo, roofMat, houses.length);
+  const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+  houses.forEach((b, i) => {
+    const along = b.ridgeX ? b.w : b.d;
+    const across = b.ridgeX ? b.d : b.w;
+    m.compose(p.set(b.x, b.h, b.z), b.ridgeX ? q.identity() : yaw, s.set(along * 1.06, 0.32 + across * 0.05, across * 1.18));
+    roofs.setMatrixAt(i, m);
+    roofSeed[i] = r();
+  });
+  roofGeo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(roofSeed, 1));
+  roofs.computeBoundingSphere();
+  group.add(roofs);
+
+  return { group, count: plan.length };
+}
+
