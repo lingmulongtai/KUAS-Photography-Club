@@ -37,10 +37,10 @@ export function buildClouds(env: Env) {
 
         vec3 v = normalize(vWorld - cameraPosition);
         float s = max(dot(v, uSunDir), 0.);
-        float phase = .55 + .35 * s + 1.5 * pow(s, 6.);
+        float phase = .5 + .3 * s + .35 * pow(s, 8.);
         vec3 lit = uCloudLight * phase * (1. - .5 * core);
         vec3 amb = mix(uHorizon, uZenith, .55) * (.8 - .35 * core);
-        vec3 glow = vec3(.045, .022, .011) * uCity * (.5 + .5 * core);
+        vec3 glow = vec3(.016, .008, .004) * uCity * (.5 + .5 * core);
         vec3 col = lit + amb + glow;
 
         float dist = length(vWorld.xz - cameraPosition.xz);
