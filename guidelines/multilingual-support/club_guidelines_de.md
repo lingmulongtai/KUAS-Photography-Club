@@ -7,7 +7,7 @@ Diese Richtlinien sind unsere wichtigen Regeln, um sicherzustellen, dass die Akt
 - **Kontakt:**
   - Instagram: @kuas_photographyclub
   - Teams/E-Mail: 2025m011@kuas.ac.jp
-- **Regelmäßige Treffen:** Montags um 16:20 und 18:00 Uhr in Raum S311, Uzumasa Campus.
+- **Regelmäßige Treffen:** Freitags ab 18:00 Uhr in Raum S306, Uzumasa Campus.
 
 ---
 
@@ -94,7 +94,7 @@ Diese Richtlinien sind unsere wichtigen Regeln, um sicherzustellen, dass die Akt
   - Beim Kauf von Material für alle wird von den Organisatoren ein Vorschlag gemacht, und die Entscheidung wird in einer Sitzung durch Diskussion getroffen.
 
 ## 9. Wie Sitzungen ablaufen
-- **Regelmäßige Treffen:** Montags um 16:20 / 18:00 Uhr (S311). Die Tagesordnung wird im Voraus mitgeteilt.
+- **Regelmäßige Treffen:** Freitags ab 18:00 Uhr (S306). Die Tagesordnung wird im Voraus mitgeteilt.
 - **Protokolle:** Wir werden protokollieren, was besprochen wurde, was entschieden wurde und wer verantwortlich ist, und es mit den Mitgliedern teilen.
 - **Entscheidungsfindung:**
   - Wichtige Angelegenheiten werden im Einvernehmen der anwesenden Organisatoren entschieden. Bei Meinungsverschiedenheiten können wir mit Stimmenmehrheit entscheiden.

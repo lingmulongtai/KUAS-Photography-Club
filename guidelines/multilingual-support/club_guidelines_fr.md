@@ -7,7 +7,7 @@ Ces directives sont nos règles importantes pour garantir que les activités du 
 - **Contact :**
   - Instagram : @kuas_photographyclub
   - Teams/E-mail : 2025m011@kuas.ac.jp
-- **Réunions régulières :** Le lundi à 16h20 et 18h00 dans la salle S311, Campus d'Uzumasa.
+- **Réunions régulières :** Le vendredi à partir de 18h00 dans la salle S306, Campus d'Uzumasa.
 
 ---
 
@@ -94,7 +94,7 @@ Ces directives sont nos règles importantes pour garantir que les activités du 
   - Lors de l'achat d'équipement pour tous, les organisateurs feront une proposition, et la décision sera prise par discussion lors d'une réunion.
 
 ## 9. Déroulement des réunions
-- **Réunions régulières :** Le lundi à 16h20 / 18h00 (S311). L'ordre du jour sera partagé à l'avance.
+- **Réunions régulières :** Le vendredi à partir de 18h00 (S306). L'ordre du jour sera partagé à l'avance.
 - **Comptes rendus :** Nous enregistrerons ce qui a été discuté, ce qui a été décidé et qui est en charge, et nous le partagerons avec les membres.
 - **Prise de décision :**
   - Les questions importantes sont décidées par l'accord des organisateurs présents. Si les avis sont partagés, nous pouvons décider par un vote à la majorité.

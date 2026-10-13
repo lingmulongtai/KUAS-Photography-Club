@@ -7,7 +7,7 @@ Panduan ini adalah aturan penting kami untuk memastikan bahwa kegiatan Klub Foto
 - **Kontak:**
   - Instagram: @kuas_photographyclub
   - Teams/Email: 2025m011@kuas.ac.jp
-- **Pertemuan Rutin:** Senin pukul 16:20 & 18:00 di Ruang S311, Kampus Uzumasa.
+- **Pertemuan Rutin:** Jumat mulai pukul 18:00 di Ruang S306, Kampus Uzumasa.
 
 ---
 
@@ -94,7 +94,7 @@ Panduan ini adalah aturan penting kami untuk memastikan bahwa kegiatan Klub Foto
   - Saat membeli peralatan untuk semua, penyelenggara akan membuat proposal, dan keputusan akan dibuat melalui diskusi dalam pertemuan.
 
 ## 9. Operasional Pertemuan
-- **Pertemuan Rutin:** Senin pukul 16:20 / 18:00 (S311). Agenda akan dibagikan sebelumnya.
+- **Pertemuan Rutin:** Jumat mulai pukul 18:00 (S306). Agenda akan dibagikan sebelumnya.
 - **Notulen:** Kami akan mencatat apa yang dibahas, apa yang diputuskan, dan siapa yang bertanggung jawab, dan membagikannya kepada anggota.
 - **Pengambilan Keputusan:**
   - Masalah-masalah penting diputuskan melalui kesepakatan di antara penyelenggara yang hadir. Jika pendapat terbagi, kami dapat memutuskan dengan suara mayoritas.
