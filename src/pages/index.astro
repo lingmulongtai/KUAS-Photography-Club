@@ -5,6 +5,7 @@ import FilmStrip from '../components/FilmStrip.astro';
 import TripRow from '../components/TripRow.astro';
 import LearnCards from '../components/learn/LearnCards.astro';
 import InstagramSection from '../components/InstagramSection.astro';
+import UpcomingEvents from '../components/UpcomingEvents.astro';
 import { getTrips, stripsFrom } from '../lib/trips';
 import { club } from '../data/club';
 
@@ -31,6 +32,19 @@ const latest = trips.slice(0, 3);
         <p class="where">{club.campus} {club.meetings.room} 教室</p>
         <a class="btn btn--primary" href="/join/">見学を申し込む <span class="arrow" aria-hidden="true">→</span></a>
       </aside>
+    </div>
+  </section>
+
+  <section class="section soft" aria-labelledby="next-title">
+    <div class="wrap stack">
+      <div class="head-row">
+        <div class="section-head">
+          <p class="edge">SCHEDULE ▸ COMING UP</p>
+          <h2 id="next-title">これからの予定</h2>
+        </div>
+        <a class="link-arrow" href="/schedule/">スケジュールを見る →</a>
+      </div>
+      <UpcomingEvents />
     </div>
   </section>
 
@@ -121,6 +135,11 @@ const latest = trips.slice(0, 3);
   .where {
     color: var(--muted);
     margin-bottom: 14px;
+  }
+
+  .soft {
+    background: var(--brand-pale);
+    border-top: 0;
   }
 
   .stack {
