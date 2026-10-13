@@ -1,0 +1,275 @@
+---
+import ApertureMark from './ApertureMark.astro';
+import { nav } from '../data/club';
+
+interface Props {
+  /** Float over a full-bleed hero instead of sitting on the page background. */
+  overlay?: boolean;
+}
+const { overlay = false } = Astro.props;
+const path = Astro.url.pathname;
+const isCurrent = (href: string) => path === href || path.startsWith(href);
+---
+<header class:list={['site-header', { overlay }]}>
+  <div class="bar">
+    <a class="brand" href="/" aria-label="KUAS Photography Club トップへ">
+      <ApertureMark size={30} />
+      <span class="brand-text">
+        <span class="brand-en">KUAS PHOTOGRAPHY CLUB</span>
+        <span class="brand-ja">京都先端科学大学 写真サークル</span>
+      </span>
+    </a>
+
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">
+      <span class="menu-icon" aria-hidden="true"><i></i><i></i></span>
+      <span class="menu-label">MENU</span>
+    </button>
+
+    <nav id="site-nav" class="nav" aria-label="メインメニュー">
+      <ul>
+        {nav.map((item) => (
+          <li>
+            <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+              <span class="en">{item.en}</span>
+              <span class="ja">{item.ja}</span>
+            </a>
+          </li>
+        ))}
+        <li class="cta-item">
+          <a class="btn btn--primary cta" href="/join/" aria-current={isCurrent('/join/') ? 'page' : undefined}>
+            見学・入部 <span class="arrow" aria-hidden="true">→</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>('.site-header');
+  const btn = header?.querySelector<HTMLButtonElement>('.menu-btn');
+  const setOpen = (open: boolean) => {
+    if (!header || !btn) return;
+    header.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+    document.documentElement.classList.toggle('menu-open', open);
+  };
+  btn?.addEventListener('click', () => setOpen(!header?.classList.contains('open')));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && header?.classList.contains('open')) {
+      setOpen(false);
+      btn?.focus();
+    }
+  });
+  header?.querySelectorAll('.nav a').forEach((a) => a.addEventListener('click', () => setOpen(false)));
+  const onScroll = () => header?.classList.toggle('scrolled', window.scrollY > 24);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+</script>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(15, 18, 23, 0.86);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    transition: background-color 0.3s, border-color 0.3s;
+  }
+
+  .site-header.overlay {
+    position: fixed;
+    left: 0;
+    right: 0;
+    background: linear-gradient(rgba(5, 7, 12, 0.55), rgba(5, 7, 12, 0));
+    border-bottom-color: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .site-header.overlay.scrolled {
+    background: rgba(15, 18, 23, 0.86);
+    border-bottom-color: var(--line);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  .bar {
+    max-width: calc(var(--maxw) + var(--gutter) * 2);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+    min-height: var(--header-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: var(--ink);
+  }
+
+  .brand :global(svg) {
+    color: var(--amber);
+    flex: none;
+  }
+
+  .brand-text {
+    display: grid;
+    line-height: 1.25;
+  }
+
+  .brand-en {
+    font: 500 12px/1.3 var(--mono);
+    letter-spacing: 0.16em;
+  }
+
+  .brand-ja {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  .nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: clamp(14px, 2.2vw, 30px);
+  }
+
+  .nav a:not(.cta) {
+    display: grid;
+    text-decoration: none;
+    line-height: 1.3;
+    padding-block: 6px;
+    border-bottom: 1px solid transparent;
+  }
+
+  .nav .en {
+    font: 500 10px/1.3 var(--mono);
+    letter-spacing: 0.16em;
+    color: var(--amber);
+    text-transform: uppercase;
+  }
+
+  .nav .ja {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .nav a[aria-current='page']:not(.cta) {
+    border-bottom-color: var(--pencil);
+  }
+
+  .cta {
+    padding: 11px 16px;
+    font-size: 13px;
+  }
+
+  .menu-btn {
+    display: none;
+    appearance: none;
+    background: none;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    gap: 10px;
+    align-items: center;
+    cursor: pointer;
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.16em;
+  }
+
+  .menu-icon {
+    display: grid;
+    gap: 5px;
+    width: 18px;
+  }
+
+  .menu-icon i {
+    display: block;
+    height: 1.5px;
+    background: currentColor;
+    transition: transform 0.25s;
+  }
+
+  .open .menu-icon i:first-child {
+    transform: translateY(3.25px) rotate(45deg);
+  }
+
+  .open .menu-icon i:last-child {
+    transform: translateY(-3.25px) rotate(-45deg);
+  }
+
+  @media (max-width: 900px) {
+    .menu-btn {
+      display: inline-flex;
+    }
+
+    .nav {
+      position: fixed;
+      inset: var(--header-h) 0 0 0;
+      background: var(--base);
+      padding: 24px var(--gutter) 40px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .open .nav {
+      display: block;
+    }
+
+    .nav ul {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .nav a:not(.cta) {
+      padding-block: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .nav .ja {
+      font: 700 22px/1.3 var(--display);
+    }
+
+    .nav a[aria-current='page']:not(.cta) {
+      border-bottom-color: var(--pencil);
+    }
+
+    .cta-item {
+      margin-top: 28px;
+    }
+
+    .cta {
+      width: 100%;
+      padding: 16px;
+      font-size: 15px;
+    }
+
+    .open.site-header,
+    .open.site-header.overlay {
+      background: var(--base);
+      border-bottom-color: var(--line);
+    }
+  }
+
+  @media (max-width: 420px) {
+    .brand-ja {
+      display: none;
+    }
+  }
+
+  :global(html.menu-open) {
+    overflow: hidden;
+  }
+</style>
