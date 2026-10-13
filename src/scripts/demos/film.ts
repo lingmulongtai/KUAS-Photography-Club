@@ -172,7 +172,7 @@ const STRIP_VS = /* glsl */ `
     vec3 p = vec3(x, 0., 0.);
     p.y = y * cos(tw) + sin(x * .25 + uTime * .31 + uPhase) * .5 * uAmp;
     p.z = y * sin(tw) + sin(x * .33 + uTime * .27 + uPhase * 1.7) * 1.1 * uAmp - .03 * x * x;
-    vShade = .62 + .38 * abs(cos(tw));
+    vShade = .8 + .2 * abs(cos(tw));
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
   }
 `;
@@ -215,16 +215,16 @@ export function createFilmStrip(renderer: THREE.WebGLRenderer, el: HTMLElement, 
   scene.background = new THREE.Color().setRGB(0.07, 0.085, 0.09, THREE.LinearSRGBColorSpace);
   const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
   cam.position.set(0, 0, 9);
-  const LEN = 18;
-  const HGT = 1.6;
+  const LEN = 22;
+  const HGT = 2.2;
   const geo = new THREE.PlaneGeometry(LEN, HGT, 240, 1);
   const aniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
   const k = renderer.capabilities.maxTextureSize >= FRAMES * PITCH * 2 ? 2 : 1;
   const lists = strips.filter((s) => s.length > 0);
   const layout = [
     { phase: 0, amp: 1, dim: 1, pos: [0, 0, 0], rot: 0, dir: 1, offset: 0 },
-    { phase: 2.4, amp: 0.8, dim: 0.42, pos: [1.2, 1.9, -4], rot: -0.12, dir: -0.6, offset: 0.37 },
-    { phase: 4.1, amp: 0.7, dim: 0.3, pos: [-1, -2.3, -6], rot: 0.1, dir: 0.45, offset: 0.71 },
+    { phase: 2.4, amp: 0.8, dim: 0.45, pos: [1.2, 2.6, -5], rot: -0.12, dir: -0.6, offset: 0.37 },
+    { phase: 4.1, amp: 0.7, dim: 0.32, pos: [-1, -3, -7], rot: 0.1, dir: 0.45, offset: 0.71 },
   ];
   const meshes = layout.map((l, i) => {
     const photos = lists[i % lists.length];
