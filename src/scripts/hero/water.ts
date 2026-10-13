@@ -66,7 +66,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[]) {
         float fres = .03 + .97 * pow(1. - max(dot(-v, n), 0.), 5.);
         vec3 deep = vec3(.006, .014, .014);
         vec3 col = deep * (uSunLight * max(uSunDir.y, 0.) + skyLight(vec3(0., 1., 0.))) + skyColor(r) * fres;
-        col += uSunLight * pow(max(dot(r, uSunDir), 0.), 180.) * 6.;
+        col += uSunLight * pow(max(dot(r, uSunDir), 0.), 90.) * 2.;
         col += uMoonLight * pow(max(dot(r, uMoonDir), 0.), 120.) * 30.;
         // reflected bank lights: vertical streaks that break up with the ripples
         float streak = vnoise(vec2(q.x * .25 + q.y * .25, t * .6) + w * 4.);

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Demo } from '../gl/stage';
 import { createEnv } from './env';
 import { KYOTO, directionFrom, jstMinutes, localSiderealAngle, moonPosition, sunPosition } from '../kyoto/astro';
-import { createLook, kelvin, lookAt, phaseName, windowsLit } from '../kyoto/palette';
+import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import { PLACES } from './geo';
 import { loadJSON, loadTexture, type TerrainMeta } from './data';
 import { loadHeightfield } from './heightfield';
@@ -18,6 +18,7 @@ import { BUILDINGS_BOX } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
 import { buildWater } from './water';
 import { createLabels } from './labels';
+import { buildTrees } from './trees';
 
 export interface HeroStatus {
   minutes: number;
@@ -39,10 +40,20 @@ export interface HeroOptions {
 
 const RAD = Math.PI / 180;
 
-/** The view from the stage of Shogunzuka Seiryuden, looking west over the city. */
+/**
+ * The view from Shogunzuka Seiryuden, looking west over the city: from just in front of the
+ * stage and a little above it, so the temple grounds stay out of frame and the slope below
+ * is all forest.
+ */
+const BEARING = 265;
 export const VIEW = {
-  eye: { ...PLACES.shogunzuka, above: 36 },
-  bearing: 265,
+  eye: {
+    x: PLACES.shogunzuka.x + Math.sin((BEARING * Math.PI) / 180) * 120,
+    z: PLACES.shogunzuka.z - Math.cos((BEARING * Math.PI) / 180) * 120,
+    /** metres above the ground at the stage */
+    above: 44,
+  },
+  bearing: BEARING,
   pitch: -6.5,
 };
 
@@ -74,7 +85,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   (async () => {
     const meta = await loadJSON<TerrainMeta>('terrain.json');
     const [hf, wide] = await Promise.all([loadHeightfield(meta), loadTexture(meta.aerialWide.file, aniso)]);
-    eye.y = hf.height(eye.x, eye.z) + VIEW.eye.above;
+    eye.y = hf.height(PLACES.shogunzuka.x, PLACES.shogunzuka.z) + VIEW.eye.above;
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
       aerialWideBox: meta.aerialWide.box,
@@ -93,6 +104,8 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     terrain.uniforms.uCityOn.value = 1;
     const city = buildCity(env, hf, buildings);
     const landmarks = buildLandmarks(env, hf);
+    const trees = buildTrees(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, VIEW.eye, opts.quality);
+    scene.add(trees.group);
     scene.add(city.group, landmarks.mesh);
     casts(city.group);
     casts(landmarks.mesh);
