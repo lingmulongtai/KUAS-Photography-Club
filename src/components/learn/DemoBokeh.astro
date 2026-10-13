@@ -1,0 +1,43 @@
+---
+/** Night street through an 85 mm lens: focus slider and aperture buttons. */
+interface Props {
+  print?: string;
+}
+const { print = '/photos/samples/summer-fireworks/01.jpg' } = Astro.props;
+const stops = ['1.4', '2.8', '5.6'];
+---
+<figure class="demo">
+  <div class="stage" data-demo="bokeh" data-print={print} data-slider="bokeh-focus" data-output="bokeh-dist" style="--fb: radial-gradient(circle at 28% 38%, rgba(255,184,106,.35), transparent 13%), radial-gradient(circle at 62% 30%, rgba(116,179,255,.3), transparent 11%), #05060b">
+    <canvas aria-label="ピント位置と絞りで玉ボケが変わる夜の街のデモ"></canvas>
+    <div class="hud">
+      <div class="row"><span class="tag" data-readout>85mm · f/1.4 · ピント 3.0m</span></div>
+      <div class="row">
+        <div class="chips" role="group" aria-label="絞り">
+          {stops.map((f) => <button class="chip" type="button" data-f={f} aria-pressed={f === '1.4' ? 'true' : 'false'}>f/{f}</button>)}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <label for="bokeh-focus">ピント位置</label>
+    <input type="range" id="bokeh-focus" min="0" max="1000" step="1" value="380" />
+    <output id="bokeh-dist" for="bokeh-focus">3.0m</output>
+  </div>
+  <figcaption class="hint">触らないでいると、ピントが写真 → 遠くの街 → 手前のイルミネーションの順に動きます。絞ると玉ボケが小さく、六角形になります（絞り羽根6枚のレンズ）。</figcaption>
+</figure>
+
+<script>
+  import { mountStage } from '../../scripts/gl/stage';
+  import { createBokeh } from '../../scripts/demos/bokeh';
+  document.querySelectorAll<HTMLElement>('.stage[data-demo="bokeh"]').forEach((el) => {
+    mountStage(el, (renderer, stage) => createBokeh(renderer, stage, el.dataset.print ?? ''));
+  });
+</script>
+
+<style>
+  .demo {
+    margin: 0;
+    display: grid;
+    gap: 10px;
+  }
+</style>
