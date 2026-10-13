@@ -1,5 +1,4 @@
 ---
-import ApertureMark from './ApertureMark.astro';
 import { nav } from '../data/club';
 
 interface Props {
@@ -12,11 +11,11 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
 ---
 <header class:list={['site-header', { overlay }]}>
   <div class="bar">
-    <a class="brand" href="/" aria-label="KUAS Photography Club トップへ">
-      <ApertureMark size={30} />
+    <a class="brand" href="/" aria-label="写真部 KUAS Photography Club トップへ">
+      <img class="mark" src="/brand/mark-192.webp" alt="" width="48" height="48" />
       <span class="brand-text">
-        <span class="brand-en">KUAS PHOTOGRAPHY CLUB</span>
-        <span class="brand-ja">京都先端科学大学 写真サークル</span>
+        <span class="brand-ja">写真部</span>
+        <span class="brand-en">KUAS Photography Club</span>
       </span>
     </a>
 
@@ -27,20 +26,21 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
 
     <nav id="site-nav" class="nav" aria-label="メインメニュー">
       <ul>
-        {nav.map((item) => (
-          <li>
+        {nav.map((item, i) => (
+          <li style={`--i: ${i}`}>
             <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
               <span class="en">{item.en}</span>
               <span class="ja">{item.ja}</span>
             </a>
           </li>
         ))}
-        <li class="cta-item">
+        <li class="cta-item" style={`--i: ${nav.length}`}>
           <a class="btn btn--primary cta" href="/join/" aria-current={isCurrent('/join/') ? 'page' : undefined}>
             見学・入部 <span class="arrow" aria-hidden="true">→</span>
           </a>
         </li>
       </ul>
+      <span class="indicator" aria-hidden="true"></span>
     </nav>
   </div>
 </header>
@@ -48,6 +48,10 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
 <script>
   const header = document.querySelector<HTMLElement>('.site-header');
   const btn = header?.querySelector<HTMLButtonElement>('.menu-btn');
+  const navEl = header?.querySelector<HTMLElement>('.nav');
+  const indicator = header?.querySelector<HTMLElement>('.indicator');
+  const links = Array.from(header?.querySelectorAll<HTMLAnchorElement>('.nav a:not(.cta)') ?? []);
+
   const setOpen = (open: boolean) => {
     if (!header || !btn) return;
     header.classList.toggle('open', open);
@@ -62,6 +66,33 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     }
   });
   header?.querySelectorAll('.nav a').forEach((a) => a.addEventListener('click', () => setOpen(false)));
+
+  // underline that glides to the hovered tab and rests on the current page
+  const current = links.find((a) => a.getAttribute('aria-current') === 'page') ?? null;
+  const moveTo = (a: HTMLElement | null, instant = false) => {
+    if (!indicator || !navEl) return;
+    if (!a || getComputedStyle(navEl).position === 'absolute') {
+      indicator.style.opacity = '0';
+      return;
+    }
+    const nr = navEl.getBoundingClientRect();
+    const r = a.getBoundingClientRect();
+    if (instant) indicator.style.transition = 'none';
+    indicator.style.opacity = '1';
+    indicator.style.width = `${r.width}px`;
+    indicator.style.transform = `translateX(${r.left - nr.left}px)`;
+    if (instant) requestAnimationFrame(() => (indicator.style.transition = ''));
+  };
+  links.forEach((a) => {
+    a.addEventListener('mouseenter', () => moveTo(a));
+    a.addEventListener('focus', () => moveTo(a));
+  });
+  navEl?.addEventListener('mouseleave', () => moveTo(current));
+  const settle = () => moveTo(current, true);
+  settle();
+  document.fonts?.ready.then(settle);
+  window.addEventListener('resize', settle);
+
   const onScroll = () => header?.classList.toggle('scrolled', window.scrollY > 24);
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });
@@ -72,28 +103,31 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     position: sticky;
     top: 0;
     z-index: 50;
-    background: rgba(15, 18, 23, 0.86);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.88);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line);
-    transition: background-color 0.3s, border-color 0.3s;
+    transition: background-color 0.35s, border-color 0.35s, color 0.35s;
+    view-transition-name: site-header;
   }
 
   .site-header.overlay {
     position: fixed;
     left: 0;
     right: 0;
-    background: linear-gradient(rgba(5, 7, 12, 0.72), rgba(5, 7, 12, 0.3) 70%, rgba(5, 7, 12, 0));
+    color: var(--on-dark);
+    background: linear-gradient(rgba(6, 16, 20, 0.62), rgba(6, 16, 20, 0.25) 70%, rgba(6, 16, 20, 0));
     border-bottom-color: transparent;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 
   .site-header.overlay.scrolled {
-    background: rgba(15, 18, 23, 0.86);
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.9);
     border-bottom-color: var(--line);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
   }
 
   .bar {
@@ -112,28 +146,44 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     align-items: center;
     gap: 12px;
     text-decoration: none;
-    color: var(--ink);
+    color: inherit;
   }
 
-  .brand :global(svg) {
-    color: var(--accent);
+  .brand:hover {
+    color: inherit;
+  }
+
+  .mark {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
     flex: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .brand:hover .mark {
+    transform: rotate(-8deg) scale(1.05);
   }
 
   .brand-text {
     display: grid;
-    line-height: 1.25;
-  }
-
-  .brand-en {
-    font: 500 12px/1.3 var(--mono);
-    letter-spacing: 0.16em;
+    line-height: 1.2;
   }
 
   .brand-ja {
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 0.06em;
+    font: 700 19px/1.2 var(--display);
+    letter-spacing: 0.32em;
+  }
+
+  .brand-en {
+    font: 600 11px/1.3 var(--latin);
+    letter-spacing: 0.12em;
+    opacity: 0.8;
+  }
+
+  .nav {
+    position: relative;
   }
 
   .nav ul {
@@ -149,28 +199,46 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     display: grid;
     text-decoration: none;
     line-height: 1.3;
-    padding-block: 6px;
-    border-bottom: 1px solid transparent;
+    padding-block: 8px;
+    color: inherit;
+    transition: opacity 0.2s, transform 0.25s;
+  }
+
+  .nav a:not(.cta):hover {
+    transform: translateY(-1px);
   }
 
   .nav .en {
-    font: 500 10px/1.3 var(--mono);
-    letter-spacing: 0.16em;
+    font: 700 10px/1.3 var(--latin);
+    letter-spacing: 0.18em;
     color: var(--accent);
     text-transform: uppercase;
   }
 
-  .nav .ja {
-    font-size: 14px;
-    font-weight: 500;
+  .overlay:not(.scrolled) .nav .en {
+    color: var(--brand);
   }
 
-  .nav a[aria-current='page']:not(.cta) {
-    border-bottom-color: var(--mark);
+  .nav .ja {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .indicator {
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    height: 3px;
+    width: 0;
+    border-radius: 3px;
+    background: var(--brand);
+    opacity: 0;
+    transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s;
+    pointer-events: none;
   }
 
   .cta {
-    padding: 11px 16px;
+    padding: 12px 18px;
     font-size: 13px;
   }
 
@@ -178,13 +246,14 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     display: none;
     appearance: none;
     background: none;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius);
-    padding: 10px 12px;
+    border: 1.5px solid currentColor;
+    border-radius: 999px;
+    padding: 10px 14px;
     gap: 10px;
     align-items: center;
     cursor: pointer;
-    font: 500 11px/1 var(--mono);
+    color: inherit;
+    font: 700 11px/1 var(--latin);
     letter-spacing: 0.16em;
   }
 
@@ -198,7 +267,7 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     display: block;
     height: 1.5px;
     background: currentColor;
-    transition: transform 0.25s;
+    transition: transform 0.3s;
   }
 
   .open .menu-icon i:first-child {
@@ -209,7 +278,7 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     transform: translateY(-3.25px) rotate(-45deg);
   }
 
-  @media (max-width: 900px) {
+  @media (max-width: 960px) {
     .menu-btn {
       display: inline-flex;
     }
@@ -221,14 +290,21 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
       left: 0;
       right: 0;
       height: calc(100dvh - var(--header-h));
-      background: var(--base);
+      background: var(--brand);
+      color: var(--ink);
       padding: 24px var(--gutter) 40px;
       overflow-y: auto;
-      display: none;
+      visibility: hidden;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.3s, transform 0.3s, visibility 0s 0.3s;
     }
 
     .open .nav {
-      display: block;
+      visibility: visible;
+      opacity: 1;
+      transform: none;
+      transition: opacity 0.3s, transform 0.3s;
     }
 
     .nav ul {
@@ -237,17 +313,35 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
       gap: 0;
     }
 
+    .nav li {
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.35s, transform 0.35s;
+    }
+
+    .open .nav li {
+      opacity: 1;
+      transform: none;
+      transition-delay: calc(var(--i) * 50ms + 80ms);
+    }
+
     .nav a:not(.cta) {
       padding-block: 18px;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid rgba(27, 54, 61, 0.18);
+    }
+
+    .nav .en,
+    .overlay:not(.scrolled) .nav .en {
+      color: var(--ink);
+      opacity: 0.7;
     }
 
     .nav .ja {
-      font: 700 22px/1.3 var(--display);
+      font-size: 24px;
     }
 
-    .nav a[aria-current='page']:not(.cta) {
-      border-bottom-color: var(--mark);
+    .indicator {
+      display: none;
     }
 
     .cta-item {
@@ -256,19 +350,25 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
 
     .cta {
       width: 100%;
-      padding: 16px;
-      font-size: 15px;
+      padding: 18px;
+      font-size: 16px;
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--on-dark);
     }
 
     .open.site-header,
     .open.site-header.overlay {
-      background: var(--base);
-      border-bottom-color: var(--line);
+      background: var(--brand);
+      color: var(--ink);
+      border-bottom-color: transparent;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
     }
   }
 
   @media (max-width: 420px) {
-    .brand-ja {
+    .brand-en {
       display: none;
     }
   }
