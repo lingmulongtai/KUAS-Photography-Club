@@ -564,7 +564,7 @@
     big.height = 1200;
     P[kind](big.getContext('2d'), big.width, big.height, rng(seed), o.variant);
     const out = document.createElement('canvas');
-    const W = o.portrait ? Math.round(o.h * 0.75) : o.w;
+    const W = o.portrait ? o.h : o.w;
     const H = o.portrait ? o.w : o.h;
     out.width = W;
     out.height = H;
