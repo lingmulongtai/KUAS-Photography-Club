@@ -1,0 +1,300 @@
+---
+/**
+ * Visit / join request form.
+ * With `joinForm.endpoint` set (Formspree, Getform, a Google Apps Script web app…) answers are POSTed there.
+ * Without it, the form opens the visitor's mail app addressed to the club, with the answers filled in.
+ */
+import { club, joinForm } from '../data/club';
+
+const interests = ['風景', '街のスナップ', 'ポートレート', '夜景・花火', 'フィルムカメラ', 'まだわからない'];
+---
+<form class="join-form" data-endpoint={joinForm.endpoint} data-email={club.email} novalidate>
+  <div class="field">
+    <label for="jf-name">お名前 <span class="req">必須</span></label>
+    <input id="jf-name" name="name" type="text" autocomplete="name" required />
+    <p class="error" data-for="name"></p>
+  </div>
+
+  <div class="field">
+    <label for="jf-email">メールアドレス <span class="req">必須</span></label>
+    <input id="jf-email" name="email" type="email" autocomplete="email" inputmode="email" required />
+    <p class="error" data-for="email"></p>
+  </div>
+
+  <div class="row2">
+    <div class="field">
+      <label for="jf-year">学年</label>
+      <select id="jf-year" name="year">
+        <option value="">選択してください</option>
+        <option>1回生</option>
+        <option>2回生</option>
+        <option>3回生</option>
+        <option>4回生</option>
+        <option>大学院生</option>
+        <option>その他</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="jf-faculty">学部・学科</label>
+      <input id="jf-faculty" name="faculty" type="text" />
+    </div>
+  </div>
+
+  <fieldset class="field">
+    <legend>連絡に使う言語</legend>
+    <div class="options">
+      <label><input type="radio" name="language" value="日本語" checked /> 日本語</label>
+      <label><input type="radio" name="language" value="English" /> English</label>
+      <label><input type="radio" name="language" value="どちらでも" /> どちらでも</label>
+    </div>
+  </fieldset>
+
+  <fieldset class="field">
+    <legend>カメラ</legend>
+    <div class="options">
+      <label><input type="radio" name="camera" value="カメラを持っている" /> カメラを持っている</label>
+      <label><input type="radio" name="camera" value="スマホで撮っている" checked /> スマホで撮っている</label>
+      <label><input type="radio" name="camera" value="これから始めたい" /> これから始めたい</label>
+    </div>
+  </fieldset>
+
+  <fieldset class="field">
+    <legend>撮ってみたいもの（いくつでも）</legend>
+    <div class="options">
+      {interests.map((i) => <label><input type="checkbox" name="interests" value={i} /> {i}</label>)}
+    </div>
+  </fieldset>
+
+  <div class="field">
+    <label for="jf-visit">見学したい日</label>
+    <select id="jf-visit" name="visit" data-mondays>
+      <option value="">あとで相談したい</option>
+    </select>
+    <p class="help">ミーティングは{club.meetings.day} {club.meetings.times.join(' / ')}、{club.campus} {club.meetings.room} 教室です。</p>
+  </div>
+
+  <div class="field">
+    <label for="jf-message">メッセージ</label>
+    <textarea id="jf-message" name="message" rows="4" placeholder="質問や、聞いておきたいことがあれば"></textarea>
+  </div>
+
+  <div class="field">
+    <label class="consent"><input type="checkbox" name="consent" value="yes" required /> <span><a href="/guidelines/" target="_blank" rel="noopener">ガイドライン</a>を読みました <span class="req">必須</span></span></label>
+    <p class="error" data-for="consent"></p>
+  </div>
+
+  <div class="submit">
+    <button class="btn btn--primary" type="submit">送信する <span class="arrow" aria-hidden="true">→</span></button>
+    <p class="status" role="status" aria-live="polite"></p>
+  </div>
+</form>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>('.join-form').forEach((form) => {
+    const endpoint = form.dataset.endpoint ?? '';
+    const email = form.dataset.email ?? '';
+    const status = form.querySelector<HTMLElement>('.status')!;
+    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+
+    // the next four Mondays, in Japan time
+    const visit = form.querySelector<HTMLSelectElement>('[data-mondays]');
+    if (visit) {
+      const now = new Date(Date.now() + 9 * 3600000);
+      const day = now.getUTCDay();
+      const first = new Date(now);
+      first.setUTCDate(now.getUTCDate() + ((8 - day) % 7 || 7));
+      for (let i = 0; i < 4; i++) {
+        const d = new Date(first);
+        d.setUTCDate(first.getUTCDate() + i * 7);
+        const label = `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（月）`;
+        visit.add(new Option(label, label), i + 1);
+      }
+    }
+
+    const setError = (name: string, text: string) => {
+      const el = form.querySelector<HTMLElement>(`.error[data-for="${name}"]`);
+      const input = form.elements.namedItem(name) as HTMLInputElement | null;
+      if (el) el.textContent = text;
+      input?.setAttribute('aria-invalid', text ? 'true' : 'false');
+    };
+
+    const validate = () => {
+      const data = new FormData(form);
+      let ok = true;
+      const name = String(data.get('name') ?? '').trim();
+      const mail = String(data.get('email') ?? '').trim();
+      setError('name', name ? '' : 'お名前を入力してください。');
+      if (!name) ok = false;
+      const mailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail);
+      setError('email', mailOk ? '' : 'メールアドレスを「name@example.com」の形で入力してください。');
+      if (!mailOk) ok = false;
+      const consent = data.get('consent') === 'yes';
+      setError('consent', consent ? '' : 'ガイドラインを読んでからチェックを入れてください。');
+      if (!consent) ok = false;
+      return ok;
+    };
+
+    const summary = (data: FormData) =>
+      [
+        `お名前：${data.get('name')}`,
+        `メール：${data.get('email')}`,
+        `学年：${data.get('year') || '—'}`,
+        `学部・学科：${data.get('faculty') || '—'}`,
+        `連絡の言語：${data.get('language')}`,
+        `カメラ：${data.get('camera') || '—'}`,
+        `撮ってみたいもの：${data.getAll('interests').join('、') || '—'}`,
+        `見学したい日：${data.get('visit') || 'あとで相談'}`,
+        '',
+        String(data.get('message') || ''),
+      ].join('\n');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!validate()) {
+        status.textContent = '入力内容を確認してください。';
+        form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+        return;
+      }
+      const data = new FormData(form);
+      if (!endpoint) {
+        const subject = encodeURIComponent('【見学・入部希望】' + String(data.get('name')));
+        const body = encodeURIComponent(summary(data));
+        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+        status.textContent = `メールアプリが開かない場合は、${email} 宛にこの内容を送ってください。`;
+        return;
+      }
+      button.disabled = true;
+      status.textContent = '送信しています…';
+      try {
+        const res = await fetch(endpoint, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(String(res.status));
+        form.reset();
+        status.textContent = '送信しました。運営からメールで連絡します。';
+      } catch {
+        status.textContent = `送信できませんでした。時間をおいてもう一度試すか、${email} までメールでご連絡ください。`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+</script>
+
+<style>
+  .join-form {
+    display: grid;
+    gap: 22px;
+  }
+
+  .field {
+    display: grid;
+    gap: 8px;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+
+  .field > label,
+  legend {
+    font-weight: 500;
+    font-size: 15px;
+    padding: 0;
+  }
+
+  .row2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+
+  input[type='text'],
+  input[type='email'],
+  select,
+  textarea {
+    width: 100%;
+    background: var(--raise);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 16px;
+    color: var(--ink);
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--amber);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(242, 161, 74, 0.35);
+  }
+
+  [aria-invalid='true'] {
+    border-color: var(--error) !important;
+  }
+
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin-top: 6px;
+  }
+
+  .options label,
+  .consent {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  input[type='radio'],
+  input[type='checkbox'] {
+    accent-color: var(--amber);
+    width: 18px;
+    height: 18px;
+  }
+
+  .req {
+    font: 500 10px/1 var(--mono);
+    letter-spacing: 0.08em;
+    color: var(--amber-ink);
+    background: var(--amber);
+    padding: 3px 6px;
+    border-radius: 2px;
+    margin-left: 6px;
+    vertical-align: 2px;
+  }
+
+  .help {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .error {
+    font-size: 13px;
+    color: var(--error);
+    min-height: 0;
+  }
+
+  .error:empty {
+    display: none;
+  }
+
+  .submit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .status {
+    font-size: 14px;
+  }
+
+  @media (max-width: 560px) {
+    .row2 {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
