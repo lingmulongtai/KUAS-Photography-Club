@@ -7,8 +7,8 @@
 export const CITY = { minX: -430, maxX: 200, minZ: -360, maxZ: 340, block: 12 };
 
 export const VIEW = {
-  camera: { x: 252, y: 34, z: 32 },
-  target: { x: -150, y: 2, z: 120 },
+  camera: { x: 252, y: 27, z: 32 },
+  target: { x: -150, y: 0, z: 120 },
 };
 
 export const LANDMARKS = {
