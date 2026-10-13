@@ -1,0 +1,249 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import SlotNote from '../components/SlotNote.astro';
+import InstagramSection from '../components/InstagramSection.astro';
+import { club } from '../data/club';
+
+const fmt = (iso: string) => iso.replaceAll('-', '.');
+const goals = [
+  { no: '01', title: 'とにかく楽しむ', text: '上手い下手は気にしない。写真を撮りに出かけること自体を楽しむのがいちばんの目的です。' },
+  { no: '02', title: '国や学年をこえてつながる', text: '日本人と留学生、1回生から院生まで。写真という共通の趣味で、普段は出会わない人とつながります。' },
+  { no: '03', title: '部活への昇格とクラブカメラ', text: '次の年度に「部活」へ昇格するのが目標です。カメラを持っていない人も撮影を楽しめるよう、共有カメラの購入を目指しています。' },
+];
+const timeline = [
+  { date: fmt(club.recognized), text: '学友会の公認サークルに' },
+  { date: fmt(club.membersAsOf), text: `メンバーが${club.members}人に` },
+  { date: '2026', text: '部活への昇格を目指して活動中', slot: true },
+];
+const roles = ['代表', '副代表', '会計', '機材管理', '広報', '企画リーダー', '安全管理'];
+const year = [
+  { m: '4月', t: '新歓撮影会（桜）' },
+  { m: '6月', t: '社寺の撮影会' },
+  { m: '8月', t: '花火大会' },
+  { m: '11月', t: '紅葉の撮影会' },
+  { m: '1月', t: '夜の街スナップ' },
+  { m: '3月', t: '写真展・1年の振り返り' },
+];
+---
+<Base title="サークルについて" description={`${club.nameJa}（${club.name}）について。活動の目的、これまでの歩み、1年の流れ、運営の役割。`}>
+  <PageHero
+    edge={`ABOUT ▸ SINCE ${club.recognized.slice(0, 4)} ▸ ${club.members} MEMBERS`}
+    title="サークルについて"
+    lead={`${club.name} は、写真を通して「楽しむ」と「つながる」を大切にするサークルです。国籍や学年、経験は問いません。スマホで撮る人も、フィルムカメラを持っている人も、同じ撮影会に出かけています。`}
+  />
+
+  <section class="wrap stats-wrap" aria-label="サークルの数字">
+    <div class="stats">
+    <div><p class="value num">{club.members}<small>人</small></p><p class="label">メンバー（{fmt(club.membersAsOf)} 時点）</p></div>
+    <div><p class="value num">{club.tripsPerMonth}<small>回 / 月</small></p><p class="label">撮影会</p></div>
+    <div><p class="value num">{club.meetings.times.length}<small>回 / 週</small></p><p class="label">ミーティング（{club.meetings.day} {club.meetings.times.join(' / ')}）</p></div>
+    <div><p class="value num">{fmt(club.recognized)}</p><p class="label">学友会公認</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="edge">PURPOSE</p>
+        <h2>活動の目的</h2>
+      </div>
+      <ol class="goals">
+        {goals.map((g) => (
+          <li>
+            <span class="no">{g.no}</span>
+            <h3>{g.title}</h3>
+            <p>{g.text}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap two">
+      <div>
+        <div class="section-head">
+          <p class="edge">HISTORY</p>
+          <h2>これまで</h2>
+        </div>
+        <ol class="timeline">
+          {timeline.map((t) => (
+            <li><span class="num date">{t.date}</span><span>{t.text} {t.slot && <SlotNote note="予定に合わせて更新してください" />}</span></li>
+          ))}
+        </ol>
+      </div>
+      <div>
+        <div class="section-head">
+          <p class="edge">A YEAR</p>
+          <h2>1年の流れ（例）</h2>
+        </div>
+        <ul class="months">
+          {year.map((y) => <li><span class="num">{y.m}</span><span>{y.t}</span></li>)}
+        </ul>
+        <p class="small muted note">撮影会は毎月2回ほど。行き先はミーティングでみんなで決めます。 <SlotNote /></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="edge">TEAM</p>
+        <h2>運営メンバー</h2>
+        <p class="muted">運営は役割を分担しています。困ったことがあれば、誰に声をかけても大丈夫です。</p>
+      </div>
+      <ul class="roles">
+        {roles.map((r) => (
+          <li><span class="role">{r}</span><span class="name">名前を入れてください</span></li>
+        ))}
+      </ul>
+      <p><SlotNote note="運営メンバーの名前（ニックネーム可）に差し替えてください" /></p>
+    </div>
+  </section>
+
+  <InstagramSection />
+</Base>
+
+<style>
+  .stats-wrap {
+    margin-bottom: clamp(56px, 8vw, 96px);
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .stats > div {
+    background: var(--base);
+    padding: 22px;
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+
+  .value {
+    font-size: clamp(30px, 4vw, 44px);
+    line-height: 1.1;
+    color: var(--amber);
+  }
+
+  .value small {
+    font-size: 15px;
+    margin-left: 4px;
+    color: var(--ink);
+  }
+
+  .label {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .goals {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+  }
+
+  .goals li {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+    padding-top: 16px;
+    border-top: 1px solid var(--line-strong);
+  }
+
+  .goals .no {
+    font: 500 12px/1 var(--mono);
+    color: var(--amber);
+    letter-spacing: 0.14em;
+  }
+
+  .goals h3 {
+    font-size: var(--step-2);
+  }
+
+  .two {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 48px 72px;
+    align-items: start;
+  }
+
+  .two > div {
+    display: grid;
+    gap: 24px;
+  }
+
+  .timeline,
+  .months {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+  }
+
+  .timeline li,
+  .months li {
+    display: grid;
+    grid-template-columns: 7.5em 1fr;
+    gap: 16px;
+    padding-block: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .date,
+  .months .num {
+    color: var(--amber);
+  }
+
+  .note {
+    margin-top: 4px;
+  }
+
+  .roles {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .roles li {
+    display: grid;
+    gap: 2px;
+    padding: 16px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+  }
+
+  .role {
+    font-weight: 700;
+  }
+
+  .name {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 860px) {
+    .stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .goals,
+    .two {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

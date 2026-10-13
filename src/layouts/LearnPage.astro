@@ -1,0 +1,112 @@
+---
+import Base from './Base.astro';
+import PageHero from '../components/PageHero.astro';
+import LearnCards from '../components/learn/LearnCards.astro';
+import { learnTopics } from '../data/learn';
+
+interface Props {
+  slug: (typeof learnTopics)[number]['slug'];
+  lead: string;
+  description: string;
+}
+const { slug, lead, description } = Astro.props;
+const topic = learnTopics.find((t) => t.slug === slug)!;
+---
+<Base title={`${topic.title} | 写真を学ぶ`} description={description}>
+  <PageHero edge={`LEARN ▸ ${topic.no} ▸ ${topic.en}`} title={topic.title} lead={lead}>
+    <p class="crumb small"><a href="/learn/">写真を学ぶ</a> / {topic.title}</p>
+  </PageHero>
+
+  <section class="wrap demo-wrap" aria-label="触って試せるデモ">
+    <slot name="demo" />
+  </section>
+
+  <article class="section article">
+    <div class="wrap cols">
+      <div class="prose">
+        <slot />
+      </div>
+      <aside class="aside">
+        <slot name="aside" />
+      </aside>
+    </div>
+  </article>
+
+  <section class="section">
+    <div class="wrap">
+      <LearnCards exclude={slug} heading="ほかのテーマ" />
+    </div>
+  </section>
+</Base>
+
+<style>
+  .crumb {
+    color: var(--muted);
+  }
+
+  .crumb a {
+    color: var(--ink);
+  }
+
+  .demo-wrap {
+    padding-bottom: 24px;
+  }
+
+  .cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+    gap: 48px 72px;
+    align-items: start;
+  }
+
+  .article .prose {
+    max-width: 40em;
+  }
+
+  .article :global(.prose h2:first-child) {
+    margin-top: 0;
+  }
+
+  .aside {
+    position: sticky;
+    top: calc(var(--header-h) + 24px);
+    display: grid;
+    gap: 16px;
+  }
+
+  .aside :global(.point) {
+    display: grid;
+    gap: 8px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+  }
+
+  .aside :global(.point h2) {
+    font: 700 15px/1.5 var(--body);
+  }
+
+  .aside :global(.point ul) {
+    margin: 0;
+    padding-left: 1.1em;
+    display: grid;
+    gap: 6px;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .aside :global(.point li::marker) {
+    color: var(--amber);
+  }
+
+  @media (max-width: 960px) {
+    .cols {
+      grid-template-columns: 1fr;
+    }
+
+    .aside {
+      position: static;
+    }
+  }
+</style>

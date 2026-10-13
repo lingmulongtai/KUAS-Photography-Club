@@ -1,0 +1,44 @@
+{
+  "fushimi-inari": [
+    { "kind": "inari", "seed": 11 },
+    { "kind": "inari", "seed": 12, "zoom": 1.5, "fx": 0.5, "fy": 0.45 },
+    { "kind": "inari", "seed": 13, "portrait": true },
+    { "kind": "inari", "seed": 14, "zoom": 1.25, "fx": 0.35, "fy": 0.6 },
+    { "kind": "bamboo", "seed": 15 }
+  ],
+  "kyoto-aquarium": [
+    { "kind": "aquarium", "seed": 21 },
+    { "kind": "aquarium", "seed": 22, "variant": 1, "portrait": true },
+    { "kind": "aquarium", "seed": 23, "zoom": 1.6, "fx": 0.4, "fy": 0.3 },
+    { "kind": "aquarium", "seed": 24, "variant": 1 },
+    { "kind": "aquarium", "seed": 25, "zoom": 1.3, "fx": 0.6, "fy": 0.55 }
+  ],
+  "summer-fireworks": [
+    { "kind": "crossing", "seed": 31 },
+    { "kind": "fireworks", "seed": 32 },
+    { "kind": "fireworks", "seed": 33, "zoom": 1.4, "fx": 0.45, "fy": 0.35 },
+    { "kind": "fireworks", "seed": 34, "portrait": true },
+    { "kind": "fireworks", "seed": 35 }
+  ],
+  "higashiyama-autumn": [
+    { "kind": "yasaka", "seed": 41 },
+    { "kind": "momiji", "seed": 42 },
+    { "kind": "momiji", "seed": 43, "portrait": true },
+    { "kind": "momiji", "seed": 44, "zoom": 1.5, "fx": 0.4, "fy": 0.3 },
+    { "kind": "yasaka", "seed": 45, "variant": 1, "portrait": true, "fx": 0.36 }
+  ],
+  "kawaramachi-night": [
+    { "kind": "street", "seed": 51 },
+    { "kind": "street", "seed": 52, "zoom": 1.4, "fx": 0.6, "fy": 0.45 },
+    { "kind": "street", "seed": 53, "portrait": true },
+    { "kind": "yasaka", "seed": 54, "variant": 1 },
+    { "kind": "street", "seed": 55, "zoom": 1.2, "fx": 0.3, "fy": 0.55 }
+  ],
+  "arashiyama-randen": [
+    { "kind": "tram", "seed": 61 },
+    { "kind": "tram", "seed": 62, "variant": 1, "zoom": 1.3, "fx": 0.45, "fy": 0.55 },
+    { "kind": "bamboo", "seed": 63, "portrait": true },
+    { "kind": "tram", "seed": 64, "portrait": true },
+    { "kind": "bamboo", "seed": 65, "zoom": 1.4, "fx": 0.5, "fy": 0.4 }
+  ]
+}

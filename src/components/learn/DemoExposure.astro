@@ -1,0 +1,43 @@
+---
+/** Long-exposure fireworks with shutter speed buttons. */
+const speeds = [
+  { label: '1/60', tau: 0.008, settings: 'f/2.8 · ISO 1600' },
+  { label: '1/4', tau: 0.12, settings: 'f/4 · ISO 400' },
+  { label: '2″', tau: 0.75, settings: 'f/8 · ISO 100' },
+  { label: '8″', tau: 3, settings: 'f/11 · ISO 100' },
+];
+---
+<figure class="demo">
+  <div class="stage" data-demo="exposure" style="--fb: radial-gradient(circle at 40% 35%, rgba(255,176,96,.3), transparent 30%), linear-gradient(#0b1028, #03050d)">
+    <canvas aria-label="シャッタースピードによって花火の写り方が変わるデモ"></canvas>
+    <div class="hud">
+      <div class="row"><span class="tag" data-readout>SS 2″ · f/8 · ISO 100</span></div>
+      <div class="row">
+        <div class="chips" role="group" aria-label="シャッタースピード">
+          {speeds.map((s) => (
+            <button class="chip" type="button" data-tau={s.tau} data-label={s.label} data-settings={s.settings} aria-pressed={s.label === '2″' ? 'true' : 'false'}>{s.label}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+  <figcaption class="hint">1/60 秒だと花火は点、8 秒だと長い光の線になります。画面をドラッグすると光で絵が描けます（ライトペインティング）。</figcaption>
+</figure>
+
+<script>
+  import { mountAll } from '../../scripts/gl/stage';
+  import { createExposure } from '../../scripts/demos/exposure';
+  mountAll('exposure', createExposure);
+</script>
+
+<style>
+  .demo {
+    margin: 0;
+    display: grid;
+    gap: 10px;
+  }
+
+  .stage {
+    cursor: crosshair;
+  }
+</style>

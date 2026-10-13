@@ -1,0 +1,242 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import JoinForm from '../components/JoinForm.astro';
+import SlotNote from '../components/SlotNote.astro';
+import { club, joinForm } from '../data/club';
+
+const faq = [
+  { q: 'カメラを持っていなくても大丈夫？', a: '大丈夫です。メンバーの多くはスマホで撮っています。サークルでは、カメラを持っていない人も使える共有カメラの購入を目指しています。' },
+  { q: '留学生でも参加できますか？ / Can international students join?', a: 'もちろんです。日本人と留学生が一緒に活動しています。English is welcome at meetings and on trips.' },
+  { q: '途中の学期からでも入れますか？', a: 'いつからでも入れます。まずは月曜のミーティングか、次の撮影会をのぞいてみてください。' },
+  { q: '毎回参加しないといけませんか？', a: '撮影会は来られるときだけで大丈夫です。参加するときは事前に連絡してもらい、キャンセルは前日21時までにお願いしています（ガイドライン第3章）。' },
+  { q: '費用はかかりますか？', a: '撮影会の交通費や入場料は各自負担です。部費については運営にお問い合わせください。', slot: true },
+];
+---
+<Base title="見学・入部" description="KUAS Photography Club への見学・入部の申し込み。毎週月曜のミーティング（太秦キャンパス S311）に気軽に来てください。">
+  <PageHero
+    edge="JOIN ▸ EVERY MONDAY ▸ ROOM S311"
+    title="見学・入部"
+    lead="経験もカメラもいりません。まずは月曜日のミーティングをのぞきに来てください。フォームから連絡をもらえれば、運営が当日案内します。"
+  />
+
+  <section class="wrap facts" aria-label="ミーティングの案内">
+    <div class="fact">
+      <p class="edge">WHEN</p>
+      <p class="big">{club.meetings.day}</p>
+      <p class="num amber">{club.meetings.times.join(' / ')}</p>
+      <p class="small muted">どちらか都合のいい時間に</p>
+    </div>
+    <div class="fact">
+      <p class="edge">WHERE</p>
+      <p class="big">{club.campus}</p>
+      <p class="num amber">{club.meetings.room} 教室</p>
+      <p class="small muted">{club.university}</p>
+    </div>
+    <div class="fact">
+      <p class="edge">BRING</p>
+      <p class="big">スマホでOK</p>
+      <p class="num amber">NO CAMERA NEEDED</p>
+      <p class="small muted">カメラがある人は持ってきてください</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap cols">
+      <div class="form-col">
+        <div class="section-head">
+          <p class="edge">FORM</p>
+          <h2>見学の申し込み</h2>
+          <p class="small muted">
+            {joinForm.endpoint
+              ? '送信すると、運営からメールで連絡します。'
+              : `送信ボタンを押すと、入力した内容でメールアプリが開きます（宛先 ${club.email}）。`}
+            Instagram の DM でも受け付けています。
+          </p>
+        </div>
+        <JoinForm />
+      </div>
+
+      <aside class="side">
+        <div class="steps">
+          <p class="edge">FLOW</p>
+          <h2>入部までの流れ</h2>
+          <ol>
+            <li><b>連絡する</b><span>フォームか Instagram の DM で、見学したい日を教えてください。</span></li>
+            <li><b>ミーティングを見学</b><span>月曜のミーティングで、運営が活動の説明をします。</span></li>
+            <li><b>撮影会に参加</b><span>気になる撮影会に、まずは1回参加してみてください。</span></li>
+            <li><b>入部</b><span>連絡用のチャットに参加して、メンバーになります。<SlotNote note="実際の手続きに合わせて書き換えてください" /></span></li>
+          </ol>
+        </div>
+        <div class="contact">
+          <p class="edge">CONTACT</p>
+          <a class="btn" href={club.instagram.url} target="_blank" rel="noopener">Instagram @{club.instagram.handle} <span class="arrow" aria-hidden="true">↗</span></a>
+          <p class="small">メール・Teams：<span class="num select">{club.email}</span></p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="faq">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="edge">FAQ</p>
+        <h2 id="faq">よくある質問</h2>
+      </div>
+      <div class="faq">
+        {faq.map((f) => (
+          <details>
+            <summary>{f.q}</summary>
+            <p>{f.a} {f.slot && <SlotNote note="部費を決めたら書き換えてください" />}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    padding-bottom: clamp(56px, 8vw, 96px);
+  }
+
+  .fact {
+    display: grid;
+    gap: 4px;
+    padding: 22px;
+    background: var(--raise);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+  }
+
+  .big {
+    font: 800 var(--step-3) / 1.3 var(--display);
+    margin-top: 6px;
+  }
+
+  .amber {
+    color: var(--amber);
+    font-size: 15px;
+    letter-spacing: 0.06em;
+  }
+
+  .cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 48px 72px;
+    align-items: start;
+  }
+
+  .form-col {
+    display: grid;
+    gap: 28px;
+  }
+
+  .side {
+    display: grid;
+    gap: 40px;
+    position: sticky;
+    top: calc(var(--header-h) + 24px);
+  }
+
+  .steps {
+    display: grid;
+    gap: 14px;
+  }
+
+  .steps h2 {
+    font-size: var(--step-3);
+  }
+
+  .steps ol {
+    list-style: none;
+    counter-reset: step;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px;
+  }
+
+  .steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 2.4em 1fr;
+    column-gap: 10px;
+  }
+
+  .steps li::before {
+    content: counter(step, decimal-leading-zero);
+    grid-row: span 2;
+    font: 500 14px/1.9 var(--mono);
+    color: var(--amber);
+  }
+
+  .steps span {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .contact {
+    display: grid;
+    gap: 12px;
+    justify-items: start;
+  }
+
+  .select {
+    user-select: all;
+    overflow-wrap: anywhere;
+  }
+
+  .faq {
+    display: grid;
+    max-width: 52em;
+    border-top: 1px solid var(--line);
+  }
+
+  details {
+    border-bottom: 1px solid var(--line);
+    padding-block: 16px;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 700;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary::after {
+    content: '+';
+    font-family: var(--mono);
+    color: var(--amber);
+  }
+
+  details[open] summary::after {
+    content: '−';
+  }
+
+  details p {
+    margin-top: 10px;
+    color: var(--ink);
+  }
+
+  @media (max-width: 900px) {
+    .facts,
+    .cols {
+      grid-template-columns: 1fr;
+    }
+
+    .side {
+      position: static;
+    }
+  }
+</style>

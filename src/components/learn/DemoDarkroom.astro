@@ -1,0 +1,60 @@
+---
+/** A print developing in the tray under a red safelight. */
+interface Props {
+  photos?: string[];
+}
+const {
+  photos = [
+    '/photos/samples/higashiyama-autumn/01.jpg',
+    '/photos/samples/fushimi-inari/01.jpg',
+    '/photos/samples/kyoto-aquarium/01.jpg',
+    '/photos/samples/summer-fireworks/01.jpg',
+    '/photos/samples/arashiyama-randen/01.jpg',
+  ],
+} = Astro.props;
+---
+<figure class="demo">
+  <div class="stage" data-demo="darkroom" data-photos={JSON.stringify(photos)} style="--fb: radial-gradient(circle at 25% 0%, rgba(255,46,31,.45), transparent 60%), #120404">
+    <canvas aria-label="暗室のバットの中で印画紙に写真が浮かび上がるデモ"></canvas>
+    <div class="hud">
+      <div class="row">
+        <span class="tag"><i class="lamp" aria-hidden="true"></i><span data-step>現像 DEV</span>&nbsp;&nbsp;<span data-timer>0:00</span></span>
+        <span class="tag">RC 印画紙 · 号数 2</span>
+      </div>
+      <div class="row"><span class="tag" data-count>1 / {photos.length}</span></div>
+    </div>
+  </div>
+  <figcaption class="hint">バットをなぞったりタップしたりすると、液面が揺れます。1枚ずつ「現像 → 停止 → 定着」と進みます（表示している時間は実際の目安を縮めたものです）。</figcaption>
+</figure>
+
+<script>
+  import { mountStage } from '../../scripts/gl/stage';
+  import { createDarkroom } from '../../scripts/demos/darkroom';
+  document.querySelectorAll<HTMLElement>('.stage[data-demo="darkroom"]').forEach((el) => {
+    const photos = JSON.parse(el.dataset.photos ?? '[]') as string[];
+    mountStage(el, (renderer, stage) => createDarkroom(renderer, stage, photos));
+  });
+</script>
+
+<style>
+  .demo {
+    margin: 0;
+    display: grid;
+    gap: 10px;
+  }
+
+  .stage {
+    cursor: crosshair;
+  }
+
+  .lamp {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--safe);
+    box-shadow: 0 0 8px var(--safe);
+    margin-right: 7px;
+    vertical-align: 1px;
+  }
+</style>
