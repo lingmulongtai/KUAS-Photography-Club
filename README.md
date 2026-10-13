@@ -28,10 +28,45 @@ KUAS Photography Club は、写真撮影を通じて「楽しむ」と「つな�
 - 会計関連（費用分担の考え方・テンプレート）
 
 推奨フォルダ構成（予定）:
-- `guidelines/` … ガイドライン本体
+- `guidelines/` … ガイドライン本体（サイトのガイドラインページもここから作られます）
+- `src/`・`public/`・`tools/` … ウェブサイト（下の「ウェブサイト」を参照）
 - `templates/` … 企画・広報・会計などのテンプレート
 - `equipment/` … 機材リスト・貸出ルール
 - `docs/` … 参考資料・記録 など
+
+## ウェブサイト
+このリポジトリには、サークルの公式サイト（Astro + three.js の静的サイト）も入っています。
+
+- トップ：京都の現在時刻に合わせて空が変わる 3D の京都
+- 撮影会：撮影会ごとに1本のフィルムとして写真と撮影メモを掲載
+- 写真を学ぶ：シャッタースピード・絞り・焦点距離・現像を、触って試せるデモつきで解説
+- サークルについて／見学・入部（フォームつき）／ガイドライン（11言語）
+
+### 手元で動かす
+Node.js 22.12 以上が必要です。
+
+```sh
+npm install
+npm run dev      # http://localhost:4321 で確認
+npm run check    # 型チェック
+npm run build    # dist/ に書き出し
+```
+
+### よくある更新
+- **ミーティングの時間・教室・メンバー数・連絡先**：`src/data/club.ts`
+- **撮影会を追加**：`src/content/trips/` に Markdown を1つ追加し、写真を `public/photos/<撮影会名>/` に置く（書き方は既存のファイルを参照）。撮影者名は `by` に書くと、ガイドライン第6章のクレジットが自動で付きます
+- **サンプルの差し替え**：`sample: true` の撮影会と写真はサンプルです。手順は `tools/sample-photos/README.md`
+- **仮の文章**：手書き風の点線メモがついている文章は、運営で書き換えてください
+- **入部フォームの送信先**：`src/data/club.ts` の `joinForm.endpoint` に Formspree などの URL を入れると、フォームの内容がそこに届きます（空のままだとメールアプリが開きます）
+- **Instagram の投稿**：`src/data/instagram.ts` に載せたい投稿を追加
+- **ガイドライン**：`guidelines/` の Markdown を編集すると、サイトにもそのまま反映されます
+
+### 公開（Vercel）
+1. [Vercel](https://vercel.com/) に GitHub アカウントでログインし、「Add New → Project」でこのリポジトリを選ぶ
+2. Framework は自動で「Astro」になるので、そのまま Deploy
+3. 以後は main ブランチに push すると自動で更新されます。プルリクエストごとにプレビュー URL も作られます
+
+公開 URL が決まったら、`astro.config.mjs` の `site` を書き換えてください（OGP や canonical に使われます）。
 
 ## 参加・問い合わせ
 - 入会・見学・撮影会の参加は、ミーティングで運営メンバーに気軽に声をかけてください
@@ -81,10 +116,19 @@ This repository is where we create, store, and update documents for the KUAS Pho
 - **Finances:** Policies for sharing costs and managing funds.
 
 **Recommended Folder Structure:**
-- `guidelines/`: Guideline documents.
+- `guidelines/`: Guideline documents (the website's guidelines pages are built from these).
+- `src/`, `public/`, `tools/`: The website (see "Website" below).
 - `templates/`: Templates for planning, announcements, and finances.
 - `equipment/`: Equipment lists and lending rules.
 - `docs/`: Reference materials and records.
+
+## Website
+This repository also holds the club website, a static Astro + three.js site: a 3D Kyoto on the top page whose sky follows the time in Kyoto, photo trip reports shown as rolls of film, hands-on lessons on shutter speed, aperture, focal length and developing, an about page, a join form and the guidelines in 11 languages.
+
+- Develop: `npm install`, then `npm run dev` (Node.js 22.12+). `npm run check` type-checks, `npm run build` writes `dist/`.
+- Club facts and the join form endpoint: `src/data/club.ts`. Trips: one Markdown file per trip in `src/content/trips/`, photos in `public/photos/`.
+- Sample trips and photos are marked `sample: true`; see `tools/sample-photos/README.md` to replace them.
+- Deploy: import the repository in Vercel (framework preset: Astro). Pushes to `main` deploy automatically. Update `site` in `astro.config.mjs` once the URL is final.
 
 ## Get Involved
 - If you'd like to join, visit a meeting, or participate in a photo trip, just speak to one of the organizers at our weekly meetings.
