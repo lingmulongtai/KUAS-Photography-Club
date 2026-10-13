@@ -188,9 +188,11 @@ const BUILDING_FS = /* glsl */ `
       }
     } else {
       vec3 wall;
-      if (wooden) wall = pick4(r1, vec3(.5, .47, .41), vec3(.12, .085, .06), vec3(.36, .33, .29), vec3(.26, .25, .24));
-      else if (use == 4. || H > 31.) wall = pick4(r1, vec3(.42, .43, .44), vec3(.3, .32, .34), vec3(.5, .48, .45), vec3(.2, .22, .25));
-      else wall = pick4(r1, vec3(.55, .52, .47), vec3(.44, .4, .35), vec3(.6, .59, .56), vec3(.34, .3, .27));
+      // Kyoto's walls: dark wood and plaster on the old houses, muted tile and concrete elsewhere
+      if (wooden) wall = pick4(r1, vec3(.36, .33, .28), vec3(.09, .065, .045), vec3(.24, .21, .18), vec3(.17, .16, .15));
+      else if (use == 4. || H > 31.) wall = pick4(r1, vec3(.3, .31, .32), vec3(.2, .22, .24), vec3(.36, .34, .31), vec3(.14, .16, .19));
+      else wall = pick4(r1, vec3(.4, .37, .33), vec3(.3, .27, .23), vec3(.44, .43, .41), vec3(.23, .2, .18));
+      wall *= .85 + .3 * r2;
 
       // windows on a floor grid
       float floorH = wooden ? 2.9 : (use == 4. ? 3.7 : 3.1);
