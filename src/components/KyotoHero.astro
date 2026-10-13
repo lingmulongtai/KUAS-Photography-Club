@@ -1,164 +1,142 @@
 ---
 /**
- * Full-bleed top-page hero: a 3D Kyoto whose sky follows the real time in Kyoto.
- * Visitors can scrub the time of day or fast-forward a whole day.
+ * Full-bleed top-page hero: Kyoto in 3D from real geodata (GSI terrain and aerial photos,
+ * PLATEAU buildings), seen from Shogunzuka. The sky follows the real time in Kyoto.
+ * Tap the sky for a shooting star; the campus pin flies the camera to the Uzumasa campus.
  */
 import { club } from '../data/club';
 ---
-<section class="hero" aria-labelledby="hero-title">
-  <div class="stage hero-stage" data-demo="kyoto">
-    <canvas aria-label="東山から西を望む京都の街。空の色は京都の現在時刻に合わせて変わります"></canvas>
-    <div class="campus" hidden>
-      <span class="dot" aria-hidden="true"></span>
-      <span class="label">太秦キャンパス<small>ここで活動しています</small></span>
+<section class="hero" aria-labelledby="hero-title" data-view="city">
+  <div class="stage hero-stage" data-demo="hero">
+    <canvas aria-label="将軍塚から西を望む京都の街の3D。実際の地形と建物のデータから作り、空は京都の現在時刻に合わせて変わります"></canvas>
+    <div class="loading" aria-hidden="true">
+      <span class="spin"></span>
+      <span>京都の街を読み込んでいます</span>
     </div>
   </div>
   <div class="scrim" aria-hidden="true"></div>
 
   <div class="hero-inner">
     <div class="copy">
-      <p class="edge">KYOTO ▸ <span data-status>いまの空</span></p>
+      <p class="edge eyebrow">KYOTO ▸ <span data-status>いまの空</span></p>
       <h1 id="hero-title">京都の空の下で、<br />写真を撮っています。</h1>
       <p class="lead">
         {club.nameJa}です。月に2回の撮影会で、京都の街や近くの府県へ写真を撮りに出かけています。カメラがなくても、スマホひとつで参加できます。
       </p>
       <div class="ctas">
         <a class="btn btn--primary" href="/trips/">撮影会の記録を見る <span class="arrow" aria-hidden="true">→</span></a>
-        <a class="btn" href="/join/">見学・入部について</a>
+        <a class="btn btn--glass" href="/join/">見学・入部について</a>
       </div>
     </div>
 
-    <div class="time-panel" role="group" aria-label="空の時刻">
-      <p class="readout">
+    <aside class="sky-chip" aria-label="いまの京都の空">
+      <p class="now">
         <span class="clock num" data-clock>--:--</span>
-        <span class="facts">
-          <span data-phase>—</span>
-          <span data-kelvin></span>
-          <span data-moon></span>
-        </span>
+        <span data-phase>—</span>
+        <span class="moon" data-moon></span>
       </p>
-      <div class="time-controls">
-        <label class="visually-hidden" for="kyoto-time">表示する時刻</label>
-        <input type="range" id="kyoto-time" min="0" max="1439" step="1" value="1050" />
-        <div class="chips">
-          <button class="chip" type="button" data-mode="lapse" aria-pressed="false">▶ 1日を早送り</button>
-          <button class="chip" type="button" data-mode="live" aria-pressed="true">いまの空</button>
-        </div>
-      </div>
-      <p class="note">京都の現在時刻・太陽と月の位置から計算しています。8月16日の夜には左大文字が灯ります。</p>
+      <p class="hint">空をタップすると流れ星。<span>「太秦キャンパス」を押すと近づけます。</span></p>
+    </aside>
+  </div>
+
+  <div class="campus-card" role="region" aria-label="太秦キャンパス" hidden>
+    <p class="edge">OUR CAMPUS</p>
+    <h2>京都先端科学大学<br />太秦キャンパス</h2>
+    <p class="small">写真部はここで集まっています。</p>
+    <dl>
+      <div><dt>ミーティング</dt><dd>{club.meetings.day} {club.meetings.times.join(' / ')}</dd></div>
+      <div><dt>教室</dt><dd>{club.meetings.room}</dd></div>
+    </dl>
+    <div class="card-actions">
+      <a class="btn btn--primary" href="/join/">見学に行く <span class="arrow" aria-hidden="true">→</span></a>
+      <button class="btn btn--glass back" type="button">← 将軍塚に戻る</button>
     </div>
   </div>
+
+  <p class="credit">地形・航空写真：国土地理院　建物：PLATEAU（国土交通省）</p>
   <a class="scroll-cue" href="#intro"><span>SCROLL</span></a>
 </section>
 
 <script>
   import { mountStage } from '../scripts/gl/stage';
-  import { createKyoto, type KyotoStatus } from '../scripts/kyoto/scene';
-  import { jstDateAt } from '../scripts/kyoto/astro';
-  import { createLook, lookAt } from '../scripts/kyoto/palette';
-  import { sunPosition } from '../scripts/kyoto/astro';
+  import { createHero, type HeroMode, type HeroStatus } from '../scripts/hero/scene';
+  import { createLook, lookAt } from '../scripts/hero/palette';
+  import { sunPosition } from '../scripts/hero/astro';
 
-  type Mode = 'live' | 'manual' | 'lapse';
-
-  const stage = document.querySelector<HTMLElement>('.stage[data-demo="kyoto"]');
+  const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
   const hero = stage?.closest<HTMLElement>('.hero');
   if (stage && hero) {
-    const slider = hero.querySelector<HTMLInputElement>('#kyoto-time')!;
-    const modeButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-mode]'));
     const out = {
       status: hero.querySelector('[data-status]'),
       clock: hero.querySelector('[data-clock]'),
       phase: hero.querySelector('[data-phase]'),
-      kelvin: hero.querySelector('[data-kelvin]'),
       moon: hero.querySelector('[data-moon]'),
     };
-    const campus = stage.querySelector<HTMLElement>('.campus')!;
-
-    let mode: Mode = 'live';
-    let manual = 0;
-    let lapse = 0;
-    let lastTick = performance.now();
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    const setMode = (next: Mode) => {
-      mode = next;
-      modeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-      const lapseBtn = modeButtons.find((b) => b.dataset.mode === 'lapse');
-      if (lapseBtn) lapseBtn.textContent = mode === 'lapse' ? '❚❚ 早送りを止める' : '▶ 1日を早送り';
-    };
-
-    const clock = {
-      now() {
-        const real = new Date();
-        const t = performance.now();
-        const step = (t - lastTick) / 1000;
-        lastTick = t;
-        if (mode === 'live') return real;
-        if (mode === 'lapse') {
-          lapse = (lapse + step * 30) % 1440;
-          return jstDateAt(real, lapse);
-        }
-        return jstDateAt(real, manual);
-      },
-    };
+    const card = hero.querySelector<HTMLElement>('.campus-card')!;
+    const back = card.querySelector<HTMLButtonElement>('.back')!;
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const hhmm = (m: number) => {
       const v = ((Math.floor(m) % 1440) + 1440) % 1440;
       return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
     };
-
-    const onStatus = (s: KyotoStatus) => {
+    const onStatus = (s: HeroStatus) => {
       if (out.clock) out.clock.textContent = hhmm(s.minutes);
-      if (out.phase) out.phase.textContent = s.fire ? '左大文字 点火中' : s.phase;
-      if (out.kelvin) out.kelvin.textContent = s.kelvin ? `約${s.kelvin.toLocaleString('ja-JP')}K` : '';
+      if (out.phase) out.phase.textContent = s.phase;
       if (out.moon) out.moon.textContent = `月齢 ${s.moonAge.toFixed(1)}`;
-      if (out.status) out.status.textContent = `${mode === 'live' ? 'いま ' : ''}${hhmm(s.minutes)} · ${s.phase}`;
-      if (mode !== 'manual') slider.value = String(Math.floor(s.minutes));
-      if (mode === 'lapse') lapse = s.minutes;
+      if (out.status) out.status.textContent = `いま ${hhmm(s.minutes)} · ${s.phase}`;
     };
 
-    const onCampus = (p: { x: number; y: number } | null) => {
-      // keep the hand-written label inside the frame
-      campus.hidden = !p || p.x > stage.clientWidth - 140 || p.y < 70;
-      if (p) campus.style.transform = `translate(${p.x}px, ${p.y}px)`;
+    const setView = (mode: HeroMode, arrived: boolean) => {
+      hero.dataset.view = mode;
+      if (mode === 'campus') {
+        card.hidden = false;
+        if (arrived) back.focus({ preventScroll: true });
+      } else if (!arrived) card.hidden = true;
     };
-
-    slider.addEventListener('input', () => {
-      manual = Number(slider.value);
-      setMode('manual');
-    });
-    modeButtons.forEach((b) =>
-      b.addEventListener('click', () => {
-        const wanted = b.dataset.mode as Mode;
-        if (wanted === 'lapse' && mode === 'lapse') {
-          manual = lapse;
-          setMode('manual');
-          return;
-        }
-        if (wanted === 'lapse') {
-          lapse = Number(slider.value);
-          lastTick = performance.now();
-          if (reduce) return;
-        }
-        setMode(wanted);
-      }),
-    );
 
     const coarse = matchMedia('(pointer: coarse)').matches;
     const cores = navigator.hardwareConcurrency || 4;
     const quality = coarse || cores < 6 || window.innerWidth < 900 ? 0.55 : 1;
 
-    const demo = mountStage(stage, (renderer, el) => createKyoto(renderer, el, { clock, quality, onStatus, onCampus }), {
-      maxDpr: quality < 1 ? 1.5 : 1.75,
+    let demo: ReturnType<typeof createHero> | null = null;
+    const mounted = mountStage(
+      stage,
+      (renderer, el) =>
+        (demo = createHero(renderer, el, {
+          now: () => new Date(),
+          quality,
+          reducedMotion,
+          onStatus,
+          onReady: () => hero.classList.add('is-ready'),
+          onAction: (id) => id === 'kuas' && demo?.flyTo('campus'),
+          onMode: setView,
+          avoid: () => {
+            const base = stage.getBoundingClientRect();
+            return [hero.querySelector('.copy'), hero.querySelector('.sky-chip'), card.hidden ? null : card]
+              .filter((n): n is Element => !!n)
+              .map((n) => {
+                const r = n.getBoundingClientRect();
+                return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+              });
+          },
+        })),
+      { maxDpr: quality < 1 ? 1.5 : 2, alwaysOn: false },
+    );
+
+    back.addEventListener('click', () => demo?.flyTo('city'));
+    hero.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && demo?.mode === 'campus') demo.flyTo('city');
     });
 
-    if (!demo) {
+    if (!mounted) {
       // No WebGL: paint today's sky as a still gradient instead
       const look = lookAt((sunPosition(new Date()).altitude * 180) / Math.PI, createLook());
       stage.style.setProperty(
         '--fb',
         `linear-gradient(${look.zenith.getStyle()}, ${look.mid.getStyle()} 55%, ${look.horizon.getStyle()} 85%, #05070c)`,
       );
+      hero.classList.add('is-ready', 'no-3d');
     }
   }
 </script>
@@ -166,10 +144,11 @@ import { club } from '../data/club';
 <style>
   .hero {
     position: relative;
-    height: max(620px, min(100svh, 1040px));
+    height: max(640px, min(100svh, 1080px));
     overflow: hidden;
-    background: var(--rebate);
+    background: #0b1424;
     isolation: isolate;
+    color: var(--on-dark);
   }
 
   .hero-stage {
@@ -179,15 +158,53 @@ import { club } from '../data/club';
     border-radius: 0;
     box-shadow: none;
     z-index: 0;
+    cursor: crosshair;
+  }
+
+  .loading {
+    position: absolute;
+    left: 50%;
+    top: 46%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font: 500 13px/1 var(--body);
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.85);
+    transition: opacity 0.8s;
+    pointer-events: none;
+  }
+
+  .spin {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: var(--brand);
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .is-ready .loading {
+    opacity: 0;
   }
 
   .scrim {
     position: absolute;
     inset: auto 0 0 0;
-    height: 78%;
-    background: linear-gradient(rgba(5, 7, 12, 0), rgba(5, 7, 12, 0.5) 45%, rgba(5, 7, 12, 0.86));
+    height: 70%;
+    background:
+      radial-gradient(120% 90% at 0% 100%, rgba(6, 12, 20, 0.62), rgba(6, 12, 20, 0) 60%),
+      linear-gradient(rgba(6, 12, 20, 0), rgba(6, 12, 20, 0.45) 50%, rgba(6, 12, 20, 0.82));
     pointer-events: none;
     z-index: 1;
+    transition: opacity 0.8s;
   }
 
   .hero-inner {
@@ -196,16 +213,17 @@ import { club } from '../data/club';
     z-index: 2;
     max-width: calc(var(--maxw) + var(--gutter) * 2);
     margin-inline: auto;
-    padding: 0 var(--gutter) clamp(28px, 5vw, 56px);
+    padding: 0 var(--gutter) clamp(40px, 6vw, 72px);
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     align-items: end;
     gap: 28px 48px;
     pointer-events: none;
+    transition: opacity 0.6s, transform 0.6s;
   }
 
   .copy,
-  .time-panel {
+  .sky-chip {
     pointer-events: auto;
     min-width: 0;
   }
@@ -215,119 +233,183 @@ import { club } from '../data/club';
     gap: 16px;
   }
 
+  .eyebrow {
+    color: var(--brand);
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5);
+  }
+
   h1 {
-    font-size: clamp(32px, 4.6vw, 64px);
-    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+    font-size: clamp(30px, 4.1vw, 56px);
+    letter-spacing: 0.06em;
+    text-shadow: 0 2px 28px rgba(0, 0, 0, 0.5);
   }
 
   .lead {
     font-size: 16px;
     max-width: 32em;
-    color: var(--ink);
-    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 1px 14px rgba(0, 0, 0, 0.6);
   }
 
   .ctas {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 4px;
+    margin-top: 6px;
   }
 
-  .ctas .btn:not(.btn--primary) {
-    background: var(--hud-bg);
-    border-color: var(--hud-line);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
+  .btn--glass {
+    color: var(--on-dark);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
   }
 
-  .time-panel {
+  .btn--glass:hover {
+    background: var(--on-dark);
+    border-color: var(--on-dark);
+    color: var(--ink);
+  }
+
+  .sky-chip {
     justify-self: end;
-    width: min(100%, 420px);
     display: grid;
-    gap: 12px;
-    padding: 16px;
-    background: var(--hud-bg);
-    border: 1px solid rgba(255, 246, 230, 0.12);
+    gap: 6px;
+    padding: 14px 18px;
     border-radius: var(--radius);
+    background: rgba(10, 18, 28, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
-    color: var(--hud);
+    max-width: 360px;
   }
 
-  .readout {
+  .now {
     display: flex;
-    align-items: baseline;
-    gap: 14px;
     flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    font-size: 13px;
+    font-weight: 700;
   }
 
   .clock {
-    font-size: 34px;
+    font-size: 28px;
     line-height: 1;
+    color: var(--brand);
+  }
+
+  .moon {
     font-weight: 500;
-    color: var(--accent);
-    letter-spacing: 0.02em;
+    opacity: 0.75;
   }
 
-  .facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    font: 500 12px/1.5 var(--mono);
-    letter-spacing: 0.06em;
+  .hint {
+    font-size: 12px;
+    line-height: 1.6;
+    opacity: 0.8;
   }
 
-  .time-controls {
+  .hint span {
+    display: block;
+  }
+
+  /* campus view */
+  .campus-card {
+    position: absolute;
+    z-index: 3;
+    right: max(var(--gutter), calc((100vw - var(--maxw)) / 2));
+    bottom: clamp(40px, 6vw, 72px);
+    width: min(360px, calc(100% - var(--gutter) * 2));
     display: grid;
     gap: 10px;
+    padding: 22px;
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--ink);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    animation: card-in 0.7s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
-  .time-controls input {
-    width: 100%;
-    accent-color: var(--accent);
+  .campus-card[hidden] {
+    display: none;
   }
 
-  .note {
-    font-size: 11px;
-    line-height: 1.6;
-    color: rgba(255, 246, 230, 0.7);
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
   }
 
-  .campus {
-    position: absolute;
-    left: 0;
-    top: 0;
-    z-index: 1;
-    pointer-events: none;
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    will-change: transform;
+  .campus-card h2 {
+    font-size: 22px;
+    line-height: 1.4;
   }
 
-  .campus .dot {
-    width: 9px;
-    height: 9px;
-    margin: -4.5px 0 0 -4.5px;
-    border-radius: 50%;
-    border: 1px solid var(--mark);
-  }
-
-  .campus .label {
+  .campus-card dl {
+    margin: 4px 0;
     display: grid;
-    margin-top: -28px;
-    padding-left: 6px;
-    border-left: 1px solid rgba(251, 243, 213, 0.6);
-    font: 400 15px/1.2 var(--hand);
-    color: var(--mark);
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
-    white-space: nowrap;
+    gap: 4px;
+    font-size: 14px;
   }
 
-  .campus small {
-    font-size: 11px;
-    opacity: 0.8;
+  .campus-card dl div {
+    display: flex;
+    gap: 12px;
+  }
+
+  .campus-card dt {
+    width: 6.5em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .campus-card dd {
+    margin: 0;
+    font-weight: 700;
+  }
+
+  .card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .campus-card .back {
+    color: var(--ink);
+    background: transparent;
+    border-color: var(--ink);
+  }
+
+  .campus-card .back:hover {
+    background: var(--ink);
+    color: var(--on-dark);
+  }
+
+  .hero[data-view='campus'] .hero-inner {
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+  }
+
+  .hero[data-view='campus'] .hero-inner * {
+    pointer-events: none;
+  }
+
+  .hero[data-view='campus'] .scrim {
+    opacity: 0.4;
+  }
+
+  .credit {
+    position: absolute;
+    z-index: 2;
+    right: 10px;
+    bottom: 8px;
+    font-size: 10px;
+    opacity: 0.55;
+    pointer-events: none;
   }
 
   .scroll-cue {
@@ -336,9 +418,9 @@ import { club } from '../data/club';
     bottom: 10px;
     z-index: 2;
     transform: translateX(-50%);
-    font: 500 10px/1 var(--mono);
+    font: 700 10px/1 var(--latin);
     letter-spacing: 0.3em;
-    color: rgba(255, 246, 230, 0.6);
+    color: rgba(255, 255, 255, 0.7);
     text-decoration: none;
     padding: 8px;
   }
@@ -366,12 +448,129 @@ import { club } from '../data/club';
     }
   }
 
+  /* pins placed by the scene (created in script, so styled globally) */
+  .hero :global(.hero-labels) {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 1s 0.4s;
+  }
+
+  .hero.is-ready :global(.hero-labels) {
+    opacity: 1;
+  }
+
+  .hero :global(.hero-pin) {
+    position: absolute;
+    left: 0;
+    top: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--on-dark);
+    opacity: 0;
+    transition: opacity 0.5s;
+    will-change: transform;
+  }
+
+  .hero :global(.hero-pin.is-shown) {
+    opacity: 1;
+  }
+
+  .hero :global(.hero-pin.is-muted) {
+    opacity: 0 !important;
+  }
+
+  .hero :global(.pin-dot) {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 12px rgba(100, 190, 198, 0.9);
+  }
+
+  .hero :global(.pin-text) {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    text-align: center;
+    font: 700 13px/1.25 var(--body);
+    letter-spacing: 0.06em;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  }
+
+  .hero :global(.pin-text small) {
+    display: block;
+    font: 600 9px/1.3 var(--latin);
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+  }
+
+  .hero :global(.pin-text)::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 1px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.6);
+  }
+
+  .hero :global(.hero-pin.is-action) {
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  .hero :global(.hero-pin.is-action .pin-text) {
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--brand);
+    color: var(--on-accent);
+    text-shadow: none;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+    animation: pin-pulse 2.6s ease-in-out infinite;
+    transition: background-color 0.2s, transform 0.2s;
+  }
+
+  .hero :global(.hero-pin.is-action:hover .pin-text),
+  .hero :global(.hero-pin.is-action:focus-visible .pin-text) {
+    background: var(--on-dark);
+    transform: translateX(-50%) translateY(-2px);
+  }
+
+  .hero :global(.hero-pin.is-action .pin-dot) {
+    width: 11px;
+    height: 11px;
+    margin: -5.5px 0 0 -5.5px;
+  }
+
+  @keyframes pin-pulse {
+    0%,
+    100% {
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35), 0 0 0 0 rgba(100, 190, 198, 0.55);
+    }
+    50% {
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35), 0 0 0 10px rgba(100, 190, 198, 0);
+    }
+  }
+
+  .hero[data-view='campus'] :global(.hero-pin.is-action) {
+    pointer-events: none;
+  }
+
   @media (max-width: 900px) {
     .hero {
       height: auto;
       min-height: 100svh;
       display: grid;
-      grid-template-rows: minmax(54svh, 1fr) auto;
+      grid-template-rows: minmax(62svh, 1fr) auto;
+      background: #0b1424;
     }
 
     .hero-stage {
@@ -388,7 +587,7 @@ import { club } from '../data/club';
       inset: auto;
       height: auto;
       align-self: end;
-      min-height: 40%;
+      min-height: 35%;
     }
 
     .hero-inner {
@@ -397,15 +596,28 @@ import { club } from '../data/club';
       grid-row: 2;
       grid-column: 1;
       grid-template-columns: 1fr;
-      margin-top: -96px;
-      padding-bottom: 32px;
+      margin-top: -72px;
+      padding-bottom: 36px;
     }
 
-    .time-panel {
+    .sky-chip {
       justify-self: stretch;
-      width: 100%;
+      max-width: none;
     }
 
+    .campus-card {
+      left: var(--gutter);
+      right: var(--gutter);
+      bottom: auto;
+      top: calc(62svh - 60px);
+      width: auto;
+    }
+
+    .hero[data-view='campus'] .hero-inner {
+      opacity: 0.15;
+    }
+
+    .credit,
     .scroll-cue {
       display: none;
     }
