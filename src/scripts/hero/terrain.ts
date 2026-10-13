@@ -182,6 +182,12 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float halo = smoothstep(900., 4000., dist);
           emit += vec3(1., .7, .42) * (glow.r * mix(.55, 1.1, halo) + glow.g * halo * .7) * uCity;
         }
+        // a teal ring that pulses around the campus when it is in focus
+        if (uHighlight > 0.){
+          float d = length(p - uCampus);
+          float ring = exp(-pow((d - 175.) / 3.5, 2.)) + .5 * exp(-pow((d - 175. - mod(uTime * 40., 160.)) / 6., 2.)) * (1. - mod(uTime * 40., 160.) / 160.);
+          emit += vec3(.39, .86, .9) * ring * uHighlight * 2.5;
+        }
         gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
       }
     `,
