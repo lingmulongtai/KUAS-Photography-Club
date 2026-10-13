@@ -1,0 +1,412 @@
+---
+/**
+ * Full-bleed top-page hero: a 3D Kyoto whose sky follows the real time in Kyoto.
+ * Visitors can scrub the time of day or fast-forward a whole day.
+ */
+import { club } from '../data/club';
+---
+<section class="hero" aria-labelledby="hero-title">
+  <div class="stage hero-stage" data-demo="kyoto">
+    <canvas aria-label="東山から西を望む京都の街。空の色は京都の現在時刻に合わせて変わります"></canvas>
+    <div class="campus" hidden>
+      <span class="dot" aria-hidden="true"></span>
+      <span class="label">太秦キャンパス<small>ここで活動しています</small></span>
+    </div>
+  </div>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="hero-inner">
+    <div class="copy">
+      <p class="edge">KYOTO ▸ <span data-status>いまの空</span></p>
+      <h1 id="hero-title">京都の空の下で、<br />写真を撮っています。</h1>
+      <p class="lead">
+        {club.nameJa}です。月に2回の撮影会で、京都の街や近くの府県へ写真を撮りに出かけています。カメラがなくても、スマホひとつで参加できます。
+      </p>
+      <div class="ctas">
+        <a class="btn btn--primary" href="/trips/">撮影会の記録を見る <span class="arrow" aria-hidden="true">→</span></a>
+        <a class="btn" href="/join/">見学・入部について</a>
+      </div>
+    </div>
+
+    <div class="time-panel" role="group" aria-label="空の時刻">
+      <p class="readout">
+        <span class="clock num" data-clock>--:--</span>
+        <span class="facts">
+          <span data-phase>—</span>
+          <span data-kelvin></span>
+          <span data-moon></span>
+        </span>
+      </p>
+      <div class="time-controls">
+        <label class="visually-hidden" for="kyoto-time">表示する時刻</label>
+        <input type="range" id="kyoto-time" min="0" max="1439" step="1" value="1050" />
+        <div class="chips">
+          <button class="chip" type="button" data-mode="lapse" aria-pressed="false">▶ 1日を早送り</button>
+          <button class="chip" type="button" data-mode="live" aria-pressed="true">いまの空</button>
+        </div>
+      </div>
+      <p class="note">京都の現在時刻・太陽と月の位置から計算しています。8月16日の夜には左大文字が灯ります。</p>
+    </div>
+  </div>
+  <a class="scroll-cue" href="#intro"><span>SCROLL</span></a>
+</section>
+
+<script>
+  import { mountStage } from '../scripts/gl/stage';
+  import { createKyoto, type KyotoStatus } from '../scripts/kyoto/scene';
+  import { jstDateAt } from '../scripts/kyoto/astro';
+  import { createLook, lookAt } from '../scripts/kyoto/palette';
+  import { sunPosition } from '../scripts/kyoto/astro';
+
+  type Mode = 'live' | 'manual' | 'lapse';
+
+  const stage = document.querySelector<HTMLElement>('.stage[data-demo="kyoto"]');
+  const hero = stage?.closest<HTMLElement>('.hero');
+  if (stage && hero) {
+    const slider = hero.querySelector<HTMLInputElement>('#kyoto-time')!;
+    const modeButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-mode]'));
+    const out = {
+      status: hero.querySelector('[data-status]'),
+      clock: hero.querySelector('[data-clock]'),
+      phase: hero.querySelector('[data-phase]'),
+      kelvin: hero.querySelector('[data-kelvin]'),
+      moon: hero.querySelector('[data-moon]'),
+    };
+    const campus = stage.querySelector<HTMLElement>('.campus')!;
+
+    let mode: Mode = 'live';
+    let manual = 0;
+    let lapse = 0;
+    let lastTick = performance.now();
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const setMode = (next: Mode) => {
+      mode = next;
+      modeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+      const lapseBtn = modeButtons.find((b) => b.dataset.mode === 'lapse');
+      if (lapseBtn) lapseBtn.textContent = mode === 'lapse' ? '❚❚ 早送りを止める' : '▶ 1日を早送り';
+    };
+
+    const clock = {
+      now() {
+        const real = new Date();
+        const t = performance.now();
+        const step = (t - lastTick) / 1000;
+        lastTick = t;
+        if (mode === 'live') return real;
+        if (mode === 'lapse') {
+          lapse = (lapse + step * 30) % 1440;
+          return jstDateAt(real, lapse);
+        }
+        return jstDateAt(real, manual);
+      },
+    };
+
+    const hhmm = (m: number) => {
+      const v = ((Math.floor(m) % 1440) + 1440) % 1440;
+      return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+    };
+
+    const onStatus = (s: KyotoStatus) => {
+      if (out.clock) out.clock.textContent = hhmm(s.minutes);
+      if (out.phase) out.phase.textContent = s.fire ? '左大文字 点火中' : s.phase;
+      if (out.kelvin) out.kelvin.textContent = s.kelvin ? `約${s.kelvin.toLocaleString('ja-JP')}K` : '';
+      if (out.moon) out.moon.textContent = `月齢 ${s.moonAge.toFixed(1)}`;
+      if (out.status) out.status.textContent = `${mode === 'live' ? 'いま ' : ''}${hhmm(s.minutes)} · ${s.phase}`;
+      if (mode !== 'manual') slider.value = String(Math.floor(s.minutes));
+      if (mode === 'lapse') lapse = s.minutes;
+    };
+
+    const onCampus = (p: { x: number; y: number } | null) => {
+      campus.hidden = !p;
+      if (p) campus.style.transform = `translate(${p.x}px, ${p.y}px)`;
+    };
+
+    slider.addEventListener('input', () => {
+      manual = Number(slider.value);
+      setMode('manual');
+    });
+    modeButtons.forEach((b) =>
+      b.addEventListener('click', () => {
+        const wanted = b.dataset.mode as Mode;
+        if (wanted === 'lapse' && mode === 'lapse') {
+          manual = lapse;
+          setMode('manual');
+          return;
+        }
+        if (wanted === 'lapse') {
+          lapse = Number(slider.value);
+          lastTick = performance.now();
+          if (reduce) return;
+        }
+        setMode(wanted);
+      }),
+    );
+
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    const cores = navigator.hardwareConcurrency || 4;
+    const quality = coarse || cores < 6 || window.innerWidth < 900 ? 0.55 : 1;
+
+    const demo = mountStage(stage, (renderer, el) => createKyoto(renderer, el, { clock, quality, onStatus, onCampus }), {
+      maxDpr: quality < 1 ? 1.5 : 1.75,
+    });
+
+    if (!demo) {
+      // No WebGL: paint today's sky as a still gradient instead
+      const look = lookAt((sunPosition(new Date()).altitude * 180) / Math.PI, createLook());
+      stage.style.setProperty(
+        '--fb',
+        `linear-gradient(${look.zenith.getStyle()}, ${look.mid.getStyle()} 55%, ${look.horizon.getStyle()} 85%, #05070c)`,
+      );
+    }
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    height: max(620px, min(100svh, 1040px));
+    overflow: hidden;
+    background: var(--rebate);
+    isolation: isolate;
+  }
+
+  .hero-stage {
+    position: absolute;
+    inset: 0;
+    aspect-ratio: auto;
+    border-radius: 0;
+    box-shadow: none;
+    z-index: 0;
+  }
+
+  .scrim {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 78%;
+    background: linear-gradient(rgba(5, 7, 12, 0), rgba(5, 7, 12, 0.5) 45%, rgba(5, 7, 12, 0.86));
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .hero-inner {
+    position: absolute;
+    inset: auto 0 0 0;
+    z-index: 2;
+    max-width: calc(var(--maxw) + var(--gutter) * 2);
+    margin-inline: auto;
+    padding: 0 var(--gutter) clamp(28px, 5vw, 56px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 28px 48px;
+    pointer-events: none;
+  }
+
+  .copy,
+  .time-panel {
+    pointer-events: auto;
+    min-width: 0;
+  }
+
+  .copy {
+    display: grid;
+    gap: 16px;
+  }
+
+  h1 {
+    font-size: clamp(32px, 4.6vw, 64px);
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .lead {
+    font-size: 16px;
+    max-width: 32em;
+    color: var(--ink);
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .ctas .btn:not(.btn--primary) {
+    background: var(--hud-bg);
+    border-color: var(--hud-line);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+
+  .time-panel {
+    justify-self: end;
+    width: min(100%, 420px);
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    background: var(--hud-bg);
+    border: 1px solid rgba(255, 246, 230, 0.12);
+    border-radius: var(--radius);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: var(--hud);
+  }
+
+  .readout {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .clock {
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 500;
+    color: var(--amber);
+    letter-spacing: 0.02em;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font: 500 12px/1.5 var(--mono);
+    letter-spacing: 0.06em;
+  }
+
+  .time-controls {
+    display: grid;
+    gap: 10px;
+  }
+
+  .time-controls input {
+    width: 100%;
+    accent-color: var(--amber);
+  }
+
+  .note {
+    font-size: 11px;
+    line-height: 1.6;
+    color: rgba(255, 246, 230, 0.7);
+  }
+
+  .campus {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    pointer-events: none;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    will-change: transform;
+  }
+
+  .campus .dot {
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%;
+    border: 1px solid var(--pencil);
+  }
+
+  .campus .label {
+    display: grid;
+    margin-top: -28px;
+    padding-left: 6px;
+    border-left: 1px solid rgba(251, 243, 213, 0.6);
+    font: 400 15px/1.2 var(--hand);
+    color: var(--pencil);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
+  }
+
+  .campus small {
+    font-size: 11px;
+    opacity: 0.8;
+  }
+
+  .scroll-cue {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    z-index: 2;
+    transform: translateX(-50%);
+    font: 500 10px/1 var(--mono);
+    letter-spacing: 0.3em;
+    color: rgba(255, 246, 230, 0.6);
+    text-decoration: none;
+    padding: 8px;
+  }
+
+  .scroll-cue span::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 22px;
+    margin: 8px auto 0;
+    background: currentColor;
+    animation: cue 2.4s ease-in-out infinite;
+    transform-origin: top;
+  }
+
+  @keyframes cue {
+    0%,
+    100% {
+      transform: scaleY(0.3);
+      opacity: 0.4;
+    }
+    50% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .hero {
+      height: auto;
+      min-height: 100svh;
+      display: grid;
+      grid-template-rows: minmax(54svh, 1fr) auto;
+    }
+
+    .hero-stage {
+      position: relative;
+      inset: auto;
+      grid-row: 1;
+      grid-column: 1;
+    }
+
+    .scrim {
+      grid-row: 1;
+      grid-column: 1;
+      position: relative;
+      inset: auto;
+      height: auto;
+      align-self: end;
+      min-height: 40%;
+    }
+
+    .hero-inner {
+      position: relative;
+      inset: auto;
+      grid-row: 2;
+      grid-column: 1;
+      grid-template-columns: 1fr;
+      margin-top: -96px;
+      padding-bottom: 32px;
+    }
+
+    .time-panel {
+      justify-self: stretch;
+      width: 100%;
+    }
+
+    .scroll-cue {
+      display: none;
+    }
+  }
+</style>
