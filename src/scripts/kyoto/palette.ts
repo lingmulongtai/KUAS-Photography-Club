@@ -27,17 +27,17 @@ interface Key {
 }
 
 const KEYS: Key[] = [
-  { alt: -90, zenith: '#020409', mid: '#050a17', horizon: '#0b1224', glow: '#000000', glowAmt: 0, sun: '#000000', sunAmt: 0, cloud: '#000000', cloudAmt: 0, stars: 1, city: 1, exposure: 1.35, bloom: 0.95 },
-  { alt: -18, zenith: '#03060f', mid: '#07101f', horizon: '#0f1830', glow: '#141a33', glowAmt: 0.05, sun: '#000000', sunAmt: 0, cloud: '#000000', cloudAmt: 0, stars: 1, city: 1, exposure: 1.35, bloom: 0.95 },
+  { alt: -90, zenith: '#03081a', mid: '#081430', horizon: '#121f42', glow: '#000000', glowAmt: 0, sun: '#000000', sunAmt: 0, cloud: '#000000', cloudAmt: 0, stars: 1, city: 1, exposure: 1.35, bloom: 0.95 },
+  { alt: -18, zenith: '#040a1e', mid: '#0a1736', horizon: '#16244a', glow: '#141a33', glowAmt: 0.05, sun: '#000000', sunAmt: 0, cloud: '#000000', cloudAmt: 0, stars: 1, city: 1, exposure: 1.35, bloom: 0.95 },
   { alt: -12, zenith: '#040a1d', mid: '#0b183c', horizon: '#1c2a58', glow: '#2b2a55', glowAmt: 0.18, sun: '#000000', sunAmt: 0, cloud: '#1c1e3c', cloudAmt: 0.25, stars: 0.85, city: 1, exposure: 1.3, bloom: 0.9 },
   { alt: -8, zenith: '#091740', mid: '#1e3478', horizon: '#4a5a9e', glow: '#7a5aa2', glowAmt: 0.4, sun: '#000000', sunAmt: 0, cloud: '#6c4c8e', cloudAmt: 0.6, stars: 0.4, city: 0.95, exposure: 1.2, bloom: 0.8 },
   { alt: -4, zenith: '#132460', mid: '#46468c', horizon: '#d4787a', glow: '#ff7a52', glowAmt: 0.75, sun: '#000000', sunAmt: 0, cloud: '#ff6878', cloudAmt: 1.1, stars: 0.1, city: 0.8, exposure: 1.1, bloom: 0.7 },
   { alt: -1, zenith: '#1d3272', mid: '#86588e', horizon: '#ff965a', glow: '#ff8a40', glowAmt: 1, sun: '#ff6a28', sunAmt: 0.4, cloud: '#ff7a44', cloudAmt: 1.4, stars: 0, city: 0.55, exposure: 1, bloom: 0.6 },
   { alt: 2, zenith: '#28488a', mid: '#ad7290', horizon: '#ffad68', glow: '#ffa050', glowAmt: 1, sun: '#ff9446', sunAmt: 1.6, cloud: '#ffae6c', cloudAmt: 1.5, stars: 0, city: 0.25, exposure: 0.9, bloom: 0.5 },
-  { alt: 6, zenith: '#30609e', mid: '#c49898', horizon: '#ffcf98', glow: '#ffc890', glowAmt: 0.8, sun: '#ffbc7c', sunAmt: 2.4, cloud: '#ffdcb0', cloudAmt: 1.4, stars: 0, city: 0.05, exposure: 0.8, bloom: 0.4 },
-  { alt: 15, zenith: '#3970b6', mid: '#88aed6', horizon: '#d6e0e8', glow: '#fff0d8', glowAmt: 0.5, sun: '#ffeedb', sunAmt: 3, cloud: '#ffffff', cloudAmt: 1.2, stars: 0, city: 0, exposure: 0.72, bloom: 0.3 },
-  { alt: 30, zenith: '#2e67b4', mid: '#76a6d6', horizon: '#c6daea', glow: '#fff6e8', glowAmt: 0.4, sun: '#fff6ec', sunAmt: 3.2, cloud: '#ffffff', cloudAmt: 1.1, stars: 0, city: 0, exposure: 0.68, bloom: 0.25 },
-  { alt: 90, zenith: '#2a62b0', mid: '#70a2d4', horizon: '#c2d8ea', glow: '#fff8f0', glowAmt: 0.35, sun: '#fff8f0', sunAmt: 3.3, cloud: '#ffffff', cloudAmt: 1.1, stars: 0, city: 0, exposure: 0.66, bloom: 0.25 },
+  { alt: 6, zenith: '#30609e', mid: '#c49898', horizon: '#f2b98a', glow: '#ffc890', glowAmt: 0.62, sun: '#ffbc7c', sunAmt: 2.4, cloud: '#ffdcb0', cloudAmt: 1.3, stars: 0, city: 0.05, exposure: 0.66, bloom: 0.4 },
+  { alt: 15, zenith: '#3970b6', mid: '#88aed6', horizon: '#cfd9e2', glow: '#fff0d8', glowAmt: 0.28, sun: '#ffeedb', sunAmt: 3, cloud: '#ffffff', cloudAmt: 1.15, stars: 0, city: 0, exposure: 0.62, bloom: 0.3 },
+  { alt: 30, zenith: '#2e67b4', mid: '#76a6d6', horizon: '#c6daea', glow: '#fff6e8', glowAmt: 0.2, sun: '#fff6ec', sunAmt: 3.2, cloud: '#ffffff', cloudAmt: 1.1, stars: 0, city: 0, exposure: 0.68, bloom: 0.25 },
+  { alt: 90, zenith: '#2a62b0', mid: '#70a2d4', horizon: '#c2d8ea', glow: '#fff8f0', glowAmt: 0.18, sun: '#fff8f0', sunAmt: 3.3, cloud: '#ffffff', cloudAmt: 1.1, stars: 0, city: 0, exposure: 0.66, bloom: 0.25 },
 ];
 
 const COLOR_FIELDS = ['zenith', 'mid', 'horizon', 'glow', 'sun', 'cloud'] as const;
