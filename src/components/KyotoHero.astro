@@ -118,7 +118,8 @@ import { club } from '../data/club';
     };
 
     const onCampus = (p: { x: number; y: number } | null) => {
-      campus.hidden = !p;
+      // keep the hand-written label inside the frame
+      campus.hidden = !p || p.x > stage.clientWidth - 140 || p.y < 70;
       if (p) campus.style.transform = `translate(${p.x}px, ${p.y}px)`;
     };
 
