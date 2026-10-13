@@ -93,7 +93,7 @@ export function createKyoto(renderer: THREE.WebGLRenderer, el: HTMLElement, opts
     env.uCity.value = look.city;
     env.uLit.value = windowsLit(minutes);
     env.uVenus.value = THREE.MathUtils.smoothstep(alt, -8, -2) * (1 - THREE.MathUtils.smoothstep(alt, 1, 5));
-    env.uFogDensity.value = minutes < 9 * 60 && minutes > 4 * 60 ? 0.0014 : 0.0011;
+    env.uFogDensity.value = minutes < 9 * 60 && minutes > 4 * 60 ? 0.001 : minutes > 13 * 60 && alt > 4 ? 0.0006 : 0.0008;
 
     const moon = moonPosition(date);
     env.uMoonDir.value.set(...directionFrom(moon));
