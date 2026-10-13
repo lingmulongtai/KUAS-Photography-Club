@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Demo } from '../gl/stage';
 import { createEnv } from './env';
-import { KYOTO, directionFrom, jstMinutes, localSiderealAngle, moonPosition, sunPosition } from '../kyoto/astro';
+import { KYOTO, directionFrom, jstMinutes, localSiderealAngle, moonPosition, sunPosition } from './astro';
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import { PLACES } from './geo';
 import { loadJSON, loadTexture, type TerrainMeta } from './data';
@@ -14,7 +14,7 @@ import { buildCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import { loadLines } from './lines-data';
 import { buildLamps, buildTraffic, roadGlowTexture } from './lights';
-import { BUILDINGS_BOX } from './geo';
+import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
 import { buildWater } from './water';
 import { createLabels } from './labels';
@@ -37,7 +37,14 @@ export interface HeroOptions {
   onReady?: () => void;
   /** A pin with an action was pressed (the campus). */
   onAction?: (id: string) => void;
+  /** The camera started moving to (or arrived at) a view. */
+  onMode?: (mode: HeroMode, arrived: boolean) => void;
+  reducedMotion?: boolean;
+  /** Screen areas (stage pixels) the place pins should keep out of, such as the headline. */
+  avoid?: () => { x: number; y: number; w: number; h: number }[];
 }
+
+export type HeroMode = 'city' | 'campus';
 
 const RAD = Math.PI / 180;
 
@@ -58,7 +65,7 @@ export const VIEW = {
   pitch: -5,
 };
 
-export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts: HeroOptions): Demo & { burst(n: number): void } {
+export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts: HeroOptions): Demo & { burst(n: number): void; flyTo(to: HeroMode): void; readonly mode: HeroMode } {
   const env = createEnv();
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 8, 60000);
@@ -84,6 +91,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   };
   let pxPerM = 1000;
   let lastT = 0;
+  const campus = new THREE.Vector3(CAMPUS_CENTER.x, 40, CAMPUS_CENTER.z);
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -91,6 +99,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     const meta = await loadJSON<TerrainMeta>('terrain.json');
     const [hf, wide] = await Promise.all([loadHeightfield(meta), loadTexture(meta.aerialWide.file, aniso)]);
     eye.y = hf.height(PLACES.shogunzuka.x, PLACES.shogunzuka.z) + VIEW.eye.above;
+    campus.y = hf.height(campus.x, campus.z) + 14;
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
       aerialWideBox: meta.aerialWide.box,
@@ -107,7 +116,10 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     const [cityPhoto, buildings] = await Promise.all([loadTexture(meta.aerialCity.file, aniso), loadBuildings()]);
     terrain.uniforms.uAerialCity.value = cityPhoto;
     terrain.uniforms.uCityOn.value = 1;
-    const city = buildCity(env, hf, buildings);
+    const lite = opts.quality < 0.75;
+    const city = buildCity(env, hf, buildings, (b) =>
+      !lite || b.w * b.d > 90 || b.h > 12 || Math.hypot(b.x - eye.x, b.z - eye.z) < 3500 || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200,
+    );
     const landmarks = buildLandmarks(env, hf);
     const trees = buildTrees(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, VIEW.eye, opts.quality);
     scene.add(trees.group);
@@ -122,7 +134,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     terrain.uniforms.uRoadGlow.value = roadGlowTexture(lines, opts.quality > 0.75 ? 4096 : 2048);
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
     scene.add(buildWater(env, hf, lines));
-    labels = createLabels(el, hf, (id) => opts.onAction?.(id));
+    labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid);
     const lamps = buildLamps(env, hf, lines, opts.quality);
     const traffic = buildTraffic(env, hf, lines, opts.quality);
     pointLayers.push(lamps.uniforms, traffic.uniforms);
@@ -132,7 +144,6 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   })().catch((err) => console.error('Kyoto data failed to load', err));
 
   let lastStatus = '';
-  const target = new THREE.Vector3();
 
   function applyTime(date: Date, t: number) {
     const sun = sunPosition(date);
@@ -174,12 +185,104 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     }
   }
 
-  function placeCamera() {
-    const b = VIEW.bearing * RAD;
-    const p = VIEW.pitch * RAD;
-    camera.position.copy(eye);
-    target.set(eye.x + Math.sin(b) * Math.cos(p), eye.y + Math.sin(p), eye.z - Math.cos(b) * Math.cos(p));
-    camera.lookAt(target);
+  /* ---------- camera: the view from Shogunzuka, and a flight to the campus ---------- */
+
+  const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
+  el.addEventListener('pointermove', (e) => {
+    const r = el.getBoundingClientRect();
+    pointer.tx = ((e.clientX - r.left) / r.width) * 2 - 1;
+    pointer.ty = 1 - ((e.clientY - r.top) / r.height) * 2;
+  });
+  el.addEventListener('pointerleave', () => {
+    pointer.tx = 0;
+    pointer.ty = 0;
+  });
+
+  let mode: HeroMode = 'city';
+  let modeSince = 0;
+  let flight: { to: HeroMode; t: number; dur: number; p0: THREE.Vector3; t0: THREE.Vector3; p1: THREE.Vector3; p2: THREE.Vector3; p3: THREE.Vector3 } | null = null;
+  env.uCampus.value.set(CAMPUS_CENTER.x, CAMPUS_CENTER.z);
+  const ORBIT = { radius: 640, height: 150, start: 112 * RAD, speed: 0.03 };
+  const pose = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+  const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+
+  function cityPose(t: number, out = pose) {
+    const drift = opts.reducedMotion ? 0 : Math.sin(t * 0.05) * 0.8;
+    const b = (VIEW.bearing + drift + pointer.x * 3) * RAD;
+    const p = (VIEW.pitch + pointer.y * 1.2) * RAD;
+    out.pos.copy(eye);
+    out.target.set(eye.x + Math.sin(b) * Math.cos(p) * 1000, eye.y + Math.sin(p) * 1000, eye.z - Math.cos(b) * Math.cos(p) * 1000);
+    return out;
+  }
+
+  function campusPose(t: number, out = pose) {
+    const a = ORBIT.start - (opts.reducedMotion ? 0 : (t - modeSince) * ORBIT.speed) + pointer.x * 0.08;
+    out.pos.set(campus.x + Math.sin(a) * ORBIT.radius, campus.y + ORBIT.height + pointer.y * 25, campus.z - Math.cos(a) * ORBIT.radius);
+    // aim a little above the campus so the mountains behind stay in frame
+    out.target.copy(campus).setY(campus.y + 45);
+    return out;
+  }
+
+  function flyTo(to: HeroMode, t: number) {
+    if (mode === to && !flight) return;
+    const from = flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() }) : campusPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() });
+    modeSince = t + (opts.reducedMotion ? 0 : 5);
+    const end = to === 'city' ? cityPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() }) : campusPose(modeSince, { pos: new THREE.Vector3(), target: new THREE.Vector3() });
+    const p0 = from.pos;
+    const p3 = end.pos;
+    const lift = new THREE.Vector3(0, 260, 0);
+    flight = {
+      to,
+      t: 0,
+      dur: opts.reducedMotion ? 0.01 : 5,
+      p0,
+      t0: from.target,
+      p1: p0.clone().lerp(p3, 0.3).add(lift),
+      p2: p0.clone().lerp(p3, 0.75).add(lift.multiplyScalar(0.7)),
+      p3,
+    };
+    shadow.setRegion(
+      to === 'campus'
+        ? new THREE.Box3(new THREE.Vector3(campus.x - 2600, 0, campus.z - 2600), new THREE.Vector3(campus.x + 2600, 450, campus.z + 2600))
+        : new THREE.Box3(new THREE.Vector3(-7500, 0, -6000), new THREE.Vector3(3200, 450, 6000)),
+    );
+    labels?.filter(to === 'campus' ? ['kuas', 'arashiyama', 'atago', 'nijo', 'tower', 'kinkaku'] : null);
+    opts.onMode?.(to, false);
+  }
+
+  const lastTarget = new THREE.Vector3();
+  const bez = new THREE.Vector3();
+  function placeCamera(t: number, dt: number) {
+    const k = dt ? Math.min(1, dt * 1.5) : 1;
+    pointer.x += (pointer.tx - pointer.x) * k;
+    pointer.y += (pointer.ty - pointer.y) * k;
+    if (flight) {
+      flight.t = Math.min(1, flight.t + dt / flight.dur);
+      const e = ease(flight.t);
+      const u = 1 - e;
+      bez.copy(flight.p0).multiplyScalar(u * u * u)
+        .addScaledVector(flight.p1, 3 * u * u * e)
+        .addScaledVector(flight.p2, 3 * u * e * e)
+        .addScaledVector(flight.p3, e * e * e);
+      const end = flight.to === 'city' ? cityPose(t) : campusPose(Math.max(t, modeSince));
+      // look ahead a little sooner than we move
+      const te = ease(Math.min(1, flight.t * 1.2));
+      lastTarget.copy(flight.t0).lerp(end.target, te);
+      camera.position.copy(bez);
+      const h = flight.to === 'campus' ? THREE.MathUtils.smoothstep(flight.t, 0.4, 1) : 1 - THREE.MathUtils.smoothstep(flight.t, 0, 0.5);
+      env.uHighlight.value = h;
+      if (flight.t >= 1) {
+        mode = flight.to;
+        flight = null;
+        modeSince = t;
+        opts.onMode?.(mode, true);
+      }
+    } else {
+      const p = mode === 'city' ? cityPose(t) : campusPose(t);
+      camera.position.copy(p.pos);
+      lastTarget.copy(p.target);
+    }
+    camera.lookAt(lastTarget);
     sky.mesh.position.copy(camera.position);
     celestial.group.position.copy(camera.position);
   }
@@ -192,9 +295,15 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     if (elev > 0.01 && !(e.target as HTMLElement).closest('button')) meteors.burst(1);
   });
 
+  let clock = 0;
   return {
     /** Send a few shooting stars at once. */
     burst: (n: number) => meteors.burst(n),
+    /** Fly to the campus or back to the view from Shogunzuka. */
+    flyTo: (to: HeroMode) => flyTo(to, clock),
+    get mode() {
+      return flight ? flight.to : mode;
+    },
     t0: 0,
     resize(w, h, d) {
       width = w;
@@ -214,8 +323,9 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     render(t) {
       const dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
+      clock = t;
       applyTime(opts.now(), t);
-      placeCamera();
+      placeCamera(t, dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);
       meteors.update(t, dt, camera.position, { az: VIEW.bearing * RAD, half, top: (VIEW.pitch * RAD) + (camera.fov * RAD) / 2 }, env.uStars.value, pxPerM);
       post.render(t);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ENV_GLSL, NOISE_GLSL, type Env } from './env';
-import { KYOTO } from '../kyoto/astro';
+import { KYOTO } from './astro';
 import { rng } from './util';
 
 /** Radius of the sky dome in metres: inside the camera's far plane, beyond the farthest mountains. */
