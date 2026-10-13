@@ -41,6 +41,8 @@ export function createEnv() {
     /** campus highlight, 0..1, and where the campus is */
     uHighlight: { value: 0 },
     uCampus: { value: new THREE.Vector2() },
+    /** 1 while the detailed campus model stands in for the plain blocks */
+    uCampusDetail: { value: 0 },
   };
 }
 
@@ -91,6 +93,7 @@ uniform float uShadowWorld;
 uniform float uShadowBias;
 uniform float uHighlight;
 uniform vec2 uCampus;
+uniform float uCampusDetail;
 
 #include <packing>
 ${NOISE_GLSL}

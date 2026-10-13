@@ -10,7 +10,16 @@ import { rng } from './util';
  * forest. Each tree takes its colour from the photo under it, so the canopy matches the real
  * woods: broadleaf crowns (shii and kashi) mixed with conical cedars.
  */
-export function buildTrees(env: Env, hf: Heightfield, photo: HTMLImageElement | ImageBitmap, photoBox: Box, eye: { x: number; z: number }, quality: number) {
+export function buildTrees(
+  env: Env,
+  hf: Heightfield,
+  photo: HTMLImageElement | ImageBitmap,
+  photoBox: Box,
+  eye: { x: number; z: number },
+  quality: number,
+  /** extra broadleaf trees, e.g. along the campus edge */
+  extra: { x: number; y: number; z: number }[] = [],
+) {
   const W = photo.width;
   const H = photo.height;
   const canvas = document.createElement('canvas');
@@ -53,6 +62,14 @@ export function buildTrees(env: Env, hf: Heightfield, photo: HTMLImageElement | 
       tint.push(c[0], c[1], c[2]);
       kind.push(cedar ? 1 : 0);
     }
+  }
+
+  for (const t of extra) {
+    const s = 0.7 + r() * 0.35;
+    pos.push(t.x, t.y - 0.5, t.z);
+    size.push(3.4 * s, 9 * s);
+    tint.push(0.2, 0.3, 0.15);
+    kind.push(0);
   }
 
   // broadleaf crown: two flattened blobs; cedar: a narrow cone. Both unit-sized, base at y = 0.
