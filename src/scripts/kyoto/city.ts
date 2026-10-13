@@ -154,9 +154,9 @@ const BUILDING_FS = /* glsl */ `
     float seed = fract(vInfo);
     vec3 n = normalize(vN);
     vec3 alb;
-    if (kind < .5) alb = mix(vec3(.07, .05, .036), vec3(.12, .09, .065), seed);
-    else if (kind < 1.5) alb = mix(vec3(.16, .15, .14), vec3(.27, .25, .22), seed);
-    else alb = mix(vec3(.36, .35, .33), vec3(.5, .48, .45), seed);
+    if (kind < .5) alb = mix(vec3(.05, .036, .026), vec3(.09, .068, .05), seed);
+    else if (kind < 1.5) alb = mix(vec3(.1, .095, .09), vec3(.18, .165, .145), seed);
+    else alb = mix(vec3(.2, .195, .185), vec3(.28, .27, .25), seed);
 
     vec3 emit = vec3(0.);
     if (n.y < .5){
@@ -171,18 +171,18 @@ const BUILDING_FS = /* glsl */ `
       float px = max(fwidth(g.x), fwidth(g.y));
       float detail = 1. - smoothstep(.35, .95, px);
       float r = hash13(vec3(id, seed * 91. + n.x * 7. + n.z * 13.));
-      float lit = step(r, uLit * (machiya ? .75 : 1.15));
+      float lit = step(r, uLit * (machiya ? .45 : .8));
       float warm = step(.28, hash13(vec3(id + 3.1, seed * 17.)));
-      vec3 wc = mix(vec3(.7, .82, 1.), vec3(1., .6, .28), warm);
+      vec3 wc = mix(vec3(.75, .82, .95), vec3(1., .58, .26), warm);
       if (machiya) wc = vec3(1., .55, .22);
-      float avg = .42 * uLit;
+      float avg = .1 * uLit;
       float pattern = mix(avg, win * lit, detail);
-      emit = wc * pattern * uCity * 2.4;
+      emit = wc * pattern * uCity * mix(.6, 1.3, detail);
       alb = mix(alb, alb * .5 + vec3(.01, .012, .016), win * detail * .85);
       // shop fronts on the ground floor glow a little brighter
-      if (!machiya && id.y < .5) emit += vec3(1., .78, .5) * win * detail * uCity * step(.4, r) * 1.6;
+      if (!machiya && id.y < .5) emit += vec3(1., .78, .5) * win * detail * uCity * step(.4, r) * 1.2;
     } else {
-      alb *= kind < .5 ? .6 : .85;
+      alb *= kind < .5 ? .6 : .9 + .25 * seed;
     }
     float ao = mix(.45, 1., smoothstep(0., .9, vLocal.y));
     vec3 col = shade(alb, n) * ao;
