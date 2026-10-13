@@ -121,7 +121,10 @@ export function buildLandmarks(env: Env) {
   const st = LANDMARKS.kyotoStation;
   const station = new THREE.Mesh(
     new THREE.BoxGeometry(st.w, st.h, st.d).translate(st.x, st.h / 2, st.z),
-    landmarkMaterial(env, new THREE.Color(0.16, 0.18, 0.2), { flood: new THREE.Color(0.5, 0.42, 0.32) }),
+    landmarkMaterial(env, new THREE.Color(0.1, 0.11, 0.12), {
+      flood: new THREE.Color(0.05, 0.045, 0.04),
+      band: [st.h * 0.45, st.h * 0.62, new THREE.Color(0.3, 0.24, 0.16)],
+    }),
   );
   group.add(station);
 
