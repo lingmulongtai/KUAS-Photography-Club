@@ -41,6 +41,8 @@ export interface HeroOptions {
   /** The camera started moving to (or arrived at) a view. */
   onMode?: (mode: HeroMode, arrived: boolean) => void;
   reducedMotion?: boolean;
+  /** Length of the flight to the campus, seconds. */
+  flightSeconds?: number;
   /** Screen areas (stage pixels) the place pins should keep out of, such as the headline. */
   avoid?: () => { x: number; y: number; w: number; h: number }[];
 }
@@ -231,7 +233,8 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   function flyTo(to: HeroMode, t: number) {
     if (mode === to && !flight) return;
     const from = flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() }) : campusPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() });
-    modeSince = t + (opts.reducedMotion ? 0 : 5);
+    const seconds = opts.reducedMotion ? 0.01 : opts.flightSeconds ?? 5;
+    modeSince = t + seconds;
     const end = to === 'city' ? cityPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() }) : campusPose(modeSince, { pos: new THREE.Vector3(), target: new THREE.Vector3() });
     const p0 = from.pos;
     const p3 = end.pos;
@@ -239,7 +242,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     flight = {
       to,
       t: 0,
-      dur: opts.reducedMotion ? 0.01 : 5,
+      dur: seconds,
       p0,
       t0: from.target,
       p1: p0.clone().lerp(p3, 0.3).add(lift),
