@@ -1,0 +1,179 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import FormLink from '../components/FormLink.astro';
+import { forms } from '../data/club';
+
+const topics = [
+  {
+    en: 'PHOTOGRAPHY',
+    title: '撮影のご依頼',
+    body: '学内外のイベント、団体の活動記録、ポートレートなど。日時・場所・内容・写真の使い道を書いて送ってください。部員の予定を確認してお返事します。',
+  },
+  {
+    en: 'SPONSORSHIP',
+    title: '協賛・スポンサー',
+    body: '機材の提供や貸し出し、写真展・撮影会へのご協力など。活動内容や実績の資料が必要な場合はお知らせください。',
+  },
+  {
+    en: 'PRESS',
+    title: '取材・メディア',
+    body: '大学の広報、学生メディア、地域の情報誌などからの取材。掲載先と締め切りを添えてご連絡ください。',
+  },
+  {
+    en: 'PHOTO USE',
+    title: '写真の利用について',
+    body: 'このサイトや Instagram の写真を使いたい場合は、必ず事前にご相談ください。撮影者本人の許可を取ってからお返事します。',
+  },
+  {
+    en: 'OTHER',
+    title: 'その他',
+    body: '他大学の写真サークルとの合同撮影会、ワークショップのお誘いなども歓迎です。',
+  },
+];
+---
+<Base title="お問い合わせ" description="撮影のご依頼、協賛、取材など、KUAS Photography Club へのお問い合わせ窓口です。">
+  <PageHero
+    edge="CONTACT ▸ FOR OUTSIDE PARTIES"
+    title="お問い合わせ"
+    lead="撮影のご依頼、協賛、取材など、学外の方・大学の部署の方からのご連絡はこちらから。学生が運営しているため、お返事まで数日いただくことがあります。"
+  />
+
+  <section class="wrap topics" aria-label="お問い合わせの種類">
+    {topics.map((t, i) => (
+      <article class="topic" style={`--i: ${i}`}>
+        <p class="edge">{t.en}</p>
+        <h2>{t.title}</h2>
+        <p class="small">{t.body}</p>
+      </article>
+    ))}
+  </section>
+
+  <section class="section">
+    <div class="wrap cols">
+      <div class="section-head">
+        <p class="edge">SEND</p>
+        <h2>ご連絡の方法</h2>
+        <p class="muted">
+          お問い合わせフォームにご記入いただくのがいちばん確実です。お名前（団体名）、ご連絡先、ご用件の種類と内容をお書きください。
+        </p>
+      </div>
+      <FormLink
+        href={forms.contact}
+        label="お問い合わせフォームを開く"
+        pending="お問い合わせフォームは準備中です。それまでは Instagram の DM かメールでご連絡ください。"
+      />
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap note">
+      <div class="section-head">
+        <p class="edge">COPYRIGHT</p>
+        <h2>写真の著作権について</h2>
+      </div>
+      <div class="prose">
+        <p>
+          このサイトと Instagram に載せている写真の<strong>著作権は、それぞれの撮影者にあります</strong>。無断での転載・加工・商用利用はご遠慮ください。
+        </p>
+        <p>
+          使いたい写真がある場合は、上の窓口から「写真の利用について」としてご連絡ください。部員がサークルの外で撮影を引き受けるときの決まりは、<a href="/guidelines/">サークルのガイドライン</a>に沿っています。
+        </p>
+        <p class="small muted">部員の方・入部を考えている方は <a href="/join/">見学・入部のページ</a> へ。</p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .topics {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 14px;
+    padding-bottom: clamp(56px, 8vw, 96px);
+  }
+
+  .topic {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+    padding: 22px;
+    background: var(--raise);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(var(--i) * 70ms + 150ms);
+    transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+  }
+
+  .topic:hover {
+    transform: translateY(-3px);
+    border-color: var(--brand);
+    box-shadow: var(--shadow);
+  }
+
+  .topic:nth-child(-n + 3) {
+    grid-column: span 2;
+  }
+
+  .topic:nth-child(n + 4) {
+    grid-column: span 3;
+  }
+
+  .topic h2 {
+    font-size: var(--step-2);
+  }
+
+  .topic .small {
+    color: var(--muted);
+  }
+
+  .cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 32px 72px;
+    align-items: start;
+  }
+
+  .note {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 24px 72px;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+
+  .note h2 {
+    font-size: var(--step-3);
+  }
+
+  @media (max-width: 860px) {
+    .topics {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .topic:nth-child(n) {
+      grid-column: auto;
+    }
+
+    .topic:last-child {
+      grid-column: 1 / -1;
+    }
+
+    .cols,
+    .note {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .topics {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
