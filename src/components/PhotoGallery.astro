@@ -128,7 +128,7 @@ const { photos, date } = Astro.props;
   }
 
   .credit {
-    font: 400 11px/1.5 var(--mono);
+    font: 600 11px/1.5 var(--latin);
     color: var(--muted);
     letter-spacing: 0.02em;
   }
@@ -137,9 +137,20 @@ const { photos, date } = Astro.props;
     width: min(96vw, 1400px);
     max-height: 96vh;
     padding: 0;
-    border: 1px solid var(--line);
+    border: 0;
+    border-radius: var(--radius);
     background: var(--rebate);
-    color: var(--ink);
+    color: var(--hud);
+  }
+
+  .lightbox .btn {
+    border-color: var(--hud-line);
+    color: var(--hud);
+  }
+
+  .lightbox .btn:hover {
+    background: var(--hud);
+    color: var(--rebate);
   }
 
   .lightbox::backdrop {
@@ -165,8 +176,8 @@ const { photos, date } = Astro.props;
   }
 
   .lb-credit {
-    font: 400 12px/1.5 var(--mono);
-    color: var(--muted);
+    font: 600 12px/1.5 var(--latin);
+    opacity: 0.7;
   }
 
   .lb-nav {
@@ -177,7 +188,7 @@ const { photos, date } = Astro.props;
   }
 
   .lb-count {
-    color: var(--accent);
+    color: var(--brand);
     min-width: 4em;
     text-align: center;
   }
