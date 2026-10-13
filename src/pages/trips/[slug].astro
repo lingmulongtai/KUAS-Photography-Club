@@ -1,0 +1,154 @@
+---
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import FilmStrip from '../../components/FilmStrip.astro';
+import PhotoGallery from '../../components/PhotoGallery.astro';
+import SampleBadge from '../../components/SampleBadge.astro';
+import { formatDate, formatDateJa, getTrips, type Trip } from '../../lib/trips';
+
+export async function getStaticPaths() {
+  const trips = await getTrips();
+  return trips.map((trip, i) => ({
+    params: { slug: trip.id },
+    props: { trip, newer: trips[i - 1] ?? null, older: trips[i + 1] ?? null, roll: trips.length - i },
+  }));
+}
+
+interface Props {
+  trip: Trip;
+  newer: Trip | null;
+  older: Trip | null;
+  roll: number;
+}
+const { trip, newer, older, roll } = Astro.props;
+const { title, date, place, members, summary, photos, sample } = trip.data;
+const { Content } = await render(trip);
+const strip = photos.map((p) => ({ src: p.src, date, portrait: p.portrait }));
+---
+<Base title={title} description={summary}>
+  <header class="wrap head">
+    <p class="edge"><a href="/trips/">PHOTO TRIPS</a> ▸ ROLL {String(roll).padStart(2, '0')} ▸ {formatDate(date)}</p>
+    <h1>{title}</h1>
+    <dl class="facts">
+      <div><dt>日付</dt><dd>{formatDateJa(date)}</dd></div>
+      <div><dt>場所</dt><dd>{place}</dd></div>
+      {members && <div><dt>参加</dt><dd>{members}人</dd></div>}
+      <div><dt>写真</dt><dd>{photos.length}枚</dd></div>
+    </dl>
+    {sample && <SampleBadge long />}
+  </header>
+
+  <section class="wrap" aria-label="この撮影会のフィルム">
+    <FilmStrip strips={[strip]} label={`${title}で撮った写真が並んだフィルム`} />
+  </section>
+
+  <section class="section report">
+    <div class="wrap cols">
+      <div class="prose">
+        <Content />
+      </div>
+      <aside class="aside">
+        <p class="edge">TRIP NOTE</p>
+        <p class="small muted">
+          写真の著作権は撮影者にあります。掲載している写真は撮影者の許可を得たものです。掲載についてのご相談は、サークルの運営までご連絡ください。
+        </p>
+        <a class="link-arrow" href="/guidelines/#6-著作権肖像権写真の取り扱い">写真の取り扱いルール →</a>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="gallery-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="edge">CONTACT SHEET</p>
+        <h2 id="gallery-title">写真</h2>
+      </div>
+      <PhotoGallery photos={photos} date={date} />
+    </div>
+  </section>
+
+  <nav class="wrap pager" aria-label="ほかの撮影会">
+    {older ? <a href={`/trips/${older.id}/`} class="prev"><span class="edge">← OLDER</span><span>{older.data.title}</span></a> : <span></span>}
+    {newer ? <a href={`/trips/${newer.id}/`} class="next"><span class="edge">NEWER →</span><span>{newer.data.title}</span></a> : <span></span>}
+  </nav>
+</Base>
+
+<style>
+  .head {
+    display: grid;
+    gap: 16px;
+    justify-items: start;
+    padding-block: clamp(48px, 7vw, 88px) 32px;
+  }
+
+  .head .edge a {
+    text-decoration: none;
+  }
+
+  h1 {
+    font-size: var(--step-5);
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    margin: 0;
+  }
+
+  .facts div {
+    display: grid;
+  }
+
+  .facts dt {
+    font: 500 11px/1.4 var(--mono);
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+
+  .facts dd {
+    margin: 0;
+  }
+
+  .cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+    gap: 40px 64px;
+    align-items: start;
+  }
+
+  .aside {
+    display: grid;
+    gap: 10px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding-block: 32px 72px;
+    border-top: 1px solid var(--line);
+  }
+
+  .pager a {
+    display: grid;
+    gap: 4px;
+    text-decoration: none;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: var(--step-1);
+  }
+
+  .pager .next {
+    text-align: right;
+  }
+
+  @media (max-width: 860px) {
+    .cols {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
