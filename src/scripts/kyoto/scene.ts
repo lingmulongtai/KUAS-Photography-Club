@@ -11,6 +11,7 @@ import { buildRiver } from './water';
 import { buildCelestial, buildSkyDome } from './sky';
 import { buildClouds, coverForDay } from './clouds';
 import { createPost } from './post';
+import { SHADOW_LAYER, createSunShadow } from './shadow';
 
 export interface KyotoStatus {
   minutes: number;
@@ -52,6 +53,12 @@ export function createKyoto(renderer: THREE.WebGLRenderer, el: HTMLElement, opts
   const beacon = buildCampusBeacon(env);
   scene.add(sky.mesh, celestial.group, terrain.mesh, city.group, landmarks, river, clouds.mesh, beacon.points);
 
+  for (const caster of [terrain.mesh, city.group, landmarks]) {
+    caster.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) o.layers.enable(SHADOW_LAYER);
+    });
+  }
+  const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 3072 : 2048);
   const post = createPost(renderer, scene, camera);
   const look = createLook();
   const tmp = new THREE.Vector3();
@@ -83,6 +90,7 @@ export function createKyoto(renderer: THREE.WebGLRenderer, el: HTMLElement, opts
 
     env.uTime.value = t;
     env.uSunDir.value.set(...directionFrom(sun));
+    shadow.update(env.uSunDir.value);
     env.uZenith.value.copy(look.zenith);
     env.uMid.value.copy(look.mid);
     env.uHorizon.value.copy(look.horizon);

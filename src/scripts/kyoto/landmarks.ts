@@ -44,7 +44,7 @@ function landmarkMaterial(env: Env, albedo: THREE.Color, night: { flood: THREE.C
       void main(){
         vec3 n = normalize(vN);
         float y = (vWorld.y - uBase) / (uTop - uBase);
-        vec3 col = shade(uAlbedo, n);
+        vec3 col = shade(uAlbedo, n, vWorld);
         vec3 emit = uFlood * uCity * mix(1.2, .35, clamp(y, 0., 1.)) * (.6 + .4 * max(n.y, 0.) + .3 * abs(n.x));
         float inBand = step(uBand.x, vWorld.y) * step(vWorld.y, uBand.y);
         vec2 rel = vWorld.xz - uCenter;

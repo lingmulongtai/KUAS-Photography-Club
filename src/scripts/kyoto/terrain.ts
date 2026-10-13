@@ -120,7 +120,7 @@ export function buildTerrain(env: Env, segments = 280) {
           emit += vec3(4., 1.5, .4) * m * uFire * flick;
         }
 
-        vec3 col = shade(albedo, n);
+        vec3 col = shade(albedo, n, vWorld);
         gl_FragColor = vec4(applyFog(col, emit, vWorld), 1.);
       }
     `,

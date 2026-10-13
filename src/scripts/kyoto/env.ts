@@ -27,6 +27,12 @@ export function createEnv() {
     /** pink band opposite the sun at twilight */
     uVenus: { value: 0 },
     uFogDensity: { value: 0.0008 },
+    /** sun shadow map (see shadow.ts) */
+    uShadowMap: { value: null as THREE.Texture | null },
+    uShadowMatrix: { value: new THREE.Matrix4() },
+    uShadowOn: { value: 0 },
+    uShadowTexel: { value: new THREE.Vector2(1 / 2048, 1 / 2048) },
+    uShadowBias: { value: 0.0001 },
   };
 }
 
@@ -67,7 +73,13 @@ uniform float uCity;
 uniform float uLit;
 uniform float uVenus;
 uniform float uFogDensity;
+uniform sampler2D uShadowMap;
+uniform mat4 uShadowMatrix;
+uniform float uShadowOn;
+uniform vec2 uShadowTexel;
+uniform float uShadowBias;
 
+#include <packing>
 ${NOISE_GLSL}
 /* Analytic sky radiance (linear) for a view direction. Shared by the dome, fog and water. */
 vec3 skyColor(vec3 dir){
@@ -108,9 +120,23 @@ vec3 applyFog(vec3 lit, vec3 emit, vec3 worldPos){
   return mix(lit, fogColor(dir), f) + emit * exp(-dist * uFogDensity * .55);
 }
 
-/* Diffuse lighting from sun, moon, sky dome and ground bounce. */
-vec3 shade(vec3 albedo, vec3 n){
+/* 1 = in sunlight, 0 = in shadow (3x3 PCF on the sun's depth map). */
+float sunShadow(vec3 wp, vec3 n){
+  if (uShadowOn < .5) return 1.;
+  vec4 sc = uShadowMatrix * vec4(wp + n * .18, 1.);
+  vec3 p = sc.xyz / sc.w * .5 + .5;
+  if (p.x <= 0. || p.x >= 1. || p.y <= 0. || p.y >= 1. || p.z >= 1.) return 1.;
+  float s = 0.;
+  for (int i = -1; i <= 1; i++)
+    for (int j = -1; j <= 1; j++)
+      s += step(p.z - uShadowBias, unpackRGBAToDepth(texture2D(uShadowMap, p.xy + vec2(float(i), float(j)) * uShadowTexel)));
+  return s / 9.;
+}
+
+/* Diffuse lighting from sun (with shadows), moon, sky dome and ground bounce. */
+vec3 shade(vec3 albedo, vec3 n, vec3 wp){
   float sun = max(dot(n, uSunDir), 0.);
+  if (sun > 0.) sun *= sunShadow(wp, n);
   float moon = max(dot(n, uMoonDir), 0.);
   vec3 sky = (mix(uZenith, uMid, .45) * .55 + uHorizon * .08) * (.5 + .5 * n.y);
   vec3 ground = uHorizon * .05 * (.5 - .5 * n.y);

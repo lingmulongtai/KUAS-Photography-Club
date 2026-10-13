@@ -185,7 +185,7 @@ const BUILDING_FS = /* glsl */ `
       alb *= kind < .5 ? .6 : .9 + .25 * seed;
     }
     float ao = mix(.45, 1., smoothstep(0., .9, vLocal.y));
-    vec3 col = shade(alb, n) * ao;
+    vec3 col = shade(alb, n, vWorld) * ao;
     gl_FragColor = vec4(applyFog(col, emit, vWorld), 1.);
   }
 `;
@@ -200,7 +200,7 @@ const SIMPLE_FS = /* glsl */ `
   void main(){
     vec3 n = normalize(vN);
     vec3 alb = uAlbedo * (1. - uVary * .5 + uVary * vSeed);
-    gl_FragColor = vec4(applyFog(shade(alb, n), vec3(0.), vWorld), 1.);
+    gl_FragColor = vec4(applyFog(shade(alb, n, vWorld), vec3(0.), vWorld), 1.);
   }
 `;
 
