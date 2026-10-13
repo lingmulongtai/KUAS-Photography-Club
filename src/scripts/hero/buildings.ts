@@ -3,6 +3,7 @@ import { ENV_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
 import { hash1 } from './util';
+import { inCampus } from './geo';
 
 /*
  * The city: every PLATEAU building at its measured height.
@@ -162,7 +163,8 @@ const BUILDING_FS = /* glsl */ `
 
   void main(){
     vec3 n = normalize(vNormal);
-    float kind = vInfo.x;
+    float campus = step(255.5, vInfo.x) * uHighlight;
+    float kind = mod(vInfo.x, 256.);
     float cls = mod(kind, 4.);
     float use = floor(kind / 4. + .01);
     float seed = vInfo.y;
@@ -230,6 +232,15 @@ const BUILDING_FS = /* glsl */ `
       if ((use == 3. || use == 5.) && id.y < .5) emit += warm * smoothstep(.1, .5, f.y) * valid * mix(1.2, .05, tiny) * uCity;
     }
 
+    // the campus, when it is in focus: clean white facades, a teal line along the roofs, teal windows at night
+    if (campus > 0.){
+      albedo = mix(albedo, vec3(.62, .66, .66), campus * .55);
+      float roofline = smoothstep(H - 1.2, H - .2, vWall.y) * (roof ? 0. : 1.);
+      vec3 teal = vec3(.39, .86, .9);
+      emit += teal * roofline * campus * (1.2 + 2. * uCity);
+      emit += teal * .25 * campus * (roof ? .4 : 1.) * (.4 + uCity);
+    }
+
     float sh = 1.;
     if (dot(n, uSunDir) > 0.) sh = sunShadow(vWorld, n);
     vec3 col = shade(albedo, n, vWorld, sh);
@@ -268,7 +279,7 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: { b: BoxBuilding;
     pos.set([b.x, y, b.z], i * 3);
     size.set([b.w, b.h, b.d], i * 3);
     rot[i] = b.angle;
-    meta.set([b.kind, seed, r.type, r.rh], i * 4);
+    meta.set([b.kind + (inCampus(b.x, b.z) ? 256 : 0), seed, r.type, r.rh], i * 4);
     minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
     minZ = Math.min(minZ, b.z); maxZ = Math.max(maxZ, b.z);
     minY = Math.min(minY, y - FOOTING); maxY = Math.max(maxY, y + b.h + r.rh);
@@ -318,7 +329,8 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
     }
     const out = area >= 0 ? 1 : -1;
     let along = 0;
-    const inf = [p.kind, seed, p.h, 0];
+    const campus = inCampus(r[0], r[1]) ? 256 : 0;
+    const inf = [p.kind + campus, seed, p.h, 0];
     for (let i = 0; i < m; i++) {
       const j = (i + 1) % m;
       const ax = r[i * 2], az = r[i * 2 + 1], bx = r[j * 2], bz = r[j * 2 + 1];
@@ -334,7 +346,7 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
     }
     const contour: THREE.Vector2[] = [];
     for (let i = 0; i < m; i++) contour.push(new THREE.Vector2(r[i * 2], r[i * 2 + 1]));
-    const roofInf = [p.kind, seed, p.h, 3];
+    const roofInf = [p.kind + campus, seed, p.h, 3];
     for (const t of THREE.ShapeUtils.triangulateShape(contour, [])) {
       const [a, b, c] = t.map((k) => contour[k]);
       tri([a.x, top, a.y, a.x, a.y], [b.x, top, b.y, b.x, b.y], [c.x, top, c.y, c.x, c.y], [0, 1, 0], roofInf);
@@ -350,7 +362,8 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
   return geo;
 }
 
-export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }) {
+/** `keep` can thin out the boxes (phones leave out small houses far from the viewpoint). */
+export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, keep: (b: BoxBuilding) => boolean = () => true) {
   const group = new THREE.Group();
   const instMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: INSTANCE_VS, fragmentShader: BUILDING_FS });
   const polyMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: POLY_VS, fragmentShader: BUILDING_FS });
@@ -368,6 +381,7 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
     return c;
   };
   data.boxes.forEach((b, i) => {
+    if (!keep(b)) return;
     const y = hf.height(b.x, b.z) + b.ground;
     const seed = hash1(i * 7 + 3);
     const c = chunkOf(b.x, b.z);

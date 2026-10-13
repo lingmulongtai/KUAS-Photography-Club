@@ -38,6 +38,9 @@ export function createEnv() {
     /** size of one shadow texel in metres, for the normal offset */
     uShadowWorld: { value: 4 },
     uShadowBias: { value: 0.0002 },
+    /** campus highlight, 0..1, and where the campus is */
+    uHighlight: { value: 0 },
+    uCampus: { value: new THREE.Vector2() },
   };
 }
 
@@ -86,6 +89,8 @@ uniform float uShadowOn;
 uniform vec2 uShadowTexel;
 uniform float uShadowWorld;
 uniform float uShadowBias;
+uniform float uHighlight;
+uniform vec2 uCampus;
 
 #include <packing>
 ${NOISE_GLSL}
