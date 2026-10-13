@@ -1,0 +1,10 @@
+---
+import { getEntry } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import GuidelinesView from '../../components/GuidelinesView.astro';
+
+const entry = (await getEntry('guidelines', 'ja'))!;
+---
+<Base title="ガイドライン" description="KUAS Photography Club の活動ガイドライン。安全・撮影マナー・写真の取り扱いなど、みんなが安心して活動するためのルールです。11言語で読めます。">
+  <GuidelinesView entry={entry} />
+</Base>
