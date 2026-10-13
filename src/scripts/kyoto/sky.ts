@@ -44,7 +44,7 @@ export function buildSkyDome(env: Env) {
         // sun disc
         float cosA = dot(dir, uSunDir);
         float sunR = .0072;
-        c += uSunLight * smoothstep(cos(sunR * 1.25), cos(sunR), cosA) * 9.;
+        c += uSunLight * smoothstep(cos(sunR * 1.25), cos(sunR), cosA) * 4.5;
 
         // moon: a sphere lit by the sun
         vec3 m = normalize(uMoonDir);
