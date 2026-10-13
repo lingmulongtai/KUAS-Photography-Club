@@ -1,0 +1,348 @@
+---
+/**
+ * Exposure triangle simulator: pick a scene and set shutter speed, aperture and ISO.
+ * A meter shows how many stops over or under the result is, and a preview brightens,
+ * darkens and gets grainy accordingly.
+ */
+const scenes = [
+  { id: 'sun', label: '晴れた屋外', ev: 15, img: '/photos/samples/arashiyama-randen/01.jpg' },
+  { id: 'cloud', label: 'くもり・木陰', ev: 12, img: '/photos/samples/fushimi-inari/05.jpg' },
+  { id: 'dusk', label: '夕暮れ', ev: 9, img: '/photos/samples/summer-fireworks/01.jpg' },
+  { id: 'indoor', label: '明るい室内', ev: 7, img: '/photos/samples/kyoto-aquarium/01.jpg' },
+  { id: 'night', label: '夜の街', ev: 4, img: '/photos/samples/kawaramachi-night/01.jpg' },
+];
+---
+<div class="sim" data-sim data-scenes={JSON.stringify(scenes)}>
+  <div class="preview">
+    <img src={scenes[0].img} alt="選んだ設定で撮ったときの明るさのイメージ" width="1400" height="933" />
+    <canvas class="grain" aria-hidden="true"></canvas>
+    <p class="verdict tag" aria-live="polite" data-verdict>適正露出</p>
+  </div>
+
+  <div class="panel">
+    <fieldset class="scenes">
+      <legend class="edge">SCENE · 撮る場所</legend>
+      <div class="chips">
+        {scenes.map((s, i) => (
+          <button class="chip" type="button" data-scene={s.id} aria-pressed={i === 0 ? 'true' : 'false'}>{s.label}<span class="ev">EV{s.ev}</span></button>
+        ))}
+      </div>
+    </fieldset>
+
+    <div class="sliders">
+      <div class="dial">
+        <label for="sim-ss">シャッタースピード</label>
+        <input type="range" id="sim-ss" min="0" max="17" step="1" value="5" />
+        <output for="sim-ss" data-out="ss">1/125</output>
+      </div>
+      <div class="dial">
+        <label for="sim-f">絞り</label>
+        <input type="range" id="sim-f" min="0" max="8" step="1" value="7" />
+        <output for="sim-f" data-out="f">f/16</output>
+      </div>
+      <div class="dial">
+        <label for="sim-iso">ISO 感度</label>
+        <input type="range" id="sim-iso" min="0" max="7" step="1" value="0" />
+        <output for="sim-iso" data-out="iso">100</output>
+      </div>
+    </div>
+
+    <div class="meter" aria-hidden="true">
+      <div class="scale">
+        {[-3, -2, -1, 0, 1, 2, 3].map((n) => <span>{n > 0 ? `+${n}` : n}</span>)}
+      </div>
+      <div class="track"><i class="needle" data-needle></i></div>
+    </div>
+
+    <ul class="effects">
+      <li><span>ブレ</span><b data-eff="blur">止まる</b></li>
+      <li><span>背景のボケ</span><b data-eff="bokeh">小さい</b></li>
+      <li><span>ノイズ</span><b data-eff="noise">少ない</b></li>
+    </ul>
+
+    <div class="actions">
+      <button class="btn" type="button" data-auto="iso">ISO で合わせる</button>
+      <button class="btn" type="button" data-auto="ss">シャッタースピードで合わせる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  interface Scene {
+    id: string;
+    label: string;
+    ev: number;
+    img: string;
+  }
+  const SS = [1 / 4000, 1 / 2000, 1 / 1000, 1 / 500, 1 / 250, 1 / 125, 1 / 60, 1 / 30, 1 / 15, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 15, 30];
+  const F = [1.4, 2, 2.8, 4, 5.6, 8, 11, 16, 22];
+  const ISO = [100, 200, 400, 800, 1600, 3200, 6400, 12800];
+  const ssLabel = (t: number) => (t >= 1 ? `${t}″` : `1/${Math.round(1 / t)}`);
+
+  document.querySelectorAll<HTMLElement>('[data-sim]').forEach((root) => {
+    const scenes = JSON.parse(root.dataset.scenes ?? '[]') as Scene[];
+    let scene = scenes[0];
+    const img = root.querySelector('img')!;
+    const grain = root.querySelector<HTMLCanvasElement>('.grain')!;
+    const ss = root.querySelector<HTMLInputElement>('#sim-ss')!;
+    const f = root.querySelector<HTMLInputElement>('#sim-f')!;
+    const iso = root.querySelector<HTMLInputElement>('#sim-iso')!;
+    const out = (k: string) => root.querySelector(`[data-out="${k}"]`)!;
+    const eff = (k: string) => root.querySelector(`[data-eff="${k}"]`)!;
+    const needle = root.querySelector<HTMLElement>('[data-needle]')!;
+    const verdict = root.querySelector('[data-verdict]')!;
+    const sceneButtons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-scene]'));
+
+    // static film grain, faded in with ISO
+    grain.width = 320;
+    grain.height = 214;
+    const g = grain.getContext('2d')!;
+    const noise = g.createImageData(grain.width, grain.height);
+    for (let i = 0; i < noise.data.length; i += 4) {
+      const v = Math.random() * 255;
+      noise.data[i] = noise.data[i + 1] = noise.data[i + 2] = v;
+      noise.data[i + 3] = 255;
+    }
+    g.putImageData(noise, 0, 0);
+
+    const offset = () => {
+      const t = SS[+ss.value];
+      const n = F[+f.value];
+      const s = ISO[+iso.value];
+      const evSet = Math.log2((n * n) / t) - Math.log2(s / 100);
+      return scene.ev - evSet;
+    };
+
+    const update = () => {
+      const t = SS[+ss.value];
+      const n = F[+f.value];
+      const s = ISO[+iso.value];
+      out('ss').textContent = ssLabel(t);
+      out('f').textContent = `f/${n}`;
+      out('iso').textContent = String(s);
+      const d = offset();
+      const clamped = Math.max(-3.4, Math.min(3.4, d));
+      needle.style.left = `${((clamped + 3.5) / 7) * 100}%`;
+      img.style.filter = `brightness(${Math.pow(2, clamped * 0.85).toFixed(3)}) saturate(${(1 - Math.min(0.5, Math.abs(clamped) * 0.12)).toFixed(2)})`;
+      grain.style.opacity = String(Math.min(0.55, Math.max(0, (Math.log2(s / 100) - 2) * 0.09)));
+      const r = Math.round(d * 3) / 3;
+      verdict.textContent = Math.abs(d) < 0.34 ? '適正露出' : d > 0 ? `${r.toFixed(1)}段 明るすぎ` : `${Math.abs(r).toFixed(1)}段 暗すぎ`;
+      eff('blur').textContent = t >= 1 / 15 ? '三脚が必要' : t >= 1 / 60 ? '手ブレ注意' : t >= 1 / 250 ? '止まる' : 'しっかり止まる';
+      eff('bokeh').textContent = n <= 2 ? '大きい' : n <= 4 ? 'ややある' : n <= 8 ? '小さい' : 'ほぼなし';
+      eff('noise').textContent = s <= 400 ? '少ない' : s <= 1600 ? 'ややある' : s <= 6400 ? '目立つ' : 'かなり目立つ';
+    };
+
+    const fit = (kind: 'iso' | 'ss') => {
+      const input = kind === 'iso' ? iso : ss;
+      const list = kind === 'iso' ? ISO : SS;
+      let best = +input.value;
+      let bestErr = Infinity;
+      for (let i = 0; i < list.length; i++) {
+        input.value = String(i);
+        const e = Math.abs(offset());
+        if (e < bestErr - 1e-6) {
+          bestErr = e;
+          best = i;
+        }
+      }
+      input.value = String(best);
+      update();
+    };
+
+    sceneButtons.forEach((b) =>
+      b.addEventListener('click', () => {
+        scene = scenes.find((s) => s.id === b.dataset.scene) ?? scene;
+        sceneButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        img.src = scene.img;
+        update();
+      }),
+    );
+    [ss, f, iso].forEach((el) => el.addEventListener('input', update));
+    root.querySelectorAll<HTMLButtonElement>('[data-auto]').forEach((b) => b.addEventListener('click', () => fit(b.dataset.auto as 'iso' | 'ss')));
+    update();
+  });
+</script>
+
+<style>
+  .sim {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .preview {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius);
+    background: #000;
+    box-shadow: 0 0 0 1px var(--line);
+    aspect-ratio: 3 / 2;
+  }
+
+  .preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: filter 0.25s;
+  }
+
+  .grain {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    mix-blend-mode: overlay;
+    image-rendering: pixelated;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .verdict {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    font: 500 13px/1.3 var(--mono);
+    color: var(--hud);
+  }
+
+  .panel {
+    display: grid;
+    gap: 22px;
+  }
+
+  .scenes {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+  }
+
+  .scenes .chip {
+    background: var(--raise);
+    border-color: var(--line-strong);
+    color: var(--ink);
+  }
+
+  .scenes .chip[aria-pressed='true'] {
+    background: var(--ink);
+    color: var(--rebate);
+  }
+
+  .ev {
+    margin-left: 6px;
+    opacity: 0.6;
+    font-size: 10px;
+  }
+
+  .sliders {
+    display: grid;
+    gap: 14px;
+  }
+
+  .dial {
+    display: grid;
+    grid-template-columns: 9em minmax(0, 1fr) 4.5em;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+
+  .dial input {
+    width: 100%;
+    accent-color: var(--amber);
+  }
+
+  .dial output {
+    font: 500 15px/1 var(--mono);
+    color: var(--amber);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .meter {
+    display: grid;
+    gap: 6px;
+  }
+
+  .scale {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font: 500 11px/1 var(--mono);
+    color: var(--muted);
+  }
+
+  .track {
+    position: relative;
+    height: 10px;
+    background:
+      linear-gradient(90deg, transparent calc(50% - 1px), var(--amber) calc(50% - 1px), var(--amber) calc(50% + 1px), transparent calc(50% + 1px)),
+      repeating-linear-gradient(90deg, var(--line-strong) 0 1px, transparent 1px calc(100% / 7));
+    background-color: var(--raise);
+    border-radius: 2px;
+  }
+
+  .needle {
+    position: absolute;
+    top: -5px;
+    width: 3px;
+    height: 20px;
+    margin-left: -1.5px;
+    background: var(--pencil);
+    transition: left 0.25s;
+  }
+
+  .effects {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .effects li {
+    display: grid;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .effects b {
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  @media (max-width: 860px) {
+    .sim {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .dial {
+      grid-template-columns: 1fr 4.5em;
+    }
+
+    .dial input {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    .effects {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
