@@ -75,33 +75,37 @@ function rrect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: 
   g.closePath();
 }
 
-/** Draw one photo into a frame of the atlas; vertical shots lie sideways, as on a real negative strip. */
-function drawFrame(g: CanvasRenderingContext2D, img: HTMLImageElement, x0: number, photo: FilmPhoto) {
+/** Draw one photo into a frame of the atlas at k× detail; vertical shots lie sideways, as on a real negative strip. */
+function drawFrame(g: CanvasRenderingContext2D, img: HTMLImageElement, x0: number, photo: FilmPhoto, k: number) {
   const pw = photo.portrait ? IH : IW;
   const ph = photo.portrait ? IW : IH;
   const tmp = document.createElement('canvas');
-  tmp.width = pw;
-  tmp.height = ph;
+  tmp.width = pw * k;
+  tmp.height = ph * k;
   const t = tmp.getContext('2d')!;
-  const scale = Math.max(pw / img.naturalWidth, ph / img.naturalHeight);
-  const sw = pw / scale;
-  const sh = ph / scale;
-  t.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, 0, 0, pw, ph);
-  if (photo.stamp) stamp(t, pw, ph, photo.stamp);
+  t.imageSmoothingQuality = 'high';
+  const scale = Math.max(tmp.width / img.naturalWidth, tmp.height / img.naturalHeight);
+  const sw = tmp.width / scale;
+  const sh = tmp.height / scale;
+  t.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, 0, 0, tmp.width, tmp.height);
+  if (photo.stamp) stamp(t, tmp.width, tmp.height, photo.stamp);
   const cx = x0 + PITCH / 2;
   const cy = SH / 2;
   g.save();
   g.translate(cx, cy);
   if (photo.portrait) g.rotate(-Math.PI / 2);
-  g.drawImage(tmp, -pw / 2, -ph / 2);
+  g.drawImage(tmp, -pw / 2, -ph / 2, pw, ph);
   g.restore();
 }
 
-/** An 8-frame strip texture: film base, sprocket holes, edge printing and the photos. */
-function createStrip(photos: FilmPhoto[], firstNumber: number, maxAniso: number) {
+/**
+ * An 8-frame strip texture: film base, sprocket holes, edge printing and the photos.
+ * `k` scales the atlas (2 → 8192×1024) so the pictures stay sharp up close.
+ */
+function createStrip(photos: FilmPhoto[], firstNumber: number, maxAniso: number, k: number) {
   const cv = document.createElement('canvas');
-  cv.width = FRAMES * PITCH;
-  cv.height = SH;
+  cv.width = FRAMES * PITCH * k;
+  cv.height = SH * k;
   const g = cv.getContext('2d')!;
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = THREE.RepeatWrapping;
@@ -109,16 +113,17 @@ function createStrip(photos: FilmPhoto[], firstNumber: number, maxAniso: number)
   const loaded: (HTMLImageElement | null)[] = new Array(FRAMES).fill(null);
 
   const paint = () => {
-    g.clearRect(0, 0, cv.width, SH);
+    g.setTransform(k, 0, 0, k, 0, 0);
+    g.clearRect(0, 0, FRAMES * PITCH, SH);
     g.fillStyle = '#0d0907';
-    g.fillRect(0, 0, cv.width, SH);
+    g.fillRect(0, 0, FRAMES * PITCH, SH);
     g.font = '500 17px "IBM Plex Mono", ui-monospace, monospace';
     g.textBaseline = 'middle';
     for (let i = 0; i < FRAMES; i++) {
       const x0 = i * PITCH;
       const n = firstNumber + i;
       const img = loaded[i];
-      if (img) drawFrame(g, img, x0, photos[i % photos.length]);
+      if (img) drawFrame(g, img, x0, photos[i % photos.length], k);
       else {
         g.fillStyle = '#1b1411';
         g.fillRect(x0 + (PITCH - IW) / 2, IY, IW, IH);
@@ -213,7 +218,8 @@ export function createFilmStrip(renderer: THREE.WebGLRenderer, el: HTMLElement, 
   const LEN = 18;
   const HGT = 1.6;
   const geo = new THREE.PlaneGeometry(LEN, HGT, 240, 1);
-  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const aniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
+  const k = renderer.capabilities.maxTextureSize >= FRAMES * PITCH * 2 ? 2 : 1;
   const lists = strips.filter((s) => s.length > 0);
   const layout = [
     { phase: 0, amp: 1, dim: 1, pos: [0, 0, 0], rot: 0, dir: 1, offset: 0 },
@@ -222,7 +228,7 @@ export function createFilmStrip(renderer: THREE.WebGLRenderer, el: HTMLElement, 
   ];
   const meshes = layout.map((l, i) => {
     const photos = lists[i % lists.length];
-    const tex = createStrip(photos, 12 + i * 8, aniso);
+    const tex = createStrip(photos, 12 + i * 8, aniso, k);
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         uTex: { value: tex },
@@ -280,7 +286,7 @@ export function createFilmStrip(renderer: THREE.WebGLRenderer, el: HTMLElement, 
       cam.position.z = w / h < 1 ? 7.4 : 9;
       cam.updateProjectionMatrix();
       rt?.dispose();
-      rt = new THREE.WebGLRenderTarget(Math.round(w * dpr), Math.round(h * dpr));
+      rt = new THREE.WebGLRenderTarget(Math.round(w * dpr), Math.round(h * dpr), { samples: 4 });
       comp.uniforms.uRes.value.set(w * dpr, h * dpr);
     },
     render(t, dt) {
