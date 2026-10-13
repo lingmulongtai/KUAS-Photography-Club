@@ -1,0 +1,52 @@
+{
+ "far": {
+  "box": [
+   -21000,
+   -13000,
+   9000,
+   14000
+  ],
+  "step": 30,
+  "nx": 1001,
+  "nz": 901,
+  "file": "terrain-far.bin"
+ },
+ "near": {
+  "box": [
+   500,
+   -4500,
+   5000,
+   4000
+  ],
+  "step": 10,
+  "nx": 451,
+  "nz": 851,
+  "file": "terrain-near.bin"
+ },
+ "aerialWide": {
+  "box": [
+   -21000,
+   -13000,
+   9000,
+   14000
+  ],
+  "file": "aerial-wide.webp",
+  "size": [
+   2048,
+   1843
+  ]
+ },
+ "aerialCity": {
+  "box": [
+   -5600,
+   -4600,
+   4400,
+   4400
+  ],
+  "file": "aerial-city.webp",
+  "size": [
+   2048,
+   1843
+  ]
+ }
+}
