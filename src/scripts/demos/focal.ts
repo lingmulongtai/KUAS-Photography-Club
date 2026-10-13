@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { press, setText, type Demo } from '../gl/stage';
 
-const FRAME_H = 0.5; // keep head and shoulders (0.5 m) filling the frame height
+const FRAME_H = 0.36; // keep the head and the top of the shoulders (36 cm) filling the frame height
 const SENSOR_H = 0.024; // full-frame sensor height in metres
 const SENSOR_DIAG = 0.04327;
 
@@ -35,24 +35,27 @@ function headGeometry() {
     // nose: a ridge that grows toward the tip, wider at the nostrils
     const along = Math.min(1, Math.max(0, (0.24 - y) / 0.46));
     const wx = 0.06 + 0.07 * along;
-    d += 0.24 * along * Math.exp(-((x / wx) ** 2)) * sm(-0.32, -0.18, y);
-    d += 0.05 * g2(x, y, 0, -0.17, 0.08, 0.07);
+    d += 0.42 * along * Math.exp(-((x / wx) ** 2)) * sm(-0.34, -0.2, y);
+    d += 0.08 * g2(x, y, 0, -0.2, 0.09, 0.07);
+    d += 0.05 * g2(ax, y, 0.1, -0.24, 0.06, 0.05);
     // brow ridge and eye sockets with the eyes inside
-    d += 0.05 * Math.exp(-(((y - 0.3) / 0.07) ** 2)) * Math.exp(-((x / 0.55) ** 2));
-    d -= 0.075 * g2(ax, y, 0.3, 0.15, 0.14, 0.09);
-    d += 0.04 * g2(ax, y, 0.3, 0.14, 0.07, 0.05);
-    // cheekbones
-    d += 0.04 * g2(ax, y, 0.46, -0.03, 0.15, 0.12);
+    d += 0.08 * Math.exp(-(((y - 0.3) / 0.07) ** 2)) * Math.exp(-((x / 0.55) ** 2));
+    d -= 0.13 * g2(ax, y, 0.3, 0.15, 0.14, 0.1);
+    d += 0.07 * g2(ax, y, 0.3, 0.14, 0.07, 0.05);
+    // cheekbones and the hollow under them
+    d += 0.06 * g2(ax, y, 0.46, -0.02, 0.15, 0.11);
+    d -= 0.04 * g2(ax, y, 0.4, -0.3, 0.12, 0.12);
     // lips, mouth line and chin
-    d += 0.05 * g2(x, y, 0, -0.42, 0.2, 0.07);
-    d -= 0.025 * g2(x, y, 0, -0.445, 0.19, 0.014);
-    d += 0.08 * g2(x, y, 0, -0.73, 0.18, 0.1);
+    d += 0.08 * g2(x, y, 0, -0.43, 0.21, 0.08);
+    d -= 0.04 * g2(x, y, 0, -0.45, 0.2, 0.014);
+    d += 0.12 * g2(x, y, 0, -0.74, 0.19, 0.1);
     d *= front;
     // jaw narrows toward the chin; skull is deeper at the back
     const jaw = sm(0.05, -0.85, y);
     x *= 1 - 0.3 * jaw;
     if (z < 0) z *= 1.1;
-    else z *= 1 - 0.1 * jaw;
+    // faces are flatter than spheres: pull the cheeks back, keep the middle
+    else z *= 1 - 0.1 * jaw - 0.18 * front * sm(0.15, 0.6, Math.abs(x));
     const k = 1 + d;
     p.setXYZ(i, x * k * 0.078, y * k * 0.115, z * k * 0.098);
   }
@@ -71,16 +74,14 @@ function bustGeometry() {
   const neck = new THREE.CylinderGeometry(0.048, 0.056, 0.14, 40).translate(0, -0.135, -0.012);
   const chest = new THREE.SphereGeometry(1, 64, 32);
   chest.scale(0.2, 0.095, 0.105);
-  chest.translate(0, -0.25, -0.01);
-  const plinth = new THREE.BoxGeometry(0.2, 0.1, 0.15).translate(0, -0.38, -0.01);
+  chest.translate(0, -0.22, -0.01);
+  const plinth = new THREE.BoxGeometry(0.2, 0.1, 0.15).translate(0, -0.35, -0.01);
   const parts = [headGeometry(), ear(1), ear(-1), neck, chest, plinth].map((g) => {
     const n = g.index ? g.toNonIndexed() : g;
     n.deleteAttribute('uv');
     return n;
   });
-  const merged = mergeGeometries(parts);
-  merged.computeVertexNormals();
-  return merged;
+  return mergeGeometries(parts);
 }
 
 /** Shoji screens behind the bust, to show how the background grows with focal length. */
@@ -156,13 +157,14 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
   wall.position.set(0, 2.2, -3.2);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshStandardMaterial({ map: floorTexture(), roughness: 0.7 }));
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set(0, 0.86, 0);
-  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.62, 32), new THREE.MeshStandardMaterial({ color: '#2a2420', roughness: 0.6 }));
-  stand.position.set(0, 0.86 + 0.31, -0.01);
+  floor.position.set(0, 0, 0);
+  const standH = bust.position.y - 0.4;
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, standH, 32), new THREE.MeshStandardMaterial({ color: '#2a2420', roughness: 0.6 }));
+  stand.position.set(0, standH / 2, -0.01);
   scene.add(wall, floor, stand);
 
   const key = new THREE.DirectionalLight('#fff4e6', 2.8);
-  key.position.set(-1.6, 3.2, 2.4);
+  key.position.set(-2.2, 2.6, 1.6);
   key.target = bust;
   const rim = new THREE.DirectionalLight('#cfe0ff', 1.4);
   rim.position.set(1.8, 2.6, -2);
@@ -199,7 +201,7 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
   });
   el.addEventListener('pointerleave', () => (ptrX = ptrY = 0));
 
-  const focus = new THREE.Vector3(0, bust.position.y - 0.06, 0);
+  const focus = new THREE.Vector3(0, bust.position.y - 0.03, 0);
   let yaw = 0;
   let pitch = 0;
 
