@@ -141,7 +141,8 @@ textarea {
 }
 
 .num {
-  font-family: var(--mono);
+  font-family: var(--latin);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
