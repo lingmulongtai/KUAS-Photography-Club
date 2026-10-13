@@ -33,11 +33,13 @@ const year = [
     lead={`${club.name} は、写真を通して「楽しむ」と「つながる」を大切にするサークルです。国籍や学年、経験は問いません。スマホで撮る人も、フィルムカメラを持っている人も、同じ撮影会に出かけています。`}
   />
 
-  <section class="wrap stats" aria-label="サークルの数字">
+  <section class="wrap stats-wrap" aria-label="サークルの数字">
+    <div class="stats">
     <div><p class="value num">{club.members}<small>人</small></p><p class="label">メンバー（{fmt(club.membersAsOf)} 時点）</p></div>
     <div><p class="value num">{club.tripsPerMonth}<small>回 / 月</small></p><p class="label">撮影会</p></div>
     <div><p class="value num">{club.meetings.times.length}<small>回 / 週</small></p><p class="label">ミーティング（{club.meetings.day} {club.meetings.times.join(' / ')}）</p></div>
     <div><p class="value num">{fmt(club.recognized)}</p><p class="label">学友会公認</p></div>
+    </div>
   </section>
 
   <section class="section">
@@ -104,6 +106,10 @@ const year = [
 </Base>
 
 <style>
+  .stats-wrap {
+    margin-bottom: clamp(56px, 8vw, 96px);
+  }
+
   .stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -112,7 +118,6 @@ const year = [
     border: 1px solid var(--line);
     border-radius: var(--radius);
     overflow: hidden;
-    margin-bottom: clamp(56px, 8vw, 96px);
   }
 
   .stats > div {
