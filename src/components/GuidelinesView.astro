@@ -1,0 +1,152 @@
+---
+/**
+ * One language of the club guidelines, rendered from guidelines/*.md,
+ * with a language switcher and a table of contents.
+ */
+import { render, type CollectionEntry } from 'astro:content';
+import { guidelineLanguages } from '../data/languages';
+
+interface Props {
+  entry: CollectionEntry<'guidelines'>;
+}
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const current = guidelineLanguages.find((l) => l.id === entry.id) ?? guidelineLanguages[0];
+const rtl = 'rtl' in current && current.rtl;
+const toc = headings.filter((h) => h.depth === 2);
+const href = (id: string) => (id === 'ja' ? '/guidelines/' : `/guidelines/${id}/`);
+---
+<div class="wrap guide">
+  <nav class="langs" aria-label="言語 / Language">
+    <p class="edge">GUIDELINES ▸ 11 LANGUAGES</p>
+    <ul>
+      {guidelineLanguages.map((l) => (
+        <li>
+          <a href={href(l.id)} lang={l.lang} aria-current={l.id === entry.id ? 'page' : undefined}>{l.name}</a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+
+  <div class="layout">
+    <aside class="toc" aria-label="目次">
+      <p class="edge">CONTENTS</p>
+      <ol>
+        {toc.map((h) => <li><a href={`#${h.slug}`} lang={current.lang} dir={rtl ? 'rtl' : 'ltr'}>{h.text}</a></li>)}
+      </ol>
+    </aside>
+    <article class="prose doc" lang={current.lang} dir={rtl ? 'rtl' : 'ltr'}>
+      <Content />
+    </article>
+  </div>
+</div>
+
+<style>
+  .guide {
+    display: grid;
+    gap: 36px;
+    padding-block: clamp(40px, 6vw, 72px) 96px;
+  }
+
+  .langs {
+    display: grid;
+    gap: 12px;
+  }
+
+  .langs ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .langs a {
+    display: inline-block;
+    padding: 7px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-size: 14px;
+    text-decoration: none;
+  }
+
+  .langs a[aria-current='page'] {
+    background: var(--ink);
+    color: var(--rebate);
+    border-color: var(--ink);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+    gap: 48px 64px;
+    align-items: start;
+  }
+
+  .toc {
+    position: sticky;
+    top: calc(var(--header-h) + 24px);
+    display: grid;
+    gap: 12px;
+    max-height: calc(100vh - var(--header-h) - 48px);
+    overflow-y: auto;
+  }
+
+  .toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .toc a {
+    text-decoration: none;
+    color: var(--muted);
+  }
+
+  .toc a:hover {
+    color: var(--ink);
+  }
+
+  .doc {
+    max-width: 44em;
+  }
+
+  .doc :global(h1) {
+    font-size: var(--step-4);
+    margin-bottom: 0.2em;
+  }
+
+  .doc :global(h2) {
+    padding-top: 1.2em;
+    border-top: 1px solid var(--line);
+    scroll-margin-top: calc(var(--header-h) + 16px);
+  }
+
+  .doc :global(ul ul) {
+    margin-top: 0.4em;
+  }
+
+  .doc[dir='rtl'] :global(ul),
+  .doc[dir='rtl'] :global(ol) {
+    padding-left: 0;
+    padding-right: 1.3em;
+  }
+
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .toc {
+      position: static;
+      max-height: none;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+  }
+</style>
