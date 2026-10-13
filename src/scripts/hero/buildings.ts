@@ -4,6 +4,7 @@ import type { Heightfield } from './heightfield';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
 import { hash1 } from './util';
 import { inCampus } from './geo';
+import { isDetailed } from './campus';
 
 /*
  * The city: every PLATEAU building at its measured height.
@@ -162,6 +163,8 @@ const BUILDING_FS = /* glsl */ `
   vec3 pick4(float r, vec3 a, vec3 b, vec3 c, vec3 d){ return r < .25 ? a : r < .5 ? b : r < .75 ? c : d; }
 
   void main(){
+    // the detailed campus model (campus.ts) stands in for these blocks up close
+    if (vInfo.x > 767.5 && uCampusDetail > .5) discard;
     vec3 n = normalize(vNormal);
     float campus = step(255.5, vInfo.x) * uHighlight;
     float kind = mod(vInfo.x, 256.);
@@ -279,7 +282,8 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: { b: BoxBuilding;
     pos.set([b.x, y, b.z], i * 3);
     size.set([b.w, b.h, b.d], i * 3);
     rot[i] = b.angle;
-    meta.set([b.kind + (inCampus(b.x, b.z) ? 256 : 0), seed, r.type, r.rh], i * 4);
+    const campus = inCampus(b.x, b.z) ? 256 + (isDetailed(b.kind, b.h, b.x, b.z) ? 512 : 0) : 0;
+    meta.set([b.kind + campus, seed, r.type, r.rh], i * 4);
     minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
     minZ = Math.min(minZ, b.z); maxZ = Math.max(maxZ, b.z);
     minY = Math.min(minY, y - FOOTING); maxY = Math.max(maxY, y + b.h + r.rh);
@@ -329,7 +333,13 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
     }
     const out = area >= 0 ? 1 : -1;
     let along = 0;
-    const campus = inCampus(r[0], r[1]) ? 256 : 0;
+    let cx = 0;
+    let cz = 0;
+    for (let i = 0; i < m; i++) {
+      cx += r[i * 2] / m;
+      cz += r[i * 2 + 1] / m;
+    }
+    const campus = inCampus(cx, cz) ? 256 + (isDetailed(p.kind, p.h, cx, cz) ? 512 : 0) : 0;
     const inf = [p.kind + campus, seed, p.h, 0];
     for (let i = 0; i < m; i++) {
       const j = (i + 1) % m;

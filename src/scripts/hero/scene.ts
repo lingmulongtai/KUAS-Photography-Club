@@ -20,6 +20,7 @@ import { buildWater } from './water';
 import { createLabels } from './labels';
 import { buildTrees } from './trees';
 import { buildMeteors } from './meteors';
+import { buildCampus, campusTreeSpots } from './campus';
 
 export interface HeroStatus {
   minutes: number;
@@ -83,6 +84,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   let pixelRatio = 1;
   const pointLayers: { uScale: { value: number } }[] = [];
   let labels: ReturnType<typeof createLabels> | null = null;
+  let campusModel: THREE.Mesh | null = null;
   /** Pixels per metre at 1 m distance, so point lights can size themselves. */
   const updatePointScale = () => {
     const k = (height * pixelRatio) / (2 * Math.tan((camera.fov * RAD) / 2));
@@ -121,8 +123,11 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       !lite || b.w * b.d > 90 || b.h > 12 || Math.hypot(b.x - eye.x, b.z - eye.z) < 3500 || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200,
     );
     const landmarks = buildLandmarks(env, hf);
-    const trees = buildTrees(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, VIEW.eye, opts.quality);
+    const trees = buildTrees(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, VIEW.eye, opts.quality, campusTreeSpots(hf));
     scene.add(trees.group);
+    campusModel = buildCampus(env, hf, buildings).mesh;
+    scene.add(campusModel);
+    casts(campusModel);
     scene.add(city.group, landmarks.mesh);
     casts(city.group);
     casts(landmarks.mesh);
@@ -283,6 +288,12 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       lastTarget.copy(p.target);
     }
     camera.lookAt(lastTarget);
+    const detail = env.uHighlight.value > 0.02;
+    if (campusModel && campusModel.visible !== detail) {
+      campusModel.visible = detail;
+      env.uCampusDetail.value = detail ? 1 : 0;
+      shadow.invalidate();
+    }
     sky.mesh.position.copy(camera.position);
     celestial.group.position.copy(camera.position);
   }
