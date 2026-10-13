@@ -1,0 +1,136 @@
+---
+/** One trip in the archive, laid out like a strip of negatives in a sleeve. */
+import SampleBadge from './SampleBadge.astro';
+import { formatDate, type Trip } from '../lib/trips';
+
+interface Props {
+  trip: Trip;
+  /** Roll number, counted from the club's first trip. */
+  roll: number;
+}
+const { trip, roll } = Astro.props;
+const { title, date, place, members, summary, photos, sample } = trip.data;
+const href = `/trips/${trip.id}/`;
+---
+<article class="trip">
+  <a class="cover-link" href={href} aria-label={`${title}（${formatDate(date)}）の記録を見る`}></a>
+  <div class="meta">
+    <p class="edge">ROLL {String(roll).padStart(2, '0')} ▸ {formatDate(date)}</p>
+    <h3>{title}</h3>
+    <p class="place small muted">{place}{members ? ` · ${members}人` : ''} · {photos.length}枚</p>
+    <p class="summary">{summary}</p>
+    {sample && <SampleBadge />}
+  </div>
+  <div class="sleeve" aria-hidden="true">
+    <div class="holes"></div>
+    <div class="frames">
+      {photos.slice(0, 5).map((p) => (
+        <span class:list={['frame', { portrait: p.portrait }]}>
+          <img src={p.src} alt="" loading="lazy" decoding="async" width="300" height="200" />
+        </span>
+      ))}
+    </div>
+    <div class="holes"></div>
+  </div>
+</article>
+
+<style>
+  .trip {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
+    gap: 20px 36px;
+    align-items: center;
+    padding-block: 28px;
+    border-top: 1px solid var(--line);
+  }
+
+  .cover-link {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  .cover-link:focus-visible {
+    outline-offset: 6px;
+  }
+
+  .meta {
+    display: grid;
+    gap: 8px;
+    justify-items: start;
+  }
+
+  h3 {
+    font-size: var(--step-3);
+    font-family: var(--display);
+  }
+
+  .trip:hover h3 {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 6px;
+  }
+
+  .summary {
+    max-width: 30em;
+  }
+
+  .sleeve {
+    background: var(--rebate);
+    border-radius: 2px;
+    overflow: hidden;
+    transition: transform 0.4s;
+  }
+
+  .trip:hover .sleeve {
+    transform: translateX(6px);
+  }
+
+  .holes {
+    height: 14px;
+    background: var(--hole);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14'%3E%3Crect x='7' y='3.5' width='8' height='7' rx='1.5'/%3E%3C/svg%3E") 0 50% / 22px 14px repeat-x;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14'%3E%3Crect x='7' y='3.5' width='8' height='7' rx='1.5'/%3E%3C/svg%3E") 0 50% / 22px 14px repeat-x;
+  }
+
+  .frames {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    padding: 4px 6px;
+  }
+
+  .frame {
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    background: #1b1411;
+  }
+
+  .frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .frame.portrait img {
+    /* vertical shots sit sideways on the negative */
+    width: 66.7%;
+    height: 150%;
+    transform: translate(25%, -16.7%) rotate(-90deg);
+  }
+
+  @media (max-width: 760px) {
+    .trip {
+      grid-template-columns: 1fr;
+    }
+
+    .frames {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .frame:nth-child(n + 4) {
+      display: none;
+    }
+  }
+</style>

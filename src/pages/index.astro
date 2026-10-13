@@ -1,0 +1,172 @@
+---
+import Base from '../layouts/Base.astro';
+import KyotoHero from '../components/KyotoHero.astro';
+import FilmStrip from '../components/FilmStrip.astro';
+import TripRow from '../components/TripRow.astro';
+import LearnCards from '../components/learn/LearnCards.astro';
+import InstagramSection from '../components/InstagramSection.astro';
+import { getTrips, stripsFrom } from '../lib/trips';
+import { club } from '../data/club';
+
+const trips = await getTrips();
+const latest = trips.slice(0, 3);
+---
+<Base overlayHeader>
+  <KyotoHero />
+
+  <section id="intro" class="section intro">
+    <div class="wrap grid">
+      <div class="statement">
+        <p class="edge">KUAS PHOTOGRAPHY CLUB</p>
+        <h2>撮りに行こう。<br />京都と、その少し先まで。</h2>
+        <p class="lead">
+          {club.name} は、{club.university}の写真サークルです。神社やお寺、花火大会、水族館、夜の街。月に{club.tripsPerMonth}回ほどの撮影会で、キャンパスの周りから近くの府県まで出かけています。日本人も留学生も、カメラがある人もスマホの人も一緒です。
+        </p>
+        <a class="link-arrow" href="/about/">サークルについて →</a>
+      </div>
+      <aside class="meeting" aria-label="ミーティングの案内">
+        <p class="edge">MEETING ▸ EVERY WEEK</p>
+        <p class="when">{club.meetings.day}</p>
+        <p class="times num">{club.meetings.times.join(' / ')}</p>
+        <p class="where">{club.campus} {club.meetings.room} 教室</p>
+        <a class="btn btn--primary" href="/join/">見学を申し込む <span class="arrow" aria-hidden="true">→</span></a>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="latest-title">
+    <div class="wrap stack">
+      <div class="head-row">
+        <div class="section-head">
+          <p class="edge">PHOTO TRIPS ▸ LATEST ROLLS</p>
+          <h2 id="latest-title">最近の撮影会</h2>
+        </div>
+        <a class="link-arrow" href="/trips/">すべての撮影会 →</a>
+      </div>
+      <FilmStrip strips={stripsFrom(latest)} label="最近の撮影会の写真が並んだフィルム" />
+      <div class="list">
+        {latest.map((trip, i) => <TripRow trip={trip} roll={trips.length - i} />)}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="learn-title">
+    <div class="wrap stack">
+      <div class="head-row">
+        <div class="section-head">
+          <p class="edge">LEARN ▸ FOR BEGINNERS</p>
+          <h2 id="learn-title">写真を、触って学ぶ。</h2>
+          <p class="muted">シャッタースピード、絞り、焦点距離、現像。カメラの設定を、ブラウザの中で動かしながら覚えられます。</p>
+        </div>
+        <a class="link-arrow" href="/learn/">写真を学ぶ →</a>
+      </div>
+      <LearnCards />
+    </div>
+  </section>
+
+  <InstagramSection />
+
+  <section class="section cta">
+    <div class="wrap cta-inner">
+      <p class="edge">JOIN US</p>
+      <h2>まずは、月曜の<br />ミーティングをのぞいてみませんか。</h2>
+      <p class="lead">経験もカメラもいりません。{club.meetings.day} {club.meetings.times.join(' / ')}、{club.campus} {club.meetings.room} 教室で待っています。</p>
+      <div class="ctas">
+        <a class="btn btn--primary" href="/join/">見学・入部について <span class="arrow" aria-hidden="true">→</span></a>
+        <a class="btn" href="/guidelines/">ガイドラインを読む</a>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .intro .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 40px 72px;
+    align-items: start;
+  }
+
+  .statement {
+    display: grid;
+    gap: 18px;
+    justify-items: start;
+  }
+
+  .statement h2 {
+    font-size: var(--step-4);
+  }
+
+  .meeting {
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+    padding: 26px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+  }
+
+  .when {
+    font: 800 var(--step-3) / 1.3 var(--display);
+    margin-top: 8px;
+  }
+
+  .times {
+    font-size: 30px;
+    color: var(--amber);
+    line-height: 1.2;
+  }
+
+  .where {
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .stack {
+    display: grid;
+    gap: 28px;
+  }
+
+  .head-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+  }
+
+  .list {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .cta {
+    background:
+      radial-gradient(circle at 0% 0%, rgba(255, 106, 42, 0.22), transparent 45%),
+      radial-gradient(circle at 100% 100%, rgba(242, 161, 74, 0.12), transparent 40%),
+      var(--base);
+  }
+
+  .cta-inner {
+    display: grid;
+    gap: 18px;
+    justify-items: start;
+  }
+
+  .cta h2 {
+    font-size: var(--step-4);
+  }
+
+  .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+  }
+
+  @media (max-width: 860px) {
+    .intro .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,11 @@
+---
+/**
+ * Marks copy that the club should rewrite in its own words.
+ * Shown as a small grease-pencil note next to the placeholder text.
+ */
+interface Props {
+  note?: string;
+}
+const { note = 'ここは仮の文章です' } = Astro.props;
+---
+<span class="slot-note">{note}</span>

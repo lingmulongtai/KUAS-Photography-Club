@@ -1,0 +1,88 @@
+---
+import { club } from '../data/club';
+import { instagramPosts } from '../data/instagram';
+import SampleBadge from './SampleBadge.astro';
+
+const samples = [
+  '/photos/samples/arashiyama-randen/01.jpg',
+  '/photos/samples/higashiyama-autumn/02.jpg',
+  '/photos/samples/kyoto-aquarium/01.jpg',
+  '/photos/samples/summer-fireworks/02.jpg',
+  '/photos/samples/fushimi-inari/01.jpg',
+  '/photos/samples/kawaramachi-night/01.jpg',
+].map((image) => ({ url: club.instagram.url, image, alt: 'サンプル画像' }));
+const posts = instagramPosts.length ? instagramPosts.slice(0, 6) : samples;
+const usingSamples = instagramPosts.length === 0;
+---
+<section class="section insta" aria-labelledby="insta-title">
+  <div class="wrap grid">
+    <div class="intro">
+      <p class="edge">INSTAGRAM ▸ @{club.instagram.handle}</p>
+      <h2 id="insta-title">撮った写真は<br />Instagram でも。</h2>
+      <p class="muted">撮影会のお知らせや、メンバーが撮った写真を投稿しています。</p>
+      <a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">Instagram を見る <span class="arrow" aria-hidden="true">↗</span></a>
+      {usingSamples && <SampleBadge />}
+    </div>
+    <ul class="tiles">
+      {posts.map((p) => (
+        <li>
+          <a href={p.url} target="_blank" rel="noopener" aria-label="Instagram で見る">
+            <img src={p.image} alt={p.alt} loading="lazy" decoding="async" width="400" height="400" />
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: 36px 56px;
+    align-items: center;
+  }
+
+  .intro {
+    display: grid;
+    gap: 16px;
+    justify-items: start;
+  }
+
+  h2 {
+    font-size: var(--step-4);
+  }
+
+  .tiles {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .tiles a {
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: var(--rebate);
+  }
+
+  .tiles img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s, opacity 0.3s;
+  }
+
+  .tiles a:hover img {
+    transform: scale(1.05);
+  }
+
+  @media (max-width: 860px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

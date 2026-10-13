@@ -1,0 +1,170 @@
+---
+/** Same framing, different focal lengths: a plaster bust and a top-down diagram of where the camera stands. */
+const lengths = [16, 24, 35, 50, 85, 135, 200];
+---
+<figure class="demo">
+  <div class="grid">
+    <div class="stage" data-demo="focal" data-slider="focal-mm" style="--fb: linear-gradient(#2a241e, #15120f)">
+      <canvas aria-label="同じ大きさに写るよう距離を変えて、焦点距離ごとに石膏像の顔の写り方を比べるデモ"></canvas>
+      <div class="hud">
+        <div class="row"><span class="tag" data-readout>50mm · 画角 47° · 距離 1.0m</span></div>
+        <div class="row">
+          <div class="chips" role="group" aria-label="焦点距離">
+            {lengths.map((mm) => <button class="chip" type="button" data-mm={mm} aria-pressed={mm === 50 ? 'true' : 'false'}>{mm}mm</button>)}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="diagram" aria-hidden="true">
+      <p class="edge">TOP VIEW · 真上から見た撮影位置</p>
+      <svg viewBox="0 0 400 150" role="img">
+        <line x1="20" y1="75" x2="380" y2="75" class="axis" />
+        <path class="wedge" d="M0 0" />
+        <g class="cam"><rect x="-9" y="-7" width="14" height="14" rx="2" /><rect x="5" y="-4" width="5" height="8" /></g>
+        <g transform="translate(362 75)">
+          <ellipse rx="9" ry="11" class="head" />
+          <path d="M-9 -2 L-14 0 L-9 2" class="nose" />
+        </g>
+        <text class="dist" x="200" y="140" text-anchor="middle">1.0 m</text>
+      </svg>
+      <dl class="figures">
+        <div><dt>焦点距離</dt><dd data-fig="mm">50mm</dd></div>
+        <div><dt>画角（対角）</dt><dd data-fig="angle">47°</dd></div>
+        <div><dt>被写体までの距離</dt><dd data-fig="dist">1.0m</dd></div>
+      </dl>
+    </div>
+  </div>
+  <div class="controls">
+    <label for="focal-mm">焦点距離</label>
+    <input type="range" id="focal-mm" min="0" max="1000" step="1" value="415" />
+  </div>
+  <figcaption class="hint">どの焦点距離でも、頭と肩の上あたりまでが画面の高さに収まる距離から撮っています。ドラッグ・カーソルで少し回り込めます。</figcaption>
+</figure>
+
+<script>
+  import { mountStage } from '../../scripts/gl/stage';
+  import { createFocal, type FocalState } from '../../scripts/demos/focal';
+
+  document.querySelectorAll<HTMLElement>('.stage[data-demo="focal"]').forEach((el) => {
+    const root = el.closest('.demo')!;
+    const wedge = root.querySelector<SVGPathElement>('.wedge')!;
+    const cam = root.querySelector<SVGGElement>('.cam')!;
+    const dist = root.querySelector<SVGTextElement>('.dist')!;
+    const fig = (k: string) => root.querySelector(`[data-fig="${k}"]`)!;
+    const update = (s: FocalState) => {
+      const span = 330 * (Math.log(s.distance / 0.25) / Math.log(7 / 0.25));
+      const cx = 362 - Math.max(24, span);
+      const half = Math.atan(0.012 / (s.mm / 1000));
+      const reach = 362 - cx + 30;
+      const dy = Math.tan(half) * reach;
+      wedge.setAttribute('d', `M${cx} 75 L${cx + reach} ${75 - dy} L${cx + reach} ${75 + dy} Z`);
+      cam.setAttribute('transform', `translate(${cx} 75)`);
+      const d = s.distance < 1 ? s.distance.toFixed(2) : s.distance.toFixed(1);
+      dist.textContent = `${d} m`;
+      dist.setAttribute('x', String((cx + 362) / 2));
+      fig('mm').textContent = `${Math.round(s.mm)}mm`;
+      fig('angle').textContent = `${s.diagonal.toFixed(s.diagonal < 20 ? 1 : 0)}°`;
+      fig('dist').textContent = `${d}m`;
+    };
+    mountStage(el, (renderer, stage) => createFocal(renderer, stage, update));
+  });
+</script>
+
+<style>
+  .demo {
+    margin: 0;
+    display: grid;
+    gap: 10px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .grid .stage {
+    aspect-ratio: 4 / 3;
+  }
+
+  .diagram {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+    min-width: 0;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .axis {
+    stroke: var(--line-strong);
+    stroke-dasharray: 3 4;
+  }
+
+  .wedge {
+    fill: rgba(242, 161, 74, 0.14);
+    stroke: var(--amber);
+    stroke-width: 1;
+  }
+
+  .cam rect {
+    fill: var(--ink);
+  }
+
+  .head {
+    fill: var(--pencil);
+  }
+
+  .nose {
+    fill: none;
+    stroke: var(--pencil);
+    stroke-width: 2;
+  }
+
+  .dist {
+    fill: var(--amber);
+    font: 500 12px var(--mono);
+  }
+
+  .figures {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .figures div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+  }
+
+  .figures dt {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .figures dd {
+    margin: 0;
+    font: 500 18px/1.2 var(--mono);
+    color: var(--amber);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 860px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

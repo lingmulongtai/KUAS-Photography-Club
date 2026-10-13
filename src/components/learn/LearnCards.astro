@@ -1,0 +1,81 @@
+---
+import { learnTopics } from '../../data/learn';
+
+interface Props {
+  /** Leave out the page you are on. */
+  exclude?: string;
+  heading?: string;
+}
+const { exclude, heading } = Astro.props;
+const topics = learnTopics.filter((t) => t.slug !== exclude);
+---
+<div class="cards-wrap">
+  {heading && <h2 class="cards-heading">{heading}</h2>}
+  <ul class="cards">
+    {topics.map((t) => (
+      <li>
+        <a class="card" href={`/learn/${t.slug}/`} style={`--fb: ${t.fb}`}>
+          <span class="no">{t.no} ▸ {t.en}</span>
+          <span class="title">{t.title}</span>
+          <span class="summary">{t.summary}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<style>
+  .cards-wrap {
+    display: grid;
+    gap: 20px;
+  }
+
+  .cards-heading {
+    font-size: var(--step-3);
+  }
+
+  .cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+
+  .card {
+    display: grid;
+    align-content: end;
+    gap: 6px;
+    min-height: 220px;
+    padding: 18px;
+    background: var(--fb);
+    border-radius: var(--radius);
+    box-shadow: 0 0 0 1px var(--line);
+    text-decoration: none;
+    color: var(--hud);
+    transition: transform 0.25s, box-shadow 0.25s;
+  }
+
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0 0 1px var(--pencil);
+    color: var(--hud);
+  }
+
+  .no {
+    font: 500 11px/1.4 var(--mono);
+    letter-spacing: 0.14em;
+    color: var(--amber);
+  }
+
+  .title {
+    font: 800 24px/1.3 var(--display);
+  }
+
+  .summary {
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgba(255, 246, 230, 0.86);
+  }
+</style>

@@ -1,0 +1,85 @@
+---
+import LearnPage from '../../layouts/LearnPage.astro';
+import DemoFocal from '../../components/learn/DemoFocal.astro';
+
+const rows = [
+  { mm: 14, angle: 114, name: '超広角', use: '建築・星空・狭い室内' },
+  { mm: 24, angle: 84, name: '広角', use: '風景・街並み・スマホの標準カメラ（約24〜26mm）' },
+  { mm: 35, angle: 63, name: '準広角', use: '街のスナップ・旅行' },
+  { mm: 50, angle: 47, name: '標準', use: 'スナップ・テーブルフォト。肉眼の印象に近い' },
+  { mm: 85, angle: 28.6, name: '中望遠', use: 'ポートレート（顔が自然に写る）' },
+  { mm: 135, angle: 18.2, name: '望遠', use: 'ポートレート・背景の圧縮' },
+  { mm: 200, angle: 12.3, name: '望遠', use: '動物・スポーツ・遠くの風景を切り取る' },
+];
+---
+<LearnPage
+  slug="focal-length"
+  lead="焦点距離（mm）が小さいほど広く、大きいほど狭く写ります。でも、顔のゆがみや背景の迫り方を本当に決めているのは、焦点距離ではなく「被写体までの距離」です。"
+  description="焦点距離と画角、遠近感（パース）、圧縮効果、センサーサイズと35mm換算、スマホで人をきれいに撮るコツを、石膏像の3Dデモで体験できます。"
+>
+  <DemoFocal slot="demo" />
+
+  <h2>焦点距離と画角</h2>
+  <p>
+    焦点距離は、レンズとセンサーの距離をもとにした数字で、写る範囲（画角）を決めます。数字が小さいほど広い範囲が写る「広角」、大きいほど狭い範囲を大きく写す「望遠」です。下の表はフルサイズ（35mm判）での対角の画角です。
+  </p>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th class="num">焦点距離</th><th class="num">画角（対角）</th><th>呼び方</th><th>よく使う場面</th></tr></thead>
+      <tbody>
+        {rows.map((r) => <tr><td class="num">{r.mm}mm</td><td class="num">{r.angle}°</td><td>{r.name}</td><td>{r.use}</td></tr>)}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>遠近感を決めるのは「距離」</h2>
+  <p>
+    上のデモでは、どの焦点距離でも石膏像が同じ大きさに写るよう、カメラの位置を変えています。16mm では 24cm まで近づくので、カメラに近い鼻やあごは大きく、遠い耳は小さくなります。200mm では 3m 離れるので、鼻と耳の距離の差がほとんどなくなり、顔が平らに写ります。
+  </p>
+  <p>
+    つまり、顔がゆがむのは広角レンズのせいではなく、<strong>近づきすぎたせい</strong>です。同じ場所から撮って後で切り抜けば、広角でも望遠と同じ遠近感になります（画質は落ちますが）。
+  </p>
+
+  <h2>圧縮効果：背景が迫ってくる</h2>
+  <p>
+    望遠で遠くから撮ると、被写体と背景の距離の差が小さく見え、背景が大きく迫ってきます。デモで 200mm にすると、後ろの障子が大きく写り、マス目が少ししか入らなくなります。千本鳥居の間隔が詰まって見えたり、街の向こうの山が大きく見えたりするのもこの効果です。
+  </p>
+
+  <h2>センサーサイズと「35mm換算」</h2>
+  <p>
+    同じ焦点距離でも、センサーが小さいと写る範囲が狭くなります。比べやすいように、フルサイズでの焦点距離に直した数字を「35mm換算」と呼びます。
+  </p>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>カメラ</th><th class="num">換算</th><th>例</th></tr></thead>
+      <tbody>
+        <tr><td>フルサイズ</td><td class="num">×1</td><td>50mm → 50mm</td></tr>
+        <tr><td>APS-C（ソニー・ニコン・富士フイルムなど）</td><td class="num">×1.5</td><td>35mm → 約52mm</td></tr>
+        <tr><td>APS-C（キヤノン）</td><td class="num">×1.6</td><td>35mm → 約56mm</td></tr>
+        <tr><td>マイクロフォーサーズ</td><td class="num">×2</td><td>25mm → 50mm</td></tr>
+        <tr><td>スマホのメインカメラ</td><td class="num">—</td><td>換算 約24〜26mm（機種による）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>スマホで人を撮るときのコツ</h2>
+  <p>
+    スマホのメインカメラは換算24mm前後の広角です。顔いっぱいに写そうと近づくと、デモの 24mm と同じで鼻や顔の中心が大きく写ります。人を撮るときは<strong>少し離れて「2x」や「3x」に切り替える</strong>と、顔が自然に写ります。集合写真で端の人が横に伸びて見えるのも広角のせいなので、端の人はなるべく中央寄りに並んでもらいましょう。
+  </p>
+
+  <div slot="aside" class="point">
+    <h2>このページのポイント</h2>
+    <ul>
+      <li>小さい mm ＝広く、大きい mm ＝狭く写る</li>
+      <li>顔のゆがみは「近すぎ」が原因</li>
+      <li>望遠で離れると背景が迫る（圧縮効果）</li>
+      <li>ポートレートは 85〜135mm、スマホなら 2x〜3x</li>
+    </ul>
+  </div>
+  <div slot="aside" class="point">
+    <h2>撮影会の記録から</h2>
+    <ul>
+      <li><a href="/trips/fushimi-inari/">伏見稲荷大社</a>：24mm と望遠で鳥居の見え方を比較</li>
+    </ul>
+  </div>
+</LearnPage>

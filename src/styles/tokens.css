@@ -1,0 +1,50 @@
+/*
+ * Design tokens.
+ * The site deliberately commits to one dark look: a film base (blue-black),
+ * amber edge printing for codes and numbers, and a white grease pencil for marks.
+ */
+:root {
+  /* color */
+  --base: #0f1217;
+  --raise: #151920;
+  --raise-2: #1b2029;
+  --rebate: #07080a;
+  --hole: #2f333a;
+  --line: #272c35;
+  --line-strong: #3a414c;
+  --ink: #ebe5d9;
+  --muted: #9ca2ab;
+  --amber: #f2a14a;
+  --amber-ink: #1a1007;
+  --pencil: #fbf3d5;
+  --safe: #ff3a24;
+  --ok: #8fd6a4;
+  --error: #ff8a7a;
+  --hud: #fff6e6;
+  --hud-bg: rgba(8, 8, 11, 0.52);
+  --hud-line: rgba(255, 246, 230, 0.34);
+
+  /* type */
+  --display: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --hand: "Yomogi", "Zen Kurenaido", "Comic Sans MS", cursive;
+
+  --step--2: 11px;
+  --step--1: 13px;
+  --step-0: 16px;
+  --step-1: 18px;
+  --step-2: 22px;
+  --step-3: clamp(24px, 2.6vw, 30px);
+  --step-4: clamp(30px, 4.2vw, 46px);
+  --step-5: clamp(38px, 7vw, 80px);
+
+  /* layout */
+  --gutter: clamp(16px, 4vw, 32px);
+  --maxw: 1180px;
+  --measure: 38em;
+  --radius: 3px;
+  --header-h: 68px;
+
+  color-scheme: dark;
+}

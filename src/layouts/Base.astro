@@ -1,0 +1,82 @@
+---
+import '../styles/global.css';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { club } from '../data/club';
+
+interface Props {
+  /** Page name. The club name is appended automatically. */
+  title?: string;
+  description?: string;
+  /** Let the header float over a full-bleed hero (top page). */
+  overlayHeader?: boolean;
+  lang?: string;
+  dir?: 'ltr' | 'rtl';
+}
+
+const {
+  title,
+  description = '京都先端科学大学の写真サークル「KUAS Photography Club」。撮影会の記録と、シャッタースピード・絞り・焦点距離・現像など写真の基礎を、触って学べるページを公開しています。',
+  overlayHeader = false,
+  lang = 'ja',
+  dir = 'ltr',
+} = Astro.props;
+
+const fullTitle = title ? `${title} | ${club.name}` : `${club.name} | ${club.nameJa}`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html>
+<html lang={lang} dir={dir}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#0f1217" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={club.name} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="ja_JP" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Shippori+Mincho+B1:wght@600;700;800&family=Yomogi&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
+    />
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="skip" href="#main">本文へ移動</a>
+    <SiteHeader overlay={overlayHeader} />
+    <main id="main">
+      <slot />
+    </main>
+    <SiteFooter />
+  </body>
+</html>
+
+<style>
+  .skip {
+    position: absolute;
+    left: 12px;
+    top: -60px;
+    z-index: 100;
+    background: var(--amber);
+    color: var(--amber-ink);
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font: 500 13px/1 var(--mono);
+    text-decoration: none;
+  }
+
+  .skip:focus {
+    top: 12px;
+  }
+</style>
