@@ -1,0 +1,49 @@
+---
+/**
+ * 3D film strips (concept A). Pass up to three photo lists; the first becomes the front strip.
+ * Each photo gets an orange date imprint from its trip date.
+ */
+export interface StripPhoto {
+  src: string;
+  date: Date;
+  portrait?: boolean;
+}
+interface Props {
+  strips: StripPhoto[][];
+  label?: string;
+  class?: string;
+}
+const { strips, label = '撮影会の写真が並んだフィルム', class: className } = Astro.props;
+const stamp = (d: Date) =>
+  `'${String(d.getFullYear()).slice(2)} ${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getDate()).padStart(2, '0')}`;
+const data = strips.map((s) => s.map((p) => ({ src: p.src, stamp: stamp(p.date), portrait: !!p.portrait })));
+---
+<div class:list={['stage', 'film-stage', className]} data-demo="film" data-strips={JSON.stringify(data)}>
+  <canvas aria-label={label}></canvas>
+  <div class="hud">
+    <div class="row"><span class="tag">KUAS 400 · 36 EXP</span><span class="tag" data-frame>▸ 12A</span></div>
+    <div class="row"><span class="tag hint-tag">カーソルを左右に動かすと流れる速さが変わります</span></div>
+  </div>
+</div>
+
+<script>
+  import { mountStage } from '../scripts/gl/stage';
+  import { createFilmStrip, type FilmPhoto } from '../scripts/demos/film';
+
+  document.querySelectorAll<HTMLElement>('.stage[data-demo="film"]').forEach((el) => {
+    const strips = JSON.parse(el.dataset.strips ?? '[]') as FilmPhoto[][];
+    mountStage(el, (renderer, stage) => createFilmStrip(renderer, stage, strips));
+  });
+</script>
+
+<style>
+  .film-stage {
+    --fb: radial-gradient(circle at 0% 30%, rgba(255, 106, 42, 0.4), transparent 50%), #150f0c;
+  }
+
+  @media (pointer: coarse) {
+    .hint-tag {
+      display: none;
+    }
+  }
+</style>
