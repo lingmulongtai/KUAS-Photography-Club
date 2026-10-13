@@ -39,7 +39,10 @@ const lengths = [16, 24, 35, 50, 85, 135, 200];
     <label for="focal-mm">焦点距離</label>
     <input type="range" id="focal-mm" min="0" max="1000" step="1" value="415" />
   </div>
-  <figcaption class="hint">どの焦点距離でも、頭と肩の上あたりまでが画面の高さに収まる距離から撮っています。ドラッグ・カーソルで少し回り込めます。</figcaption>
+  <figcaption class="hint">
+    どの焦点距離でも、頭と肩の上あたりまでが画面の高さに収まる距離から撮っています。カーソルを動かすと少し回り込めます。
+    <span class="credit">頭部モデル：<a href="https://www.ir-ltd.net/" target="_blank" rel="noopener">Infinite-Realities</a>「Lee Perry-Smith 3D Head Scan」（<a href="https://creativecommons.org/licenses/by/3.0/deed.ja" target="_blank" rel="noopener">CC BY 3.0</a>）を石膏像として表示</span>
+  </figcaption>
 </figure>
 
 <script>
@@ -72,6 +75,11 @@ const lengths = [16, 24, 35, 50, 85, 135, 200];
 </script>
 
 <style>
+  .credit {
+    display: block;
+    font-size: 12px;
+  }
+
   .demo {
     margin: 0;
     display: grid;
