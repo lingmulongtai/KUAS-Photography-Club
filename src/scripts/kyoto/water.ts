@@ -55,7 +55,7 @@ export function buildRiver(env: Env) {
         vec3 refl = skyColor(r);
         refl += uSunLight * pow(max(dot(r, uSunDir), 0.), 220.) * 2.5;
         vec3 deep = vec3(.01, .016, .018);
-        vec3 col = mix(deep + shade(vec3(.02, .03, .03), vec3(0., 1., 0.)) * .5, refl * .85, clamp(fres + .08, 0., 1.));
+        vec3 col = mix(deep + shade(vec3(.02, .03, .03), vec3(0., 1., 0.), vWorld) * .5, refl * .85, clamp(fres + .08, 0., 1.));
         // city lights stretched across the water at night
         float streak = pow(fbm(vec2(p.x * 3., p.y * .25 + t * .2)), 3.) * 2.2;
         vec3 emit = vec3(1., .6, .3) * streak * uCity * .6;
