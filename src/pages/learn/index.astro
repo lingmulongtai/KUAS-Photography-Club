@@ -11,7 +11,7 @@ import LearnCards from '../../components/learn/LearnCards.astro';
     lead="カメラの設定は、文章で読むより動かしてみるほうが早くわかります。サークルの新入生向けにまとめた写真の基礎を、ブラウザの中で試せるようにしました。カメラがなくても、スマホで撮っている人にも役に立つ内容です。"
   />
 
-  <section class="wrap">
+  <section class="wrap topics">
     <LearnCards />
   </section>
 
@@ -48,6 +48,10 @@ import LearnCards from '../../components/learn/LearnCards.astro';
 </Base>
 
 <style>
+  .topics {
+    padding-bottom: clamp(56px, 8vw, 96px);
+  }
+
   .notes {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
