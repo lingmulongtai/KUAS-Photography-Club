@@ -45,4 +45,32 @@ const guidelines = defineCollection({
   }),
 });
 
-export const collections = { trips, guidelines };
+/**
+ * One Markdown file per month in src/content/schedule/ (e.g. 2026-10.md).
+ * Every Friday gets the weekly meeting automatically unless listed in noMeeting.
+ */
+const schedule = defineCollection({
+  loader: glob({ pattern: '*.md', base: './src/content/schedule' }),
+  schema: z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/),
+    weeklyMeeting: z.boolean().default(true),
+    /** Fridays without the weekly meeting, as YYYY-MM-DD. */
+    noMeeting: z.array(z.string()).default([]),
+    sample: z.boolean().default(false),
+    events: z
+      .array(
+        z.object({
+          date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          title: z.string(),
+          kind: z.enum(['meeting', 'trip', 'event', 'deadline', 'other']).default('event'),
+          time: z.string().optional(),
+          place: z.string().optional(),
+          note: z.string().optional(),
+          link: z.string().optional(),
+        }),
+      )
+      .default([]),
+  }),
+});
+
+export const collections = { trips, guidelines, schedule };
