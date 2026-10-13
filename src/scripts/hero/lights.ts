@@ -10,8 +10,9 @@ import { rng } from './util';
 const WIDTH = [3, 4.5, 9, 16, 24];
 
 /**
- * A glow map of the streets, painted once from the road lines: main avenues bright and wide,
- * side streets fine and faint. The terrain adds it as light after dark, so Kyoto's grid shows.
+ * A glow map of the streets, painted once from the road lines. Red holds the streets themselves
+ * (avenues bright, side streets faint), green a soft halo around the avenues that only shows from
+ * afar. The terrain adds it as light after dark, so Kyoto's grid shows.
  */
 export function roadGlowTexture(lines: LineFeature[], size: number) {
   const [minX, minZ, maxX, maxZ] = BUILDINGS_BOX;
@@ -24,9 +25,10 @@ export function roadGlowTexture(lines: LineFeature[], size: number) {
   const sz = size / (maxZ - minZ);
   g.lineCap = 'round';
   g.lineJoin = 'round';
-  const draw = (rank: number, blur: number, alpha: number, widen: number) => {
+  const draw = (rank: number, blur: number, alpha: number, widen: number, channel: 'r' | 'g') => {
     g.filter = blur ? `blur(${blur}px)` : 'none';
-    g.strokeStyle = rank >= 3 ? `rgba(255,214,160,${alpha})` : `rgba(255,190,120,${alpha})`;
+    const v = Math.round(alpha * 255);
+    g.strokeStyle = channel === 'r' ? `rgb(${v},0,0)` : `rgb(0,${v},0)`;
     g.lineWidth = Math.max(0.6, WIDTH[rank] * sx * widen);
     g.beginPath();
     for (const f of lines) {
@@ -38,12 +40,10 @@ export function roadGlowTexture(lines: LineFeature[], size: number) {
     g.stroke();
   };
   g.globalCompositeOperation = 'lighter';
-  for (const rank of [1, 2, 3, 4]) draw(rank, 0, rank >= 3 ? 0.7 : rank === 2 ? 0.42 : 0.24, 1);
-  // a soft halo around the busy avenues
-  for (const rank of [3, 4]) draw(rank, Math.max(1, size / 1200), 0.35, 3);
+  for (const rank of [1, 2, 3, 4]) draw(rank, 0, rank >= 3 ? 0.75 : rank === 2 ? 0.45 : 0.26, 1, 'r');
+  for (const rank of [3, 4]) draw(rank, Math.max(1, size / 1200), 0.4, 3, 'g');
   g.filter = 'none';
   const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.anisotropy = 8;

@@ -177,8 +177,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 emit = vec3(0.);
         vec2 ur = boxUv(uRoadBox, p);
         if (uCity > .01 && ur.x > 0. && ur.x < 1. && ur.y > 0. && ur.y < 1.){
-          vec3 glow = texture2D(uRoadGlow, vec2(ur.x, 1. - ur.y)).rgb;
-          emit += glow * uCity * 1.4;
+          vec2 glow = texture2D(uRoadGlow, vec2(ur.x, 1. - ur.y)).rg;
+          // streets up close, plus their halo from far away
+          float halo = smoothstep(900., 4000., dist);
+          emit += vec3(1., .7, .42) * (glow.r * mix(.55, 1.1, halo) + glow.g * halo * .7) * uCity;
         }
         gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
       }
