@@ -196,6 +196,8 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
 
   const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
   el.addEventListener('pointermove', (e) => {
+    // hold still while the pointer is on a pin, so it doesn't slide away from the cursor
+    if ((e.target as HTMLElement).closest('.hero-pin')) return;
     const r = el.getBoundingClientRect();
     pointer.tx = ((e.clientX - r.left) / r.width) * 2 - 1;
     pointer.ty = 1 - ((e.clientY - r.top) / r.height) * 2;
@@ -215,8 +217,8 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
 
   function cityPose(t: number, out = pose) {
     const drift = opts.reducedMotion ? 0 : Math.sin(t * 0.05) * 0.8;
-    const b = (VIEW.bearing + drift + pointer.x * 3) * RAD;
-    const p = (VIEW.pitch + pointer.y * 1.2) * RAD;
+    const b = (VIEW.bearing + drift + pointer.x * 1.6) * RAD;
+    const p = (VIEW.pitch + pointer.y * 0.6) * RAD;
     out.pos.copy(eye);
     out.target.set(eye.x + Math.sin(b) * Math.cos(p) * 1000, eye.y + Math.sin(p) * 1000, eye.z - Math.cos(b) * Math.cos(p) * 1000);
     return out;
