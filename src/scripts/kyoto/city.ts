@@ -289,6 +289,7 @@ export function buildCity(env: Env, quality: number) {
   group.add(roofs);
 
   group.add(buildTrees(env, quality));
+  group.add(buildStreetLights(env, quality));
   return { group, count: plan.length };
 }
 
@@ -340,3 +341,84 @@ function buildTrees(env: Env, quality: number) {
   return mesh;
 }
 
+/* ---------- street lights ---------- */
+
+const LIGHT_VS = /* glsl */ `
+  attribute vec3 aColor;
+  attribute float aSize;
+  uniform float uPx;
+  uniform float uCity;
+  uniform float uFogDensity;
+  varying vec3 vColor;
+  varying float vA;
+  void main(){
+    vec4 mv = modelViewMatrix * vec4(position, 1.);
+    float d = -mv.z;
+    float size = aSize * uPx / d;
+    vA = clamp(size / 1.6, 0., 1.) * uCity * exp(-d * uFogDensity * .5);
+    gl_PointSize = max(size, 1.6);
+    vColor = aColor;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const LIGHT_FS = /* glsl */ `
+  varying vec3 vColor;
+  varying float vA;
+  void main(){
+    float r = length(gl_PointCoord - .5) * 2.;
+    float a = exp(-r * r * 3.5) * vA;
+    if (a < .003) discard;
+    gl_FragColor = vec4(vColor * a, 1.);
+  }
+`;
+
+function lightMaterial(env: Env, extra: Record<string, THREE.IUniform> = {}, vs = LIGHT_VS) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uCity: env.uCity, uFogDensity: env.uFogDensity, uTime: env.uTime, uPx: { value: 600 }, ...extra },
+    vertexShader: vs,
+    fragmentShader: LIGHT_FS,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
+function buildStreetLights(env: Env, quality: number) {
+  const step = quality > 0.75 ? 1.6 : 2.4;
+  const pos: number[] = [];
+  const col: number[] = [];
+  const size: number[] = [];
+  const B = CITY.block;
+  const push = (x: number, z: number, avenue: boolean) => {
+    if (heightAt(x, z) > 0.3 || isRiver(x, z) || inRect(x, z, LANDMARKS.gosho)) return;
+    pos.push(x, 0.6, z);
+    if (avenue) col.push(2.6, 2.3, 1.9);
+    else col.push(2.4, 1.25, 0.45);
+    size.push(avenue ? 0.5 : 0.36);
+  };
+  for (let x = CITY.minX; x <= CITY.maxX; x += B) {
+    const av = nearAvenue(x, AVENUES.northSouth, 1);
+    for (let z = CITY.minZ; z <= CITY.maxZ; z += step) push(x, z, av);
+  }
+  for (let z = CITY.minZ; z <= CITY.maxZ; z += B) {
+    const av = nearAvenue(z, AVENUES.eastWest, 1);
+    for (let x = CITY.minX; x <= CITY.maxX; x += step) push(x, z, av);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('aColor', new THREE.Float32BufferAttribute(col, 3));
+  geo.setAttribute('aSize', new THREE.Float32BufferAttribute(size, 1));
+  const points = new THREE.Points(geo, lightMaterial(env));
+  points.frustumCulled = false;
+  points.name = 'streetLights';
+  return points;
+}
+
+/** Point sizes are given in world units; tell the shaders how many pixels one unit is at distance 1. */
+export function setPointScale(root: THREE.Object3D, pxPerUnit: number) {
+  root.traverse((o) => {
+    const mat = (o as THREE.Points).material as THREE.ShaderMaterial | undefined;
+    if (mat && mat.uniforms && mat.uniforms.uPx) mat.uniforms.uPx.value = pxPerUnit;
+  });
+}
