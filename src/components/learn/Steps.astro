@@ -1,0 +1,352 @@
+---
+/**
+ * A numbered workflow: 第一ステップ, 第二ステップ… joined by a line, each with what light it needs,
+ * how long it takes and what to use. Steps fade in as they scroll into view.
+ */
+export interface Step {
+  title: string;
+  body: string;
+  /** dark = complete darkness, safe = red safelight is fine, room = normal light is fine */
+  light?: 'dark' | 'safe' | 'room';
+  time?: string;
+  tools?: string;
+  /** What you have at the end of this step. */
+  result?: string;
+}
+interface Props {
+  part: string;
+  title: string;
+  steps: Step[];
+}
+const { part, title, steps } = Astro.props;
+const kanji = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+const lights = {
+  dark: '真っ暗で作業',
+  safe: 'セーフライトの下で',
+  room: '明るくしてOK',
+};
+---
+<section class="steps">
+  <header class="head">
+    <p class="part">{part}</p>
+    <h2>{title}</h2>
+  </header>
+  <ol class="list">
+    {steps.map((s, i) => (
+      <li class="step" style={`--i: ${i}`}>
+        <div class="num" aria-hidden="true">
+          <span class="ring"></span>
+          <span class="n">{String(i + 1).padStart(2, '0')}</span>
+        </div>
+        <div class="card">
+          <p class="label">
+            <span>第{kanji[i] ?? i + 1}ステップ</span>
+            {s.light && <span class:list={['light', s.light]}><i></i>{lights[s.light]}</span>}
+          </p>
+          <h3>{s.title}</h3>
+          <p class="body" set:html={s.body} />
+          {(s.time || s.tools) && (
+            <dl class="meta">
+              {s.time && <div><dt>時間</dt><dd>{s.time}</dd></div>}
+              {s.tools && <div><dt>使うもの</dt><dd>{s.tools}</dd></div>}
+            </dl>
+          )}
+          {s.result && <p class="result"><span>できあがり</span>{s.result}</p>}
+        </div>
+      </li>
+    ))}
+  </ol>
+</section>
+
+<script>
+  const lists = document.querySelectorAll<HTMLElement>('.steps .list');
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      },
+      { rootMargin: '0px 0px -12% 0px' },
+    );
+    lists.forEach((l) => {
+      l.classList.add('anim');
+      l.querySelectorAll('.step').forEach((s) => io.observe(s));
+    });
+  }
+</script>
+
+<style>
+  .steps {
+    display: grid;
+    gap: 26px;
+    margin-block: 1.6em 0.6em;
+  }
+
+  .head {
+    display: grid;
+    gap: 6px;
+  }
+
+  .part {
+    font: 700 12px/1.4 var(--latin);
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  /* beat the .prose heading margins */
+  .steps .head h2 {
+    font-size: var(--step-3);
+    margin: 0;
+  }
+
+  .steps .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0;
+  }
+
+  .step {
+    position: relative;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    column-gap: 18px;
+    padding-bottom: 22px;
+  }
+
+  /* the line joining one step to the next */
+  .step::before {
+    content: '';
+    position: absolute;
+    left: 31px;
+    top: 64px;
+    bottom: 0;
+    width: 2px;
+    background: repeating-linear-gradient(var(--line-strong) 0 6px, transparent 6px 11px);
+  }
+
+  .step:last-child::before {
+    display: none;
+  }
+
+  .num {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+  }
+
+  /* the open ring and dot from the club logo */
+  .ring {
+    position: absolute;
+    inset: 4px;
+    border: 2.5px solid var(--brand);
+    border-radius: 50%;
+    -webkit-mask: conic-gradient(from 30deg, #000 0 310deg, transparent 310deg 340deg, #000 340deg);
+    mask: conic-gradient(from 30deg, #000 0 310deg, transparent 310deg 340deg, #000 340deg);
+    transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .ring::after {
+    content: '';
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--brand);
+    top: 1px;
+    right: 7px;
+  }
+
+  .n {
+    font: 700 20px/1 var(--latin);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card {
+    display: grid;
+    gap: 8px;
+    padding: 18px 20px 20px;
+    background: var(--raise);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .step:hover .card {
+    border-color: var(--brand);
+    box-shadow: var(--shadow);
+  }
+
+  .step:hover .ring {
+    transform: rotate(40deg);
+  }
+
+  .label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    font: 700 13px/1.4 var(--body);
+    color: var(--accent);
+    letter-spacing: 0.08em;
+  }
+
+  .light {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    background: var(--raise-2);
+  }
+
+  .light i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
+  .light.dark {
+    background: #1b232a;
+    color: #fff;
+  }
+
+  .light.dark i {
+    background: #000;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.6);
+  }
+
+  .light.safe {
+    background: #fbe4df;
+    color: #8f2416;
+  }
+
+  .light.safe i {
+    background: #e2321c;
+    box-shadow: 0 0 6px #ff4a2e;
+  }
+
+  .light.room i {
+    background: #ffd36b;
+    box-shadow: 0 0 0 1.5px #e0a23b;
+  }
+
+  .steps .card h3 {
+    font-size: var(--step-2);
+    margin: 0;
+  }
+
+  .body {
+    font-size: 15px;
+    line-height: 1.85;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    margin: 2px 0 0;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .meta div {
+    display: flex;
+    gap: 8px;
+  }
+
+  .meta dt {
+    font-weight: 700;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .meta dd {
+    margin: 0;
+  }
+
+  .result {
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--brand-pale);
+  }
+
+  .result span {
+    font: 700 11px/1 var(--latin);
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-right: 10px;
+  }
+
+  /* scroll-in */
+  .anim .step .card,
+  .anim .step .num {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.6s, transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .anim .step .ring {
+    transform: rotate(-120deg);
+  }
+
+  .anim .step.in .card,
+  .anim .step.in .num {
+    opacity: 1;
+    transform: none;
+  }
+
+  .anim .step.in .num {
+    transition-delay: 0.05s;
+  }
+
+  .anim .step.in .card {
+    transition-delay: 0.12s, 0.12s, 0s, 0s;
+  }
+
+  .anim .step.in .ring {
+    transform: none;
+  }
+
+  .anim .step.in:hover .ring {
+    transform: rotate(40deg);
+  }
+
+  @media (max-width: 520px) {
+    .step {
+      grid-template-columns: 44px minmax(0, 1fr);
+      column-gap: 12px;
+    }
+
+    .num {
+      width: 44px;
+      height: 44px;
+    }
+
+    .step::before {
+      left: 21px;
+      top: 44px;
+    }
+
+    .n {
+      font-size: 15px;
+    }
+
+    .card {
+      padding: 14px 15px 16px;
+    }
+  }
+</style>
