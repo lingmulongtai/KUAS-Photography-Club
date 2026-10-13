@@ -7,7 +7,7 @@ Estas directrices son nuestras reglas importantes para garantizar que las activi
 - **Contacto:**
   - Instagram: @kuas_photographyclub
   - Teams/Correo electrónico: 2025m011@kuas.ac.jp
-- **Reuniones periódicas:** Lunes a las 16:20 y 18:00 en la sala S311, Campus de Uzumasa.
+- **Reuniones periódicas:** Viernes a partir de las 18:00 en la sala S306, Campus de Uzumasa.
 
 ---
 
@@ -94,7 +94,7 @@ Estas directrices son nuestras reglas importantes para garantizar que las activi
   - Al comprar equipo para que lo usen todos, los organizadores harán una propuesta y la decisión se tomará mediante discusión en una reunión.
 
 ## 9. Cómo se llevan a cabo las reuniones
-- **Reuniones periódicas:** Lunes a las 16:20 / 18:00 (S311). El orden del día se compartirá con antelación.
+- **Reuniones periódicas:** Viernes a partir de las 18:00 (S306). El orden del día se compartirá con antelación.
 - **Actas:** Registraremos lo que se discutió, lo que se decidió y quién está a cargo, y lo compartiremos con los miembros.
 - **Toma de decisiones:**
   - Los asuntos importantes se deciden por acuerdo de los organizadores asistentes. Si las opiniones están divididas, podemos decidir por mayoría de votos.

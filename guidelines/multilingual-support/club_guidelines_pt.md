@@ -7,7 +7,7 @@ Estas diretrizes são as nossas regras importantes para garantir que as atividad
 - **Contato:**
   - Instagram: @kuas_photographyclub
   - Teams/E-mail: 2025m011@kuas.ac.jp
-- **Reuniões regulares:** Segundas-feiras às 16:20 e 18:00 na sala S311, Campus de Uzumasa.
+- **Reuniões regulares:** Sextas-feiras a partir das 18:00 na sala S306, Campus de Uzumasa.
 
 ---
 
@@ -94,7 +94,7 @@ Estas diretrizes são as nossas regras importantes para garantir que as atividad
   - Ao comprar equipamento para todos, os organizadores farão uma proposta e a decisão será tomada através de discussão numa reunião.
 
 ## 9. Funcionamento das reuniões
-- **Reuniões regulares:** Segundas-feiras às 16:20 / 18:00 (S311). A ordem de trabalhos será partilhada com antecedência.
+- **Reuniões regulares:** Sextas-feiras a partir das 18:00 (S306). A ordem de trabalhos será partilhada com antecedência.
 - **Atas:** Registaremos o que foi discutido, o que foi decidido e quem é o responsável, e partilharemos com os membros.
 - **Tomada de decisões:**
   - As questões importantes são decididas por acordo entre os organizadores presentes. Se as opiniões estiverem divididas, podemos decidir por voto maioritário.
