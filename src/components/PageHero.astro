@@ -1,0 +1,32 @@
+---
+/** Title block for inner pages: an edge-printed code line, the page title and a lead paragraph. */
+interface Props {
+  edge: string;
+  title: string;
+  lead?: string;
+}
+const { edge, title, lead } = Astro.props;
+---
+<header class="page-hero">
+  <div class="wrap inner">
+    <p class="edge">{edge}</p>
+    <h1 set:html={title} />
+    {lead && <p class="lead">{lead}</p>}
+    <slot />
+  </div>
+</header>
+
+<style>
+  .page-hero {
+    padding-block: clamp(48px, 8vw, 96px) clamp(36px, 5vw, 56px);
+  }
+
+  .inner {
+    display: grid;
+    gap: 18px;
+  }
+
+  h1 {
+    font-size: var(--step-5);
+  }
+</style>
