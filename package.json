@@ -18,5 +18,8 @@
     "@astrojs/check": "0.9.10",
     "@types/three": "0.186.0",
     "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
