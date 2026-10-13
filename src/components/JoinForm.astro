@@ -96,17 +96,17 @@ const interests = ['風景', '街のスナップ', 'ポートレート', '夜景
     const status = form.querySelector<HTMLElement>('.status')!;
     const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
 
-    // the next four Mondays, in Japan time
+    // the next four Fridays, in Japan time
     const visit = form.querySelector<HTMLSelectElement>('[data-mondays]');
     if (visit) {
       const now = new Date(Date.now() + 9 * 3600000);
       const day = now.getUTCDay();
       const first = new Date(now);
-      first.setUTCDate(now.getUTCDate() + ((8 - day) % 7 || 7));
+      first.setUTCDate(now.getUTCDate() + ((12 - day) % 7 || 7));
       for (let i = 0; i < 4; i++) {
         const d = new Date(first);
         d.setUTCDate(first.getUTCDate() + i * 7);
-        const label = `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（月）`;
+        const label = `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（金）`;
         visit.add(new Option(label, label), i + 1);
       }
     }
