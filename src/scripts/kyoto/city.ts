@@ -290,6 +290,7 @@ export function buildCity(env: Env, quality: number) {
 
   group.add(buildTrees(env, quality));
   group.add(buildStreetLights(env, quality));
+  group.add(buildTraffic(env, quality));
   return { group, count: plan.length };
 }
 
@@ -412,6 +413,64 @@ function buildStreetLights(env: Env, quality: number) {
   const points = new THREE.Points(geo, lightMaterial(env));
   points.frustumCulled = false;
   points.name = 'streetLights';
+  return points;
+}
+
+/* ---------- traffic ---------- */
+
+const TRAFFIC_VS = /* glsl */ `
+  attribute vec4 aLane;
+  attribute vec2 aMove;
+  uniform float uPx;
+  uniform float uCity;
+  uniform float uTime;
+  uniform float uFogDensity;
+  varying vec3 vColor;
+  varying float vA;
+  void main(){
+    float t = fract(aMove.x + uTime * aMove.y);
+    vec3 p = vec3(aLane.x + aLane.z * t, .18, aLane.y + aLane.w * t);
+    vec4 mv = modelViewMatrix * vec4(p, 1.);
+    float d = -mv.z;
+    vec3 dir = normalize(vec3(aLane.z, 0., aLane.w));
+    vec3 toCam = normalize(cameraPosition - p);
+    bool coming = dot(dir, toCam) > 0.;
+    vColor = coming ? vec3(3., 2.8, 2.4) : vec3(3., .25, .12);
+    float size = (coming ? .55 : .42) * uPx / d;
+    vA = clamp(size / 1.6, 0., 1.) * uCity * exp(-d * uFogDensity * .5) * smoothstep(0., .03, t) * smoothstep(1., .97, t);
+    gl_PointSize = max(size, 1.6);
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+function buildTraffic(env: Env, quality: number) {
+  const r = rng(99);
+  const lanes: number[] = [];
+  const moves: number[] = [];
+  const perRoad = Math.round(70 * quality);
+  const add = (x0: number, z0: number, x1: number, z1: number) => {
+    for (let i = 0; i < perRoad; i++) {
+      lanes.push(x0, z0, x1 - x0, z1 - z0);
+      moves.push(r(), (0.004 + r() * 0.004) * (300 / Math.hypot(x1 - x0, z1 - z0)));
+    }
+  };
+  for (const x of AVENUES.northSouth) {
+    add(x - 0.45, CITY.minZ, x - 0.45, CITY.maxZ);
+    add(x + 0.45, CITY.maxZ, x + 0.45, CITY.minZ);
+  }
+  for (const z of AVENUES.eastWest) {
+    const x1 = Math.min(CITY.maxX, 180);
+    add(CITY.minX, z + 0.45, x1, z + 0.45);
+    add(x1, z - 0.45, CITY.minX, z - 0.45);
+  }
+  const count = lanes.length / 4;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(count * 3), 3));
+  geo.setAttribute('aLane', new THREE.Float32BufferAttribute(lanes, 4));
+  geo.setAttribute('aMove', new THREE.Float32BufferAttribute(moves, 2));
+  const points = new THREE.Points(geo, lightMaterial(env, {}, TRAFFIC_VS));
+  points.frustumCulled = false;
+  points.name = 'traffic';
   return points;
 }
 
