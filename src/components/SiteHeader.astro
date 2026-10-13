@@ -214,9 +214,13 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
       display: inline-flex;
     }
 
+    /* absolute, not fixed: the header's backdrop-filter would trap a fixed child inside the bar */
     .nav {
-      position: fixed;
-      inset: var(--header-h) 0 0 0;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      height: calc(100dvh - var(--header-h));
       background: var(--base);
       padding: 24px var(--gutter) 40px;
       overflow-y: auto;
