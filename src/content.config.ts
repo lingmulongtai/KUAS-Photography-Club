@@ -49,18 +49,21 @@ const guidelines = defineCollection({
  * One Markdown file per month in src/content/schedule/ (e.g. 2026-10.md).
  * Every Friday gets the weekly meeting automatically unless listed in noMeeting.
  */
+/** YAML turns 2026-10-24 into a Date; keep dates as plain YYYY-MM-DD strings. */
+const day = z.preprocess((v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
+
 const schedule = defineCollection({
   loader: glob({ pattern: '*.md', base: './src/content/schedule' }),
   schema: z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/),
     weeklyMeeting: z.boolean().default(true),
     /** Fridays without the weekly meeting, as YYYY-MM-DD. */
-    noMeeting: z.array(z.string()).default([]),
+    noMeeting: z.array(day).default([]),
     sample: z.boolean().default(false),
     events: z
       .array(
         z.object({
-          date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          date: day,
           title: z.string(),
           kind: z.enum(['meeting', 'trip', 'event', 'deadline', 'other']).default('event'),
           time: z.string().optional(),
