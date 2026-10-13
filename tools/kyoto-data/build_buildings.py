@@ -106,17 +106,24 @@ def planes(v):
 
 
 # LOD1 prisms that misrepresent landmarks; the scene models these itself (landmarks.ts)
+# (x, z, radius, new height or None to drop)
 REPLACED = [
-    (-27, 1784, 12),   # 京都タワー: the tower and its base building as one 130 m block
-    (-984, 2632, 8),   # 東寺 五重塔
-    (1802, 560, 8),    # 法観寺 八坂の塔
+    (-27, 1784, 12, 31.0),  # 京都タワー: tower and base building came as one 130 m block; keep the 31 m base
+    (-984, 2632, 8, None),  # 東寺 五重塔
+    (1802, 560, 8, None),   # 法観寺 八坂の塔
 ]
 
 
-def keep(b, area, cx, cz):
-    for x, z, r in REPLACED:
+def replaced(cx, cz):
+    for x, z, r, h in REPLACED:
         if math.hypot(cx - x, cz - z) < r:
-            return False
+            return h if h is not None else -1
+    return None
+
+
+def keep(b, area, cx, cz):
+    if replaced(cx, cz) == -1:
+        return False
     cam = R.to_local(*R.PLACES['shogunzuka'])
     kuas = R.to_local(*R.PLACES['kuas'])
     d_cam = math.hypot(cx - cam[0], cz - cam[1])
@@ -156,6 +163,8 @@ def main():
             dropped += 1
             continue
         h = max(2.5, min(b['height'], 127.5))
+        if replaced(c.x, c.y):
+            h = replaced(c.x, c.y)
         cls = CLASS.get(b['class'], 1)
         if cls == 3:
             h = min(h, 4)
