@@ -4,7 +4,7 @@ KUAS Photography Club は、写真撮影を通じて「楽しむ」と「つな�
 
 - 学友会公認: 2025/05/21
 - メンバー数: 55名（2025/10/29 現在）
-- ミーティング: 毎週 月曜 16:20 / 18:00（太秦キャンパス S311 教室）
+- ミーティング: 毎週 金曜 18:00〜（太秦キャンパス S306 教室）
 
 ## 活動目的
 - 写真撮影を通して、とにかく楽しむ
@@ -93,7 +93,7 @@ The KUAS Photography Club is a group for students who love photography. Our main
 
 - **Official Recognition:** Approved by the Student Union on May 21, 2025
 - **Members:** 55 (as of October 29, 2025)
-- **Meetings:** Mondays at 16:20 and 18:00 in Room S311, Uzumasa Campus
+- **Meetings:** Fridays from 18:00 in Room S306, Uzumasa Campus
 
 ## Our Goals
 - To enjoy photography above all else.
