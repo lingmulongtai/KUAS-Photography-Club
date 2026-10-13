@@ -1,32 +1,44 @@
 /*
- * Design tokens.
- * The site deliberately commits to one dark look: a film base (blue-black),
- * amber edge printing for codes and numbers, and a white grease pencil for marks.
+ * Design tokens, taken from the club's 写真部 logo:
+ * a clear teal ground, the deep teal-black of the line drawing, and white.
+ * Photos and WebGL stages keep a dark film-base backdrop so pictures read well.
  */
 :root {
-  /* color */
-  --base: #0f1217;
-  --raise: #151920;
-  --raise-2: #1b2029;
-  --rebate: #07080a;
-  --hole: #2f333a;
-  --line: #272c35;
-  --line-strong: #3a414c;
-  --ink: #ebe5d9;
-  --muted: #9ca2ab;
-  --accent: #f2a14a;
-  --on-accent: #1a1007;
-  --mark: #fbf3d5;
+  /* brand */
+  --brand: #64bec6;
+  --brand-deep: #3a9ca6;
+  --brand-pale: #e4f5f6;
+  --brand-ink: #1b363d;
+
+  /* surfaces */
+  --base: #f7fbfb;
+  --raise: #ffffff;
+  --raise-2: #eef8f8;
+  --rebate: #0f191c;
+  --hole: #34434a;
+  --line: #d4e7e9;
+  --line-strong: #a8ced2;
+
+  /* text */
+  --ink: #1b363d;
+  --muted: #557079;
+  --accent: #1c7a85;
+  --on-accent: #10272c;
+  --mark: #1c7a85;
+  --on-dark: #ffffff;
   --safe: #ff3a24;
-  --ok: #8fd6a4;
-  --error: #ff8a7a;
+  --ok: #2f8f5b;
+  --error: #c2412d;
+
+  /* text over WebGL stages and photos */
   --hud: #fff6e6;
-  --hud-bg: rgba(8, 8, 11, 0.52);
+  --hud-bg: rgba(8, 12, 14, 0.5);
   --hud-line: rgba(255, 246, 230, 0.34);
 
   /* type */
-  --display: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --display: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
   --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --latin: "Quicksand", "Zen Kaku Gothic New", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   --hand: "Yomogi", "Zen Kurenaido", "Comic Sans MS", cursive;
 
@@ -37,14 +49,16 @@
   --step-2: 22px;
   --step-3: clamp(24px, 2.6vw, 30px);
   --step-4: clamp(30px, 4.2vw, 46px);
-  --step-5: clamp(38px, 7vw, 80px);
+  --step-5: clamp(36px, 6.4vw, 72px);
 
   /* layout */
   --gutter: clamp(16px, 4vw, 32px);
   --maxw: 1180px;
   --measure: 38em;
-  --radius: 3px;
-  --header-h: 68px;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --header-h: 72px;
+  --shadow: 0 1px 2px rgba(27, 54, 61, 0.06), 0 8px 24px rgba(27, 54, 61, 0.08);
 
-  color-scheme: dark;
+  color-scheme: light;
 }
