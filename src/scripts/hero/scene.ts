@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Demo } from '../gl/stage';
 import { createEnv } from './env';
-import { KYOTO, directionFrom, jstMinutes, localSiderealAngle, moonPosition, sunPosition } from './astro';
+import { KYOTO, directionFrom, jstMinutes, jstParts, localSiderealAngle, moonPosition, sunPosition } from './astro';
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import { PLACES } from './geo';
 import { loadJSON, loadTexture, type TerrainMeta } from './data';
@@ -21,6 +21,7 @@ import { createLabels } from './labels';
 import { buildTrees } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
+import { buildClouds, coverForDay } from './clouds';
 
 export interface HeroStatus {
   minutes: number;
@@ -75,7 +76,8 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   const sky = buildSkyDome(env);
   const celestial = buildCelestial(env, opts.quality);
   const meteors = buildMeteors(opts.quality);
-  scene.add(sky.mesh, celestial.group, meteors.group);
+  const clouds = buildClouds(env);
+  scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
   const casts = (o: THREE.Object3D) => o.traverse((c) => (c as THREE.Mesh).isMesh && c.layers.enable(SHADOW_LAYER));
@@ -180,6 +182,8 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     env.uMoonLight.value.setRGB(0.5, 0.58, 0.78).multiplyScalar(0.07 * moon.illumination * moonUp * dark);
     env.uStars.value = dark * (1 - 0.35 * moon.illumination * moonUp);
     celestial.setSidereal(localSiderealAngle(date, KYOTO.lon));
+    const ymd = jstParts(date);
+    clouds.uniforms.uCover.value = coverForDay(ymd.year, ymd.month, ymd.day);
 
     renderer.toneMappingExposure = look.exposure;
     post.bloom.strength = look.bloom;
@@ -301,6 +305,9 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     }
     sky.mesh.position.copy(camera.position);
     celestial.group.position.copy(camera.position);
+    clouds.mesh.position.x = camera.position.x;
+    clouds.mesh.position.z = camera.position.z;
+    clouds.uniforms.uWind.value.set(t * 0.0009, t * 0.0003);
   }
 
   // tap the sky for a shooting star
@@ -312,6 +319,19 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   });
 
   let clock = 0;
+  let maxDpr = 1;
+  let lowered = false;
+  let slow = 0;
+  function setResolution(d: number) {
+    pixelRatio = d;
+    renderer.setPixelRatio(d);
+    renderer.setSize(width, height, false);
+    post.setSize(width, height, d);
+    celestial.starUniforms.uDpr.value = d;
+    meteors.spriteUniforms.uDpr.value = d;
+    updatePointScale();
+  }
+
   return {
     /** Send a few shooting stars at once. */
     burst: (n: number) => meteors.burst(n),
@@ -322,19 +342,14 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     },
     t0: 0,
     resize(w, h, d) {
+      maxDpr = d;
       width = w;
       height = h;
       camera.aspect = w / h;
       // about 68° across on a wide screen: Kyoto Tower and Toji on the left to Nijo Castle and Atago on the right
       camera.fov = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(34 * RAD) / camera.aspect)) / RAD, 36, 66);
       camera.updateProjectionMatrix();
-      pixelRatio = d;
-      renderer.setPixelRatio(d);
-      renderer.setSize(width, height, false);
-      post.setSize(width, height, d);
-      celestial.starUniforms.uDpr.value = d;
-      meteors.spriteUniforms.uDpr.value = d;
-      updatePointScale();
+      setResolution(Math.min(d, pixelRatio < maxDpr && pixelRatio > 0 && lowered ? pixelRatio : d));
     },
     render(t) {
       const dt = Math.min(0.1, Math.max(0, t - lastT));
@@ -346,6 +361,15 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       meteors.update(t, dt, camera.position, { az: VIEW.bearing * RAD, half, top: (VIEW.pitch * RAD) + (camera.fov * RAD) / 2 }, env.uStars.value, pxPerM);
       post.render(t);
       labels?.update(camera, width, height);
+      // keep the frame rate up on slower devices by rendering fewer pixels
+      if (dt > 0) {
+        slow = dt > 0.034 ? slow + 1 : Math.max(0, slow - 1);
+        if (slow > 90 && pixelRatio > 1) {
+          slow = 0;
+          lowered = true;
+          setResolution(Math.max(1, pixelRatio - 0.25));
+        }
+      }
     },
   };
 }
