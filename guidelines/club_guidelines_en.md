@@ -7,7 +7,7 @@ These guidelines are our important rules to ensure that the activities of the KU
 - **Contact:**
   - Instagram: @kuas_photographyclub
   - Teams/Email: 2025m011@kuas.ac.jp
-- **Regular Meetings:** Mondays at 16:20 and 18:00 in Room S311, Uzumasa Campus.
+- **Regular Meetings:** Fridays from 18:00 in Room S306, Uzumasa Campus.
 
 ---
 
@@ -112,7 +112,7 @@ These guidelines are our important rules to ensure that the activities of the KU
   - When buying equipment for everyone to use, the organizers will make a proposal, and the decision will be made by discussion at a meeting.
 
 ## 9. How Meetings Are Run
-- **Regular Meetings:** Mondays at 16:20 / 18:00 (S311). The agenda will be shared in advance.
+- **Regular Meetings:** Fridays from 18:00 (S306). The agenda will be shared in advance.
 - **Minutes:** We will record what was discussed, what was decided, and who is in charge, and share it with the members.
 - **Decision-Making:**
   - Important matters are decided by the agreement of the attending organizers. If opinions are divided, we may decide by a majority vote.
