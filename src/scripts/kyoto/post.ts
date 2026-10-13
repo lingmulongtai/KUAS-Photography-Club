@@ -12,7 +12,7 @@ const FilmShader = {
     tDiffuse: { value: null as THREE.Texture | null },
     uTime: { value: 0 },
     uRes: { value: new THREE.Vector2(1, 1) },
-    uGrain: { value: 0.06 },
+    uGrain: { value: 0.035 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -28,7 +28,7 @@ const FilmShader = {
     void main(){
       vec3 c = texture2D(tDiffuse, vUv).rgb;
       float l = dot(c, vec3(.299, .587, .114));
-      c += vec3(.012, .004, -.006) * (1. - l);
+      c += vec3(-.004, .0, .008) * (1. - l) * (1. - l);
       float v = smoothstep(1.2, .35, length((vUv - .5) * vec2(1.15, 1.)));
       c *= mix(.62, 1., v);
       float g = hash12(vUv * uRes + fract(uTime * 7.31) * 517.) - .5;
