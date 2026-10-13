@@ -72,17 +72,17 @@ a {
 }
 
 a:hover {
-  color: var(--pencil);
+  color: var(--mark);
 }
 
 :focus-visible {
-  outline: 2px solid var(--amber);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
 ::selection {
-  background: var(--amber);
-  color: var(--amber-ink);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 button,
@@ -117,7 +117,7 @@ textarea {
 .edge {
   font: 500 12px/1.4 var(--mono);
   letter-spacing: 0.16em;
-  color: var(--amber);
+  color: var(--accent);
   text-transform: uppercase;
 }
 
@@ -137,7 +137,7 @@ textarea {
 
 .hand {
   font-family: var(--hand);
-  color: var(--pencil);
+  color: var(--mark);
 }
 
 .num {
@@ -194,11 +194,11 @@ textarea {
 }
 
 .prose li::marker {
-  color: var(--amber);
+  color: var(--accent);
 }
 
 .prose strong {
-  color: var(--pencil);
+  color: var(--mark);
 }
 
 .prose code {
@@ -219,7 +219,7 @@ textarea {
 .prose blockquote {
   margin: 0;
   padding-left: 1em;
-  border-left: 2px solid var(--amber);
+  border-left: 2px solid var(--accent);
   color: var(--muted);
 }
 
@@ -286,15 +286,15 @@ table.data th.num {
 }
 
 .btn--primary {
-  background: var(--amber);
-  border-color: var(--amber);
-  color: var(--amber-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 .btn--primary:hover {
-  background: var(--pencil);
-  border-color: var(--pencil);
-  color: var(--amber-ink);
+  background: var(--mark);
+  border-color: var(--mark);
+  color: var(--on-accent);
 }
 
 .btn:disabled {
@@ -313,12 +313,12 @@ table.data th.num {
 .link-arrow {
   font: 500 14px/1.4 var(--mono);
   letter-spacing: 0.04em;
-  color: var(--amber);
+  color: var(--accent);
   text-decoration: none;
 }
 
 .link-arrow:hover {
-  color: var(--pencil);
+  color: var(--mark);
 }
 
 /* ---------- WebGL stage + HUD (shared by every demo) ---------- */
@@ -430,13 +430,13 @@ table.data th.num {
 .controls input[type="range"] {
   flex: 1 1 220px;
   min-width: 0;
-  accent-color: var(--amber);
+  accent-color: var(--accent);
 }
 
 .controls output {
   min-width: 4.5em;
   font-variant-numeric: tabular-nums;
-  color: var(--amber);
+  color: var(--accent);
 }
 
 .hint {
@@ -454,7 +454,7 @@ table.data th.num {
 .slot-note {
   display: inline-block;
   font: 400 14px/1.4 var(--hand);
-  color: var(--pencil);
+  color: var(--mark);
   border: 1px dashed rgba(251, 243, 213, 0.45);
   border-radius: 2px;
   padding: 2px 8px;

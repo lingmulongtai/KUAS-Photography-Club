@@ -14,9 +14,9 @@
   --line-strong: #3a414c;
   --ink: #ebe5d9;
   --muted: #9ca2ab;
-  --amber: #f2a14a;
-  --amber-ink: #1a1007;
-  --pencil: #fbf3d5;
+  --accent: #f2a14a;
+  --on-accent: #1a1007;
+  --mark: #fbf3d5;
   --safe: #ff3a24;
   --ok: #8fd6a4;
   --error: #ff8a7a;

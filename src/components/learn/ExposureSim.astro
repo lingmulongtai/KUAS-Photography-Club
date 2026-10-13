@@ -251,12 +251,12 @@ const scenes = [
 
   .dial input {
     width: 100%;
-    accent-color: var(--amber);
+    accent-color: var(--accent);
   }
 
   .dial output {
     font: 500 15px/1 var(--mono);
-    color: var(--amber);
+    color: var(--accent);
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
@@ -278,7 +278,7 @@ const scenes = [
     position: relative;
     height: 10px;
     background:
-      linear-gradient(90deg, transparent calc(50% - 1px), var(--amber) calc(50% - 1px), var(--amber) calc(50% + 1px), transparent calc(50% + 1px)),
+      linear-gradient(90deg, transparent calc(50% - 1px), var(--accent) calc(50% - 1px), var(--accent) calc(50% + 1px), transparent calc(50% + 1px)),
       repeating-linear-gradient(90deg, var(--line-strong) 0 1px, transparent 1px calc(100% / 7));
     background-color: var(--raise);
     border-radius: 2px;
@@ -290,7 +290,7 @@ const scenes = [
     width: 3px;
     height: 20px;
     margin-left: -1.5px;
-    background: var(--pencil);
+    background: var(--mark);
     transition: left 0.25s;
   }
 
