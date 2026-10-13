@@ -124,11 +124,12 @@ This repository is where we create, store, and update documents for the KUAS Pho
 - `docs/`: Reference materials and records.
 
 ## Website
-This repository also holds the club website, a static Astro + three.js site: a 3D Kyoto on the top page whose sky follows the time in Kyoto, photo trip reports shown as rolls of film, hands-on lessons on shutter speed, aperture, focal length and developing, a monthly schedule, an about page, join and contact pages that link to the club's own forms, and the guidelines in 11 languages.
+This repository also holds the club website, a static Astro + three.js site: a 3D Kyoto on the top page built from real data (GSI terrain and aerial photos, PLATEAU buildings with measured heights) and seen from Shogunzuka, with the live sky of Kyoto, sparkling shooting stars and a flight to the Uzumasa campus, photo trip reports shown as rolls of film, hands-on lessons on shutter speed, aperture, focal length and developing, a monthly schedule, an about page, join and contact pages that link to the club's own forms, and the guidelines in 11 languages.
 
 - Develop: `npm install`, then `npm run dev` (Node.js 22.12+). `npm run check` type-checks, `npm run build` writes `dist/`.
 - Club facts and the links to the club's Google/Microsoft Forms: `src/data/club.ts`. Monthly schedules: one Markdown file per month in `src/content/schedule/`. Trips: one Markdown file per trip in `src/content/trips/`, photos in `public/photos/`.
 - Sample trips and photos are marked `sample: true`; see `tools/sample-photos/README.md` to replace them.
+- The top-page Kyoto data lives in `public/kyoto/` and is rebuilt with the scripts in `tools/kyoto-data/` (sources, licences and steps in its README).
 - Deploy: import the repository in Vercel (framework preset: Astro). Pushes to `main` deploy automatically. Update `site` in `astro.config.mjs` once the URL is final.
 
 ## Get Involved
