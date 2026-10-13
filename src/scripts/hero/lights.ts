@@ -179,7 +179,8 @@ export function buildTraffic(env: Env, hf: Heightfield, lines: LineFeature[], qu
         float px = clamp(uScale * 2. / dist, 1., 4.);
         float fade = smoothstep(0., .05, t) * smoothstep(1., .95, t);
         float on = max(uCity, .25 * step(.001, uCity));
-        vColor = mix(tail, head, step(0., toward)) * on * fade * mix(hazeTransmittance(p), 1., .4);
+        float near = 1. - smoothstep(2., 4., uScale * 2. / dist) * .7;
+        vColor = mix(tail, head, step(0., toward)) * on * fade * near * mix(hazeTransmittance(p), 1., .4);
         gl_PointSize = px;
         gl_Position = projectionMatrix * mv;
       }

@@ -15,6 +15,9 @@ import { SHADOW_LAYER, createSunShadow } from './shadow';
 import { loadLines } from './lines-data';
 import { buildLamps, buildTraffic, roadGlowTexture } from './lights';
 import { BUILDINGS_BOX } from './geo';
+import { buildBeacons, buildLandmarks } from './landmarks';
+import { buildWater } from './water';
+import { createLabels } from './labels';
 
 export interface HeroStatus {
   minutes: number;
@@ -30,6 +33,8 @@ export interface HeroOptions {
   quality: number;
   onStatus?: (s: HeroStatus) => void;
   onReady?: () => void;
+  /** A pin with an action was pressed (the campus). */
+  onAction?: (id: string) => void;
 }
 
 const RAD = Math.PI / 180;
@@ -37,7 +42,7 @@ const RAD = Math.PI / 180;
 /** The view from the stage of Shogunzuka Seiryuden, looking west over the city. */
 export const VIEW = {
   eye: { ...PLACES.shogunzuka, above: 36 },
-  bearing: 266,
+  bearing: 265,
   pitch: -6.5,
 };
 
@@ -57,6 +62,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   let height = 1;
   let pixelRatio = 1;
   const pointLayers: { uScale: { value: number } }[] = [];
+  let labels: ReturnType<typeof createLabels> | null = null;
   /** Pixels per metre at 1 m distance, so point lights can size themselves. */
   const updatePointScale = () => {
     const k = (height * pixelRatio) / (2 * Math.tan((camera.fov * RAD) / 2));
@@ -86,13 +92,19 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     terrain.uniforms.uAerialCity.value = cityPhoto;
     terrain.uniforms.uCityOn.value = 1;
     const city = buildCity(env, hf, buildings);
-    scene.add(city.group);
+    const landmarks = buildLandmarks(env, hf);
+    scene.add(city.group, landmarks.mesh);
     casts(city.group);
+    casts(landmarks.mesh);
     shadow.invalidate();
+    const tops = [landmarks.positions.kyotoTower.clone().setY(landmarks.positions.kyotoTower.y + 131.5)];
+    scene.add(buildBeacons(env, tops));
 
     const lines = await loadLines();
     terrain.uniforms.uRoadGlow.value = roadGlowTexture(lines, opts.quality > 0.75 ? 4096 : 2048);
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
+    scene.add(buildWater(env, hf, lines));
+    labels = createLabels(el, hf, (id) => opts.onAction?.(id));
     const lamps = buildLamps(env, hf, lines, opts.quality);
     const traffic = buildTraffic(env, hf, lines, opts.quality);
     pointLayers.push(lamps.uniforms, traffic.uniforms);
@@ -160,7 +172,8 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       width = w;
       height = h;
       camera.aspect = w / h;
-      camera.fov = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(24 * RAD) / camera.aspect)) / RAD, 34, 64);
+      // about 68° across on a wide screen: Kyoto Tower and Toji on the left to Nijo Castle and Atago on the right
+      camera.fov = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(34 * RAD) / camera.aspect)) / RAD, 36, 66);
       camera.updateProjectionMatrix();
       pixelRatio = d;
       renderer.setPixelRatio(d);
@@ -173,6 +186,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       applyTime(opts.now(), t);
       placeCamera();
       post.render(t);
+      labels?.update(camera, width, height);
     },
   };
 }

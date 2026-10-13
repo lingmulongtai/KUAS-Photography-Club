@@ -203,14 +203,14 @@ const BUILDING_FS = /* glsl */ `
       float wy = smoothstep(.32 - fw.y, .32 + fw.y, f.y) * (1. - smoothstep(.86 - fw.y, .86 + fw.y, f.y));
       float valid = step(0., id.y) * step((id.y + 1.) * floorH, H + .2);
       float pane = wx * wy;
-      float tiny = smoothstep(.3, .6, max(fw.x, fw.y));
+      float tiny = smoothstep(.18, .45, max(fw.x, fw.y));
       pane = mix(pane, .35, tiny) * valid;
       if (wooden) pane *= step(.45, hash12(id + seed * 7.)) ;
 
       // glass by day: darker panes that pick up a little sky
-      float glassRefl = .04 + .4 * pow(1. - max(dot(-v, n), 0.), 4.);
-      vec3 glass = vec3(.03, .035, .04) + skyColor(reflect(v, n)) * glassRefl;
-      albedo = mix(wall, glass, pane * (.65 - .35 * tiny));
+      float glassRefl = .03 + .18 * pow(1. - max(dot(-v, n), 0.), 4.);
+      vec3 glass = vec3(.025, .03, .035) + skyColor(reflect(v, n)) * glassRefl * (1. - tiny);
+      albedo = mix(wall, glass, pane * (.6 - .3 * tiny));
 
       // lit windows at night: warm homes and hotels, cooler offices. Some buildings are dark.
       float awake = step(.22, fract(seed * 5.31));
