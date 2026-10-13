@@ -1,0 +1,102 @@
+---
+/** The next few events from the schedule. Past ones are hidden in the browser, so the list stays current between deploys. */
+import { formatDay, getSchedule, kindLabel } from '../lib/schedule';
+
+interface Props {
+  count?: number;
+}
+const { count = 4 } = Astro.props;
+const events = (await getSchedule()).flatMap((m) => m.events);
+---
+<div class="upcoming" data-count={count}>
+  <ol class="events">
+    {events.map((e) => (
+      <li class={`k-${e.kind}`} data-date={e.date} hidden>
+        <span class="date"><span class="num">{formatDay(e.date)}</span></span>
+        <span class="body">
+          <span class="kind">{kindLabel[e.kind]}</span>
+          <b>{e.title}</b>
+          {(e.time || e.place) && <span class="meta">{[e.time, e.place].filter(Boolean).join(' · ')}</span>}
+        </span>
+      </li>
+    ))}
+  </ol>
+  <p class="empty muted" hidden>これからの予定は、決まりしだいここに載せます。</p>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('.upcoming').forEach((root) => {
+    const count = Number(root.dataset.count ?? 4);
+    const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    const items = Array.from(root.querySelectorAll<HTMLElement>('li[data-date]')).filter((li) => li.dataset.date! >= today);
+    items.slice(0, count).forEach((li) => (li.hidden = false));
+    const empty = root.querySelector<HTMLElement>('.empty');
+    if (empty) empty.hidden = items.length > 0;
+  });
+</script>
+
+<style>
+  .events {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  li {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    padding: 18px;
+    background: var(--raise);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border-top: 5px solid var(--c);
+  }
+
+  li[hidden] {
+    display: none;
+  }
+
+  .date .num {
+    font-size: 20px;
+  }
+
+  .body {
+    display: grid;
+    gap: 2px;
+  }
+
+  .kind {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .meta {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .k-meeting {
+    --c: var(--brand);
+  }
+
+  .k-trip {
+    --c: #1b363d;
+  }
+
+  .k-event {
+    --c: #e0a23b;
+  }
+
+  .k-deadline {
+    --c: #c2412d;
+  }
+
+  .k-other {
+    --c: #8aa1a7;
+  }
+</style>
