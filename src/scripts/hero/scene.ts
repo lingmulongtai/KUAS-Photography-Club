@@ -19,6 +19,7 @@ import { buildBeacons, buildLandmarks } from './landmarks';
 import { buildWater } from './water';
 import { createLabels } from './labels';
 import { buildTrees } from './trees';
+import { buildMeteors } from './meteors';
 
 export interface HeroStatus {
   minutes: number;
@@ -54,16 +55,17 @@ export const VIEW = {
     above: 44,
   },
   bearing: BEARING,
-  pitch: -6.5,
+  pitch: -5,
 };
 
-export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts: HeroOptions): Demo {
+export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts: HeroOptions): Demo & { burst(n: number): void } {
   const env = createEnv();
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 8, 60000);
   const sky = buildSkyDome(env);
   const celestial = buildCelestial(env, opts.quality);
-  scene.add(sky.mesh, celestial.group);
+  const meteors = buildMeteors(opts.quality);
+  scene.add(sky.mesh, celestial.group, meteors.group);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
   const casts = (o: THREE.Object3D) => o.traverse((c) => (c as THREE.Mesh).isMesh && c.layers.enable(SHADOW_LAYER));
@@ -78,7 +80,10 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   const updatePointScale = () => {
     const k = (height * pixelRatio) / (2 * Math.tan((camera.fov * RAD) / 2));
     for (const u of pointLayers) u.uScale.value = k;
+    pxPerM = k;
   };
+  let pxPerM = 1000;
+  let lastT = 0;
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -179,7 +184,17 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     celestial.group.position.copy(camera.position);
   }
 
+  // tap the sky for a shooting star
+  el.addEventListener('pointerdown', (e) => {
+    const r = el.getBoundingClientRect();
+    const ndcY = 1 - ((e.clientY - r.top) / r.height) * 2;
+    const elev = VIEW.pitch * RAD + ndcY * (camera.fov * RAD) / 2;
+    if (elev > 0.01 && !(e.target as HTMLElement).closest('button')) meteors.burst(1);
+  });
+
   return {
+    /** Send a few shooting stars at once. */
+    burst: (n: number) => meteors.burst(n),
     t0: 0,
     resize(w, h, d) {
       width = w;
@@ -193,11 +208,16 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       renderer.setSize(width, height, false);
       post.setSize(width, height, d);
       celestial.starUniforms.uDpr.value = d;
+      meteors.spriteUniforms.uDpr.value = d;
       updatePointScale();
     },
     render(t) {
+      const dt = Math.min(0.1, Math.max(0, t - lastT));
+      lastT = t;
       applyTime(opts.now(), t);
       placeCamera();
+      const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);
+      meteors.update(t, dt, camera.position, { az: VIEW.bearing * RAD, half, top: (VIEW.pitch * RAD) + (camera.fov * RAD) / 2 }, env.uStars.value, pxPerM);
       post.render(t);
       labels?.update(camera, width, height);
     },
