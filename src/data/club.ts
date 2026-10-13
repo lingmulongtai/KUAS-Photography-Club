@@ -13,10 +13,10 @@ export const club = {
   members: 55,
   membersAsOf: '2025-10-29',
   meetings: {
-    day: '毎週月曜',
-    dayEn: 'Mondays',
-    times: ['16:20', '18:00'],
-    room: 'S311',
+    day: '毎週金曜',
+    dayEn: 'Fridays',
+    times: ['18:00〜'],
+    room: 'S306',
   },
   tripsPerMonth: 2,
   instagram: {
