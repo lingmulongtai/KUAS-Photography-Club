@@ -1,0 +1,55 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageHero from '../../components/PageHero.astro';
+import FilmStrip from '../../components/FilmStrip.astro';
+import TripRow from '../../components/TripRow.astro';
+import { getTrips, stripsFrom } from '../../lib/trips';
+import { club } from '../../data/club';
+
+const trips = await getTrips();
+const strips = stripsFrom(trips);
+const photoCount = trips.reduce((n, t) => n + t.data.photos.length, 0);
+---
+<Base title="撮影会の記録" description="KUAS Photography Club の撮影会の記録。京都の街や近くの府県で撮った写真を、撮影会ごとに1本のフィルムとして残しています。">
+  <PageHero
+    edge={`PHOTO TRIPS ▸ ${trips.length} ROLLS ▸ ${photoCount} FRAMES`}
+    title="撮影会の記録"
+    lead={`月に${club.tripsPerMonth}回ほど、京都の街や近くの府県へ写真を撮りに出かけています。撮影会ごとに1本のフィルムとして、撮った写真と撮影メモを残しています。`}
+  />
+
+  <section class="wrap film-wrap" aria-label="最近の撮影会の写真">
+    <FilmStrip strips={strips} label="最近の撮影会の写真が並んだフィルム" />
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="edge">ARCHIVE</p>
+        <h2>撮影会のアーカイブ</h2>
+      </div>
+      <div class="list">
+        {trips.map((trip, i) => <TripRow trip={trip} roll={trips.length - i} />)}
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .film-wrap {
+    padding-bottom: 8px;
+  }
+
+  .film-wrap :global(.stage) {
+    aspect-ratio: 21 / 9;
+  }
+
+  @media (max-width: 600px) {
+    .film-wrap :global(.stage) {
+      aspect-ratio: 4 / 5;
+    }
+  }
+
+  .list {
+    border-bottom: 1px solid var(--line);
+  }
+</style>
