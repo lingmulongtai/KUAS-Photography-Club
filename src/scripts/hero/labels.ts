@@ -41,7 +41,7 @@ export const LABELS: LabelDef[] = [
  * Pins that follow their places on screen. They hide when off screen or behind a ridge
  * (checked by stepping along the line of sight over the terrain).
  */
-export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: string) => void) {
+export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: string) => void, avoid?: () => { x: number; y: number; w: number; h: number }[]) {
   const layer = document.createElement('div');
   layer.className = 'hero-labels';
   el.appendChild(layer);
@@ -62,6 +62,8 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
   });
   const byRank = [...items].sort((a, b) => a.def.rank - b.def.rank);
   const placed: { x: number; y: number; w: number }[] = [];
+  let blocks: { x: number; y: number; w: number; h: number }[] = [];
+  let frame = 0;
   const v = new THREE.Vector3();
   const lastCam = new THREE.Vector3(Infinity, 0, 0);
   const occluded = new Map<string, boolean>();
@@ -89,6 +91,8 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
       const moved = lastCam.distanceToSquared(camera.position) > 1;
       if (moved) lastCam.copy(camera.position);
       placed.length = 0;
+      // re-measure the areas to keep clear now and then (they only move on resize and scroll-in)
+      if (avoid && (frame++ % 30 === 0 || moved)) blocks = avoid();
       for (const it of byRank) {
         if (moved) occluded.set(it.def.id, blocked(camera.position, it.ground.clone().setY(it.ground.y + 6)));
         v.copy(it.anchor).project(camera);
@@ -99,7 +103,9 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
           const px = ((v.x + 1) / 2) * width;
           const py = ((1 - v.y) / 2) * height;
           const w = it.def.action ? 150 : 96;
-          const clash = placed.some((p) => Math.abs(p.x - px) < (p.w + w) / 2 && Math.abs(p.y - py) < 34);
+          const clash =
+            placed.some((p) => Math.abs(p.x - px) < (p.w + w) / 2 && Math.abs(p.y - py) < 34) ||
+            blocks.some((b) => px + w / 2 > b.x - 8 && px - w / 2 < b.x + b.w + 8 && py > b.y - 12 && py - 40 < b.y + b.h);
           if (clash) show = false;
           else placed.push({ x: px, y: py, w });
         }
