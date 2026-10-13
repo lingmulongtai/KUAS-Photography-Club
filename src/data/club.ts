@@ -28,15 +28,15 @@ export const club = {
 } as const;
 
 /**
- * Where the join form sends its answers.
- * - `endpoint`: any service that accepts a form POST (Formspree, Getform, a Google Apps Script web app…).
- *   Leave it empty and the form will open the member's mail app with the answers filled in instead.
- * - `googleFormUrl`: optional. If set, a link to the Google Form is shown next to the form.
+ * Forms the club runs itself (Google Forms or Microsoft Forms).
+ * Paste each form's share link here; while a link is empty the site points people to Instagram and email instead.
  */
-export const joinForm = {
-  endpoint: '',
-  googleFormUrl: '',
-} as const;
+export const forms = {
+  /** 見学・入部の申し込み */
+  join: '',
+  /** 撮影依頼・協賛・取材など、外部の方からのお問い合わせ */
+  contact: '',
+};
 
 export const nav = [
   { href: '/trips/', ja: '撮影会', en: 'Trips' },
