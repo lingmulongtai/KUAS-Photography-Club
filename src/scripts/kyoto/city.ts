@@ -288,6 +288,55 @@ export function buildCity(env: Env, quality: number) {
   roofs.computeBoundingSphere();
   group.add(roofs);
 
+  group.add(buildTrees(env, quality));
   return { group, count: plan.length };
+}
+
+/* ---------- trees ---------- */
+
+function buildTrees(env: Env, quality: number) {
+  const r = rng(1192);
+  const spots: [number, number, number][] = [];
+  const add = (x: number, z: number, size: number) => spots.push([x, z, size]);
+  const g = LANDMARKS.gosho;
+  for (let i = 0; i < 700 * quality; i++) add(g.minX + r() * (g.maxX - g.minX), g.minZ + r() * (g.maxZ - g.minZ), 1 + r() * 1.4);
+  const nj = LANDMARKS.nijo;
+  for (let i = 0; i < 120 * quality; i++) add(nj.minX + r() * (nj.maxX - nj.minX), nj.minZ + r() * (nj.maxZ - nj.minZ), 0.8 + r());
+  // cherry trees along the Kamo river banks
+  for (let z = CITY.minZ; z < CITY.maxZ; z += 2.2 / quality) {
+    const x = riverX(z);
+    add(x - RIVER_HALF_WIDTH - 3.4, z + r(), 0.7 + r() * 0.5);
+    add(x + RIVER_HALF_WIDTH + 3.4, z + r(), 0.7 + r() * 0.5);
+  }
+  for (let i = 0; i < 160; i++) add(LANDMARKS.toji.x + (r() - 0.5) * 22, LANDMARKS.toji.z + (r() - 0.5) * 22, 0.8 + r());
+  // the wooded slope of Higashiyama in front of the camera
+  const cam = VIEW.camera;
+  for (let i = 0; i < 4200 * quality; i++) {
+    const a = Math.PI * (0.55 + r() * 0.95);
+    const d = 6 + Math.pow(r(), 0.7) * 150;
+    const x = cam.x + Math.cos(a) * d;
+    const z = cam.z - Math.sin(a) * d * 0.9;
+    if (heightAt(x, z) > 0.9) add(x, z, 0.9 + r() * 1.6);
+  }
+
+  const geo = new THREE.IcosahedronGeometry(1, 1);
+  const seeds = new Float32Array(spots.length);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { ...env, uAlbedo: { value: new THREE.Color(0.022, 0.04, 0.022) }, uVary: { value: 0.9 }, uWobble: { value: 0.18 } },
+    vertexShader: SIMPLE_VS,
+    fragmentShader: SIMPLE_FS,
+  });
+  const mesh = new THREE.InstancedMesh(geo, mat, spots.length);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  spots.forEach(([x, z, size], i) => {
+    const y = heightAt(x, z);
+    m.compose(new THREE.Vector3(x, y + size * 0.55, z), q, new THREE.Vector3(size, size * (0.8 + r() * 0.5), size));
+    mesh.setMatrixAt(i, m);
+    seeds[i] = r();
+  });
+  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
+  mesh.computeBoundingSphere();
+  return mesh;
 }
 
