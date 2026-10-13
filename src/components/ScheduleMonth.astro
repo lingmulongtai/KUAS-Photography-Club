@@ -1,0 +1,243 @@
+---
+/** One month: a Monday-first calendar with the events marked, and the list of events below it. */
+import SampleBadge from './SampleBadge.astro';
+import { calendarCells, formatDay, kindLabel, renderNotes, weekday, type ScheduleMonth } from '../lib/schedule';
+
+interface Props {
+  month: ScheduleMonth;
+}
+const { month } = Astro.props;
+const cells = calendarCells(month.year, month.month);
+const byDate = new Map<string, typeof month.events>();
+for (const e of month.events) byDate.set(e.date, [...(byDate.get(e.date) ?? []), e]);
+const { Content } = await renderNotes(month);
+const heads = ['月', '火', '水', '木', '金', '土', '日'];
+---
+<section class="month" id={`m-${month.id}`} data-month={month.entry.data.month} aria-labelledby={`t-${month.id}`}>
+  <header class="head">
+    <h2 id={`t-${month.id}`}><span class="num">{month.year}</span>年 <span class="num big">{month.month}</span>月</h2>
+    <span class="now-tag">今月</span>
+    {month.sample && <SampleBadge />}
+  </header>
+
+  <div class="layout">
+    <div class="cal" role="grid" aria-label={`${month.year}年${month.month}月のカレンダー`}>
+      {heads.map((h, i) => <div class:list={['wd', { sat: i === 5, sun: i === 6 }]} role="columnheader">{h}</div>)}
+      {cells.map((date) =>
+        date ? (
+          <div class:list={['day', { sat: weekday(date) === 6, sun: weekday(date) === 0 }]} data-date={date} role="gridcell">
+            <span class="n">{Number(date.slice(8))}</span>
+            <span class="dots">
+              {(byDate.get(date) ?? []).map((e) => <i class={`k-${e.kind}`} title={e.title}></i>)}
+            </span>
+          </div>
+        ) : (
+          <div class="day empty" role="gridcell"></div>
+        ),
+      )}
+    </div>
+
+    <ol class="list">
+      {month.events.map((e) => (
+        <li class={`ev k-${e.kind}`} data-date={e.date}>
+          <span class="date num">{formatDay(e.date)}</span>
+          <span class="body">
+            <span class="kind">{kindLabel[e.kind]}</span>
+            <b class="title">{e.link ? <a href={e.link}>{e.title}</a> : e.title}</b>
+            {(e.time || e.place) && <span class="meta">{[e.time, e.place].filter(Boolean).join(' · ')}</span>}
+            {e.note && <span class="note">{e.note}</span>}
+          </span>
+        </li>
+      ))}
+    </ol>
+  </div>
+  <div class="notes prose"><Content /></div>
+</section>
+
+<style>
+  .month {
+    display: grid;
+    gap: 20px;
+    padding-block: 40px;
+    border-top: 1px solid var(--line);
+    scroll-margin-top: calc(var(--header-h) + 16px);
+  }
+
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 14px;
+  }
+
+  h2 {
+    font-size: var(--step-3);
+  }
+
+  .big {
+    font-size: 1.6em;
+    color: var(--accent);
+  }
+
+  .now-tag {
+    display: none;
+    font: 700 12px/1 var(--body);
+    background: var(--brand);
+    color: var(--on-accent);
+    padding: 6px 10px;
+    border-radius: 999px;
+  }
+
+  :global(.month.is-now) .now-tag {
+    display: inline-block;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 28px 40px;
+    align-items: start;
+  }
+
+  .cal {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    background: var(--raise);
+    padding: 12px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .wd {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    padding-block: 4px;
+  }
+
+  .day {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    display: grid;
+    align-content: start;
+    justify-items: center;
+    gap: 2px;
+    padding-top: 6px;
+    background: var(--raise-2);
+  }
+
+  .day.empty {
+    background: transparent;
+  }
+
+  .n {
+    font: 700 14px/1 var(--latin);
+  }
+
+  .sat .n,
+  .wd.sat {
+    color: #2f6fa8;
+  }
+
+  .sun .n,
+  .wd.sun {
+    color: #b8483a;
+  }
+
+  :global(.day.today) {
+    background: var(--brand);
+  }
+
+  :global(.day.past) {
+    opacity: 0.45;
+  }
+
+  .dots {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .dots i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--c);
+  }
+
+  .k-meeting {
+    --c: var(--brand);
+  }
+
+  .k-trip {
+    --c: #1b363d;
+  }
+
+  .k-event {
+    --c: #e0a23b;
+  }
+
+  .k-deadline {
+    --c: #c2412d;
+  }
+
+  .k-other {
+    --c: #8aa1a7;
+  }
+
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  .ev {
+    display: grid;
+    grid-template-columns: 6.5em 1fr;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--raise);
+    border-radius: var(--radius-sm);
+    border-left: 4px solid var(--c);
+  }
+
+  :global(.ev.past) {
+    opacity: 0.5;
+  }
+
+  .date {
+    font-size: 14px;
+  }
+
+  .body {
+    display: grid;
+    gap: 2px;
+  }
+
+  .kind {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .meta,
+  .note {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .notes:empty {
+    display: none;
+  }
+
+  @media (max-width: 860px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
