@@ -26,7 +26,7 @@ export function createEnv() {
     uLit: { value: 0.3 },
     /** pink band opposite the sun at twilight */
     uVenus: { value: 0 },
-    uFogDensity: { value: 0.0011 },
+    uFogDensity: { value: 0.0008 },
   };
 }
 
@@ -72,15 +72,15 @@ ${NOISE_GLSL}
 /* Analytic sky radiance (linear) for a view direction. Shared by the dome, fog and water. */
 vec3 skyColor(vec3 dir){
   float h = max(dir.y, 0.);
-  vec3 c = mix(uHorizon, uMid, smoothstep(0., .28, h));
-  c = mix(c, uZenith, smoothstep(.22, .8, h));
+  vec3 c = mix(uHorizon, uMid, smoothstep(0., .14, h));
+  c = mix(c, uZenith, smoothstep(.1, .55, h));
 
   vec2 sh = normalize(uSunDir.xz + 1e-5);
   vec2 dh = normalize(dir.xz + 1e-5);
   float toward = dot(dh, sh) * .5 + .5;
-  float band = exp(-h * 7.);
-  c *= .8 + .2 * toward;
-  c += uGlow * band * pow(toward, 3.) * .8;
+  float band = exp(-h * 11.);
+  c *= .78 + .22 * toward;
+  c += uGlow * band * pow(toward, 4.) * .45;
 
   // Belt of Venus over Earth's shadow, opposite the sun at twilight
   float anti = pow(1. - toward, 2.);
@@ -88,15 +88,15 @@ vec3 skyColor(vec3 dir){
   c *= 1. - .3 * uVenus * anti * smoothstep(.09, 0., h);
 
   float cosA = dot(dir, uSunDir);
-  c += uGlow * (pow(max(cosA, 0.), 10.) * .5 + pow(max(cosA, 0.), 300.) * 1.6);
+  c += uGlow * (pow(max(cosA, 0.), 12.) * .35 + pow(max(cosA, 0.), 300.) * .6);
 
   // city light pollution on the horizon at night
-  c += vec3(.03, .014, .006) * uCity * exp(-h * 9.);
+  c += vec3(.012, .0055, .0022) * uCity * exp(-h * 16.);
   return c;
 }
 
 vec3 fogColor(vec3 dir){
-  return skyColor(normalize(vec3(dir.x, .015, dir.z)));
+  return skyColor(normalize(vec3(dir.x, .05, dir.z))) * .9;
 }
 
 /* lit: reflected light, emit: self-lit (windows, lamps). Lights carry further through haze than reflected light. */
@@ -112,8 +112,8 @@ vec3 applyFog(vec3 lit, vec3 emit, vec3 worldPos){
 vec3 shade(vec3 albedo, vec3 n){
   float sun = max(dot(n, uSunDir), 0.);
   float moon = max(dot(n, uMoonDir), 0.);
-  vec3 sky = mix(uHorizon, uZenith, .5) * (.55 + .45 * n.y) * 1.25;
-  vec3 ground = uHorizon * .18 * (.5 - .5 * n.y);
+  vec3 sky = (mix(uZenith, uMid, .45) * .55 + uHorizon * .08) * (.5 + .5 * n.y);
+  vec3 ground = uHorizon * .05 * (.5 - .5 * n.y);
   return albedo * (uSunLight * sun + uMoonLight * moon + sky + ground);
 }
 `;
