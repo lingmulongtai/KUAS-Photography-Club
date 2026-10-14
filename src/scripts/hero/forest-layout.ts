@@ -1,6 +1,6 @@
 /** World-anchored, full-circle vegetation candidates; sparse outer rings bound the GPU cost. */
 export function* forestCells(eye: { x: number; z: number }, quality: number) {
-  const bands = quality > .75 ? [[32, 650, 8], [650, 1900, 18], [1900, 4800, 48], [4800,10000,128]] : [[40, 450, 12], [450, 1500, 27], [1500, 4200, 64], [4200,10000,192]];
+  const bands = quality > .75 ? [[32, 240, 8], [240, 1200, 18], [1200, 4800, 48], [4800,10000,128]] : [[40, 160, 12], [160, 1100, 27], [1100, 4200, 64], [4200,10000,192]];
   for (let lod = 0; lod < bands.length; lod++) {
     const [inner, outer, step] = bands[lod];
     for (let ix = Math.floor((eye.x - outer) / step); ix <= Math.ceil((eye.x + outer) / step); ix++) {
