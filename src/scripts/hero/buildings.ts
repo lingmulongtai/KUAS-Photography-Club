@@ -167,12 +167,15 @@ const BUILDING_FS = /* glsl */ `
     if (vInfo.x > 767.5 && uCampusDetail > .5) discard;
     vec3 n = normalize(vNormal);
     float campus = step(255.5, vInfo.x) * uHighlight;
-    float kind = mod(vInfo.x, 256.);
+    // codes arrive through interpolation, so 4.0 can turn up as 3.99999: round before taking them
+    // apart, or a house flips between wood and concrete from one pixel to the next
+    float code = floor(vInfo.x + .5);
+    float kind = mod(code, 256.);
     float cls = mod(kind, 4.);
     float use = floor(kind / 4. + .01);
     float seed = vInfo.y;
     float H = vInfo.z;
-    float role = vInfo.w;
+    float role = floor(vInfo.w + .5);
     vec3 v = normalize(vWorld - cameraPosition);
     float r1 = fract(seed * 13.17);
     float r2 = fract(seed * 71.31);
