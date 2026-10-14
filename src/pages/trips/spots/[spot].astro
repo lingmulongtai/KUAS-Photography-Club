@@ -11,7 +11,7 @@ const sample=SPOT_SAMPLES.find(s=>s.spot===spot.id)!;
 const related=(await getTrips()).filter(t=>t.data.spot===spot.id);
 ---
 <Base title={`${spot.ja}の撮影会`} description={`${spot.ja}の撮影会とサンプルプレビュー。`}>
-  <main class="wrap section spot-sample">
+  <section class="wrap section spot-sample">
     <p class="edge">PHOTO TRIPS ▸ {spot.en}</p>
     <h1>{spot.ja}の撮影会</h1>
     {related.some(t=>!t.data.sample) ? <p>この場所の撮影会記録をご覧ください。</p> : <p>この場所の実際の撮影会記録はまだありません。</p>}
@@ -22,7 +22,7 @@ const related=(await getTrips()).filter(t=>t.data.spot===spot.id);
     {related.map(t=><p><a class="link-arrow" href={`/trips/${encodeURIComponent(t.id)}/`}>{t.data.title}{t.data.sample ? '（サンプル）' : ''} →</a></p>)}
     <p><a class="link-arrow" href="/trips/">撮影会の一覧を見る →</a></p>
     <p><a class="link-arrow" href="/">京都の眺めに戻る →</a></p>
-  </main>
+  </section>
 </Base>
 <style>
   .spot-sample { display: grid; gap: 22px; padding-top: calc(var(--header-h) + 64px); }
