@@ -1,0 +1,436 @@
+---
+/**
+ * Admin panel: add a photo trip, add photos to a trip, or write a month's schedule.
+ * Publishing commits to GitHub through /api/admin/*, and Vercel redeploys the site.
+ * Without ADMIN_PASSWORD and GITHUB_TOKEN set on Vercel it runs as a demo (password "demo").
+ */
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+const trips = (await getCollection('trips'))
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+  .map((t) => ({ slug: t.id, title: t.data.title, date: t.data.date.toISOString().slice(0, 10), photos: t.data.photos.length, sample: t.data.sample }));
+const months = (await getCollection('schedule')).map((m) => ({
+  month: m.data.month,
+  weeklyMeeting: m.data.weeklyMeeting,
+  noMeeting: m.data.noMeeting,
+  events: m.data.events,
+  notes: m.body?.trim() ?? '',
+}));
+---
+<Base title="管理画面" description="KUAS Photography Club の管理画面" noindex>
+  <main class="wrap admin" data-trips={JSON.stringify(trips)} data-months={JSON.stringify(months)}>
+    <header class="top">
+      <p class="edge">ADMIN</p>
+      <h1>管理画面</h1>
+      <p class="mode" data-mode hidden></p>
+    </header>
+
+    <!-- sign in -->
+    <section class="card login" data-view="login" hidden>
+      <h2>ログイン</h2>
+      <form data-login>
+        <label>パスワード<input type="password" name="password" autocomplete="current-password" required /></label>
+        <button class="btn btn--primary" type="submit">ログイン</button>
+        <p class="error" data-login-error hidden></p>
+        <p class="small muted" data-demo-hint hidden>いまはデモです。パスワードは <code>demo</code>。何を送ってもサイトには公開されません。</p>
+      </form>
+    </section>
+
+    <!-- signed in -->
+    <section data-view="app" hidden>
+      <nav class="tabs" role="tablist">
+        <button role="tab" type="button" data-tab="new" aria-selected="true">撮影会を追加</button>
+        <button role="tab" type="button" data-tab="add" aria-selected="false">写真を追加</button>
+        <button role="tab" type="button" data-tab="schedule" aria-selected="false">スケジュール</button>
+        <button type="button" class="logout" data-logout>ログアウト</button>
+      </nav>
+
+      <!-- new trip -->
+      <form class="card panel" data-panel="new">
+        <h2>新しい撮影会</h2>
+        <div class="grid2">
+          <label>タイトル<input name="title" required maxlength="60" placeholder="例：東山の紅葉" /></label>
+          <label>日付<input name="date" type="date" required /></label>
+          <label>場所<input name="place" required maxlength="80" placeholder="例：京都市東山区（清水寺・高台寺）" /></label>
+          <label>参加人数<input name="members" type="number" min="1" max="999" placeholder="任意" /></label>
+        </div>
+        <label>ひとこと紹介<input name="summary" required maxlength="140" placeholder="一覧に出る1文" /></label>
+        <label>本文（撮影会のレポート・撮影メモ）<textarea name="body" rows="7" placeholder="段落は空行で区切ります。「## 撮影メモ」のように見出しも書けます。"></textarea></label>
+        <label>ページの URL 用の名前（半角英小文字・数字・ハイフン）
+          <span class="slug"><span class="muted">/trips/</span><input name="slug" required pattern="[a-z0-9][a-z0-9\-]{1,60}" placeholder="higashiyama-autumn" /></span>
+        </label>
+        <fieldset class="photos-field">
+          <legend>写真</legend>
+          <div class="photos" data-photos="new"></div>
+        </fieldset>
+        <div class="actions">
+          <button class="btn btn--primary" type="submit">公開する</button>
+          <p class="status" data-status="new" aria-live="polite"></p>
+        </div>
+        <pre class="preview" data-preview="new" hidden></pre>
+      </form>
+
+      <!-- add photos -->
+      <form class="card panel" data-panel="add" hidden>
+        <h2>撮影会に写真を追加</h2>
+        <label>撮影会<select name="slug" data-trip-select required></select></label>
+        <fieldset class="photos-field">
+          <legend>写真</legend>
+          <div class="photos" data-photos="add"></div>
+        </fieldset>
+        <div class="actions">
+          <button class="btn btn--primary" type="submit">追加して公開する</button>
+          <p class="status" data-status="add" aria-live="polite"></p>
+        </div>
+        <pre class="preview" data-preview="add" hidden></pre>
+      </form>
+
+      <!-- schedule -->
+      <form class="card panel" data-panel="schedule" hidden>
+        <h2>月のスケジュール</h2>
+        <div class="grid2">
+          <label>月<input name="month" type="month" required /></label>
+          <label class="check"><input name="weeklyMeeting" type="checkbox" checked /> 毎週金曜の定例ミーティングを自動で入れる</label>
+        </div>
+        <fieldset>
+          <legend>ミーティングがお休みの金曜</legend>
+          <div class="list" data-nomeeting></div>
+          <button class="btn small-btn" type="button" data-add-off>＋ お休みの日を追加</button>
+        </fieldset>
+        <fieldset>
+          <legend>予定</legend>
+          <div class="list" data-events></div>
+          <button class="btn small-btn" type="button" data-add-event>＋ 予定を追加</button>
+        </fieldset>
+        <label>この月のお知らせ（任意・カレンダーの下に出ます）<textarea name="notes" rows="3"></textarea></label>
+        <div class="actions">
+          <button class="btn btn--primary" type="submit">公開する</button>
+          <p class="status" data-status="schedule" aria-live="polite"></p>
+        </div>
+        <pre class="preview" data-preview="schedule" hidden></pre>
+      </form>
+    </section>
+  </main>
+</Base>
+
+<script>
+  import { startAdmin } from '../../scripts/admin/app';
+  startAdmin(document.querySelector<HTMLElement>('.admin')!);
+</script>
+
+<style>
+  .admin {
+    padding-block: clamp(32px, 6vw, 64px) 96px;
+    display: grid;
+    gap: 24px;
+    max-width: 920px;
+  }
+
+  /* cards and forms set their own display, which would otherwise beat [hidden] */
+  .admin :global([hidden]) {
+    display: none !important;
+  }
+
+  .top {
+    display: grid;
+    gap: 6px;
+  }
+
+  h1 {
+    font-size: var(--step-4);
+  }
+
+  .mode {
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    background: #fff4dc;
+    border: 1px solid #f0d49b;
+    font-size: 14px;
+  }
+
+  .mode.live {
+    background: var(--brand-pale);
+    border-color: var(--line-strong);
+  }
+
+  .card {
+    display: grid;
+    gap: 16px;
+    padding: clamp(18px, 3vw, 28px);
+    background: var(--raise);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .card h2 {
+    font-size: var(--step-3);
+  }
+
+  .login {
+    max-width: 420px;
+  }
+
+  form {
+    display: grid;
+    gap: 14px;
+  }
+
+  label {
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .admin :global(input:not([type='checkbox'])),
+  .admin :global(select),
+  .admin :global(textarea) {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--ink);
+    font: 400 15px/1.5 var(--body);
+  }
+
+  .admin :global(input:focus),
+  .admin :global(select:focus),
+  .admin :global(textarea:focus) {
+    outline: 2px solid var(--brand);
+    outline-offset: 1px;
+  }
+
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    align-self: end;
+    padding-bottom: 10px;
+  }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .slug {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 400;
+  }
+
+  fieldset {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+  }
+
+  legend {
+    padding: 0 6px;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .tabs button {
+    appearance: none;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1.5px solid var(--line-strong);
+    background: var(--raise);
+    font: 700 14px/1 var(--body);
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .tabs button[aria-selected='true'] {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-accent);
+  }
+
+  .tabs .logout {
+    margin-left: auto;
+    border-color: transparent;
+    background: none;
+    color: var(--muted);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .status {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .status :global(a) {
+    color: var(--accent);
+  }
+
+  .error {
+    color: var(--error);
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .preview {
+    margin: 0;
+    padding: 14px;
+    max-height: 360px;
+    overflow: auto;
+    background: var(--rebate);
+    color: #e8f4f4;
+    border-radius: var(--radius-sm);
+    font: 12px/1.6 var(--mono);
+    white-space: pre-wrap;
+  }
+
+  .small-btn {
+    justify-self: start;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .list {
+    display: grid;
+    gap: 8px;
+  }
+
+  /* photo picker and rows (built by the script) */
+  .admin :global(.drop) {
+    display: grid;
+    place-items: center;
+    gap: 6px;
+    padding: 26px;
+    border: 2px dashed var(--line-strong);
+    border-radius: var(--radius);
+    color: var(--muted);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .admin :global(.drop.over),
+  .admin :global(.drop:hover) {
+    border-color: var(--brand);
+    background: var(--brand-pale);
+  }
+
+  .admin :global(.photo-row) {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+
+  .admin :global(.photo-row img) {
+    width: 120px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 4px;
+    background: var(--raise-2);
+  }
+
+  .admin :global(.photo-row .fields) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .admin :global(.photo-row .fields .wide) {
+    grid-column: 1 / -1;
+  }
+
+  .admin :global(.photo-row .meta) {
+    grid-column: 1 / -1;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .admin :global(.row-tools) {
+    display: grid;
+    gap: 4px;
+  }
+
+  .admin :global(.row-tools button),
+  .admin :global(.event-row button) {
+    appearance: none;
+    border: 1px solid var(--line-strong);
+    background: #fff;
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .admin :global(.event-row) {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1.5fr) 110px minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .admin :global(.event-row .note) {
+    grid-column: 1 / -2;
+  }
+
+  .admin :global(.off-row) {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    max-width: 260px;
+  }
+
+  @media (max-width: 720px) {
+    .grid2,
+    .admin :global(.photo-row .fields) {
+      grid-template-columns: 1fr;
+    }
+
+    .admin :global(.photo-row) {
+      grid-template-columns: 90px minmax(0, 1fr);
+    }
+
+    .admin :global(.photo-row img) {
+      width: 90px;
+      height: 70px;
+    }
+
+    .admin :global(.row-tools) {
+      grid-column: 1 / -1;
+      grid-auto-flow: column;
+      justify-content: start;
+    }
+
+    .admin :global(.event-row) {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .admin :global(.event-row .note) {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
