@@ -42,6 +42,7 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     if (!e.isPrimary || e.button !== 0 || interactive(e)) return;
     rotation.stop();
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, time: e.timeStamp, touch: e.pointerType !== 'mouse', moved: false };
+    if (!drag.touch) el.setPointerCapture(e.pointerId);
   });
   el.addEventListener('pointermove', (e) => {
     if (!drag || drag.id !== e.pointerId) return;
@@ -70,7 +71,9 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
     suppressClick = previous.moved;
     if (e.type !== 'pointerup' || e.timeStamp - previous.time > 80) rotation.stop();
-    if (e.type === 'pointerup' && !previous.moved && Math.hypot(e.clientX - previous.x, e.clientY - previous.y) < 6) onTap(e);
+    const r = el.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.left + r.width && e.clientY >= r.top && e.clientY <= r.top + r.height;
+    if (inside && e.type === 'pointerup' && !previous.moved && Math.hypot(e.clientX - previous.x, e.clientY - previous.y) < 6) onTap(e);
   };
   el.addEventListener('pointerup', finish);
   el.addEventListener('pointercancel', finish);
