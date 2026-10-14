@@ -8,11 +8,19 @@ export function infrastructureMask(lines: LineFeature[], box: Box) {
   const sx = 2048 / (box[2] - box[0]), sz = 2048 / (box[3] - box[1]);
   ctx.setTransform(sx,0,0,sz,-box[0]*sx,-box[1]*sz);
   ctx.strokeStyle = ctx.fillStyle = 'white'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (const f of lines) {
-    if (f.kind !== 0 && f.kind !== 1 && f.kind !== 2) continue;
-    ctx.beginPath(); ctx.moveTo(f.pts[0],f.pts[1]);
+  const path = (f: LineFeature) => {
+    ctx.moveTo(f.pts[0],f.pts[1]);
     for (let i=2;i<f.pts.length;i+=2) ctx.lineTo(f.pts[i],f.pts[i+1]);
-    if (f.kind === 2) {ctx.closePath();ctx.fill();}
+  };
+  for (let n=0;n<lines.length;n++) {
+    const f=lines[n];
+    if (f.kind !== 0 && f.kind !== 1 && f.kind !== 2) continue;
+    ctx.beginPath(); path(f);
+    if (f.kind === 2) {
+      ctx.closePath();
+      while (n+1<lines.length && lines[n+1].kind===3) {path(lines[++n]);ctx.closePath();}
+      ctx.fill('evenodd');
+    }
     else {ctx.lineWidth = (f.kind === 1 ? 6 : [6,8,12,18,26][Math.min(4,f.attr&15)]) + 8;ctx.stroke();}
   }
   const pixels=ctx.getImageData(0,0,2048,2048).data;

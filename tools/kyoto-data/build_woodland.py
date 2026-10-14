@@ -72,7 +72,8 @@ def simplify(points, epsilon=2):
 def main(path):
     source = json.loads(Path(path).read_text(encoding='utf-8'))
     relations = [e for e in source['elements'] if e['type'] == 'relation']
-    members = {m['ref'] for e in relations for m in e.get('members', []) if m['type'] == 'way'}
+    # Tagged inner ways can be woods in their own right (e.g. a bamboo grove).
+    members = {m['ref'] for e in relations for m in e.get('members', []) if m['type'] == 'way' and m.get('role') != 'inner'}
     polygons = []
     for e in source['elements']:
         if e['type'] == 'way' and e['id'] not in members:
@@ -82,7 +83,8 @@ def main(path):
             outer = rings([m.get('geometry', []) for m in e['members'] if m['type'] == 'way' and m.get('role') != 'inner'])
             holes = rings([m.get('geometry', []) for m in e['members'] if m['type'] == 'way' and m.get('role') == 'inner'])
             if outer:
-                polygons.append({'outer': [simplify(r) for r in outer], 'holes': [simplify(r) for r in holes]})
+                # Keep relation topology intact, including holes that touch an outer edge.
+                polygons.append({'outer': outer, 'holes': holes})
     data = {'source': '© OpenStreetMap contributors, ODbL', 'timestamp': source.get('osm3s', {}).get('timestamp_osm_base'), 'polygons': polygons}
     payload = gzip.compress(json.dumps(data, separators=(',', ':')).encode(), mtime=0)
     if len(payload) > 1024 * 1024:

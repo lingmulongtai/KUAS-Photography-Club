@@ -17,4 +17,6 @@ test('shipped woodland covers the Senkoji foreground and stays inside its transf
   const x=(135.6655983-135.7595)*91284.17129262601,z=-(35.0157751-35.0036)*110940.6404266756;
   assert.equal(hit(x,z),true); assert.equal(hit(x+200,z),true); assert.equal(hit(x+600,z),true);
   assert.equal(hit(-3755,-700),false);
+  // Independently tagged inner ways remain woods, rather than relation clearings.
+  assert.equal(hit(-7195,-5233),true); assert.equal(hit(4155,332),true);
 });

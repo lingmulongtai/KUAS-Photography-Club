@@ -1,26 +1,35 @@
 import * as THREE from 'three';
 import type { Box } from './geo';
-import { inRing, type Woodland } from './woodland';
+import type { Woodland } from './woodland';
 
-/** Rasterize forest geometry once on the GPU; canopy shading costs one texture read. */
-export function buildWoodlandTexture(renderer: THREE.WebGLRenderer, polygons: Woodland[], box: Box) {
-  const vertices: number[] = [];
-  for (const polygon of polygons) for (const ring of polygon.outer) {
-    const outer = ring.slice(0, -1).map(([x, z]) => new THREE.Vector2(x, z));
-    const holes = polygon.holes.filter(h => inRing(h[0][0], h[0][1], ring)).map(h => h.slice(0, -1).map(([x,z]) => new THREE.Vector2(x,z)));
-    const points = [...outer, ...holes.flat()];
-    for (const triangle of THREE.ShapeUtils.triangulateShape(outer, holes)) for (const i of triangle) vertices.push(points[i].x, points[i].y, 0);
+/** One shared raster keeps ground shading and O(1) tree placement consistent. */
+export function buildWoodlandTexture(polygons: Woodland[], box: Box) {
+  const size=2048, canvas=document.createElement('canvas');
+  canvas.width=canvas.height=size;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true})!;
+  const sx=size/(box[2]-box[0]),sz=size/(box[3]-box[1]);
+  ctx.setTransform(sx,0,0,sz,-box[0]*sx,-box[1]*sz);
+  ctx.fillStyle='white';
+  for(const polygon of polygons) {
+    ctx.beginPath();
+    for(const ring of [...polygon.outer,...polygon.holes]) {
+      ctx.moveTo(...ring[0]);
+      for(const p of ring.slice(1)) ctx.lineTo(...p);
+      ctx.closePath();
+    }
+    ctx.fill('evenodd');
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  const material = new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide,depthTest:false,toneMapped:false});
-  const mesh = new THREE.Mesh(geo,material);
-  const camera = new THREE.OrthographicCamera(box[0],box[2],box[3],box[1],.1,10);
-  camera.position.z=1;
-  const target = new THREE.WebGLRenderTarget(1024,1024,{depthBuffer:false,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
-  const previous = renderer.getRenderTarget(), color = renderer.getClearColor(new THREE.Color()), alpha=renderer.getClearAlpha();
-  renderer.setRenderTarget(target); renderer.setClearColor(0,1); renderer.clear(); renderer.render(mesh,camera);
-  renderer.setRenderTarget(previous); renderer.setClearColor(color,alpha);
-  geo.dispose(); material.dispose();
-  return target.texture;
+  const pixels=ctx.getImageData(0,0,size,size).data;
+  const coverage=new Uint8Array(size*size);
+  for(let i=0;i<coverage.length;i++) coverage[i]=pixels[i*4+3];
+  const texture=new THREE.CanvasTexture(canvas);
+  // The shader uses increasing world z as texture v; canvas rows already do that.
+  texture.flipY=false;
+  texture.generateMipmaps=false;
+  texture.minFilter=texture.magFilter=THREE.LinearFilter;
+  const contains=(x:number,z:number)=>{
+    const ix=Math.floor((x-box[0])*sx),iz=Math.floor((z-box[1])*sz);
+    return ix>=0&&iz>=0&&ix<size&&iz<size&&coverage[iz*size+ix]>127;
+  };
+  return {texture,contains};
 }
