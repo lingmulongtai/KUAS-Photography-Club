@@ -95,8 +95,10 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
       if (avoid && (frame++ % 30 === 0 || moved)) blocks = avoid();
       for (const it of byRank) {
         if (moved) occluded.set(it.def.id, blocked(camera.position, it.ground.clone().setY(it.ground.y + 6)));
+        // a place you are standing on (Kyoto Tower from its own deck) needs no pin
+        const here = Math.hypot(it.ground.x - camera.position.x, it.ground.z - camera.position.z) < 350;
         v.copy(it.anchor).project(camera);
-        const onScreen = v.z < 1 && Math.abs(v.x) < 0.95 && v.y < 0.9 && v.y > -0.98;
+        const onScreen = !here && v.z < 1 && Math.abs(v.x) < 0.95 && v.y < 0.9 && v.y > -0.98;
         let show = onScreen && !occluded.get(it.def.id);
         if (show) {
           // keep pins from piling up: a lower-ranked pin gives way
