@@ -47,7 +47,13 @@
 
 2026-10-15、公開用ビルドを同じWi-Fiのスマホで確認したユーザーから「今回の版もスマホ実機で問題なし」と回答を受領。対象は塔・清水寺の収まり、船岡山のキャンパス位置、横スワイプ／縦スクロール、キャンパスの「真上から」、昼夜切替と重さ。これはユーザーによる今回の版の実機確認であり、前回A〜J版の結果やブラウザの幅変更を流用したものではない。
 
-PC実GPUの確認と上記のスマホ実機確認が揃ったため、指示書のpush前の実機確認条件を満たす。mainへのpush後にGitHub Actions、Vercelの対象コミット、本番URLの表示を確認する。
+PC実GPUの確認と上記のスマホ実機確認が揃い、指示書のpush前の実機確認条件を満たした。`70001aa1e95cb67d1bf1c1d161b1b658a4d23868` をmainへpushし、2026-10-15に次を確認した。
+
+- [GitHub ActionsのSite実行](https://github.com/lingmulongtai/KUAS-Photography-Club/actions/runs/38614344668): 成功。15テスト成功、117ファイルの型チェックでerror/warning/hint各0、ビルド成功。
+- Vercelプロジェクト `prj_mpOknb7FpLVYgf25ZOi9ckbP7KeR`、チーム `team_BdUg78K04Elh8McFcPqj5skC`。本番デプロイ `dpl_J1Ved2Dye4wPKBtbP6wR2zMMqY2K` はREADY、GitHubリポジトリ・main・上記SHAが一致し、[本番URL](https://kuas-photography-club.vercel.app/)へalias割当済み。MCPの権限エラーは既存のCLI認証で検証を完了した。
+- 本番トップのHTML全文・17地点のプレビュー、17地点の詳細ページ、既存サンプル記事への3リンク、3DエントリーJS・依存JS3件・CSS2件をHTTPで確認し、検証済みの静的ビルドとSHA256が一致。
+- 森林データは本番でも405,535bytes、SHA256 `e452ccd7c093f2e1b93f8170764dda7b907d025e02e3b16f6d7f4957a216a0da` で一致。
+- 本番ブラウザで7視点の切替と名所の構図、船岡山からのキャンパス位置、キャンパスのプレビュー・接近・「真上から」、夜の大文字のイメージを確認。警告・エラーログはなし。画面を保存した。
 
 ## コミット列
 
@@ -80,3 +86,6 @@ SHA・件名・目的は下表。各単位の型チェック、関連テスト�
 | 2a3a40a | fix(hero): make shadow filtering deterministic on ANGLE | Use nine explicit depth taps instead of the loop that produced divergent-gradient warnings on the RTX 4050 Direct3D renderer. |
 | b521329 | perf(hero): reserve detailed foliage for the foreground | Limit detailed crowns to 240m on desktop and 160m on mobile, use two MSAA samples, and permit a bounded resolution fallback when a scene remains slow. |
 | 18e59b6 | fix(hero): keep landmark strokes and edge labels legible | Face Daimonji from the west so the fire-bed strokes read clearly, and hide pins before their full labels are clipped at portrait edges. |
+| bd1ed96 | docs: record Kyoto graphics changes and verification boundaries | Preserve the modelling sources, performance evidence and physical-device acceptance boundary. |
+| 11efe38 | docs: verify full-circle scenery and narrow campus framing | Record the city rotation and 320px Funaokayama composition checks. |
+| 70001aa | docs: record current-version smartphone acceptance | Record the user's physical smartphone acceptance before publishing this graphics version. |
