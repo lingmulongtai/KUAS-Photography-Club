@@ -30,6 +30,7 @@ import type { Woodland } from './woodland';
 import { buildWoodlandTexture } from './woodland-texture';
 import { infrastructureMask } from './forest-infrastructure';
 import { buildDaimonji, fireClearing } from './daimonji';
+import { landmarkOrbit, type OrbitSite } from './landmark-orbit';
 
 export interface HeroStatus {
   minutes: number;
@@ -73,6 +74,8 @@ export interface ViewDef {
   bearing: number;
   /** Centre a close landmark more tightly as the horizontal field narrows. */
   focusBearing?: number;
+  /** Object-centred camera instead of turning at a fixed observation point. */
+  orbit?: OrbitSite;
   pitch: number;
 }
 
@@ -93,14 +96,14 @@ export const VIEWS = {
   /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
   shogunzuka: { ja: '将軍塚', en: 'Shogunzuka', eye: ahead(PLACES.shogunzuka, 265, 120), ref: PLACES.shogunzuka, above: 44, bearing: 265, pitch: -5 },
   /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
-  kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, focusBearing: 310, pitch: -13 },
+  kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, orbit: {center:KIYOMIZU,targetHeight:16}, pitch: -13 },
   /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
   daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 270, 430), ref: DAIMONJI, above: 95, bearing: 90, pitch: -10 },
   /** An exterior composition: the whole tower against the northern city and mountains. */
-  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 320), ref: TOWER, above: 135, bearing: 350, focusBearing: 360, pitch: -9 },
+  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 320), ref: TOWER, above: 135, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
   funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 45, bearing: 208, pitch: -4 },
-  kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, pitch: -10 },
+  kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
@@ -144,10 +147,12 @@ export function createHero(
   let VIEW: ViewDef = VIEWS.shogunzuka;
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   let groundAt: ((x: number, z: number) => number) | null = null;
+  let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let driveCars: ((dt: number) => void) | null = null;
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
+  const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
   (async () => {
@@ -174,7 +179,7 @@ export function createHero(
     const prepNext = () => {
       const v = pending.shift();
       if (!v) return;
-      terrain.prepare(v.eye);
+      terrain.prepare(landscapeCenter(v));
       idle(prepNext);
     };
     idle(prepNext);
@@ -203,9 +208,15 @@ export function createHero(
     );
     const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
     const roadsAndWater = infrastructureMask(lines, BUILDINGS_BOX);
+    orbitObstruction = (x,z) => {
+      const center=landscapeCenter(VIEW);
+      // The inner 32m has no forest candidates; keep the target itself free of a canopy envelope.
+      const canopy=Math.hypot(x-center.x,z-center.z)>24 && forestArea(x,z) && !buildingsMask(x,z) && !roadsAndWater(x,z);
+      return hf.height(x,z)+(canopy?24:4);
+    };
     scene.add(buildDaimonji(env,hf));
     const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || roadsAndWater(x,z) || fireClearing(x,z), forestArea);
-    forest.plant(VIEW.eye, VIEW.bearing);
+    forest.plant(landscapeCenter(VIEW), VIEW.bearing);
     plantTrees = forest.plant;
     scene.add(forest.group);
     campusModel = buildCampus(env, hf, buildings).mesh;
@@ -307,6 +318,12 @@ export function createHero(
   const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
   function cityPose(t: number, out = pose) {
+    if (VIEW.orbit) {
+      const p = landmarkOrbit(VIEW.orbit,eye,lookDrag.yaw,lookDrag.pitch,groundAt ?? (()=>40),orbitObstruction);
+      out.pos.set(p.pos.x,p.pos.y,p.pos.z);
+      out.target.set(p.target.x,p.target.y,p.target.z);
+      return out;
+    }
     const drift = opts.reducedMotion || opts.drift === false ? 0 : Math.sin(t * 0.05) * 0.8;
     const focus=VIEW.focusBearing??VIEW.bearing;
     const framing=THREE.MathUtils.clamp(camera.aspect/1.35,.35,1);
@@ -360,7 +377,7 @@ export function createHero(
     if (opts.reducedMotion) {
       // the stage clock stands still under reduced motion: cut straight to the new view
       if (locationChanged) {
-        const center = to === 'campus' ? CAMPUS_CENTER : VIEW.eye;
+        const center = to === 'campus' ? CAMPUS_CENTER : landscapeCenter(VIEW);
         terrainRecenter?.(center);
         plantTrees?.(center, VIEW.bearing);
         shadow.invalidate();
@@ -412,7 +429,7 @@ export function createHero(
       camera.position.copy(bez);
       if (flight.regrow && flight.t >= 0.5) {
         flight.regrow = false;
-        const center = flight.to === 'campus' ? CAMPUS_CENTER : VIEW.eye;
+        const center = flight.to === 'campus' ? CAMPUS_CENTER : landscapeCenter(VIEW);
         terrainRecenter?.(center);
         plantTrees?.(center, VIEW.bearing);
         shadow.invalidate();
