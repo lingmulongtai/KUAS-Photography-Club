@@ -28,7 +28,7 @@ const FinishShader = {
     void main(){
       vec3 c = texture2D(tDiffuse, vUv).rgb;
       float l = dot(c, vec3(.299, .587, .114));
-      float v = smoothstep(1.25, .4, length((vUv - .5) * vec2(1.1, 1.)));
+      float v = 1. - smoothstep(.4, 1.25, length((vUv - .5) * vec2(1.1, 1.)));
       c *= mix(.78, 1., v);
       float g = hash12(vUv * uRes + fract(uTime * 7.31) * 517.) - .5;
       c += g * uGrain * (1. - l * .7);
@@ -71,6 +71,14 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   composer.addPass(new RenderPass(scene, camera));
   composer.addPass(new ShaderPass(SanitizeShader));
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.7, 0.5, 0.85);
+  // Bloom targets have no mipmaps. Explicit level-zero sampling keeps ANGLE from
+  // estimating undefined gradients inside the separable blur's filter loop.
+  for (const material of bloom.separableBlurMaterials) {
+    material.fragmentShader = material.fragmentShader.replace(
+      /texture2D\( colorTexture, (vUv(?: [+-] uvOffset)?) \)/g,
+      'textureLod( colorTexture, $1, 0.0 )',
+    );
+  }
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const finish = new ShaderPass(FinishShader);
