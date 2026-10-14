@@ -33,7 +33,7 @@ def global_pixels(x, z, zoom, tile=256):
     return px, py
 
 
-def mosaic(name, zoom, px, py, ext, decode, tile=256, channels=1, fill=np.nan):
+def mosaic(name, zoom, px, py, ext, decode, tile=256, channels=1, fill=np.nan, required=False):
     """Load the tiles covering pixel coords into one array; returns (array, x0, y0) in global pixels."""
     tx0 = int(np.floor(np.nanmin(px) / tile)) - 0
     ty0 = int(np.floor(np.nanmin(py) / tile)) - 0
@@ -47,6 +47,8 @@ def mosaic(name, zoom, px, py, ext, decode, tile=256, channels=1, fill=np.nan):
         for ty in range(ty0, ty1 + 1):
             path = os.path.join(CACHE, 'gsi', name, str(zoom), str(tx), f'{ty}.{ext}')
             if not os.path.exists(path):
+                if required:
+                    raise FileNotFoundError(f'Missing source tile: {path}. Run fetch.py photos first.')
                 continue
             a = decode(path)
             arr[(ty - ty0) * tile:(ty - ty0 + 1) * tile, (tx - tx0) * tile:(tx - tx0 + 1) * tile] = a

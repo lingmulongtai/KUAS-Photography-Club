@@ -4,6 +4,8 @@ Writes public/kyoto/terrain-far.bin, terrain-near.bin, aerial-wide.webp and aeri
 """
 import json
 import os
+import io
+import sys
 
 import numpy as np
 from PIL import Image
@@ -31,15 +33,38 @@ def heights(box, step, sources):
     return h
 
 
-def aerial(box, step, zoom, out, quality):
+def aerial(box, step, zoom, out, quality, max_bytes=None):
     X, Z = grid(box, step)
     px, py = global_pixels(X, Z, zoom)
-    arr, ox, oy = mosaic('seamlessphoto', zoom, px, py, 'jpg', decode_rgb, channels=3, fill=0)
+    arr, ox, oy = mosaic('seamlessphoto', zoom, px, py, 'jpg', decode_rgb, channels=3, fill=0, required=True)
     img = bilinear(arr, px - ox, py - oy)
     im = Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
     path = os.path.join(OUT, out)
-    im.save(path, 'WEBP', quality=quality, method=6)
+    for q in range(quality, 39, -5):
+        encoded = io.BytesIO()
+        im.save(encoded, 'WEBP', quality=q, method=6)
+        if max_bytes is None or encoded.tell() <= max_bytes:
+            with open(path + '.part', 'wb') as f:
+                f.write(encoded.getvalue())
+            os.replace(path + '.part', path)
+            break
+    else:
+        raise RuntimeError('Aerial photo exceeds the download budget')
     return im.size, os.path.getsize(path)
+
+
+def mountain_photo():
+    """Upgrade wide imagery without rebuilding terrain, roads or buildings."""
+    path = os.path.join(OUT, 'terrain.json')
+    with open(path, encoding='utf-8') as f:
+        meta = json.load(f)
+    dims, size = aerial(R.TERRAIN, (R.TERRAIN[2] - R.TERRAIN[0]) / 4095, 14,
+                        'aerial-mountains.webp', 80, max_bytes=3 * 1024 * 1024)
+    meta['aerialWide']['high'] = {'file': 'aerial-mountains.webp', 'size': dims, 'bytes': size, 'zoom': 14}
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, indent=1)
+        f.write('\n')
+    print('mountain photo', dims, size, 'bytes')
 
 
 def main():
@@ -70,4 +95,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    mountain_photo() if '--photos-only' in sys.argv else main()

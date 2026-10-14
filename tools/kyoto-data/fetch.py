@@ -58,8 +58,8 @@ def get(url, path):
     return 'ok'
 
 
-def fetch_gsi():
-    for name, pattern, tiles in GSI_SETS:
+def fetch_gsi(sets=GSI_SETS):
+    for name, pattern, tiles in sets:
         counts = {}
         for z, x, y in tiles:
             ext = pattern.rsplit('.', 1)[1]
@@ -130,5 +130,7 @@ if __name__ == '__main__':
     what = sys.argv[1:] or ['gsi', 'plateau']
     if 'gsi' in what:
         fetch_gsi()
+    if 'photos' in what:
+        fetch_gsi([('seamlessphoto', GSI + '/seamlessphoto/{z}/{x}/{y}.jpg', R.tiles_for(R.TERRAIN, 14))])
     if 'plateau' in what:
         fetch_plateau()
