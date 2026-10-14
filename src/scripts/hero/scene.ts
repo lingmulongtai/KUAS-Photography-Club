@@ -24,6 +24,7 @@ import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds, coverForDay } from './clouds';
+import { createLookRotation, mountLookControls } from './look-controls';
 
 export interface HeroStatus {
   minutes: number;
@@ -249,17 +250,13 @@ export function createHero(
 
   /* ---------- camera: the view from Shogunzuka, and a flight to the campus ---------- */
 
-  const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
-  el.addEventListener('pointermove', (e) => {
-    // hold still while the pointer is on a pin, so it doesn't slide away from the cursor
-    if ((e.target as HTMLElement).closest('.hero-pin')) return;
+  const rotation = createLookRotation();
+  const lookDrag = rotation.state;
+  const ray = new THREE.Raycaster();
+  const resetLook = mountLookControls(el, rotation, (e) => {
     const r = el.getBoundingClientRect();
-    pointer.tx = ((e.clientX - r.left) / r.width) * 2 - 1;
-    pointer.ty = 1 - ((e.clientY - r.top) / r.height) * 2;
-  });
-  el.addEventListener('pointerleave', () => {
-    pointer.tx = 0;
-    pointer.ty = 0;
+    ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, 1 - (e.clientY - r.top) / r.height * 2), camera);
+    if (ray.ray.direction.y > .01) meteors.burst(1);
   });
 
   let mode: HeroMode = 'city';
@@ -283,16 +280,16 @@ export function createHero(
 
   function cityPose(t: number, out = pose) {
     const drift = opts.reducedMotion || opts.drift === false ? 0 : Math.sin(t * 0.05) * 0.8;
-    const b = (VIEW.bearing + drift + pointer.x * 1.6) * RAD;
-    const p = (VIEW.pitch + pointer.y * 0.6) * RAD;
+    const b = (VIEW.bearing + drift + lookDrag.yaw) * RAD;
+    const p = (VIEW.pitch + lookDrag.pitch) * RAD;
     out.pos.copy(eye);
     out.target.set(eye.x + Math.sin(b) * Math.cos(p) * 1000, eye.y + Math.sin(p) * 1000, eye.z - Math.cos(b) * Math.cos(p) * 1000);
     return out;
   }
 
   function campusPose(t: number, out = pose) {
-    const a = ORBIT.start - (opts.reducedMotion ? 0 : (t - modeSince) * ORBIT.speed) + pointer.x * 0.08;
-    out.pos.set(campus.x + Math.sin(a) * ORBIT.radius, campus.y + ORBIT.height + pointer.y * 25, campus.z - Math.cos(a) * ORBIT.radius);
+    const a = ORBIT.start - (opts.reducedMotion ? 0 : (t - modeSince) * ORBIT.speed) + lookDrag.yaw * RAD;
+    out.pos.set(campus.x + Math.sin(a) * ORBIT.radius, campus.y + ORBIT.height + lookDrag.pitch * 3, campus.z - Math.cos(a) * ORBIT.radius);
     // aim a little above the campus so the mountains behind stay in frame
     out.target.copy(campus).setY(campus.y + 45);
     return out;
@@ -308,9 +305,10 @@ export function createHero(
   function flyTo(target: 'campus' | HeroView, t: number) {
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
-    if (!flight && mode === to && (to === 'campus' || nextView === view)) return;
+    if (!flight && mode === to && (to === 'campus' || nextView === view)) { resetLook(); return; }
     const blank = () => ({ pos: new THREE.Vector3(), target: new THREE.Vector3() });
     const from = flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, blank()) : campusPose(t, blank());
+    resetLook();
     const seconds = opts.flightSeconds ?? 5;
     modeSince = t + seconds;
     const viewChanged = nextView !== view;
@@ -364,11 +362,9 @@ export function createHero(
   const lastTarget = new THREE.Vector3();
   const bez = new THREE.Vector3();
   function placeCamera(t: number, dt: number) {
-    const k = dt ? Math.min(1, dt * 1.5) : 1;
-    pointer.x += (pointer.tx - pointer.x) * k;
-    pointer.y += (pointer.ty - pointer.y) * k;
+    rotation.step(dt, opts.reducedMotion ?? false);
     if (flight) {
-      flight.t = Math.min(1, flight.t + dt / flight.dur);
+      flight.t = opts.reducedMotion ? 1 : Math.min(1, flight.t + dt / flight.dur);
       const e = ease(flight.t);
       const u = 1 - e;
       bez.copy(flight.p0).multiplyScalar(u * u * u)
@@ -413,14 +409,7 @@ export function createHero(
     clouds.uniforms.uWind.value.set(t * 0.0009, t * 0.0003);
   }
 
-  // tap the sky for a shooting star
-  el.addEventListener('pointerdown', (e) => {
-    const r = el.getBoundingClientRect();
-    const ndcY = 1 - ((e.clientY - r.top) / r.height) * 2;
-    const elev = VIEW.pitch * RAD + ndcY * (camera.fov * RAD) / 2;
-    if (elev > 0.01 && !(e.target as HTMLElement).closest('button')) meteors.burst(1);
-  });
-
+  const forward = new THREE.Vector3();
   let clock = 0;
   let maxDpr = 1;
   let lowered = false;
@@ -465,7 +454,10 @@ export function createHero(
       placeCamera(t, dt);
       if (dt > 0) driveCars?.(dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);
-      meteors.update(t, dt, camera.position, { az: VIEW.bearing * RAD, half, top: (VIEW.pitch * RAD) + (camera.fov * RAD) / 2 }, env.uStars.value, pxPerM);
+      camera.getWorldDirection(forward);
+      const az = Math.atan2(forward.x, -forward.z);
+      const top = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) + camera.fov * RAD / 2;
+      meteors.update(t, dt, camera.position, { az, half, top }, env.uStars.value, pxPerM);
       post.render(t);
       labels?.update(camera, width, height);
       // keep the frame rate up on slower devices by rendering fewer pixels
