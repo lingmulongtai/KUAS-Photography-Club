@@ -192,7 +192,7 @@ export function createHero(
     terrain.uniforms.uRoads.value = buildRoadField(renderer, lines, opts.quality > 0.75 ? 4096 : 2048).texture;
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
     terrain.uniforms.uRoadsOn.value = 1;
-    scene.add(buildWater(env, hf, lines));
+    scene.add(buildWater(env, hf, lines, terrain.uniforms));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid);
     const lamps = buildLamps(env, hf, lines, opts.quality);
     const cars = buildCars(env, hf, lines, opts.quality);
