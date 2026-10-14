@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { LINE, type LineFeature } from './lines-data';
+import { ROAD_GLSL } from './roads';
 
 /**
  * Rivers, the castle moat and ponds from the GSI water areas. The surface mirrors the sky,
@@ -9,7 +10,11 @@ import { LINE, type LineFeature } from './lines-data';
  * Vertices are pulled a few metres toward the camera so the coarse terrain mesh, which
  * smooths over narrow channels, never hides them; buildings still do.
  */
-export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[]) {
+export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], roads: {
+  uRoads: { value: THREE.Texture | null };
+  uRoadBox: { value: THREE.Vector4 };
+  uRoadsOn: { value: number };
+}) {
   const pos: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     const f = lines[i];
@@ -39,7 +44,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[]) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.computeBoundingSphere();
   const material = new THREE.ShaderMaterial({
-    uniforms: env,
+    uniforms: { ...env, ...roads },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
       void main(){
@@ -53,9 +58,14 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[]) {
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
+      ${ROAD_GLSL}
       varying vec3 vWorld;
       void main(){
         vec2 q = vWorld.xz;
+        // Sample before discarding so the road texture's mip level remains well defined.
+        // The road painted on the terrain and its cars must remain visible across rivers.
+        Road road = roadAt(q);
+        if (road.edge <= 0.) discard;
         float t = uTime;
         vec2 w = vec2(vnoise(q * .35 + vec2(t * .3, 0.)) - .5, vnoise(q * .35 + vec2(0., t * .25) + 9.) - .5);
         w += .5 * vec2(vnoise(q * 1.4 - t * .5) - .5, vnoise(q * 1.4 + 3. + t * .4) - .5);
