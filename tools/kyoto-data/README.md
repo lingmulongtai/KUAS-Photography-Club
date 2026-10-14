@@ -49,3 +49,13 @@ This uses GSI seamlessphoto zoom 14 for the same 30 × 27 km area, at
 Missing source tiles fail the build instead of becoming black patches.
 The existing 2048-pixel wide image remains the lightweight mobile variant.
 Elevation, building and road binaries are unchanged by these commands.
+# 森林の輪郭
+
+`build_woodland.py` の冒頭にあるOverpassクエリで `natural=wood` / `landuse=forest` のwayとrelationを取得し、ローカルに保存したJSONを渡します。
+
+```sh
+python build_woodland.py /path/to/overpass.json
+```
+
+relationの外周・穴を保持し、2m許容で簡略化して `public/kyoto/woodland.json.gz` を生成します。1MiBを上限とし、2026-10-14のデータは361,287 bytes。描画時にAPIを呼び出しません。© OpenStreetMap contributors / ODbL。一部は2006年の森林データ由来なので、PLATEAUの建物と国土地理院の道路・水域で植樹を除外します。
+

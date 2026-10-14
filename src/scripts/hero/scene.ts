@@ -4,7 +4,7 @@ import { createEnv } from './env';
 import { KYOTO, directionFrom, jstMinutes, jstParts, localSiderealAngle, moonPosition, sunPosition } from './astro';
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import { PLACES, toLocal } from './geo';
-import { loadJSON, loadTexture, type TerrainMeta } from './data';
+import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
 import { loadHeightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
 import { buildCelestial, buildSkyDome } from './sky';
@@ -26,6 +26,9 @@ import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds, coverForDay } from './clouds';
 import { createLookRotation, mountLookControls } from './look-controls';
 import { createBuildingMask } from './vegetation-mask';
+import { createWoodlandMask, type Woodland } from './woodland';
+import { buildWoodlandTexture } from './woodland-texture';
+import { infrastructureMask } from './forest-infrastructure';
 
 export interface HeroStatus {
   minutes: number;
@@ -173,7 +176,11 @@ export function createHero(
     scene.add(terrain.mesh);
     casts(terrain.mesh);
     shadow.invalidate();
-    const [cityPhoto, buildings] = await Promise.all([loadTexture(meta.aerialCity.file, aniso), loadBuildings()]);
+    const [cityPhoto, buildings, lines, woodlandBytes] = await Promise.all([loadTexture(meta.aerialCity.file, aniso), loadBuildings(), loadLines(), loadBinary('woodland.json.gz')]);
+    const woodlandData = JSON.parse(new TextDecoder().decode(woodlandBytes)) as {polygons: Woodland[]};
+    const forestArea = createWoodlandMask(woodlandData.polygons);
+    terrain.uniforms.uWoodland.value = buildWoodlandTexture(renderer, woodlandData.polygons, meta.aerialWide.box);
+    terrain.uniforms.uWoodlandOn.value = 1;
     terrain.uniforms.uAerialCity.value = cityPhoto;
     terrain.uniforms.uCityOn.value = 1;
     const lite = opts.quality < 0.75;
@@ -182,7 +189,9 @@ export function createHero(
       !lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200,
     );
     const landmarks = buildLandmarks(env, hf);
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, createBuildingMask(buildings.boxes, buildings.polys));
+    const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
+    const roadsAndWater = infrastructureMask(lines, BUILDINGS_BOX);
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || roadsAndWater(x,z), forestArea);
     forest.plant(VIEW.eye, VIEW.bearing);
     plantTrees = forest.plant;
     scene.add(forest.group);
@@ -196,7 +205,6 @@ export function createHero(
     const tops = [landmarks.positions.kyotoTower.clone().setY(landmarks.positions.kyotoTower.y + 131.5)];
     scene.add(buildBeacons(env, tops));
 
-    const lines = await loadLines();
     terrain.uniforms.uRoads.value = buildRoadField(renderer, lines, opts.quality > 0.75 ? 4096 : 2048).texture;
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
     terrain.uniforms.uRoadsOn.value = 1;
