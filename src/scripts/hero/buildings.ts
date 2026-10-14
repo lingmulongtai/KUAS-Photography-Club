@@ -165,8 +165,9 @@ const BUILDING_FS = /* glsl */ `
 
   void main(){
     vec3 n = normalize(vNormal);
-    // shadows take screen-space derivatives: look them up before any branch or discard
+    // everything that takes screen-space derivatives runs first, before any branch or discard
     float sh = sunShadow(vWorld, n);
+    vec2 fwWall = fwidth(vWall);
     // the detailed campus model (campus.ts) stands in for these blocks up close
     if (vInfo.x > 767.5 && uCampusDetail > .5) discard;
     float campus = step(255.5, vInfo.x) * uHighlight;
@@ -191,11 +192,13 @@ const BUILDING_FS = /* glsl */ `
       if (wooden || role < 2.5){
         // kawara: blue-grey tiles, a few newer brown or slate roofs
         albedo = pick4(r1, vec3(.055, .06, .068), vec3(.075, .078, .085), vec3(.045, .046, .05), vec3(.09, .065, .05));
-        albedo *= .9 + .25 * vnoise(vWall * vec2(.6, 3.));
+        // rows of tiles, faded to their average once a row is thinner than a couple of pixels
+        float rows = 1. - smoothstep(.15, .4, max(fwWall.x * .6, fwWall.y * 3.));
+        albedo *= .9 + .25 * mix(.5, vnoise(vWall * vec2(.6, 3.)), rows);
       } else {
         // flat concrete roofs, some darker waterproofing
         albedo = pick4(r1, vec3(.32, .31, .29), vec3(.24, .24, .23), vec3(.4, .39, .36), vec3(.16, .17, .18));
-        albedo *= .85 + .3 * vnoise(vWorld.xz * .15 + seed);
+        albedo *= .85 + .3 * mix(.5, vnoise(vWorld.xz * .15 + seed), 1. - smoothstep(.2, .5, fwWall.x * .15));
       }
     } else {
       vec3 wall;
@@ -211,14 +214,16 @@ const BUILDING_FS = /* glsl */ `
       vec2 g = vec2(vWall.x / cellW, (vWall.y - .5) / floorH);
       vec2 id = floor(g);
       vec2 f = fract(g);
-      vec2 fw = fwidth(g);
+      vec2 fw = fwWall / vec2(cellW, floorH);
       float wx = smoothstep(.18 - fw.x, .18 + fw.x, f.x) * (1. - smoothstep(.82 - fw.x, .82 + fw.x, f.x));
       float wy = smoothstep(.32 - fw.y, .32 + fw.y, f.y) * (1. - smoothstep(.86 - fw.y, .86 + fw.y, f.y));
-      float valid = step(0., id.y) * step((id.y + 1.) * floorH, H + .2);
-      float pane = wx * wy;
-      float tiny = smoothstep(.18, .45, max(fw.x, fw.y));
-      pane = mix(pane, .35, tiny) * valid;
-      if (wooden) pane *= step(.45, hash12(id + seed * 7.)) ;
+      // a window cell under ~4 pixels can't be drawn without shimmering: everything that switches
+      // per cell blends to the facade's average as the cells shrink
+      float tiny = smoothstep(.12, .3, max(fw.x, fw.y));
+      float valid = mix(step(0., id.y) * step((id.y + 1.) * floorH, H + .2), step(0., vWall.y), tiny);
+      float pane = mix(wx * wy, .35, tiny) * valid;
+      // old wooden houses only have a window here and there
+      if (wooden) pane *= mix(step(.45, hash12(id + seed * 7.)), .55, tiny);
 
       // glass by day: darker panes that pick up a little sky
       float glassRefl = .03 + .18 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);

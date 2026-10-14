@@ -149,6 +149,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       void main(){
         vec2 p = vWorld.xz;
         float dist = length(vWorld - cameraPosition);
+        // ground covered by one pixel, in metres (the longer side of its footprint)
+        float fp = max(length(dFdx(p)), length(dFdy(p)));
 
         // slope from the elevation grids
         vec3 nf = texture2D(uNormalFar, boxUv(uNormalFarBox, p)).xyz * 2. - 1.;
@@ -166,12 +168,15 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         float green = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * smoothstep(.2, .05, dot(photo, vec3(.33)));
         float near = 1. - smoothstep(600., 3500., dist);
         if (near > 0.){
+          // each layer of canopy fades to its average once its blobs shrink below a few pixels
+          float k1 = 1. - smoothstep(.2, .45, fp * .22);
+          float k2 = 1. - smoothstep(.2, .45, fp * .55);
           float c1 = vnoise(p * .22);
           float c2 = vnoise(p * .55 + 7.);
-          float canopy = c1 * .65 + c2 * .35;
+          float canopy = mix(.5, c1, k1) * .65 + mix(.5, c2, k2) * .35;
           photo *= mix(1., .55 + .9 * canopy, green * near);
           vec2 g = vec2(vnoise(p * .22 + vec2(.6, 0.)) - c1, vnoise(p * .22 + vec2(0., .6)) - c1);
-          n = normalize(n + vec3(-g.x, 0., -g.y) * 1.6 * green * near);
+          n = normalize(n + vec3(-g.x, 0., -g.y) * 1.6 * green * near * k1);
         }
 
         // photos carry their own midday light: bring them down to something like albedo
