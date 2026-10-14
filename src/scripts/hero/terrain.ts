@@ -204,8 +204,15 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   });
   const mesh = new THREE.Mesh(geo, material);
   mesh.frustumCulled = false;
-  const recenter = (c: { x: number; z: number }) => {
-    geo.setAttribute('position', new THREE.BufferAttribute(terrainPositions(hf, c, segments), 3));
+  // positions for other viewpoints, worked out ahead of time so switching doesn't stall a frame
+  const cache = new Map<string, Float32Array>([[`${center.x},${center.z}`, pos]]);
+  const prepare = (c: { x: number; z: number }) => {
+    const key = `${c.x},${c.z}`;
+    if (!cache.has(key)) cache.set(key, terrainPositions(hf, c, segments));
+    return cache.get(key)!;
   };
-  return { mesh, uniforms, recenter };
+  const recenter = (c: { x: number; z: number }) => {
+    geo.setAttribute('position', new THREE.BufferAttribute(prepare(c), 3));
+  };
+  return { mesh, uniforms, recenter, prepare };
 }
