@@ -35,7 +35,7 @@ KUAS Photography Club は、写真撮影を通じて「楽しむ」と「つな�
 - `docs/` … 参考資料・記録 など
 
 ## ウェブサイト
-このリポジトリには、サークルの公式サイト（Astro + three.js の静的サイト）も入っています。
+このリポジトリには、サークルの公式サイト（Astro + three.js。ページは静的で、管理画面の API だけ Vercel の関数で動きます）も入っています。
 
 - トップ：京都の現在時刻に合わせて空が変わる 3D の京都
 - 撮影会：撮影会ごとに1本のフィルムとして写真と撮影メモを掲載
@@ -49,7 +49,7 @@ Node.js 22.12 以上が必要です。
 npm install
 npm run dev      # http://localhost:4321 で確認
 npm run check    # 型チェック
-npm run build    # dist/ に書き出し
+npm run build    # dist/ と .vercel/output/ に書き出し
 ```
 
 ### よくある更新
@@ -69,6 +69,26 @@ npm run build    # dist/ に書き出し
 3. 以後は main ブランチに push すると自動で更新されます。プルリクエストごとにプレビュー URL も作られます
 
 公開 URL が決まったら、`astro.config.mjs` の `site` を書き換えてください（OGP や canonical に使われます）。
+
+### 管理画面（写真・撮影会・スケジュールの更新）
+サイトの `/admin/` から、ログインして次のことができます。公開すると GitHub に自動でコミットされ、Vercel が1〜2分でサイトを更新します。
+
+- **撮影会を追加**：タイトル・日付・場所・本文と写真を入れて公開
+- **写真を追加**：あとから撮影会に写真を足す
+- **スケジュール**：月ごとの予定・ミーティングがお休みの金曜・お知らせを書く
+
+写真は送る前にブラウザの中で長い辺 2000px の JPEG に縮小され、位置情報（GPS）などのデータも消えます。
+
+**いまはデモモードです**（パスワード `demo`）。試せますが、サイトには何も公開されません。本番にするには、Vercel のプロジェクトの「Settings → Environment Variables」に次を設定して再デプロイしてください。
+
+| 名前 | 中身 |
+| --- | --- |
+| `ADMIN_PASSWORD` | 管理画面のパスワード（長めのものにしてください）。設定するとデモの `demo` は使えなくなります |
+| `GITHUB_TOKEN` | GitHub の Fine-grained personal access token。対象をこのリポジトリだけにし、権限は「Contents: Read and write」だけ |
+| `SESSION_SECRET`（任意） | ログイン状態の署名に使うランダムな文字列。変えると全員ログアウトされます |
+| `GITHUB_REPO` / `GITHUB_BRANCH`（任意） | 書き込み先。既定は `lingmulongtai/KUAS-Photography-Club` の `main` |
+
+トークンとパスワードは Vercel の中だけに置き、リポジトリやチャットには書かないでください。
 
 ## 参加・問い合わせ
 - 入会・見学・撮影会の参加は、ミーティングで運営メンバーに気軽に声をかけてください
@@ -125,13 +145,15 @@ This repository is where we create, store, and update documents for the KUAS Pho
 - `docs/`: Reference materials and records.
 
 ## Website
-This repository also holds the club website, a static Astro + three.js site: a 3D Kyoto on the top page built from real data (GSI terrain and aerial photos, PLATEAU buildings with measured heights) and seen from Shogunzuka, with the live sky of Kyoto, sparkling shooting stars and a flight to the Uzumasa campus, photo trip reports shown as rolls of film, hands-on lessons on shutter speed, aperture, focal length and developing, a monthly schedule, an about page, join and contact pages that link to the club's own forms, and the guidelines in 11 languages.
+This repository also holds the club website, an Astro + three.js site (static pages plus a small admin API on Vercel): a 3D Kyoto on the top page built from real data (GSI terrain and aerial photos, PLATEAU buildings with measured heights) and seen from Shogunzuka, with the live sky of Kyoto, sparkling shooting stars and a flight to the Uzumasa campus, photo trip reports shown as rolls of film, hands-on lessons on shutter speed, aperture, focal length and developing, a monthly schedule, an about page, join and contact pages that link to the club's own forms, and the guidelines in 11 languages.
 
 - Develop: `npm install`, then `npm run dev` (Node.js 22.12+). `npm run check` type-checks, `npm run build` writes `dist/`.
 - Club facts and the links to the club's Google/Microsoft Forms: `src/data/club.ts`. Monthly schedules: one Markdown file per month in `src/content/schedule/`. Trips: one Markdown file per trip in `src/content/trips/`, photos in `public/photos/`.
 - Sample trips and photos are marked `sample: true`; see `tools/sample-photos/README.md` to replace them.
 - The top-page Kyoto data lives in `public/kyoto/` and is rebuilt with the scripts in `tools/kyoto-data/` (sources, licences and steps in its README).
 - Deploy: import the repository in Vercel (framework preset: Astro). Pushes to `main` deploy automatically. Update `site` in `astro.config.mjs` once the URL is final.
+
+- Admin panel: `/admin/` lets organizers add a photo trip, add photos to a trip and edit a month's schedule; publishing commits to this repository and Vercel redeploys. Photos are resized to 2000 px JPEG in the browser, which also strips GPS data. Without settings it runs as a demo (password `demo`) that publishes nothing. To go live, set `ADMIN_PASSWORD` and `GITHUB_TOKEN` (a fine-grained token for this repository only, with Contents read and write) in the Vercel project's environment variables; `SESSION_SECRET`, `GITHUB_REPO` and `GITHUB_BRANCH` are optional.
 
 ## Get Involved
 - If you'd like to join, visit a meeting, or participate in a photo trip, just speak to one of the organizers at our weekly meetings.
