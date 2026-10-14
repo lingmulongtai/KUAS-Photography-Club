@@ -202,7 +202,7 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
           float u = vCell.x / 1.6;
           float mull = smoothstep(.0, .06, fract(u)) * smoothstep(1., .94, fract(u));
           vec2 id = vec2(floor(u), floor(vCell.y));
-          float fres = .06 + .7 * pow(1. - max(dot(-v, n), 0.), 4.);
+          float fres = .06 + .7 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);
           vec3 refl = skyColor(reflect(v, n));
           albedo = mix(vec3(.5), vec3(.02, .03, .035), mull);
           emit += refl * fres * mull * .9;

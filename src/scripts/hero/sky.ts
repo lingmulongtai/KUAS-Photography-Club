@@ -163,7 +163,8 @@ export function buildCelestial(env: Env, quality: number) {
       void main(){
         float b = dot(vLocal, uNgp);
         float band = exp(-b * b / .018);
-        float core = exp(-pow(1. - dot(vLocal, uGc), 2.) * 1.6);
+        float off = max(1. - dot(vLocal, uGc), 0.);
+        float core = exp(-off * off * 1.6);
         vec2 q = vec2(atan(vLocal.y, vLocal.x) * 3., vLocal.z * 6.);
         float dust = smoothstep(.35, .75, fbm(q * 2.2));
         float lane = 1. - .7 * exp(-b * b / .0012) * smoothstep(.45, .7, fbm(q * 4. + 7.));

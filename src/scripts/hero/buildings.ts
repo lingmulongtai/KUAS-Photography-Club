@@ -215,7 +215,7 @@ const BUILDING_FS = /* glsl */ `
       if (wooden) pane *= step(.45, hash12(id + seed * 7.)) ;
 
       // glass by day: darker panes that pick up a little sky
-      float glassRefl = .03 + .18 * pow(1. - max(dot(-v, n), 0.), 4.);
+      float glassRefl = .03 + .18 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);
       vec3 glass = vec3(.025, .03, .035) + skyColor(reflect(v, n)) * glassRefl * (1. - tiny);
       albedo = mix(wall, glass, pane * (.6 - .3 * tiny));
 
