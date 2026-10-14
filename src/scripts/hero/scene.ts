@@ -100,7 +100,7 @@ export const VIEWS = {
   /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
   daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 270, 430), ref: DAIMONJI, above: 95, bearing: 90, pitch: -10 },
   /** An exterior composition: the whole tower against the northern city and mountains. */
-  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 320), ref: TOWER, above: 135, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
+  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 260), ref: TOWER, above: 112, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
   funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 45, bearing: 208, pitch: -4 },
   kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
