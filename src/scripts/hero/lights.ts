@@ -5,8 +5,7 @@ import { LINE, type LineFeature } from './lines-data';
 import { ROAD_WIDTH as WIDTH } from './roads';
 import { rng } from './util';
 
-/* The city at night, drawn from the real road network. */
-
+/* Street lamps along the real road network. */
 
 /** Points spaced along every road: street lamps, brighter and closer together on the avenues. */
 export function buildLamps(env: Env, hf: Heightfield, lines: LineFeature[], quality: number) {
@@ -80,83 +79,4 @@ export function buildLamps(env: Env, hf: Heightfield, lines: LineFeature[], qual
   const points = new THREE.Points(geo, material);
   points.frustumCulled = false;
   return { points, uniforms: material.uniforms as typeof material.uniforms & { uScale: { value: number } }, count: pos.length / 3 };
-}
-
-/**
- * Car lights on the avenues: each car runs back and forth along one stretch of road, white
- * headlights when it comes toward the camera and red tail lights when it goes away.
- */
-export function buildTraffic(env: Env, hf: Heightfield, lines: LineFeature[], quality: number) {
-  const r = rng(91);
-  const a: number[] = [];
-  const b: number[] = [];
-  const m: number[] = [];
-  for (const f of lines) {
-    if (f.kind !== LINE.road) continue;
-    const rank = f.attr & 15;
-    if (rank < 3) continue;
-    const p = f.pts;
-    for (let i = 0; i < p.length - 2; i += 2) {
-      const ax = p[i], az = p[i + 1], bx = p[i + 2], bz = p[i + 3];
-      const len = Math.hypot(bx - ax, bz - az);
-      if (len < 20) continue;
-      const nx = -(bz - az) / len;
-      const nz = (bx - ax) / len;
-      const cars = Math.max(1, Math.round((len / (rank === 4 ? 45 : 70)) * quality));
-      for (let c = 0; c < cars; c++) {
-        const dir = r() < 0.5 ? 1 : -1;
-        const off = WIDTH[rank] * 0.22 * dir;
-        const sx = dir > 0 ? ax : bx, sz = dir > 0 ? az : bz, ex = dir > 0 ? bx : ax, ez = dir > 0 ? bz : az;
-        a.push(sx + nx * off, hf.height(sx, sz) + 1.2, sz + nz * off);
-        b.push(ex + nx * off, hf.height(ex, ez) + 1.2, ez + nz * off);
-        m.push(r(), (9 + r() * 7) / len);
-      }
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(a, 3));
-  geo.setAttribute('aEnd', new THREE.Float32BufferAttribute(b, 3));
-  geo.setAttribute('aMotion', new THREE.Float32BufferAttribute(m, 2));
-  const material = new THREE.ShaderMaterial({
-    uniforms: { ...env, uScale: { value: 1 } },
-    vertexShader: /* glsl */ `
-      ${ENV_GLSL}
-      attribute vec3 aEnd;
-      attribute vec2 aMotion;
-      uniform float uScale;
-      varying vec3 vColor;
-      void main(){
-        float t = fract(aMotion.x + uTime * aMotion.y);
-        vec3 p = mix(position, aEnd, t);
-        vec3 dir = normalize(aEnd - position);
-        float toward = dot(dir, normalize(cameraPosition - p));
-        vec3 head = vec3(1., .93, .8) * 2.6;
-        vec3 tail = vec3(1., .08, .04) * 2.;
-        vec4 mv = viewMatrix * vec4(p, 1.);
-        float dist = -mv.z;
-        float px = clamp(uScale * 2. / dist, 1., 4.);
-        float fade = smoothstep(0., .05, t) * smoothstep(1., .95, t);
-        float on = max(uCity, .25 * step(.001, uCity));
-        float near = 1. - smoothstep(2., 4., uScale * 2. / dist) * .7;
-        vColor = mix(tail, head, step(0., toward)) * on * fade * near * mix(hazeTransmittance(p), 1., .4);
-        gl_PointSize = px;
-        gl_Position = projectionMatrix * mv;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      varying vec3 vColor;
-      void main(){
-        float d = length(gl_PointCoord - .5) * 2.;
-        float a = exp(-d * d * 3.);
-        if (a < .02) discard;
-        gl_FragColor = vec4(vColor * a, 1.);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const points = new THREE.Points(geo, material);
-  points.frustumCulled = false;
-  return { points, uniforms: material.uniforms as typeof material.uniforms & { uScale: { value: number } }, count: a.length / 3 };
 }
