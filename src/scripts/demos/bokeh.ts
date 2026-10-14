@@ -168,6 +168,16 @@ export function createBokeh(renderer: THREE.WebGLRenderer, el: HTMLElement, prin
   let round = 1;
   let roundT = 1;
   let Hpx = 500;
+  const pauseAuto = () => {
+    if (autoFocus) {
+      const index = nearestStop(FOCUS_STOPS, focus);
+      target = FOCUS_STOPS[index];
+      if (slider) slider.value = String(index);
+      syncCameraDial(slider);
+    }
+    autoFocus = false;
+    autoButton.setAttribute('aria-pressed', 'false');
+  };
   let ptrX = 0;
   let ptrY = 0;
   slider?.addEventListener('input', () => {
@@ -177,6 +187,7 @@ export function createBokeh(renderer: THREE.WebGLRenderer, el: HTMLElement, prin
   });
   fButtons.forEach((b) =>
     b.addEventListener('click', () => {
+      pauseAuto();
       aper = Number(b.dataset.f);
       roundT = aper < 2 ? 1 : aper < 4 ? 0.55 : 0;
       press(fButtons, b);
@@ -185,19 +196,14 @@ export function createBokeh(renderer: THREE.WebGLRenderer, el: HTMLElement, prin
     }),
   );
   apertureDial?.addEventListener('input', () => {
+    pauseAuto();
     aper = APERTURES[Number(apertureDial.value)] ?? 1.4;
     roundT = aper < 2 ? 1 : aper < 4 ? .55 : 0;
     fButtons.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.f) === aper)));
   });
   autoButton.addEventListener('click', () => {
-    autoFocus = !autoFocus;
-    autoButton.setAttribute('aria-pressed', String(autoFocus));
-    if (!autoFocus) {
-      const index = nearestStop(FOCUS_STOPS, focus);
-      target = FOCUS_STOPS[index];
-      if (slider) slider.value = String(index);
-      syncCameraDial(slider);
-    }
+    if (autoFocus) pauseAuto();
+    else { autoFocus = true; autoButton.setAttribute('aria-pressed', 'true'); }
   });
   el.addEventListener('pointermove', (e) => {
     const rect = el.getBoundingClientRect();
