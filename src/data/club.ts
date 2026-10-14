@@ -23,19 +23,18 @@ export const club = {
     handle: 'kuas_photographyclub',
     url: 'https://www.instagram.com/kuas_photographyclub',
   },
-  email: '2025m011@kuas.ac.jp',
+  /** Public contact address (the club's Gmail; messages are forwarded to the organisers). */
+  email: 'photography.club.in.kuas@gmail.com',
   github: 'https://github.com/lingmulongtai/KUAS-Photography-Club',
 } as const;
 
 /**
- * Forms the club runs itself (Google Forms or Microsoft Forms).
- * Paste each form's share link here; while a link is empty the site points people to Instagram and email instead.
+ * Forms the club runs itself. Paste a form's share link here; while it is empty the site points
+ * people to Instagram and email instead. Outside parties contact the club by Instagram DM or email only.
  */
 export const forms = {
-  /** 見学・入部の申し込み */
-  join: '',
-  /** 撮影依頼・協賛・取材など、外部の方からのお問い合わせ */
-  contact: '',
+  /** 見学・入部の申し込み (Microsoft Forms, KUAS accounts only; English for now) */
+  join: 'https://forms.cloud.microsoft/r/ZGB8GdNTUC',
 };
 
 export const nav = [
