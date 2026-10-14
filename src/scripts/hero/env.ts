@@ -153,7 +153,8 @@ vec3 skyLight(vec3 n){
   vec3 up = mix(uZenith, uMid, .45) * .6 + uHorizon * .12;
   vec3 side = uHorizon * .35 + uMid * .15;
   vec3 c = mix(side, up, clamp(n.y, 0., 1.));
-  return c * (.6 + .4 * n.y) + vec3(.012, .007, .004) * uCity * (1. - n.y);
+  // Lift reflected night light without increasing window/lamp emission or the exposure.
+  return c * (.6 + .4 * n.y) * (1. + .18 * uCity) + vec3(.012, .007, .004) * uCity * (1. - n.y);
 }
 
 /* Diffuse lighting from sun (with shadows), moon, sky dome and ground bounce. */
