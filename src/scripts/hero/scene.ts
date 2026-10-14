@@ -3,7 +3,7 @@ import type { Demo } from '../gl/stage';
 import { createEnv } from './env';
 import { KYOTO, directionFrom, jstMinutes, jstParts, localSiderealAngle, moonPosition, sunPosition } from './astro';
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
-import { PLACES } from './geo';
+import { PLACES, toLocal } from './geo';
 import { loadJSON, loadTexture, type TerrainMeta } from './data';
 import { loadHeightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
@@ -18,7 +18,7 @@ import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
 import { buildWater } from './water';
 import { createLabels } from './labels';
-import { buildTrees } from './trees';
+import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds, coverForDay } from './clouds';
@@ -54,24 +54,45 @@ export type HeroMode = 'city' | 'campus';
 
 const RAD = Math.PI / 180;
 
-/**
- * The view from Shogunzuka Seiryuden, looking west over the city: from just in front of the
- * stage and a little above it, so the temple grounds stay out of frame and the slope below
- * is all forest.
- */
-const BEARING = 265;
-export const VIEW = {
-  eye: {
-    x: PLACES.shogunzuka.x + Math.sin((BEARING * Math.PI) / 180) * 120,
-    z: PLACES.shogunzuka.z - Math.cos((BEARING * Math.PI) / 180) * 120,
-    /** metres above the ground at the stage */
-    above: 44,
-  },
-  bearing: BEARING,
-  pitch: -5,
-};
+/** A place to look at Kyoto from. `ref` is where the ground height is taken; the eye floats `above` it. */
+export interface ViewDef {
+  ja: string;
+  en: string;
+  eye: { x: number; z: number };
+  ref: { x: number; z: number };
+  above: number;
+  bearing: number;
+  pitch: number;
+}
 
-export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts: HeroOptions): Demo & { burst(n: number): void; flyTo(to: HeroMode): void; readonly mode: HeroMode } {
+const ahead = (p: { x: number; z: number }, bearing: number, m: number) => ({
+  x: p.x + Math.sin(bearing * RAD) * m,
+  z: p.z - Math.cos(bearing * RAD) * m,
+});
+
+const KIYOMIZU = toLocal(34.9946668, 135.7849382); // 清水寺 本堂舞台
+const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
+const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
+
+/** The viewpoints. Coordinates from OpenStreetMap; heights from the elevation data. */
+export const VIEWS = {
+  /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
+  shogunzuka: { ja: '将軍塚', en: 'Shogunzuka', eye: ahead(PLACES.shogunzuka, 265, 120), ref: PLACES.shogunzuka, above: 44, bearing: 265, pitch: -5 },
+  /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
+  kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 258, 40), ref: KIYOMIZU, above: 30, bearing: 258, pitch: -3.5 },
+  /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
+  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: DAIMONJI, ref: DAIMONJI, above: 24, bearing: 248, pitch: -7 },
+  /** The observation deck of Kyoto Tower, 100 m up, looking north up the city. */
+  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 0, 9), ref: TOWER, above: 100, bearing: 2, pitch: -9 },
+} satisfies Record<string, ViewDef>;
+
+export type HeroView = keyof typeof VIEWS;
+
+export function createHero(
+  renderer: THREE.WebGLRenderer,
+  el: HTMLElement,
+  opts: HeroOptions,
+): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void; readonly mode: HeroMode; readonly view: HeroView } {
   const env = createEnv();
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 8, 60000);
@@ -100,13 +121,20 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   let pxPerM = 1000;
   let lastT = 0;
   const campus = new THREE.Vector3(CAMPUS_CENTER.x, 40, CAMPUS_CENTER.z);
+  let view: HeroView = 'shogunzuka';
+  let VIEW: ViewDef = VIEWS.shogunzuka;
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
+  let groundAt: ((x: number, z: number) => number) | null = null;
+  let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
+  let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
+  const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
   (async () => {
     const meta = await loadJSON<TerrainMeta>('terrain.json');
     const [hf, wide] = await Promise.all([loadHeightfield(meta), loadTexture(meta.aerialWide.file, aniso)]);
-    eye.y = hf.height(PLACES.shogunzuka.x, PLACES.shogunzuka.z) + VIEW.eye.above;
+    groundAt = (x, z) => hf.height(x, z);
+    eye.copy(eyeOf(VIEW));
     campus.y = hf.height(campus.x, campus.z) + 14;
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
@@ -118,6 +146,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       normalNear: normalTexture(hf, meta.near),
       normalNearBox: meta.near.box,
     }, opts.quality > 0.75 ? 640 : 400);
+    terrainRecenter = terrain.recenter;
     scene.add(terrain.mesh);
     casts(terrain.mesh);
     shadow.invalidate();
@@ -125,12 +154,15 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     terrain.uniforms.uAerialCity.value = cityPhoto;
     terrain.uniforms.uCityOn.value = 1;
     const lite = opts.quality < 0.75;
+    const eyes = Object.values(VIEWS).map((v) => v.eye);
     const city = buildCity(env, hf, buildings, (b) =>
-      !lite || b.w * b.d > 90 || b.h > 12 || Math.hypot(b.x - eye.x, b.z - eye.z) < 3500 || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200,
+      !lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200,
     );
     const landmarks = buildLandmarks(env, hf);
-    const trees = buildTrees(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, VIEW.eye, opts.quality, campusTreeSpots(hf));
-    scene.add(trees.group);
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf));
+    forest.plant(VIEW.eye, VIEW.bearing);
+    plantTrees = forest.plant;
+    scene.add(forest.group);
     campusModel = buildCampus(env, hf, buildings).mesh;
     scene.add(campusModel);
     casts(campusModel);
@@ -215,7 +247,18 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
 
   let mode: HeroMode = 'city';
   let modeSince = 0;
-  let flight: { to: HeroMode; t: number; dur: number; p0: THREE.Vector3; t0: THREE.Vector3; p1: THREE.Vector3; p2: THREE.Vector3; p3: THREE.Vector3 } | null = null;
+  let flight: {
+    to: HeroMode;
+    t: number;
+    dur: number;
+    p0: THREE.Vector3;
+    t0: THREE.Vector3;
+    p1: THREE.Vector3;
+    p2: THREE.Vector3;
+    p3: THREE.Vector3;
+    /** re-centre the terrain and re-plant the trees for the new view at the top of the arc */
+    regrow: boolean;
+  } | null = null;
   env.uCampus.value.set(CAMPUS_CENTER.x, CAMPUS_CENTER.z);
   const ORBIT = { radius: 640, height: 150, start: 112 * RAD, speed: 0.03 };
   const pose = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
@@ -238,15 +281,55 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     return out;
   }
 
-  function flyTo(to: HeroMode, t: number) {
-    if (mode === to && !flight) return;
-    const from = flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() }) : campusPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() });
-    const seconds = opts.reducedMotion ? 0.01 : opts.flightSeconds ?? 5;
+  /** Region the sun shadows cover for a view: the city out in front of it. */
+  function shadowRegion(v: ViewDef, e: THREE.Vector3) {
+    const c = ahead(v.eye, v.bearing, 4600);
+    return new THREE.Box3(new THREE.Vector3(Math.min(c.x, e.x) - 5400, 0, Math.min(c.z, e.z) - 5400), new THREE.Vector3(Math.max(c.x, e.x) + 5400, 450, Math.max(c.z, e.z) + 5400));
+  }
+
+  /** Fly to the campus, or to one of the viewpoints over the city. */
+  function flyTo(target: 'campus' | HeroView, t: number) {
+    const to: HeroMode = target === 'campus' ? 'campus' : 'city';
+    const nextView = target === 'campus' ? view : target;
+    if (!flight && mode === to && (to === 'campus' || nextView === view)) return;
+    const blank = () => ({ pos: new THREE.Vector3(), target: new THREE.Vector3() });
+    const from = flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, blank()) : campusPose(t, blank());
+    const seconds = opts.flightSeconds ?? 5;
     modeSince = t + seconds;
-    const end = to === 'city' ? cityPose(t, { pos: new THREE.Vector3(), target: new THREE.Vector3() }) : campusPose(modeSince, { pos: new THREE.Vector3(), target: new THREE.Vector3() });
+    const viewChanged = nextView !== view;
+    if (viewChanged) {
+      view = nextView;
+      VIEW = VIEWS[view];
+      eye.copy(eyeOf(VIEW));
+    }
+    const region =
+      to === 'campus'
+        ? new THREE.Box3(new THREE.Vector3(campus.x - 2600, 0, campus.z - 2600), new THREE.Vector3(campus.x + 2600, 450, campus.z + 2600))
+        : shadowRegion(VIEW, eye);
+    shadow.setRegion(region);
+    labels?.filter(to === 'campus' ? ['kuas', 'arashiyama', 'atago', 'nijo', 'tower', 'kinkaku'] : null);
+
+    if (opts.reducedMotion) {
+      // the stage clock stands still under reduced motion: cut straight to the new view
+      if (viewChanged) {
+        terrainRecenter?.(VIEW.eye);
+        plantTrees?.(VIEW.eye, VIEW.bearing);
+        shadow.invalidate();
+      }
+      flight = null;
+      mode = to;
+      modeSince = t;
+      env.uHighlight.value = to === 'campus' ? 1 : 0;
+      opts.onMode?.(to, false);
+      opts.onMode?.(to, true);
+      return;
+    }
+
+    const end = to === 'city' ? cityPose(t, blank()) : campusPose(modeSince, blank());
     const p0 = from.pos;
     const p3 = end.pos;
-    const lift = new THREE.Vector3(0, 260, 0);
+    // arc higher for longer hops
+    const lift = new THREE.Vector3(0, 160 + Math.min(p0.distanceTo(p3) * 0.06, 420), 0);
     flight = {
       to,
       t: 0,
@@ -256,13 +339,8 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       p1: p0.clone().lerp(p3, 0.3).add(lift),
       p2: p0.clone().lerp(p3, 0.75).add(lift.multiplyScalar(0.7)),
       p3,
+      regrow: viewChanged,
     };
-    shadow.setRegion(
-      to === 'campus'
-        ? new THREE.Box3(new THREE.Vector3(campus.x - 2600, 0, campus.z - 2600), new THREE.Vector3(campus.x + 2600, 450, campus.z + 2600))
-        : new THREE.Box3(new THREE.Vector3(-7500, 0, -6000), new THREE.Vector3(3200, 450, 6000)),
-    );
-    labels?.filter(to === 'campus' ? ['kuas', 'arashiyama', 'atago', 'nijo', 'tower', 'kinkaku'] : null);
     opts.onMode?.(to, false);
   }
 
@@ -285,6 +363,12 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
       const te = ease(Math.min(1, flight.t * 1.2));
       lastTarget.copy(flight.t0).lerp(end.target, te);
       camera.position.copy(bez);
+      if (flight.regrow && flight.t >= 0.5) {
+        flight.regrow = false;
+        terrainRecenter?.(VIEW.eye);
+        plantTrees?.(VIEW.eye, VIEW.bearing);
+        shadow.invalidate();
+      }
       const h = flight.to === 'campus' ? THREE.MathUtils.smoothstep(flight.t, 0.4, 1) : 1 - THREE.MathUtils.smoothstep(flight.t, 0, 0.5);
       env.uHighlight.value = h;
       if (flight.t >= 1) {
@@ -338,9 +422,12 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
     /** Send a few shooting stars at once. */
     burst: (n: number) => meteors.burst(n),
     /** Fly to the campus or back to the view from Shogunzuka. */
-    flyTo: (to: HeroMode) => flyTo(to, clock),
+    flyTo: (to: 'campus' | HeroView) => flyTo(to, clock),
     get mode() {
       return flight ? flight.to : mode;
+    },
+    get view() {
+      return view;
     },
     t0: 0,
     resize(w, h, d) {
