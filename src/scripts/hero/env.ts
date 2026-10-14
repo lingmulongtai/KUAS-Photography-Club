@@ -200,11 +200,17 @@ float sunShadow(vec3 wp, vec3 n){
   ax *= clamp(lx, t, t * 12.) / max(lx, 1e-7);
   ay *= clamp(ly, t, t * 12.) / max(ly, 1e-7);
   float z = p.z - uShadowBias;
-  float s = 0.;
-  for (int i = -1; i <= 1; i++)
-    for (int j = -1; j <= 1; j++)
-      // The depth map has one mip level; avoid implicit derivatives inside the filter loop.
-      s += textureLod(uShadowMap, vec3(p.xy + (ax * float(i) + ay * float(j)) * .45, z), 0.);
+  // Explicit taps avoid ANGLE's divergent-loop gradient path for shadow samplers.
+  ax *= .45; ay *= .45;
+  float s = textureLod(uShadowMap,vec3(p.xy-ax-ay,z),0.)
+    + textureLod(uShadowMap,vec3(p.xy-ax,z),0.)
+    + textureLod(uShadowMap,vec3(p.xy-ax+ay,z),0.)
+    + textureLod(uShadowMap,vec3(p.xy-ay,z),0.)
+    + textureLod(uShadowMap,vec3(p.xy,z),0.)
+    + textureLod(uShadowMap,vec3(p.xy+ay,z),0.)
+    + textureLod(uShadowMap,vec3(p.xy+ax-ay,z),0.)
+    + textureLod(uShadowMap,vec3(p.xy+ax,z),0.)
+    + textureLod(uShadowMap,vec3(p.xy+ax+ay,z),0.);
   return s / 9.;
 }
 `;
