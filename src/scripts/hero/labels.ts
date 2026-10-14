@@ -74,13 +74,19 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
     if (d.action || related.length) {
       (trigger as HTMLButtonElement).type = 'button';
       trigger.tabIndex = -1;
-      trigger.setAttribute('aria-label', d.action ? `${d.ja}へ近づく` : `${d.ja}の撮影会を見る`);
-      if (d.action) trigger.addEventListener('click', () => onAction(d.id));
-      else {
+      trigger.setAttribute('aria-label', `${d.ja}の撮影会を見る`);
+      if (!related.length && d.action) trigger.addEventListener('click', () => onAction(d.id));
+      if (related.length) {
         trigger.setAttribute('aria-controls', popup.id);
         trigger.setAttribute('aria-expanded', 'false');
         popup.setAttribute('role', 'region');
         popup.setAttribute('aria-label', `${d.ja}の撮影会`);
+        if(d.action) {
+          const fly=document.createElement('button'); fly.type='button';
+          fly.textContent='キャンパスへ近づく';
+          fly.addEventListener('click',()=>{close();onAction(d.id);});
+          popup.appendChild(fly);
+        }
         for (const trip of related) {
           const link = document.createElement('a');
           link.href = trip.href;
