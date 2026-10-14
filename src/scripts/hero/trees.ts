@@ -81,10 +81,17 @@ export function createForest(
   const blob2 = new THREE.IcosahedronGeometry(0.36, 1).scale(1, 0.75, 1).translate(0.18, 0.86, 0.1);
   const crown = mergeGeometries([blob1, blob2]);
   const trunk = new THREE.CylinderGeometry(.035, .05, .45, 6).translate(0, .225, 0).toNonIndexed();
+  for(const geo of [crown,trunk]) geo.deleteAttribute('uv');
+  crown.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(crown.getAttribute('position').count),1));
+  trunk.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(trunk.getAttribute('position').count).fill(1),1));
   const closeCrown = mergeGeometries([crown, trunk]);
   const farCrown = new THREE.IcosahedronGeometry(.5, 0).scale(1, .65, 1).translate(0, .65, 0);
-  const cone = new THREE.ConeGeometry(0.5, 1, 7, 1, true).translate(0, 0.55, 0).toNonIndexed();
-  for (const geo of [crown, closeCrown, farCrown, cone]) geo.deleteAttribute('uv');
+  const cone = new THREE.ConeGeometry(0.5, .75, 7, 1, true).translate(0, .625, 0).toNonIndexed();
+  for (const geo of [farCrown, cone]) {
+    geo.deleteAttribute('uv');
+    geo.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(geo.getAttribute('position').count),1));
+  }
+  const closeCedar=mergeGeometries([cone,trunk]);
 
   const material = new THREE.ShaderMaterial({
     uniforms: env,
@@ -92,6 +99,7 @@ export function createForest(
       attribute vec3 iPos;
       attribute vec2 iSize;
       attribute vec3 iTint;
+      attribute float aBark;
       uniform float uTime;
       varying vec3 vWorld;
       varying vec3 vNormal;
@@ -108,7 +116,7 @@ export function createForest(
         vec3 n = normal;
         n.xz = mat2(cos(a), sin(a), -sin(a), cos(a)) * n.xz;
         vNormal = normalize(n + vec3(0., .35, 0.));
-        vTint = position.y < .3 ? vec3(.22, .15, .09) : iTint;
+        vTint = mix(iTint,vec3(.22,.15,.09),aBark);
         vUp = position.y;
         gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.);
       }
@@ -155,10 +163,11 @@ export function createForest(
     });
     for (const idx of chunks.values()) {
       const first = idx[0];
-      const shape = kind[first] === 1 ? cone : lods[first] === 0 ? closeCrown : farCrown;
+      const shape = kind[first] === 1 ? lods[first] === 0 ? closeCedar : cone : lods[first] === 0 ? closeCrown : farCrown;
       const geo = new THREE.InstancedBufferGeometry();
       geo.setAttribute('position', shape.getAttribute('position'));
       geo.setAttribute('normal', shape.getAttribute('normal'));
+      geo.setAttribute('aBark', shape.getAttribute('aBark'));
       geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => pos.slice(i * 3, i * 3 + 3))), 3));
       geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => size.slice(i * 2, i * 2 + 2))), 2));
       geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => tint.slice(i * 3, i * 3 + 3))), 3));
