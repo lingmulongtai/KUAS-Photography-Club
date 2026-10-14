@@ -167,7 +167,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 photo = texture2D(uAerialWide, vec2(uw.x, 1. - uw.y)).rgb;
         vec2 uc = boxUv(uAerialCityBox, p);
         vec3 city = texture2D(uAerialCity, vec2(uc.x, 1. - uc.y)).rgb;
-        float mappedForest = texture2D(uWoodland, uw).r * uWoodlandOn;
+        float mappedForest = texture2D(uWoodland, uw).a * uWoodlandOn;
         photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
 
         // forest: green and dark in the photo. Up close add canopy texture the photo can't resolve.
