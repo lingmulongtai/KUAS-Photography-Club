@@ -244,11 +244,12 @@ const BUILDING_FS = /* glsl */ `
       float lit = step(hash12(id * vec2(1.7, 3.1) + seed * 31.), rate);
       // far away a facade's windows are below a pixel: keep only a faint average so the city
       // reads as dark masses with points of light, not a lit sheet
-      lit = mix(lit, rate * .04, tiny);
+      lit = mix(lit, rate * .1, tiny);
       vec3 warm = vec3(1., .58, .26);
       vec3 cool = vec3(.95, .85, .7);
       vec3 lampCol = mix(warm, cool, (use == 4. ? .8 : .15) * step(.4, hash12(id + seed)));
-      float strength = wooden ? 1.8 : 2.6;
+      // bright enough to glow through the haze from the hills, not so bright they burn out up close
+      float strength = wooden ? .75 : 1.05;
       emit += lampCol * lit * pane * strength * uCity;
       // shopfronts glow along the street
       if ((use == 3. || use == 5.) && id.y < .5) emit += warm * smoothstep(.1, .5, f.y) * valid * mix(1.2, .05, tiny) * uCity;
