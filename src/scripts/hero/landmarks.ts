@@ -3,13 +3,14 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
+import { goldenPavilion } from './temple-models';
 
 /*
  * Landmarks the building data can't show properly, modelled at their real positions and sizes.
  * Each part carries a colour (linear) and how strongly it is floodlit at night.
  */
 
-type Part = { geo: THREE.BufferGeometry; color: [number, number, number]; glow: number };
+export type Part = { geo: THREE.BufferGeometry; color: [number, number, number]; glow: number };
 
 function paint({ geo, color, glow }: Part) {
   const g = geo.index ? geo.toNonIndexed() : geo;
@@ -180,6 +181,7 @@ const LANDMARKS: Record<string, Placed> = {
   yasaka: { parts: pagoda(5, 6.4, 4.6, 46, 9.5, WOOD, ROOF), x: 1802, z: 560 },
   kiyomizu: { parts: pagoda(3, 6.2, 4.8, 31, 8, VERMILION, [0.05, 0.032, 0.022]), lat: 34.9950586, lon: 135.7838348 },
   heianTorii: { parts: torii(), lat: 35.0125663, lon: 135.7826821 },
+  goldenPavilion: { parts: goldenPavilion(), lat: 35.0395092, lon: 135.7284548 },
 };
 
 export function buildLandmarks(env: Env, hf: Heightfield) {

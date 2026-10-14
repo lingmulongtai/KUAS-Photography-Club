@@ -13,7 +13,7 @@ export const SPOTS = [
   { id: 'nijo', rank: 1, ja: '二条城', en: 'Nijo Castle', lat: 35.0140076, lon: 135.7485369, above: 34 },
   { id: 'gosho', rank: 2, ja: '京都御所', en: 'Imperial Palace', lat: 35.0252635, lon: 135.7623445, above: 30 },
   { id: 'heian', rank: 3, ja: '平安神宮', en: 'Heian Shrine', lat: 35.0125663, lon: 135.7826821, above: 36 },
-  { id: 'kinkaku', rank: 2, ja: '金閣寺', en: 'Kinkaku-ji', lat: 35.0395293, lon: 135.7295373, above: 36 },
+  { id: 'kinkaku', rank: 2, ja: '金閣寺', en: 'Kinkaku-ji', lat: 35.0395092, lon: 135.7284548, above: 24 },
   { id: 'arashiyama', rank: 2, ja: '嵐山', en: 'Arashiyama', lat: 35.0128713, lon: 135.6777623, above: 80 },
   { id: 'atago', rank: 3, ja: '愛宕山', en: 'Mt. Atago', lat: 35.0600453, lon: 135.6342851, above: 60 },
   { id: 'kuas', rank: 0, ja: '太秦キャンパス', en: 'KUAS Uzumasa Campus', lat: 35.0099245, lon: 135.7184382, above: 48, action: true },

@@ -83,6 +83,7 @@ const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
 const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
 const FUNAOKA = toLocal(35.0389964, 135.7417307); // OSM node/6611051734: 船岡山三角点
+const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
 
 /** The viewpoints. Coordinates from OpenStreetMap; heights from the elevation data. */
 export const VIEWS = {
@@ -96,6 +97,7 @@ export const VIEWS = {
   tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 320), ref: TOWER, above: 135, bearing: 350, pitch: -9 },
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 82, pitch: -4 },
   funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 45, bearing: 208, pitch: -4 },
+  kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, pitch: -10 },
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
@@ -185,10 +187,16 @@ export function createHero(
     terrain.uniforms.uCityOn.value = 1;
     const lite = opts.quality < 0.75;
     const eyes = Object.values(VIEWS).map((v) => v.eye);
-    const city = buildCity(env, hf, buildings, (b) =>
-      !lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200,
-    );
     const landmarks = buildLandmarks(env, hf);
+    const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25}];
+    const replaced = (x:number,z:number) => replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
+    const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>{
+      let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}
+      return !replaced(x/(p.ring.length/2),z/(p.ring.length/2));
+    })};
+    const city = buildCity(env, hf, modeledBuildings, (b) =>
+      !replaced(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
+    );
     const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
     const roadsAndWater = infrastructureMask(lines, BUILDINGS_BOX);
     const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || roadsAndWater(x,z), forestArea);
