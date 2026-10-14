@@ -96,11 +96,45 @@ function kyotoTower(): Part[] {
   deck.translate(0, base + 67.6, 0);
   const tip = new THREE.CylinderGeometry(0.18, 0.25, 4, 6);
   tip.translate(0, base + 98, 0);
-  return [
-    { geo: lathe, color: [0.72, 0.72, 0.7], glow: 0.42 },
-    { geo: deck, color: [0.05, 0.06, 0.07], glow: 3.4 },
+  const parts: Part[] = [
+    { geo: lathe, color: [0.62, 0.65, 0.63], glow: 0.42 },
+    { geo: deck, color: [0.028, 0.06, 0.085], glow: 1.1 },
     { geo: tip, color: [0.6, 0.08, 0.04], glow: 1 },
   ];
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, color: Part['color'], glow = .2) => {
+    const geo = new THREE.BoxGeometry(w, h, d); geo.translate(x, y, z);
+    parts.push({ geo, color, glow });
+  };
+  // The tower stands on its hotel podium; dark floor bands and recessed windows
+  // distinguish the facade from the smooth ivory shell above it.
+  box(49, 30, 36, 0, 15, 0, [.32, .3, .27]);
+  box(51, 1.2, 38, 0, 30.4, 0, [.14, .15, .15]);
+  for (let floor = 0; floor < 7; floor++) {
+    const y = 3.8 + floor * 3.7;
+    for (const side of [-1, 1]) {
+      box(49.2, .24, .3, 0, y - 1.5, side * 18.1, [.12, .11, .1]);
+      for (let x = -21; x <= 21; x += 3.5) box(2.35, 1.85, .3, x, y, side * 18.2, [.025, .045, .06], .7);
+      for (let z = -14; z <= 14; z += 3.5) box(.3, 1.85, 2.35, side * 24.7, y, z, [.025, .045, .06], .7);
+    }
+  }
+  for (const [y, radius] of [[base + 62.6, 7.7], [base + 65.5, 8.45], [base + 71.7, 8.5], [base + 74.5, 7.9]]) {
+    const ring = new THREE.TorusGeometry(radius, .16, 6, 64);
+    ring.rotateX(Math.PI / 2); ring.translate(0, y, 0);
+    parts.push({ geo: ring, color: [.65, .68, .65], glow: .38 });
+  }
+  for (let i = 0; i < 48; i++) {
+    const a = i * Math.PI * 2 / 48;
+    const mullion = new THREE.BoxGeometry(.14, 4.4, .24);
+    mullion.rotateY(-a); mullion.translate(Math.sin(a) * 8.5, base + 67.6, Math.cos(a) * 8.5);
+    parts.push({ geo: mullion, color: [.56, .59, .56], glow: .5 });
+  }
+  for (const y of [base + 7, base + 22, base + 42, base + 58]) {
+    const radius = y < base + 10 ? 6.35 : y < base + 30 ? 5.6 : y < base + 50 ? 4.9 : 4.6;
+    const seam = new THREE.TorusGeometry(radius, .045, 4, 48);
+    seam.rotateX(Math.PI / 2); seam.translate(0, y, 0);
+    parts.push({ geo: seam, color: [.4, .43, .42], glow: .25 });
+  }
+  return parts;
 }
 
 /** The great torii of Heian Shrine on Jingu-michi: 24 m tall, its beam running east–west. */
@@ -192,6 +226,12 @@ export function buildLandmarks(env: Env, hf: Heightfield) {
         vec3 n = normalize(vNormal);
         float sh = sunShadow(vWorld, n);
         vec3 col = shade(vColor, n, vWorld, sh);
+        // Cool panes reflect the sky; the smooth tower shell catches a restrained highlight.
+        vec3 view = normalize(cameraPosition - vWorld);
+        float spec = pow(clamp(dot(n, normalize(uSunDir + view)), 0., 1.), 36.);
+        col += uSunLight * spec * .12 * sh;
+        float glass = step(vColor.r * 1.4, vColor.b) * (1. - step(.12, vColor.r));
+        col = mix(col, col + skyColor(reflect(-view, n)) * (.15 + .35 * pow(clamp(1. - dot(view, n), 0., 1.), 4.)), glass);
         // floodlights from below after dark, warmer toward the ground
         float up = clamp(n.y * -.5 + .75, .35, 1.);
         vec3 flood = vColor * vec3(1., .86, .66) * vGlow * up * 2.2 + vec3(1., .8, .55) * max(vGlow - 2.5, 0.) * .5;
