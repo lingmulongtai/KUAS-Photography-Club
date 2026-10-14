@@ -78,3 +78,23 @@ export function kiyomizuHall():Part[] {
   roof(parts,35,8,1.8,18,-3);
   return parts;
 }
+/** Togetsukyo's measured axis and width, with timber rails and exposed piers. */
+export function togetsukyo():Part[] {
+  const parts:Part[]=[];
+  const length=152.5,width=11;
+  for(let i=0;i<32;i++) {
+    const z=-length/2+(i+.5)*length/32;
+    const y=.4+.55*(1-(z/(length/2))**2);
+    box(parts,width,.5,length/32+.04,0,y,z,[.17,.18,.17],.1);
+    for(const side of [-1,1]) {
+      box(parts,.18,1.2,.18,side*width*.48,y+.85,z,[.16,.085,.038],.18);
+      box(parts,.18,.18,length/32+.1,side*width*.48,y+1.35,z,[.18,.1,.045],.2);
+      box(parts,.14,.14,length/32+.1,side*width*.48,y+.7,z,[.18,.1,.045],.2);
+    }
+  }
+  for(const z of [-55,-27,0,27,55]) {
+    box(parts,9,1,2,0,-.7,z,[.15,.16,.15],.1);
+    for(const x of [-3.5,3.5])box(parts,1.4,8,2.6,x,-4,z,[.22,.21,.19],.1);
+  }
+  return parts;
+}

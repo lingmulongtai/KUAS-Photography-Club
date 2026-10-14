@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
-import { goldenPavilion, kiyomizuHall } from './temple-models';
+import { goldenPavilion, kiyomizuHall, togetsukyo } from './temple-models';
 
 /*
  * Landmarks the building data can't show properly, modelled at their real positions and sizes.
@@ -183,6 +183,7 @@ const LANDMARKS: Record<string, Placed> = {
   heianTorii: { parts: torii(), lat: 35.0125663, lon: 135.7826821 },
   goldenPavilion: { parts: goldenPavilion(), lat: 35.0395092, lon: 135.7284548 },
   kiyomizuHall: { parts: kiyomizuHall(), lat: 34.9946668, lon: 135.7849382 },
+  togetsukyo: { parts: togetsukyo(), lat: 35.01287125, lon: 135.67776225 },
 };
 
 export function buildLandmarks(env: Env, hf: Heightfield) {
