@@ -49,7 +49,7 @@ import { club } from '../data/club';
         <button type="button" data-time="sunset" aria-pressed="false">夕焼け</button>
         <button type="button" data-time="night" aria-pressed="false">夜</button>
       </div>
-      <p class="hint">空をタップすると流れ星。<span>「太秦キャンパス」を押すと近づけます。</span></p>
+      <p class="hint">ドラッグで見回せます。スマホは横スワイプ。<span>空をタップすると流れ星。「太秦キャンパス」を押すと近づけます。</span></p>
     </aside>
   </div>
 
@@ -88,7 +88,7 @@ import { club } from '../data/club';
     };
     const card = hero.querySelector<HTMLElement>('.campus-card')!;
     const back = card.querySelector<HTMLButtonElement>('.back')!;
-    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
 
     const hhmm = (m: number) => {
       const v = ((Math.floor(m) % 1440) + 1440) % 1440;
@@ -125,7 +125,7 @@ import { club } from '../data/club';
         sky.from = from;
         sky.delta = delta;
         sky.start = performance.now();
-        sky.dur = reducedMotion ? 0 : 2800;
+        sky.dur = motion.matches ? 0 : 2800;
         if (!sky.dur) {
           sky.from = from + delta;
           sky.delta = 0;
@@ -160,7 +160,7 @@ import { club } from '../data/club';
         (demo = createHero(renderer, el, {
           now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
           quality,
-          reducedMotion,
+          get reducedMotion() { return motion.matches; },
           drift: !coarse,
           onStatus,
           onReady: () => hero.classList.add('is-ready'),
@@ -222,8 +222,11 @@ import { club } from '../data/club';
     border-radius: 0;
     box-shadow: none;
     z-index: 0;
-    cursor: crosshair;
+    cursor: grab;
+    touch-action: pan-y;
   }
+
+  .hero-stage.is-dragging { cursor: grabbing; }
 
   /* viewpoints */
   .views {
