@@ -166,7 +166,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
 
         // forest: green and dark in the photo. Up close add canopy texture the photo can't resolve.
-        float green = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * smoothstep(.2, .05, dot(photo, vec3(.33)));
+        float green = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * (1. - smoothstep(.05, .2, dot(photo, vec3(.33))));
         float near = 1. - smoothstep(600., 3500., dist);
         if (near > 0.){
           // each layer of canopy fades to its average once its blobs shrink below a few pixels
@@ -181,8 +181,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         }
 
         // photos carry their own midday light: bring them down to something like albedo
-        vec3 albedo = photo * .62;
-        albedo = mix(vec3(dot(albedo, vec3(.3, .55, .15))), albedo, .85);
+        vec3 albedo = photo * .68 * mix(vec3(1.), vec3(1.07, 1., .9), green);
+        albedo = mix(vec3(dot(albedo, vec3(.3, .55, .15))), albedo, .9);
 
         // ---- streets, from the distance field (roads.ts) ----
         // Edges are drawn over the width of a pixel, so they stay sharp up close and blend into

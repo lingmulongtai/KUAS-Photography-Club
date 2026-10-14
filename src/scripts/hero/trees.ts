@@ -19,22 +19,28 @@ export function createForest(
   quality: number,
   /** extra broadleaf trees, e.g. along the campus edge */
   extra: { x: number; y: number; z: number }[] = [],
+  fallback?: { photo: HTMLImageElement | ImageBitmap; box: Box },
 ) {
-  const W = photo.width;
-  const H = photo.height;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const g = canvas.getContext('2d', { willReadFrequently: true })!;
-  g.drawImage(photo, 0, 0);
-  const px = g.getImageData(0, 0, W, H).data;
-  const sample = (x: number, z: number) => {
-    const u = (x - photoBox[0]) / (photoBox[2] - photoBox[0]);
-    const v = (z - photoBox[1]) / (photoBox[3] - photoBox[1]);
-    if (u < 0 || v < 0 || u >= 1 || v >= 1) return null;
-    const o = (Math.floor(v * H) * W + Math.floor(u * W)) * 4;
-    return [px[o] / 255, px[o + 1] / 255, px[o + 2] / 255];
+  const sampler = (photo: HTMLImageElement | ImageBitmap, photoBox: Box, maxWidth = photo.width) => {
+    const W = Math.min(maxWidth, photo.width);
+    const H = Math.round(photo.height * W / photo.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const g = canvas.getContext('2d', { willReadFrequently: true })!;
+    g.drawImage(photo, 0, 0, W, H);
+    const px = g.getImageData(0, 0, W, H).data;
+    return (x: number, z: number) => {
+      const u = (x - photoBox[0]) / (photoBox[2] - photoBox[0]);
+      const v = (z - photoBox[1]) / (photoBox[3] - photoBox[1]);
+      if (u < 0 || v < 0 || u >= 1 || v >= 1) return null;
+      const o = (Math.floor(v * H) * W + Math.floor(u * W)) * 4;
+      return [px[o] / 255, px[o + 1] / 255, px[o + 2] / 255];
+    };
   };
+  const citySample = sampler(photo, photoBox);
+  const wideSample = fallback ? sampler(fallback.photo, fallback.box, 1024) : null;
+  const sample = (x: number, z: number) => citySample(x, z) ?? wideSample?.(x, z) ?? null;
 
   function trees(eye: { x: number; z: number }, bearing: number) {
     const r = rng(4242);

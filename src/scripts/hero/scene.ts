@@ -138,7 +138,8 @@ export function createHero(
 
   (async () => {
     const meta = await loadJSON<TerrainMeta>('terrain.json');
-    const [hf, wide] = await Promise.all([loadHeightfield(meta), loadTexture(meta.aerialWide.file, aniso)]);
+    const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
+    const [hf, wide] = await Promise.all([loadHeightfield(meta), loadTexture(wideFile, aniso)]);
     groundAt = (x, z) => hf.height(x, z);
     eye.copy(eyeOf(VIEW));
     campus.y = hf.height(campus.x, campus.z) + 14;
@@ -175,7 +176,7 @@ export function createHero(
       !lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200,
     );
     const landmarks = buildLandmarks(env, hf);
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf));
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box });
     forest.plant(VIEW.eye, VIEW.bearing);
     plantTrees = forest.plant;
     scene.add(forest.group);
