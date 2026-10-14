@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { press, setText, type Demo } from '../gl/stage';
 import { buildPhotographer } from './focal-subjects';
+import { buildFocalBackgrounds } from './focal-backgrounds';
 
 const FRAME_H = 0.36; // keep the head and the top of the shoulders (36 cm) filling the frame height
 const SENSOR_H = 0.024; // full-frame sensor height in metres
@@ -138,6 +139,16 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshStandardMaterial({ map: floorTexture(), roughness: 0.7 }));
   floor.rotation.x = -Math.PI / 2;
   scene.add(wall, floor, stand, socle);
+  const backgrounds = buildFocalBackgrounds(renderer);
+  scene.add(backgrounds.forest, backgrounds.night);
+  const backgroundSelect = el.closest('.demo')!.querySelector<HTMLSelectElement>('[data-focal-background]')!;
+  backgroundSelect.addEventListener('change', () => {
+    const selected = backgroundSelect.value;
+    wall.visible = selected === 'shoji';
+    backgrounds.forest.visible = selected === 'forest';
+    backgrounds.night.visible = selected === 'night';
+    scene.background = new THREE.Color(selected === 'forest' ? '#667e70' : selected === 'night' ? '#07111b' : '#1a1714');
+  });
 
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const root = el.closest('.demo')!;
@@ -227,10 +238,13 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
 
   let yaw = 0;
   let pitch = 0;
+  let pixelHeight = 1, pixelRatio = 1;
 
   return {
     t0: 0,
-    resize(w, h) {
+    resize(w, h, dpr) {
+      pixelHeight = h * dpr;
+      pixelRatio = dpr;
       cam.aspect = w / h;
       cam.updateProjectionMatrix();
     },
@@ -240,6 +254,7 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
       yaw += (ptrX * 0.45 + Math.sin(t * 0.25) * 0.12 - yaw) * k;
       pitch += (ptrY * 0.12 - pitch) * k;
       const d = distanceFor(mm);
+      backgrounds.update(mm, d, pixelHeight, pixelRatio);
       cam.fov = (verticalFov(mm) * 180) / Math.PI;
       cam.updateProjectionMatrix();
       cam.position.set(focus.x + Math.sin(yaw) * d, focus.y + Math.sin(pitch) * d, focus.z + Math.cos(yaw) * d);
