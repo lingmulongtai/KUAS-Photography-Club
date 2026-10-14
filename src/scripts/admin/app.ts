@@ -329,21 +329,23 @@ export function startAdmin(root: HTMLElement) {
     const status = (s: string) => (addStatus.textContent = s);
     try {
       const slug = select.value;
+      const requestedSpot = spotSelect.value;
+      const spotChanged = requestedSpot !== (trips.find((t) => t.slug === slug)?.spot ?? '');
       if (addPhotos.photos.length) checkPhotos(addPhotos.photos);
-      else if (spotSelect.value === (trips.find((t) => t.slug === slug)?.spot ?? '')) throw new Error('写真を追加するか場所のピンを変更してください');
+      else if (!spotChanged) throw new Error('写真を追加するか場所のピンを変更してください');
       const stamp = Date.now().toString(36);
       const names = addPhotos.photos.map((_, i) => `p${stamp}-${String(i + 1).padStart(2, '0')}.jpg`);
       const blobs = await upload(addPhotos.photos, names, status);
       status('公開しています…');
       const r = await call<{ demo?: boolean; markdown?: string; path?: string; commit?: string; page?: string }>('/api/admin/trip', {
         method: 'POST',
-        body: JSON.stringify({ mode: 'append', slug, spot: spotSelect.value, blobs, photos: photoMeta(addPhotos.photos, names) }),
+        body: JSON.stringify({ mode: 'append', slug, ...(spotChanged ? { spot: requestedSpot } : {}), blobs, photos: photoMeta(addPhotos.photos, names) }),
       });
       result(addStatus, $('[data-preview=add]'), r);
       if (!r.demo) {
         addPhotos.clear();
         const ref = trips.find((t) => t.slug === slug);
-        if (ref) ref.spot = spotSelect.value;
+        if (ref && spotChanged) ref.spot = requestedSpot;
       }
     } catch (x) {
       status(`⚠ ${(x as Error).message}`);
