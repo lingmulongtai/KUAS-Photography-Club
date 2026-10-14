@@ -3,6 +3,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { press, setText, type Demo } from '../gl/stage';
 import { buildPhotographer } from './focal-subjects';
 import { buildFocalBackgrounds } from './focal-backgrounds';
+import { FOCAL_STOPS } from '../../data/camera-settings';
+import { nearestStop, syncCameraDial } from '../controls/camera-dial';
 
 const FRAME_H = 0.36; // keep the head and the top of the shoulders (36 cm) filling the frame height
 const SENSOR_H = 0.024; // full-frame sensor height in metres
@@ -210,10 +212,7 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
   const buttons = Array.from(el.querySelectorAll<HTMLButtonElement>('[data-mm]'));
   const slider = document.getElementById(el.dataset.slider ?? '') as HTMLInputElement | null;
   const readout = el.querySelector('[data-readout]');
-  const MIN = 14;
-  const MAX = 300;
-  const toSlider = (mm: number) => Math.round((1000 * Math.log(mm / MIN)) / Math.log(MAX / MIN));
-  const fromSlider = (v: number) => MIN * Math.pow(MAX / MIN, v / 1000);
+  const toSlider = (mm: number) => nearestStop(FOCAL_STOPS, mm);
   let mm = 50;
   let target = 50;
   let ptrX = 0;
@@ -222,12 +221,14 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
   buttons.forEach((b) =>
     b.addEventListener('click', () => {
       target = Number(b.dataset.mm);
+      if (slider) slider.value = String(toSlider(target));
+      syncCameraDial(slider);
       press(buttons, b);
     }),
   );
   slider?.addEventListener('input', () => {
-    target = fromSlider(Number(slider.value));
-    buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    target = FOCAL_STOPS[Number(slider.value)] ?? 50;
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.mm) === target)));
   });
   el.addEventListener('pointermove', (e) => {
     const r = el.getBoundingClientRect();
@@ -260,7 +261,8 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
       cam.position.set(focus.x + Math.sin(yaw) * d, focus.y + Math.sin(pitch) * d, focus.z + Math.cos(yaw) * d);
       cam.lookAt(focus);
       renderer.render(scene, cam);
-      if (slider && document.activeElement !== slider) slider.value = String(toSlider(mm));
+      if (slider) slider.value = String(toSlider(target));
+      syncCameraDial(slider);
       const diag = (diagonalFov(mm) * 180) / Math.PI;
       const label = `${Math.round(mm)}mm · 画角 ${diag.toFixed(diag < 20 ? 1 : 0)}° · 距離 ${d < 1 ? d.toFixed(2) : d.toFixed(1)}m`;
       if (label !== last) {
