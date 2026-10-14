@@ -22,6 +22,7 @@ export function createForest(
   extra: { x: number; y: number; z: number }[] = [],
   fallback?: { photo: HTMLImageElement | ImageBitmap; box: Box },
   excluded: (x: number, z: number) => boolean = () => false,
+  forestArea: (x: number, z: number) => boolean = () => false,
 ) {
   const sampler = (photo: HTMLImageElement | ImageBitmap, photoBox: Box, maxWidth = photo.width) => {
     const W = Math.min(maxWidth, photo.width);
@@ -53,14 +54,14 @@ export function createForest(
     const lods: number[] = [];
     for (const { x, z, lod, seed } of forestCells(eye, quality)) {
         const c = sample(x, z);
-        if (!c || !woodland(c) || excluded(x, z)) continue;
+        if (!c || (!forestArea(x, z) && !woodland(c)) || excluded(x, z)) continue;
         const y = hf.height(x, z);
         const cedar = seed < .28;
         const s = .8 + seed * .65;
         pos.push(x, y - 0.5, z);
         const cluster = lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
         size.push((cedar ? 2.6 : 4.2) * s * cluster, (cedar ? 15 : 10.5) * s);
-        tint.push(c[0], c[1], c[2]);
+        tint.push(c[0] * .9, Math.max(c[1], c[0] * 1.08), c[2] * .83);
         kind.push(cedar ? 1 : 0);
         lods.push(lod);
     }

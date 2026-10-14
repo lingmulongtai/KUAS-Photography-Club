@@ -106,6 +106,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uAerialCity: { value: tex.aerialCity ?? tex.aerialWide },
     uAerialCityBox: { value: v4(tex.aerialCityBox) },
     uCityOn: { value: tex.aerialCity ? 1 : 0 },
+    uWoodland: { value: tex.aerialWide },
+    uWoodlandOn: { value: 0 },
     uNormalFar: { value: tex.normalFar },
     uNormalFarBox: { value: v4(tex.normalFarBox) },
     uNormalNear: { value: tex.normalNear },
@@ -133,6 +135,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform sampler2D uAerialCity;
       uniform vec4 uAerialCityBox;
       uniform float uCityOn;
+      uniform sampler2D uWoodland;
+      uniform float uWoodlandOn;
       uniform sampler2D uNormalFar;
       uniform vec4 uNormalFarBox;
       uniform sampler2D uNormalNear;
@@ -163,10 +167,13 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 photo = texture2D(uAerialWide, vec2(uw.x, 1. - uw.y)).rgb;
         vec2 uc = boxUv(uAerialCityBox, p);
         vec3 city = texture2D(uAerialCity, vec2(uc.x, 1. - uc.y)).rgb;
+        float mappedForest = texture2D(uWoodland, uw).r * uWoodlandOn;
         photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
 
         // forest: green and dark in the photo. Up close add canopy texture the photo can't resolve.
         float green = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * (1. - smoothstep(.05, .2, dot(photo, vec3(.33))));
+        green = max(green, mappedForest);
+        photo = mix(photo, mix(photo, vec3(.12, .17, .075), .35), mappedForest);
         float near = 1. - smoothstep(600., 3500., dist);
         if (near > 0.){
           // each layer of canopy fades to its average once its blobs shrink below a few pixels
