@@ -43,12 +43,8 @@ export interface TerrainTextures {
 
 const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
 
-/**
- * One mesh for the whole basin on a warped grid: vertices pack tightly around the viewpoint
- * and spread out toward the far mountains. Beyond the data the last ring is pulled out 20 km
- * so the edge never shows against the sky.
- */
-export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: number }, tex: TerrainTextures, segments = 640) {
+/** Vertex positions of the warped grid centred on `center` (see buildTerrain). */
+function terrainPositions(hf: Heightfield, center: { x: number; z: number }, segments: number) {
   const [minX, minZ, maxX, maxZ] = hf.bounds;
   const n = segments + 1;
   const p = 2.1;
@@ -75,6 +71,17 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       pos[k + 2] = z;
     }
   }
+  return pos;
+}
+
+/**
+ * One mesh for the whole basin on a warped grid: vertices pack tightly around the viewpoint
+ * and spread out toward the far mountains. Beyond the data the last ring is pulled out 20 km
+ * so the edge never shows against the sky. recenter() moves the dense part to a new viewpoint.
+ */
+export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: number }, tex: TerrainTextures, segments = 640) {
+  const n = segments + 1;
+  const pos = terrainPositions(hf, center, segments);
   const idx = new Uint32Array(segments * segments * 6);
   let q = 0;
   for (let j = 0; j < segments; j++) {
@@ -197,5 +204,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   });
   const mesh = new THREE.Mesh(geo, material);
   mesh.frustumCulled = false;
-  return { mesh, uniforms };
+  const recenter = (c: { x: number; z: number }) => {
+    geo.setAttribute('position', new THREE.BufferAttribute(terrainPositions(hf, c, segments), 3));
+  };
+  return { mesh, uniforms, recenter };
 }
