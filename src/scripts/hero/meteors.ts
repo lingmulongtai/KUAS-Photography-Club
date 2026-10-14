@@ -62,7 +62,8 @@ export function buildMeteors(quality: number) {
       varying vec2 vUv;
       void main(){
         // soft core across the ribbon, broken up a little along it so it sparkles
-        float across = 1. - abs(vUv.y * 2. - 1.);
+        // with MSAA the edge pixels can see uv slightly outside 0..1: clamp, or pow() gives NaN
+        float across = clamp(1. - abs(vUv.y * 2. - 1.), 0., 1.);
         float core = pow(across, 2.2) + pow(across, 12.) * 2.;
         float flick = .75 + .25 * sin(vUv.x * 90. - uTime * 40.);
         gl_FragColor = vec4(vColor.rgb * vColor.a * core * flick, 1.);
