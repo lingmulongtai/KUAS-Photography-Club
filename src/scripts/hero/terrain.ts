@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import { ROAD_GLSL } from './roads';
 import type { Box } from './geo';
+import { toLocal } from './geo';
 import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
 
@@ -81,6 +82,7 @@ function terrainPositions(hf: Heightfield, center: { x: number; z: number }, seg
  * so the edge never shows against the sky. recenter() moves the dense part to a new viewpoint.
  */
 export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: number }, tex: TerrainTextures, segments = 640) {
+  const kinkaku = toLocal(35.0395092, 135.7284548), kiyomizu = toLocal(34.9946668, 135.7849382);
   const n = segments + 1;
   const pos = terrainPositions(hf, center, segments);
   const idx = new Uint32Array(segments * segments * 6);
@@ -108,6 +110,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uCityOn: { value: tex.aerialCity ? 1 : 0 },
     uWoodland: { value: tex.aerialWide },
     uWoodlandOn: { value: 0 },
+    uTempleGrounds: { value: new THREE.Vector4(kinkaku.x,kinkaku.z,kiyomizu.x,kiyomizu.z) },
     uNormalFar: { value: tex.normalFar },
     uNormalFarBox: { value: v4(tex.normalFarBox) },
     uNormalNear: { value: tex.normalNear },
@@ -137,6 +140,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform float uCityOn;
       uniform sampler2D uWoodland;
       uniform float uWoodlandOn;
+      uniform vec4 uTempleGrounds;
       uniform sampler2D uNormalFar;
       uniform vec4 uNormalFarBox;
       uniform sampler2D uNormalNear;
@@ -191,6 +195,27 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 albedo = photo * .68 * mix(vec3(1.), vec3(1.07, 1., .9), green);
         albedo = mix(vec3(dot(albedo, vec3(.3, .55, .15))), albedo, .9);
 
+        // Aerial roofs and paving contain baked highlights. Compress pale neutral ground
+        // locally instead of changing the sky/exposure or decoding sRGB for a second time.
+        float garden = max(1. - smoothstep(120.,240.,length(p-uTempleGrounds.xy)),
+                           1. - smoothstep(100.,220.,length(p-uTempleGrounds.zw)));
+        float chroma = max(albedo.r,max(albedo.g,albedo.b))-min(albedo.r,min(albedo.g,albedo.b));
+        float neutral = 1. - smoothstep(.025,.095,chroma);
+        float luminance = dot(albedo,vec3(.3,.55,.15));
+        albedo = mix(albedo,albedo/(1.+luminance*2.8),neutral*garden);
+        float groundNear = 1. - smoothstep(450.,1800.,dist);
+        if (groundNear > 0.) {
+          // Broad, world-fixed moss / leaf-litter patches; subpixel grain fades to its mean.
+          float mossPatch = vnoise(p*.035+vec2(13.,27.));
+          float grain = mix(.5,vnoise(p*1.8),1.-smoothstep(.16,.5,fp*1.8));
+          float moss = smoothstep(.34,.72,mossPatch)*smoothstep(.55,.95,n.y);
+          vec3 earth = vec3(.075,.048,.026)*(.85+.3*grain);
+          vec3 floorColor = mix(earth,vec3(.04,.075,.025),moss);
+          float cover = clamp(green*.86+garden*(.32+.34*green),0.,.96)*groundNear;
+          albedo = mix(albedo,floorColor,cover);
+          n = normalize(n+vec3((grain-.5)*.035,0.,(mossPatch-.5)*.045)*cover);
+        }
+
         // ---- streets, from the distance field (roads.ts) ----
         // Edges are drawn over the width of a pixel, so they stay sharp up close and blend into
         // an even tone far away instead of shimmering. Thin markings fade by how much of the
@@ -231,7 +256,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         mark += 1. - smoothstep(.08 - aa, .08 + aa, abs(rd.avenue + .7));
         mark = clamp(mark, 0., 1.) * onAve * fine * min(1., .25 / aa);
         vec3 street = mix(asphalt, vec3(.5, .5, .48), mark);
-        albedo = mix(albedo, vec3(.27, .26, .24) * (.9 + .2 * patchy), walk * .85);
+        vec3 paving = mix(vec3(.27,.26,.24),vec3(.16,.145,.12),garden);
+        albedo = mix(albedo, paving * (.9 + .2 * patchy), walk * .85);
         albedo = mix(albedo, street, onRoad * .93);
         // railway ballast
         albedo = mix(albedo, vec3(.16, .145, .13), onRail * .9);
