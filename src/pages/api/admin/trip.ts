@@ -1,13 +1,13 @@
 import type { APIRoute } from 'astro';
 import { canPublish, guard, json } from '../../../lib/admin/auth';
 import { commit, readText, type CommitFile } from '../../../lib/admin/github';
-import { appendPhotos, checkSlug, photoEntries, photoPath, tripMarkdown, tripPath, type PhotoIn, type TripIn } from '../../../lib/admin/content';
+import { appendPhotos, checkSlug, cleanSpot, photoEntries, photoPath, tripMarkdown, tripPath, type PhotoIn, type TripIn } from '../../../lib/admin/content';
 
 export const prerender = false;
 
 type Body =
   | { mode: 'new'; trip: TripIn; blobs: Record<string, string> }
-  | { mode: 'append'; slug: string; photos: PhotoIn[]; blobs: Record<string, string> };
+  | { mode: 'append'; slug: string; spot?: string | null; photos: PhotoIn[]; blobs: Record<string, string> };
 
 /**
  * Publish a new trip, or add photos to an existing one, as a single commit:
@@ -34,13 +34,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       if (canPublish() && (await readText(tripPath(slug))) !== null) throw new Error('その URL 用の名前の撮影会はもうあります');
     } else {
       if (!canPublish()) {
-        const preview = `# 今ある写真のあとに、次の写真が追加されます\n${photoEntries(slug, photos)}`;
+        const spot = cleanSpot(body.spot);
+        const preview = `# 今ある写真は保持され、次の写真が追加されます\n${photoEntries(slug, photos)}\n# 場所ピン: ${body.spot === undefined ? '変更しません' : spot ?? '関連づけない'}`;
         return json({ demo: true, path: tripPath(slug), markdown: preview });
       }
       const current = await readText(tripPath(slug));
       if (current === null) throw new Error('撮影会が見つかりません');
-      md = appendPhotos(current, slug, photos);
-      message = `content(trips): add ${photos.length} photos to ${slug}`;
+      md = appendPhotos(current, slug, photos, body.spot);
+      message = photos.length ? `content(trips): add ${photos.length} photos to ${slug}` : `content(trips): set place pin for ${slug}`;
     }
     if (!canPublish()) return json({ demo: true, path: tripPath(slug), markdown: md });
 
