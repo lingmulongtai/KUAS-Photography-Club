@@ -5,9 +5,15 @@
  * Tap the sky for a shooting star; the campus pin flies the camera to the Uzumasa campus.
  */
 import { club } from '../data/club';
+import { getCollection } from 'astro:content';
+import { credit } from '../lib/trips';
+const pinTrips = (await getCollection('trips'))
+  .filter((t) => t.data.spot)
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+  .map((t) => ({ spot: t.data.spot, title: t.data.title, href: `/trips/${encodeURIComponent(t.id)}/`, src: t.data.photos[0].src, alt: t.data.photos[0].alt, credit: credit(t.data.photos[0], t.data.date), sample: t.data.sample }));
 ---
 <section class="hero" aria-labelledby="hero-title" data-view="city">
-  <div class="stage hero-stage" data-demo="hero">
+  <div class="stage hero-stage" data-demo="hero" data-trips={JSON.stringify(pinTrips)}>
     <canvas aria-label="将軍塚から西を望む京都の街の3D。実際の地形と建物のデータから作り、空は京都の現在時刻に合わせて変わります"></canvas>
     <nav class="views" aria-label="眺める場所">
       <span class="views-label">VIEW</span>
@@ -162,6 +168,7 @@ import { club } from '../data/club';
         (demo = createHero(renderer, el, {
           now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
           quality,
+          trips: JSON.parse(stage.dataset.trips ?? '[]'),
           get reducedMotion() { return motion.matches; },
           drift: !coarse,
           onStatus,
@@ -636,6 +643,36 @@ import { club } from '../data/club';
   .hero :global(.hero-pin.is-shown) {
     opacity: 1;
   }
+
+  .hero :global(.hero-pin:not(.is-shown)) { pointer-events: none; }
+  .hero :global(.pin-trigger) { color: inherit; font: inherit; background: none; border: 0; padding: 0; }
+  .hero :global(button.pin-trigger) { position: absolute; width: 44px; height: 44px; left: -22px; top: -22px; cursor: pointer; }
+  .hero :global(button.pin-trigger .pin-dot) { left: 22px; top: 22px; }
+  .hero :global(button.pin-trigger .pin-text) { left: 22px; bottom: 34px; }
+  .hero :global(.hero-pin.is-linked) { pointer-events: auto; }
+  .hero :global(.hero-pin.is-open) { z-index: 5; }
+  .hero :global(.pin-trips) {
+    position: absolute;
+    bottom: 48px;
+    left: clamp(calc(16px - var(--pin-x)), -124px, calc(var(--stage-w) - var(--pin-x) - 264px));
+    width: min(248px, calc(100vw - 32px));
+    max-height: 320px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .hero :global(.pin-trips[hidden]) { display: none; }
+  .hero :global(.opens-below .pin-trips) { bottom: auto; top: 12px; }
+  .hero :global(.pin-trips a) { display: grid; gap: 5px; text-decoration: none; margin-bottom: 10px; }
+  .hero :global(.pin-trips a:last-child) { margin-bottom: 0; }
+  .hero :global(.pin-trips img) { width: 100%; height: 112px; object-fit: cover; border-radius: var(--radius-sm); }
+  .hero :global(.pin-trips strong) { font-size: 13px; }
+  .hero :global(.pin-trips small) { font-size: 10px; color: var(--muted); }
 
   .hero :global(.hero-pin.is-muted) {
     opacity: 0 !important;

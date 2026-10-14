@@ -3,6 +3,7 @@ title: 嵐山と嵐電の桜
 date: 2026-04-04
 place: 京都市右京区（嵐山・太秦）
 members: 23
+spot: arashiyama
 summary: キャンパスのある太秦から嵐電に乗って、桜の嵐山へ。
 sample: true
 photos:

@@ -19,7 +19,7 @@ import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
 import { buildWater } from './water';
-import { createLabels } from './labels';
+import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
@@ -38,6 +38,7 @@ export interface HeroOptions {
   /** Date to render for this frame. */
   now: () => Date;
   quality: number;
+  trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
   onReady?: () => void;
   /** A pin with an action was pressed (the campus). */
@@ -199,7 +200,7 @@ export function createHero(
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
     terrain.uniforms.uRoadsOn.value = 1;
     scene.add(buildWater(env, hf, lines, terrain.uniforms));
-    labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid);
+    labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips);
     const lamps = buildLamps(env, hf, lines, opts.quality);
     const cars = buildCars(env, hf, lines, opts.quality);
     driveCars = cars.update;

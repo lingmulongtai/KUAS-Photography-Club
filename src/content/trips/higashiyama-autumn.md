@@ -3,6 +3,7 @@ title: 東山の紅葉と八坂の塔
 date: 2025-11-15
 place: 京都市東山区
 members: 21
+spot: yasaka
 summary: 紅葉の東山を歩いて、夕暮れの八坂の塔まで。
 sample: true
 photos:

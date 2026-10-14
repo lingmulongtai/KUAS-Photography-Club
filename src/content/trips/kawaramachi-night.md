@@ -3,6 +3,7 @@ title: 夜の河原町スナップ
 date: 2026-01-17
 place: 京都市中京区・下京区
 members: 9
+spot: kawaramachi
 summary: 街の光を玉ボケにして、夜の街をスナップ。
 sample: true
 photos:
