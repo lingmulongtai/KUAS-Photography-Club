@@ -38,6 +38,29 @@ const FinishShader = {
 };
 
 /**
+ * Replaces NaN and infinite pixels before bloom. A single bad pixel would otherwise be smeared
+ * across the whole frame by the bloom blur and flash the screen black.
+ */
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null as THREE.Texture | null } },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      // comparisons with NaN are always false, which survives compilers that drop isnan()
+      bool ok = c.r < 1e20 && c.g < 1e20 && c.b < 1e20 && c.r > -1e20 && c.g > -1e20 && c.b > -1e20;
+      if (!ok || any(isnan(c))) c = vec3(0.);
+      gl_FragColor = vec4(clamp(c, 0., 2000.), 1.);
+    }
+  `,
+};
+
+/**
  * HDR pipeline: the scene renders into a multisampled half-float target (4× MSAA, so building
  * edges and power lines of light stay clean), then bloom, ACES tone mapping and the finish.
  */
@@ -46,6 +69,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new ShaderPass(SanitizeShader));
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.7, 0.5, 0.85);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
