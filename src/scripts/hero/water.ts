@@ -62,14 +62,18 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
       varying vec3 vWorld;
       void main(){
         vec2 q = vWorld.xz;
+        float footprint=max(length(dFdx(q)),length(dFdy(q)));
+        float fine=1.-smoothstep(.2,.65,footprint);
+        float broad=1.-smoothstep(.8,2.,footprint);
         // Sample before discarding so the road texture's mip level remains well defined.
         // The road painted on the terrain and its cars must remain visible across rivers.
         Road road = roadAt(q);
         if (road.edge <= 0.) discard;
         float t = uTime;
         vec2 w = vec2(vnoise(q * .35 + vec2(t * .3, 0.)) - .5, vnoise(q * .35 + vec2(0., t * .25) + 9.) - .5);
-        w += .5 * vec2(vnoise(q * 1.4 - t * .5) - .5, vnoise(q * 1.4 + 3. + t * .4) - .5);
-        vec3 n = normalize(vec3(w.x * .12, 1., w.y * .12));
+        w *= broad;
+        w += fine * .25 * vec2(vnoise(q * 1.4 - t * .5) - .5, vnoise(q * 1.4 + 3. + t * .4) - .5);
+        vec3 n = normalize(vec3(w.x * .07, 1., w.y * .07));
         vec3 v = normalize(vWorld - cameraPosition);
         vec3 r = reflect(v, n);
         r.y = abs(r.y);
@@ -80,7 +84,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
         col += uMoonLight * pow(max(dot(r, uMoonDir), 0.), 120.) * 30.;
         // reflected bank lights: vertical streaks that break up with the ripples
         float streak = vnoise(vec2(q.x * .25 + q.y * .25, t * .6) + w * 4.);
-        vec3 emit = vec3(1., .66, .34) * smoothstep(.55, .95, streak) * .35 * uCity;
+        vec3 emit = vec3(1., .66, .34) * mix(.12,smoothstep(.55, .95, streak),broad) * .35 * uCity;
         gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
       }
     `,
