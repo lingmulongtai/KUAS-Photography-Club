@@ -194,6 +194,8 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
       varying vec2 vCell;
       void main(){
         vec3 n = normalize(vNormal);
+        float sh = sunShadow(vWorld, n);
+        vec2 cellWidth = max(fwidth(vCell),vec2(.001));
         vec3 v = normalize(vWorld - cameraPosition);
         int m = int(vMat + .5);
         vec3 albedo = vec3(.62, .63, .62);
@@ -201,25 +203,29 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
         if (m == 1){
           // glass: mullions every 1.6 m, sky reflection by day, lit rooms at night
           float u = vCell.x / 1.6;
-          float mull = smoothstep(.0, .06, fract(u)) * smoothstep(1., .94, fract(u));
+          float fw=cellWidth.x/1.6;
+          float mull = smoothstep(.04-fw,.04+fw,fract(u)) * (1.-smoothstep(.96-fw,.96+fw,fract(u)));
+          float tiny=smoothstep(.12,.35,fw);
+          mull=mix(mull,.92,tiny);
           vec2 id = vec2(floor(u), floor(vCell.y));
           float fres = .06 + .7 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);
           vec3 refl = skyColor(reflect(v, n));
-          albedo = mix(vec3(.5), vec3(.02, .03, .035), mull);
+          albedo = mix(vec3(.32,.34,.34), vec3(.025, .045, .055), mull);
           emit += refl * fres * mull * .9;
-          float lit = step(hash12(id + 3.1), .5);
+          float lit = mix(step(hash12(id + 3.1), .5),.25,tiny);
           emit += vec3(1., .9, .76) * lit * mull * .9 * uCity;
         } else if (m == 2) albedo = vec3(.55, .56, .56);
-        else if (m == 3) albedo = vec3(.3, .31, .31) * (.85 + .3 * vnoise(vCell * .3));
+        else if (m == 3) albedo = vec3(.13, .15, .16) * (.85 + .3 * vnoise(vCell * .3));
         else if (m == 4) albedo = vec3(.42, .43, .43);
         else if (m == 5){ albedo = vec3(.5, .78, .8); emit += vec3(.39, .86, .9) * (.4 + 1.6 * uCity); }
         else if (m == 6){
           // paving: big light slabs with fine joints
           vec2 g = fract(vCell / 3.);
-          float joint = smoothstep(.0, .03, g.x) * smoothstep(.0, .03, g.y);
+          vec2 fw=cellWidth/3.;
+          float joint = smoothstep(.015-fw.x,.015+fw.x,g.x) * smoothstep(.015-fw.y,.015+fw.y,g.y);
+          joint=mix(joint,.98,smoothstep(.08,.25,max(fw.x,fw.y)));
           albedo = vec3(.44, .43, .41) * (.85 + .15 * joint) * (.9 + .2 * vnoise(vCell * .2));
         }
-        float sh = sunShadow(vWorld, n);
         vec3 col = shade(albedo, n, vWorld, sh);
         gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), 1.);
       }

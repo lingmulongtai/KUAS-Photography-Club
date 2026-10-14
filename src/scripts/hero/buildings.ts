@@ -205,7 +205,7 @@ const BUILDING_FS = /* glsl */ `
         albedo *= .9 + .25 * mix(.5, vnoise(vWall * vec2(.6, 3.)), rows);
       } else {
         // flat concrete roofs, some darker waterproofing
-        albedo = pick4(r1, vec3(.32, .31, .29), vec3(.24, .24, .23), vec3(.4, .39, .36), vec3(.16, .17, .18));
+        albedo = pick4(r1, vec3(.12, .13, .14), vec3(.18, .17, .15), vec3(.095, .12, .14), vec3(.23, .22, .19));
         albedo *= .85 + .3 * mix(.5, vnoise(vWorld.xz * .15 + seed), 1. - smoothstep(.2, .5, fwWall.x * .15));
       }
     } else {
@@ -215,6 +215,9 @@ const BUILDING_FS = /* glsl */ `
       else if (use == 4. || H > 31.) wall = pick4(r1, vec3(.3, .31, .32), vec3(.2, .22, .24), vec3(.36, .34, .31), vec3(.14, .16, .19));
       else wall = pick4(r1, vec3(.4, .37, .33), vec3(.3, .27, .23), vec3(.44, .43, .41), vec3(.23, .2, .18));
       wall *= .85 + .3 * r2;
+      // A darker plinth and the shadow below the eaves make a facade read as a building.
+      wall *= mix(.73,1.,smoothstep(0.,2.,vWall.y));
+      wall *= 1. - .22 * smoothstep(H-1.1,H-.15,vWall.y);
 
       // windows on a floor grid
       float floorH = wooden ? 2.9 : (use == 4. ? 3.7 : 3.1);
