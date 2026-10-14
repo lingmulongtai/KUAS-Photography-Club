@@ -6,7 +6,7 @@ Estas directrices son nuestras reglas importantes para garantizar que las activi
 - **Ámbito de aplicación:** Estas reglas se aplican a todas las actividades organizadas, coorganizadas o aprobadas por el club, incluidas las reuniones, los viajes fotográficos y las comunicaciones en línea.
 - **Contacto:**
   - Instagram: @kuas_photographyclub
-  - Teams/Correo electrónico: 2025m011@kuas.ac.jp
+  - Correo electrónico: photography.club.in.kuas@gmail.com
 - **Reuniones periódicas:** Viernes a partir de las 18:00 en la sala S306, Campus de Uzumasa.
 
 ---

@@ -6,7 +6,7 @@
 - **적용 범위:** 이 규칙은 회의, 촬영회, 온라인 커뮤니케이션을 포함하여 동아리가 주최, 공동 주최 또는 승인하는 모든 활동에 적용됩니다.
 - **연락처:**
   - Instagram: @kuas_photographyclub
-  - Teams/이메일: 2025m011@kuas.ac.jp
+  - 이메일: photography.club.in.kuas@gmail.com
 - **정기 회의:** 매주 금요일 18:00부터, 우즈마사 캠퍼스 S306호실.
 
 ---

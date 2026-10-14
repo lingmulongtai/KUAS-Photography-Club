@@ -6,7 +6,7 @@ Diese Richtlinien sind unsere wichtigen Regeln, um sicherzustellen, dass die Akt
 - **Geltungsbereich:** Diese Regeln gelten für alle vom Club organisierten, mitorganisierten oder genehmigten Aktivitäten, einschließlich Treffen, Fotoausflüge und Online-Kommunikation.
 - **Kontakt:**
   - Instagram: @kuas_photographyclub
-  - Teams/E-Mail: 2025m011@kuas.ac.jp
+  - E-Mail: photography.club.in.kuas@gmail.com
 - **Regelmäßige Treffen:** Freitags ab 18:00 Uhr in Raum S306, Uzumasa Campus.
 
 ---
