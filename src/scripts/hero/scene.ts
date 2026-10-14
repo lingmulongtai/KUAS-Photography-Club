@@ -25,6 +25,7 @@ import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds, coverForDay } from './clouds';
 import { createLookRotation, mountLookControls } from './look-controls';
+import { createBuildingMask } from './vegetation-mask';
 
 export interface HeroStatus {
   minutes: number;
@@ -181,7 +182,7 @@ export function createHero(
       !lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200,
     );
     const landmarks = buildLandmarks(env, hf);
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box });
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, createBuildingMask(buildings.boxes, buildings.polys));
     forest.plant(VIEW.eye, VIEW.bearing);
     plantTrees = forest.plant;
     scene.add(forest.group);
