@@ -2,16 +2,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createLookRotation } from '../src/scripts/hero/look-controls.ts';
 
-test('city look remains bounded through large drags and inertia', () => {
+test('look can complete multiple turns while pitch avoids the poles', () => {
   const look = createLookRotation();
   look.move(-10000, 10000, 800, 600, .016);
   look.step(1, false);
-  assert.equal(look.state.yaw, 75);
-  assert.equal(look.state.pitch, 12);
+  assert.ok(look.state.yaw > 720);
+  assert.equal(look.state.pitch, 89);
   look.move(10000, -10000, 800, 600, .016);
   look.step(1, false);
-  assert.equal(look.state.yaw, -75);
-  assert.equal(look.state.pitch, -25);
+  assert.equal(look.state.pitch, -75);
+  const before = look.state.yaw;
+  look.move(3200, 0, 800, 600, .016);
+  assert.ok(look.state.yaw < before - 700);
 });
 
 test('inertia is independent of frame rate and disabled for reduced motion', () => {

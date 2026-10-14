@@ -11,8 +11,8 @@ export function createLookRotation() {
     move(dx: number, dy: number, width: number, height: number, seconds: number) {
       const yaw = state.yaw;
       const pitch = state.pitch;
-      state.yaw = limit(yaw - dx / Math.max(1, width) * 120, -75, 75);
-      state.pitch = limit(pitch + dy / Math.max(1, height) * 45, -25, 12);
+      state.yaw = yaw - dx / Math.max(1, width) * 180;
+      state.pitch = limit(pitch + dy / Math.max(1, height) * 90, -75, 89);
       const dt = Math.max(1 / 120, seconds);
       state.vx = limit((state.yaw - yaw) / dt, -120, 120);
       state.vy = limit((state.pitch - pitch) / dt, -60, 60);
@@ -24,9 +24,9 @@ export function createLookRotation() {
       const decay = Math.exp(-6 * dt);
       const yaw = state.yaw + state.vx * (1 - decay) / 6;
       const pitch = state.pitch + state.vy * (1 - decay) / 6;
-      state.yaw = limit(yaw, -75, 75);
-      state.pitch = limit(pitch, -25, 12);
-      state.vx = yaw === state.yaw ? state.vx * decay : 0;
+      state.yaw = yaw;
+      state.pitch = limit(pitch, -75, 89);
+      state.vx *= decay;
       state.vy = pitch === state.pitch ? state.vy * decay : 0;
     },
   };

@@ -287,7 +287,7 @@ export function createHero(
   function cityPose(t: number, out = pose) {
     const drift = opts.reducedMotion || opts.drift === false ? 0 : Math.sin(t * 0.05) * 0.8;
     const b = (VIEW.bearing + drift + lookDrag.yaw) * RAD;
-    const p = (VIEW.pitch + lookDrag.pitch) * RAD;
+    const p = THREE.MathUtils.clamp(VIEW.pitch + lookDrag.pitch, -80, 89) * RAD;
     out.pos.copy(eye);
     out.target.set(eye.x + Math.sin(b) * Math.cos(p) * 1000, eye.y + Math.sin(p) * 1000, eye.z - Math.cos(b) * Math.cos(p) * 1000);
     return out;
@@ -295,9 +295,12 @@ export function createHero(
 
   function campusPose(t: number, out = pose) {
     const a = ORBIT.start - (opts.reducedMotion ? 0 : (t - modeSince) * ORBIT.speed) + lookDrag.yaw * RAD;
-    out.pos.set(campus.x + Math.sin(a) * ORBIT.radius, campus.y + ORBIT.height + lookDrag.pitch * 3, campus.z - Math.cos(a) * ORBIT.radius);
-    // aim a little above the campus so the mountains behind stay in frame
     out.target.copy(campus).setY(campus.y + 45);
+    // A spherical orbit reaches an overhead view without passing through the ground.
+    const elevation = THREE.MathUtils.clamp(Math.atan2(ORBIT.height - 45, ORBIT.radius) / RAD + lookDrag.pitch, 5, 89) * RAD;
+    const distance = Math.hypot(ORBIT.radius, ORBIT.height - 45);
+    const radius = Math.cos(elevation) * distance;
+    out.pos.set(campus.x + Math.sin(a) * radius, out.target.y + Math.sin(elevation) * distance, campus.z - Math.cos(a) * radius);
     return out;
   }
 
