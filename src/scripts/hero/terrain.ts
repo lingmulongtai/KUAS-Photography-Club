@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
+import { ROAD_GLSL } from './roads';
 import type { Box } from './geo';
 import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
@@ -109,9 +110,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uNormalFarBox: { value: v4(tex.normalFarBox) },
     uNormalNear: { value: tex.normalNear },
     uNormalNearBox: { value: v4(tex.normalNearBox) },
-    /** night road glow painted from the road network (see lights.ts) */
-    uRoadGlow: { value: null as THREE.Texture | null },
+    /** distance field of the streets and railways (see roads.ts) */
+    uRoads: { value: null as THREE.Texture | null },
     uRoadBox: { value: new THREE.Vector4(0, 0, 1, 1) },
+    uRoadsOn: { value: 0 },
   };
   const material = new THREE.ShaderMaterial({
     uniforms,
@@ -135,8 +137,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform vec4 uNormalFarBox;
       uniform sampler2D uNormalNear;
       uniform vec4 uNormalNearBox;
-      uniform sampler2D uRoadGlow;
-      uniform vec4 uRoadBox;
+      ${ROAD_GLSL}
       varying vec3 vWorld;
 
       vec2 boxUv(vec4 b, vec2 p){ return (p - b.xy) / (b.zw - b.xy); }
@@ -183,16 +184,69 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 albedo = photo * .62;
         albedo = mix(vec3(dot(albedo, vec3(.3, .55, .15))), albedo, .85);
 
+        // ---- streets, from the distance field (roads.ts) ----
+        // Edges are drawn over the width of a pixel, so they stay sharp up close and blend into
+        // an even tone far away instead of shimmering. Thin markings fade by how much of the
+        // pixel they would cover.
+        Road rd = roadAt(p);
+        float aa = max(fp * .6, .12);
+        float onRoad = 1. - smoothstep(-aa, aa, rd.edge);
+        float onAve = 1. - smoothstep(-aa, aa, rd.avenue);
+        float walk = (1. - smoothstep(-aa, aa, rd.avenue - 3.2)) * (1. - onAve);
+        float onRail = 1. - smoothstep(-aa, aa, rd.rail);
+        float fine = 1. - smoothstep(.6, 2.5, fp);
+        // asphalt, a touch lighter and patched on the avenues
+        float patchy = mix(.5, vnoise(p * .07), 1. - smoothstep(4., 12., fp));
+        vec3 asphalt = vec3(.085, .088, .094) * (.85 + .3 * patchy);
+        asphalt = mix(asphalt, asphalt * 1.25, onAve);
+        // markings on the avenues: a centre line, dashed lane lines, a line along each kerb
+        float halfW = max(rd.centre - rd.avenue, 1.);
+        vec2 e = vec2(1.5, 0.);
+        vec2 grad = vec2(roadAt(p + e.xy).centre - roadAt(p - e.xy).centre, roadAt(p + e.yx).centre - roadAt(p - e.yx).centre);
+        vec2 along = normalize(vec2(-grad.y, grad.x) + 1e-5);
+        // one direction per road (the gradient flips sign across the centre line), snapped to
+        // Kyoto's north-south / east-west grid so the phase of dashes and lamps holds through junctions
+        if (along.x < 0. || (abs(along.x) < 1e-4 && along.y < 0.)) along = -along;
+        if (abs(along.x) > .985) along = vec2(1., 0.);
+        else if (abs(along.y) > .985) along = vec2(0., 1.);
+        // the distance to the centre line changes evenly across a straight road: where it
+        // doesn't (junctions, bends) the lane dashes would scribble, so leave them out
+        float straight = smoothstep(.75, .95, length(grad) / 3.);
+        float s = dot(p, along);
+        // where the road bends sharply (bus terminals, junctions) s sweeps round faster than the
+        // ground under the pixel: leave dashes and lamp pools out there
+        straight *= 1. - smoothstep(1.6, 3., fwidth(s) / max(fp, .05));
+        float dash = smoothstep(.45, .5, fract(s / 10.)) * (1. - smoothstep(.95, 1., fract(s / 10.)));
+        float lane = abs(fract(rd.centre / 3.4 + .5) - .5) * 3.4;
+        float mark = 0.;
+        mark += 1. - smoothstep(.12 - aa, .12 + aa, rd.centre);
+        mark += (1. - smoothstep(.08 - aa, .08 + aa, lane)) * dash * straight * step(2.5, rd.centre) * step(rd.centre, halfW - 2.);
+        mark += 1. - smoothstep(.08 - aa, .08 + aa, abs(rd.avenue + .7));
+        mark = clamp(mark, 0., 1.) * onAve * fine * min(1., .25 / aa);
+        vec3 street = mix(asphalt, vec3(.5, .5, .48), mark);
+        albedo = mix(albedo, vec3(.27, .26, .24) * (.9 + .2 * patchy), walk * .85);
+        albedo = mix(albedo, street, onRoad * .93);
+        // railway ballast
+        albedo = mix(albedo, vec3(.16, .145, .13), onRail * .9);
+
         float sh = sunShadow(vWorld, n);
         vec3 col = shade(albedo, n, vWorld, sh);
 
         vec3 emit = vec3(0.);
-        vec2 ur = boxUv(uRoadBox, p);
-        if (uCity > .01 && ur.x > 0. && ur.x < 1. && ur.y > 0. && ur.y < 1.){
-          vec2 glow = texture2D(uRoadGlow, vec2(ur.x, 1. - ur.y)).rg;
-          // streets up close, plus their halo from far away
+        if (uCity > .01){
+          // street lighting: a dim warm wash on the side streets; on the avenues, pools of
+          // light under lamps every 28 m along each kerb (their average from far away)
+          float inKerb = max(-rd.avenue, 0.);
+          float ph = fract(s / 28.) - .5;
+          float pool = exp(-inKerb * inKerb / 14.) * exp(-ph * ph * 40.);
+          pool = mix(.3, pool * 1.7, (1. - smoothstep(3., 9., fp)) * straight);
+          emit += vec3(1., .66, .36) * .03 * (onRoad - onAve * onRoad);
+          emit += vec3(1., .84, .62) * onAve * (.012 + .1 * pool) * (1. + mark * .6);
+          emit += vec3(1., .85, .66) * walk * (.01 + .05 * pool);
+          // from far away the avenues read as lines of light with a little haze around them
           float halo = smoothstep(900., 4000., dist);
-          emit += vec3(1., .7, .42) * (glow.r * mix(.55, 1.1, halo) + glow.g * halo * .7) * uCity;
+          emit += vec3(1., .74, .46) * exp(-max(rd.avenue, 0.) / 14.) * (1. - smoothstep(16., 30., rd.avenue)) * halo * .18;
+          emit *= uCity;
         }
         // a teal ring that pulses around the campus when it is in focus
         if (uHighlight > 0.){

@@ -1,54 +1,12 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
-import { BUILDINGS_BOX } from './geo';
 import { LINE, type LineFeature } from './lines-data';
+import { ROAD_WIDTH as WIDTH } from './roads';
 import { rng } from './util';
 
 /* The city at night, drawn from the real road network. */
 
-const WIDTH = [3, 4.5, 9, 16, 24];
-
-/**
- * A glow map of the streets, painted once from the road lines. Red holds the streets themselves
- * (avenues bright, side streets faint), green a soft halo around the avenues that only shows from
- * afar. The terrain adds it as light after dark, so Kyoto's grid shows.
- */
-export function roadGlowTexture(lines: LineFeature[], size: number) {
-  const [minX, minZ, maxX, maxZ] = BUILDINGS_BOX;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const g = canvas.getContext('2d')!;
-  g.fillStyle = '#000';
-  g.fillRect(0, 0, size, size);
-  const sx = size / (maxX - minX);
-  const sz = size / (maxZ - minZ);
-  g.lineCap = 'round';
-  g.lineJoin = 'round';
-  const draw = (rank: number, blur: number, alpha: number, widen: number, channel: 'r' | 'g') => {
-    g.filter = blur ? `blur(${blur}px)` : 'none';
-    const v = Math.round(alpha * 255);
-    g.strokeStyle = channel === 'r' ? `rgb(${v},0,0)` : `rgb(0,${v},0)`;
-    g.lineWidth = Math.max(0.6, WIDTH[rank] * sx * widen);
-    g.beginPath();
-    for (const f of lines) {
-      if (f.kind !== LINE.road || (f.attr & 15) !== rank) continue;
-      const p = f.pts;
-      g.moveTo((p[0] - minX) * sx, (p[1] - minZ) * sz);
-      for (let i = 2; i < p.length; i += 2) g.lineTo((p[i] - minX) * sx, (p[i + 1] - minZ) * sz);
-    }
-    g.stroke();
-  };
-  g.globalCompositeOperation = 'lighter';
-  for (const rank of [1, 2, 3, 4]) draw(rank, 0, rank >= 3 ? 0.75 : rank === 2 ? 0.45 : 0.26, 1, 'r');
-  for (const rank of [3, 4]) draw(rank, Math.max(1, size / 1200), 0.4, 3, 'g');
-  g.filter = 'none';
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.generateMipmaps = true;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.anisotropy = 8;
-  return tex;
-}
 
 /** Points spaced along every road: street lamps, brighter and closer together on the avenues. */
 export function buildLamps(env: Env, hf: Heightfield, lines: LineFeature[], quality: number) {

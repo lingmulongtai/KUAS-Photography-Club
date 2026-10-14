@@ -13,7 +13,8 @@ import { loadBuildings } from './buildings-data';
 import { buildCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import { loadLines } from './lines-data';
-import { buildLamps, buildTraffic, roadGlowTexture } from './lights';
+import { buildLamps, buildTraffic } from './lights';
+import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
 import { buildWater } from './water';
@@ -186,8 +187,9 @@ export function createHero(
     scene.add(buildBeacons(env, tops));
 
     const lines = await loadLines();
-    terrain.uniforms.uRoadGlow.value = roadGlowTexture(lines, opts.quality > 0.75 ? 4096 : 2048);
+    terrain.uniforms.uRoads.value = buildRoadField(renderer, lines, opts.quality > 0.75 ? 4096 : 2048).texture;
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
+    terrain.uniforms.uRoadsOn.value = 1;
     scene.add(buildWater(env, hf, lines));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid);
     const lamps = buildLamps(env, hf, lines, opts.quality);
