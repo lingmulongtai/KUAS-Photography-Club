@@ -122,13 +122,15 @@ export function createForest(
       varying float vUp;
       void main(){
         vec3 n = normalize(vNormal);
+        float sh = sunShadow(vWorld, n);
+        float fp = max(length(dFdx(vWorld)), length(dFdy(vWorld)));
         // photo colour as albedo, a little richer, darker inside the crown
         vec3 alb = pow(vTint, vec3(2.2)) * .85;
         alb = mix(vec3(dot(alb, vec3(.3, .55, .15))), alb, 1.25);
         alb *= .55 + .55 * smoothstep(.1, .9, vUp);
-        float leaf = vnoise(vWorld.xz * 1.7 + vWorld.y * .9);
+        // clumps of leaves, smoothed away once they are smaller than a couple of pixels
+        float leaf = mix(.5, vnoise(vWorld.xz * 1.7 + vWorld.y * .9), 1. - smoothstep(.25, .6, fp * 1.7));
         alb *= .8 + .4 * leaf;
-        float sh = sunShadow(vWorld, n);
         vec3 col = shade(alb, n, vWorld, sh);
         gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
       }
