@@ -35,7 +35,7 @@ export interface GridMeta {
 export interface TerrainMeta {
   far: GridMeta;
   near: GridMeta;
-  aerialWide: { box: Box; file: string; size: [number, number] };
+  aerialWide: { box: Box; file: string; size: [number, number]; high?: { file: string; size: [number, number]; bytes: number; zoom: number } };
   aerialCity: { box: Box; file: string; size: [number, number] };
 }
 
