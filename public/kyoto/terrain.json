@@ -34,7 +34,16 @@
   "size": [
    2048,
    1843
-  ]
+  ],
+  "high": {
+   "file": "aerial-mountains.webp",
+   "size": [
+    4096,
+    3687
+   ],
+   "bytes": 2902028,
+   "zoom": 14
+  }
  },
  "aerialCity": {
   "box": [
