@@ -90,7 +90,7 @@ export const VIEWS = {
   /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
   shogunzuka: { ja: '将軍塚', en: 'Shogunzuka', eye: ahead(PLACES.shogunzuka, 265, 120), ref: PLACES.shogunzuka, above: 44, bearing: 265, pitch: -5 },
   /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
-  kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 258, 40), ref: KIYOMIZU, above: 30, bearing: 258, pitch: -3.5 },
+  kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 287, pitch: -8 },
   /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
   daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: DAIMONJI, ref: DAIMONJI, above: 24, bearing: 248, pitch: -7 },
   /** An exterior composition: the whole tower against the northern city and mountains. */
@@ -188,7 +188,7 @@ export function createHero(
     const lite = opts.quality < 0.75;
     const eyes = Object.values(VIEWS).map((v) => v.eye);
     const landmarks = buildLandmarks(env, hf);
-    const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25}];
+    const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48}];
     const replaced = (x:number,z:number) => replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
     const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>{
       let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}

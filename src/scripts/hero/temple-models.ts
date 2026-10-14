@@ -49,3 +49,32 @@ export function goldenPavilion():Part[] {
   box(parts,.12,.8,.12,0,11.6,0,gold,.7);
   return parts;
 }
+
+/** Main hall and its cantilevered stage, supported by eighteen timber columns. */
+export function kiyomizuHall():Part[] {
+  const parts:Part[]=[];
+  for(let row=0;row<3;row++) for(let i=0;i<6;i++) {
+    const x=-14+i*5.6,z=-5+row*6;
+    box(parts,.75,13,.75,x,6.5,z,wood,.28);
+    box(parts,1.3,.6,1.3,x,.3,z,[.24,.23,.2],.1);
+  }
+  for(const y of [3,7,11]) {
+    for(const z of [-5,1,7])box(parts,30,.4,.4,0,y,z,wood,.2);
+    for(let x=-14;x<=14;x+=5.6)box(parts,.4,.4,15,x,y,1,wood,.2);
+  }
+  for(let i=0;i<26;i++)box(parts,1.18,.3,18,-15+i*1.2,13.15,1,[.24,.13,.062],.35);
+  for(let x=-15;x<=15;x+=2.5)box(parts,.18,1.25,.18,x,13.9,10,wood,.4);
+  for(const y of [13.6,14.45])box(parts,31,.18,.18,0,y,10,wood,.4);
+  for(const side of [-1,1]) {
+    for(let z=-7;z<=9;z+=2.5)box(parts,.18,1.25,.18,side*15,13.9,z,wood,.4);
+    box(parts,.18,.18,18,side*15,14.45,1,wood,.4);
+  }
+  box(parts,32,5,16,0,15.7,-14,[.095,.055,.026],.3);
+  for(let x=-15;x<=15;x+=3) {
+    box(parts,.4,6,.4,x,16,-5.7,wood,.4);
+    box(parts,2.4,3.6,.2,x,16,-5.5,[.025,.022,.015],.15);
+  }
+  roof(parts,40,25,6.5,19,-13);
+  roof(parts,35,8,1.8,18,-3);
+  return parts;
+}
