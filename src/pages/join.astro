@@ -48,10 +48,15 @@ const faq = [
           <p class="edge">APPLY</p>
           <h2>見学・入部の申し込み</h2>
           <p class="muted">
-            申し込みはサークルのフォームで受け付けています。名前と連絡先、見学したい日を書いて送ってください。運営から連絡します。
+            申し込みはサークルのフォーム（Microsoft Forms）で受け付けています。名前と連絡先、見学したい日を書いて送ってください。運営から連絡します。
           </p>
         </div>
         <FormLink href={forms.join} label="申し込みフォームを開く" />
+        <ul class="form-notes small">
+          <li>京都先端科学大学の Microsoft アカウントでサインインして回答します（学内の人だけが開けます）。</li>
+          <li>フォームはいまは英語のみです。日本語版も準備しています。</li>
+          <li>わからないことは Instagram の DM かメールで気軽に聞いてください。</li>
+        </ul>
       </div>
 
       <aside class="side">
@@ -130,6 +135,14 @@ const faq = [
   .form-col {
     display: grid;
     gap: 28px;
+  }
+
+  .form-notes {
+    margin: -8px 0 0;
+    padding-left: 1.2em;
+    display: grid;
+    gap: 4px;
+    color: var(--muted);
   }
 
   .side {
