@@ -146,12 +146,19 @@ export function createForest(
   });
 
   const group = new THREE.Group();
+  // Repeated visits reuse three recent populations; evicted instance buffers are released.
+  const populations=new Map<string,{meshes:THREE.Mesh[];count:number}>();
   let count = 0;
   /** All directions remain populated when the user turns; chunks outside the frustum are culled. */
   function plant(eye: { x: number; z: number }, _bearing: number) {
+    const key=`${Math.round(eye.x)},${Math.round(eye.z)}`;
     for (const m of [...group.children] as THREE.Mesh[]) {
-      m.geometry.dispose();
       group.remove(m);
+    }
+    const cached=populations.get(key);
+    if(cached) {
+      populations.delete(key);populations.set(key,cached);
+      group.add(...cached.meshes);count=cached.count;return;
     }
     const { pos, size, tint, kind, lods } = trees(eye);
     count = kind.length;
@@ -183,6 +190,12 @@ export function createForest(
       geo.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
       const mesh = new THREE.Mesh(geo, material);
       group.add(mesh);
+    }
+    populations.set(key,{meshes:[...group.children] as THREE.Mesh[],count});
+    if(populations.size>3) {
+      const oldest=populations.keys().next().value!;
+      for(const mesh of populations.get(oldest)!.meshes) mesh.geometry.dispose();
+      populations.delete(oldest);
     }
   }
   return { group, plant, get count() { return count; } };
