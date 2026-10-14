@@ -8,6 +8,7 @@ test('forest coverage surrounds a viewpoint and has a bounded lightweight popula
   assert.ok(pc.length < 100000);
   assert.ok(mobile.length < pc.length / 2);
   for (const cells of [pc,mobile]) {
+    assert.ok(cells.some(c=>Math.hypot(c.x-center.x,c.z-center.z)>9500));
     const quadrants = new Set(cells.filter(c=>c.lod===0).map(c=>`${c.x>center.x},${c.z>center.z}`));
     assert.equal(quadrants.size,4);
     assert.ok(cells.every(c=>Math.hypot(c.x-center.x,c.z-center.z)>=32));
