@@ -67,6 +67,10 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
     <p class="edge">OUR CAMPUS</p>
     <h2>京都先端科学大学<br />太秦キャンパス</h2>
     <p class="small">写真部はここで集まっています。</p>
+    <div class="times campus-angles" role="group" aria-label="キャンパスを見る角度">
+      <button type="button" data-elevation="oblique" aria-pressed="true">斜めから</button>
+      <button type="button" data-elevation="overhead" aria-pressed="false">真上から</button>
+    </div>
     <dl>
       <div><dt>ミーティング</dt><dd>{club.meetings.day} {club.meetings.times.join(' / ')}</dd></div>
       <div><dt>教室</dt><dd>{club.meetings.room}</dd></div>
@@ -155,6 +159,7 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
       hero.dataset.view = mode;
       if (mode === 'campus') {
         card.hidden = false;
+        if(!arrived) hero.querySelectorAll<HTMLButtonElement>('[data-elevation]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.elevation==='oblique')));
         if (arrived) back.focus({ preventScroll: true });
       } else if (!arrived) card.hidden = true;
     };
@@ -191,6 +196,11 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
     );
 
     back.addEventListener('click', () => demo && demo.flyTo(demo.view));
+    const angleButtons=Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-elevation]'));
+    angleButtons.forEach(b=>b.addEventListener('click',()=>{
+      demo?.setCampusElevation(b.dataset.elevation==='overhead');
+      angleButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    }));
     hero.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && demo?.mode === 'campus') demo.flyTo(demo.view);
     });
@@ -513,6 +523,7 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
     font-size: 22px;
     line-height: 1.4;
   }
+  .campus-angles button { color: var(--ink); border-color: var(--line); }
 
   .campus-card dl {
     margin: 4px 0;
