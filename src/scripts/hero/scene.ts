@@ -120,7 +120,7 @@ export function createHero(
   const meteors = buildMeteors(opts.quality);
   const clouds = buildClouds(env);
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
-  const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
+  const post = createPost(renderer, scene, camera, 2);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
   const casts = (o: THREE.Object3D) => o.traverse((c) => (c as THREE.Mesh).isMesh && c.layers.enable(SHADOW_LAYER));
   const look = createLook();
@@ -502,10 +502,10 @@ export function createHero(
       // keep the frame rate up on slower devices by rendering fewer pixels
       if (dt > 0) {
         slow = dt > 0.034 ? slow + 1 : Math.max(0, slow - 1);
-        if (slow > 90 && pixelRatio > 1) {
+        if (slow > 45 && pixelRatio > .75) {
           slow = 0;
           lowered = true;
-          setResolution(Math.max(1, pixelRatio - 0.25));
+          setResolution(Math.max(.75, pixelRatio - 0.25));
         }
       }
     },
