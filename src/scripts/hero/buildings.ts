@@ -18,6 +18,14 @@ const CHUNK = 1500;
 /** Walls run this far below the ground so buildings on slopes never float. */
 const FOOTING = 6;
 
+/**
+ * Neighbouring houses often have the same measured height, and their fitted rectangles overlap
+ * a little, so two roofs (or two street fronts) can lie in exactly the same plane and fight over
+ * every pixel as the camera moves. Each building gets its own few centimetres of extra height
+ * and inset so one of them always wins.
+ */
+const separation = (seed: number) => ({ lift: 0.06 + 0.42 * ((seed * 97.13) % 1), inset: 0.04 + 0.22 * ((seed * 57.71) % 1) });
+
 /* ---------- unit shapes ---------- */
 
 interface Face {
@@ -288,8 +296,9 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: { b: BoxBuilding;
   let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity, maxY = -Infinity, minY = Infinity;
   list.forEach(({ b, y, seed }, i) => {
     const r = pitched ? roofFor(b) : { type: 0, rh: 0 };
+    const { lift, inset } = separation(seed);
     pos.set([b.x, y, b.z], i * 3);
-    size.set([b.w, b.h, b.d], i * 3);
+    size.set([Math.max(1, b.w - 2 * inset), b.h + lift, Math.max(1, b.d - 2 * inset)], i * 3);
     rot[i] = b.angle;
     const campus = inCampus(b.x, b.z) ? 256 + (isDetailed(b.kind, b.h, b.x, b.z) ? 512 : 0) : 0;
     meta.set([b.kind + campus, seed, r.type, r.rh], i * 4);
@@ -332,7 +341,7 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
   for (const { p, y, seed } of list) {
     const r = p.ring;
     const m = r.length / 2;
-    const top = y + p.h;
+    const top = y + p.h + separation(seed).lift;
     const bottom = y - FOOTING;
     // signed area decides which side of each edge is outside
     let area = 0;

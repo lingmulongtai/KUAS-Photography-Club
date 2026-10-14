@@ -95,7 +95,9 @@ export function createHero(
 ): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void; readonly mode: HeroMode; readonly view: HeroView } {
   const env = createEnv();
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 8, 60000);
+  // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
+  // away depends on it, and too little of it makes neighbouring rooftops flicker
+  const camera = new THREE.PerspectiveCamera(40, 1, 20, 60000);
   const sky = buildSkyDome(env);
   const celestial = buildCelestial(env, opts.quality);
   const meteors = buildMeteors(opts.quality);
