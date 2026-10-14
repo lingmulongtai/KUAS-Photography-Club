@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
+import { kyotoTower } from './kyoto-tower';
 import { goldenPavilion, kiyomizuHall, togetsukyo } from './temple-models';
 
 /*
@@ -82,59 +83,6 @@ function pagoda(storeys: number, base: number, top: number, height: number, spir
   const ball = new THREE.SphereGeometry(0.45, 10, 8);
   ball.translate(0, y + spire, 0);
   parts.push({ geo: ball, color: BRONZE, glow: 0.6 });
-  return parts;
-}
-
-/** Kyoto Tower: the white tower on the roof of its 31 m base building, 131 m to the tip. */
-function kyotoTower(): Part[] {
-  const base = 31;
-  const profile: [number, number][] = [
-    [0, 0], [6.9, 0], [6.4, 6], [5.6, 22], [4.9, 42], [4.6, 58], [5.2, 61],
-    [7.6, 62.5], [8.4, 66], [8.4, 71.5], [7.9, 74.5], [5.4, 76], [4.1, 80], [2.6, 86], [1.3, 92], [0.45, 97], [0.25, 100], [0, 100],
-  ];
-  const lathe = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y + base)), 48);
-  const deck = new THREE.CylinderGeometry(8.45, 8.45, 4.2, 48, 1, true);
-  deck.translate(0, base + 67.6, 0);
-  const tip = new THREE.CylinderGeometry(0.18, 0.25, 4, 6);
-  tip.translate(0, base + 98, 0);
-  const parts: Part[] = [
-    { geo: lathe, color: [0.62, 0.65, 0.63], glow: 0.42 },
-    { geo: deck, color: [0.028, 0.06, 0.085], glow: 1.1 },
-    { geo: tip, color: [0.6, 0.08, 0.04], glow: 1 },
-  ];
-  const box = (w: number, h: number, d: number, x: number, y: number, z: number, color: Part['color'], glow = .2) => {
-    const geo = new THREE.BoxGeometry(w, h, d); geo.translate(x, y, z);
-    parts.push({ geo, color, glow });
-  };
-  // The tower stands on its hotel podium; dark floor bands and recessed windows
-  // distinguish the facade from the smooth ivory shell above it.
-  box(49, 30, 36, 0, 15, 0, [.32, .3, .27]);
-  box(51, 1.2, 38, 0, 30.4, 0, [.14, .15, .15]);
-  for (let floor = 0; floor < 7; floor++) {
-    const y = 3.8 + floor * 3.7;
-    for (const side of [-1, 1]) {
-      box(49.2, .24, .3, 0, y - 1.5, side * 18.1, [.12, .11, .1]);
-      for (let x = -21; x <= 21; x += 3.5) box(2.35, 1.85, .3, x, y, side * 18.2, [.025, .045, .06], .7);
-      for (let z = -14; z <= 14; z += 3.5) box(.3, 1.85, 2.35, side * 24.7, y, z, [.025, .045, .06], .7);
-    }
-  }
-  for (const [y, radius] of [[base + 62.6, 7.7], [base + 65.5, 8.45], [base + 71.7, 8.5], [base + 74.5, 7.9]]) {
-    const ring = new THREE.TorusGeometry(radius, .16, 6, 64);
-    ring.rotateX(Math.PI / 2); ring.translate(0, y, 0);
-    parts.push({ geo: ring, color: [.65, .68, .65], glow: .38 });
-  }
-  for (let i = 0; i < 48; i++) {
-    const a = i * Math.PI * 2 / 48;
-    const mullion = new THREE.BoxGeometry(.14, 4.4, .24);
-    mullion.rotateY(-a); mullion.translate(Math.sin(a) * 8.5, base + 67.6, Math.cos(a) * 8.5);
-    parts.push({ geo: mullion, color: [.56, .59, .56], glow: .5 });
-  }
-  for (const y of [base + 7, base + 22, base + 42, base + 58]) {
-    const radius = y < base + 10 ? 6.35 : y < base + 30 ? 5.6 : y < base + 50 ? 4.9 : 4.6;
-    const seam = new THREE.TorusGeometry(radius, .045, 4, 48);
-    seam.rotateX(Math.PI / 2); seam.translate(0, y, 0);
-    parts.push({ geo: seam, color: [.4, .43, .42], glow: .25 });
-  }
   return parts;
 }
 
