@@ -4,8 +4,8 @@
  */
 export const club = {
   name: 'KUAS Photography Club',
-  nameJa: '京都先端科学大学 写真サークル',
-  shortJa: 'KUAS 写真サークル',
+  nameJa: '京都先端科学大学 写真部',
+  shortJa: 'KUAS 写真部',
   university: '京都先端科学大学',
   campus: '太秦キャンパス',
   /** Recognised by the student union. */
@@ -41,6 +41,6 @@ export const nav = [
   { href: '/trips/', ja: '撮影会', en: 'Trips' },
   { href: '/schedule/', ja: 'スケジュール', en: 'Schedule' },
   { href: '/learn/', ja: '写真を学ぶ', en: 'Learn' },
-  { href: '/about/', ja: 'サークルについて', en: 'About' },
+  { href: '/about/', ja: '写真部について', en: 'About' },
   { href: '/guidelines/', ja: 'ガイドライン', en: 'Guidelines' },
 ] as const;
