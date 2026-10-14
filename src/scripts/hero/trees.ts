@@ -5,6 +5,7 @@ import type { Heightfield } from './heightfield';
 import type { Box } from './geo';
 import { rng } from './util';
 import { forestCells, woodland } from './forest-layout';
+import { treeProfile, standDensity } from './tree-profile';
 
 /**
  * Real trees on the slopes in front of the viewpoint, where the aerial photo shows forest.
@@ -44,6 +45,10 @@ export function createForest(
   const citySample = sampler(photo, photoBox);
   const wideSample = fallback ? sampler(fallback.photo, fallback.box, quality > .75 ? 4096 : 2048) : null;
   const sample = (x: number, z: number) => citySample(x, z) ?? wideSample?.(x, z) ?? null;
+  const contains = (x:number,z:number) => {
+    const c=sample(x,z);
+    return !!c && !excluded(x,z) && (woodland(c)||forestArea(x,z));
+  };
 
   function trees(eye: { x: number; z: number }) {
     const r = rng(4242);
@@ -52,18 +57,21 @@ export function createForest(
     const tint: number[] = [];
     const kind: number[] = [];
     const lods: number[] = [];
+    const shapes: number[] = [];
     for (const { x, z, lod, seed } of forestCells(eye, quality)) {
         const c = sample(x, z);
         if (!c || excluded(x, z) || (!woodland(c) && !forestArea(x, z))) continue;
+        if (lod<2 && seed>standDensity(x,z)) continue;
         const y = hf.height(x, z);
-        const cedar = seed < .28;
-        const s = .8 + seed * .65;
+        const profile = treeProfile(x,z);
+        const cedar = profile.cedar;
         pos.push(x, y - 0.5, z);
         const cluster = lod === 3 ? quality>.75 ? 8 : 11 : lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
-        size.push((cedar ? 2.6 : 4.2) * s * cluster, (cedar ? 15 : 10.5) * s);
-        tint.push(c[0] * .9, Math.max(c[1], c[0] * 1.08), c[2] * .83);
+        size.push((cedar ? 2.6 : 4.2) * profile.width * cluster, (cedar ? 15 : 10.5) * profile.height);
+        tint.push(...profile.tint.map((v,i)=>v*.8+Math.min(c[i],.45)*.2));
         kind.push(cedar ? 1 : 0);
         lods.push(lod);
+        shapes.push(profile.aspect,profile.lean,profile.crown);
     }
     for (const t of extra) {
       const s = 0.7 + r() * 0.35;
@@ -72,8 +80,10 @@ export function createForest(
       tint.push(0.2, 0.3, 0.15);
       kind.push(0);
       lods.push(0);
+      const profile=treeProfile(t.x,t.z);
+      shapes.push(profile.aspect,profile.lean,profile.crown);
     }
-    return { pos, size, tint, kind, lods };
+    return { pos, size, tint, kind, lods, shapes };
   }
 
   // broadleaf crown: two flattened blobs; cedar: a narrow cone. Both unit-sized, base at y = 0.
@@ -99,6 +109,7 @@ export function createForest(
       attribute vec3 iPos;
       attribute vec2 iSize;
       attribute vec3 iTint;
+      attribute vec3 iShape;
       attribute float aBark;
       uniform float uTime;
       varying vec3 vWorld;
@@ -106,16 +117,25 @@ export function createForest(
       varying vec3 vTint;
       varying float vUp;
       void main(){
-        vec3 p = position * vec3(iSize.x * 2., iSize.y, iSize.x * 2.);
+        float foliage=1.-aBark;
+        vec3 scale=vec3(iSize.x*2.*iShape.x,iSize.y,iSize.x*2./iShape.x);
+        vec3 p = position * scale;
+        float upper=max(position.y-.4,0.);
+        p.y += upper*iSize.y*(iShape.z-1.)*foliage;
+        p.x += upper*iSize.x*2.*iShape.y*foliage;
         float a = fract(sin(dot(iPos.xz, vec2(12.9898, 78.233))) * 43758.5453) * 6.283;
         p.xz = mat2(cos(a), sin(a), -sin(a), cos(a)) * p.xz;
         vec3 wp = iPos + p;
         // a breath of wind in the canopy
         wp.x += sin(uTime * 1.3 + iPos.x * .05) * .12 * position.y;
         vWorld = wp;
-        vec3 n = normal;
+        vec3 n = normal / scale;
+        if(position.y>.4) {
+          n.y /= mix(1.,iShape.z,foliage);
+          n.y -= n.x*iSize.x*2.*iShape.y/(iSize.y*mix(1.,iShape.z,foliage))*foliage;
+        }
         n.xz = mat2(cos(a), sin(a), -sin(a), cos(a)) * n.xz;
-        vNormal = normalize(n + vec3(0., .35, 0.));
+        vNormal = normalize(normalize(n) + vec3(0., .15, 0.));
         vTint = mix(iTint,vec3(.22,.15,.09),aBark);
         vUp = position.y;
         gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.);
@@ -160,7 +180,7 @@ export function createForest(
       populations.delete(key);populations.set(key,cached);
       group.add(...cached.meshes);count=cached.count;return;
     }
-    const { pos, size, tint, kind, lods } = trees(eye);
+    const { pos, size, tint, kind, lods, shapes } = trees(eye);
     count = kind.length;
     const chunks = new Map<string, number[]>();
     kind.forEach((k, i) => {
@@ -178,13 +198,14 @@ export function createForest(
       geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => pos.slice(i * 3, i * 3 + 3))), 3));
       geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => size.slice(i * 2, i * 2 + 2))), 2));
       geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => tint.slice(i * 3, i * 3 + 3))), 3));
+      geo.setAttribute('iShape', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => shapes.slice(i * 3, i * 3 + 3))), 3));
       geo.instanceCount = idx.length;
       const bounds = new THREE.Box3();
       for (const i of idx) {
-        const radius = size[i * 2] * 1.4;
+        const radius = size[i * 2] * 1.9;
         const [x, y, z] = pos.slice(i * 3, i * 3 + 3);
         bounds.expandByPoint(new THREE.Vector3(x - radius, y, z - radius));
-        bounds.expandByPoint(new THREE.Vector3(x + radius, y + size[i * 2 + 1] * 1.4, z + radius));
+        bounds.expandByPoint(new THREE.Vector3(x + radius, y + size[i * 2 + 1] * 1.6, z + radius));
       }
       geo.boundingBox = bounds;
       geo.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
@@ -198,5 +219,5 @@ export function createForest(
       populations.delete(oldest);
     }
   }
-  return { group, plant, get count() { return count; } };
+  return { group, plant, contains, get count() { return count; } };
 }

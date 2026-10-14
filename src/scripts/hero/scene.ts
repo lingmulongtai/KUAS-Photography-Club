@@ -208,14 +208,13 @@ export function createHero(
     );
     const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
     const roadsAndWater = infrastructureMask(lines, BUILDINGS_BOX);
-    orbitObstruction = (x,z) => {
-      const center=landscapeCenter(VIEW);
-      // The inner 32m has no forest candidates; keep the target itself free of a canopy envelope.
-      const canopy=Math.hypot(x-center.x,z-center.z)>24 && forestArea(x,z) && !buildingsMask(x,z) && !roadsAndWater(x,z);
-      return hf.height(x,z)+(canopy?24:4);
-    };
     scene.add(buildDaimonji(env,hf));
     const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || roadsAndWater(x,z) || fireClearing(x,z), forestArea);
+    orbitObstruction = (x,z) => {
+      const center=landscapeCenter(VIEW);
+      const canopy=Math.hypot(x-center.x,z-center.z)>24 && forest.contains(x,z);
+      return hf.height(x,z)+(canopy?24:4);
+    };
     forest.plant(landscapeCenter(VIEW), VIEW.bearing);
     plantTrees = forest.plant;
     scene.add(forest.group);
