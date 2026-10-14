@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createLookRotation, mountLookControls } from '../src/scripts/hero/look-controls.ts';
 
-function setup(t) {
+function setup(t, enabled=()=>true) {
   const listeners = new Map(), captured = new Set();
   const oldWindow = globalThis.window, oldDocument = globalThis.document;
   globalThis.window = {addEventListener(){}};
@@ -14,7 +14,7 @@ function setup(t) {
     classList:{add(){},remove(){}}, getBoundingClientRect(){return {left:0,top:0,width:600,height:400};},
   };
   const look = createLookRotation(); let taps=0;
-  mountLookControls(el,look,()=>taps++);
+  mountLookControls(el,look,()=>taps++,enabled);
   const send=(type,x,y,extra={})=>listeners.get(type)({type,isPrimary:true,button:0,pointerType:'mouse',pointerId:1,clientX:x,clientY:y,timeStamp:10,target:{closest(){return null;}},...extra});
   return {send,look,captured,taps:()=>taps};
 }
@@ -24,6 +24,15 @@ test('small mouse release outside is captured, cancelled and never becomes a lat
   h.send('pointerup',602,100);
   h.send('pointermove',300,100);
   assert.equal(h.look.state.yaw,0); assert.equal(h.taps(),0);
+});
+test('flight input lock ignores drags and taps until the camera has arrived', (t)=>{
+  let arrived=false;
+  const h=setup(t,()=>arrived);
+  h.send('pointerdown',100,100);h.send('pointermove',240,100);h.send('pointerup',240,100);
+  assert.equal(h.look.state.yaw,0);assert.equal(h.taps(),0);assert.equal(h.captured.size,0);
+  arrived=true;
+  h.send('pointerdown',100,100);h.send('pointermove',240,100);h.send('pointerup',240,100);
+  assert.ok(h.look.state.yaw<0);
 });
 test('short taps remain taps while horizontal drags and vertical touch scrolls do not fire them', (t) => {
   const h=setup(t);

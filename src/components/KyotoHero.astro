@@ -59,6 +59,10 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
         <button type="button" data-time="sunset" aria-pressed="false">夕焼け</button>
         <button type="button" data-time="night" aria-pressed="false">夜</button>
       </div>
+      <div class="times landmark-angles" role="group" aria-label="名所を見る角度" hidden>
+        <button type="button" data-landmark-elevation="oblique" aria-pressed="true">斜めから</button>
+        <button type="button" data-landmark-elevation="overhead" aria-pressed="false">真上から</button>
+      </div>
       <p class="hint">ドラッグで360°見回せます。スマホは横スワイプ。<span>空をタップすると流れ星。「太秦キャンパス」から近づけます。夜景の送り火はイメージです。</span></p>
     </aside>
   </div>
@@ -103,6 +107,9 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
     const card = hero.querySelector<HTMLElement>('.campus-card')!;
     const back = card.querySelector<HTMLButtonElement>('.back')!;
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    const landmarkAngles=hero.querySelector<HTMLElement>('.landmark-angles')!;
+    const landmarkButtons=Array.from(landmarkAngles.querySelectorAll<HTMLButtonElement>('button'));
+    const cameraHint=hero.querySelector('.hint')!.firstChild!;
 
     const hhmm = (m: number) => {
       const v = ((Math.floor(m) % 1440) + 1440) % 1440;
@@ -157,6 +164,12 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
 
     const setView = (mode: HeroMode, arrived: boolean) => {
       hero.dataset.view = mode;
+      hero.querySelectorAll<HTMLButtonElement>('[data-elevation],[data-landmark-elevation]').forEach(b=>b.disabled=!arrived);
+      landmarkAngles.hidden = mode!=='city' || !demo?.orbiting;
+      cameraHint.textContent = demo?.orbiting && mode==='city'
+        ? 'ドラッグで建物を中心に360°回れます。スマホは横スワイプ。'
+        : 'ドラッグで360°見回せます。スマホは横スワイプ。';
+      if (!arrived) landmarkButtons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.landmarkElevation==='oblique')));
       if (mode === 'campus') {
         card.hidden = false;
         if(!arrived) hero.querySelectorAll<HTMLButtonElement>('[data-elevation]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.elevation==='oblique')));
@@ -198,8 +211,12 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
     back.addEventListener('click', () => demo && demo.flyTo(demo.view));
     const angleButtons=Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-elevation]'));
     angleButtons.forEach(b=>b.addEventListener('click',()=>{
-      demo?.setCampusElevation(b.dataset.elevation==='overhead');
+      demo?.setElevation(b.dataset.elevation==='overhead');
       angleButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    }));
+    landmarkButtons.forEach(b=>b.addEventListener('click',()=>{
+      demo?.setElevation(b.dataset.landmarkElevation==='overhead');
+      landmarkButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
     }));
     hero.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && demo?.mode === 'campus') demo.flyTo(demo.view);
@@ -524,6 +541,7 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
     line-height: 1.4;
   }
   .campus-angles button { color: var(--ink); border-color: var(--line); }
+  .landmark-angles[hidden] { display: none; }
 
   .campus-card dl {
     margin: 4px 0;

@@ -33,13 +33,13 @@ export function createLookRotation() {
 }
 
 /** Keep vertical touch scrolling native and leave controls and short taps alone. */
-export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void) {
+export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true) {
   let drag: { id: number; x: number; y: number; lastX: number; lastY: number; time: number; touch: boolean; moved: boolean } | null = null;
   let suppressClick = false;
   const interactive = (e: PointerEvent) => (e.target as Element).closest('button, a, input, select, textarea, [role="slider"]');
   el.addEventListener('pointerdown', (e) => {
     suppressClick = false;
-    if (!e.isPrimary || e.button !== 0 || interactive(e)) return;
+    if (!enabled() || !e.isPrimary || e.button !== 0 || interactive(e)) return;
     rotation.stop();
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, time: e.timeStamp, touch: e.pointerType !== 'mouse', moved: false };
     if (!drag.touch) el.setPointerCapture(e.pointerId);

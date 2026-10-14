@@ -112,7 +112,7 @@ export function createHero(
   renderer: THREE.WebGLRenderer,
   el: HTMLElement,
   opts: HeroOptions,
-): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void; setCampusElevation(overhead:boolean):void; readonly mode: HeroMode; readonly view: HeroView } {
+): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void; setElevation(overhead:boolean):void; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
   const env = createEnv();
   const scene = new THREE.Scene();
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
@@ -295,7 +295,7 @@ export function createHero(
     const r = el.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, 1 - (e.clientY - r.top) / r.height * 2), camera);
     if (ray.ray.direction.y > .01) meteors.burst(1);
-  });
+  },()=>!flight);
 
   let mode: HeroMode = 'city';
   let modeSince = 0;
@@ -353,7 +353,12 @@ export function createHero(
   function flyTo(target: 'campus' | HeroView, t: number) {
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
-    if (!flight && mode === to && (to === 'campus' || nextView === view)) { resetLook(); return; }
+    if (!flight && mode === to && (to === 'campus' || nextView === view)) {
+      resetLook();
+      opts.onMode?.(to,false);
+      opts.onMode?.(to,true);
+      return;
+    }
     const blank = () => ({ pos: new THREE.Vector3(), target: new THREE.Vector3() });
     const from = flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, blank()) : campusPose(t, blank());
     resetLook();
@@ -486,9 +491,16 @@ export function createHero(
     get view() {
       return view;
     },
-    setCampusElevation(overhead) {
+    get orbiting() { return !!VIEW.orbit; },
+    setElevation(overhead) {
       rotation.stop();
-      lookDrag.pitch=overhead ? 89-Math.atan2(ORBIT.height-45,ORBIT.radius)/RAD : 0;
+      let base=Math.atan2(ORBIT.height-45,ORBIT.radius)/RAD;
+      if ((flight?.to??mode)==='city') {
+        if (!VIEW.orbit) return;
+        const c=VIEW.orbit.center, y=(groundAt?.(c.x,c.z)??40)+VIEW.orbit.targetHeight;
+        base=Math.atan2(eye.y-y,Math.hypot(eye.x-c.x,eye.z-c.z))/RAD;
+      }
+      lookDrag.pitch=overhead ? 89-base : 0;
     },
     t0: 0,
     resize(w, h, d) {
