@@ -12,6 +12,8 @@ interface Props {
   overlayHeader?: boolean;
   lang?: string;
   dir?: 'ltr' | 'rtl';
+  /** Keep the page out of search engines (the admin panel). */
+  noindex?: boolean;
 }
 
 const {
@@ -20,6 +22,7 @@ const {
   overlayHeader = false,
   lang = 'ja',
   dir = 'ltr',
+  noindex = false,
 } = Astro.props;
 
 const fullTitle = title ? `${title} | ${club.name}` : `${club.name} | ${club.nameJa}`;
@@ -32,6 +35,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="icon" href="/brand/favicon-48.png" sizes="48x48" type="image/png" />
