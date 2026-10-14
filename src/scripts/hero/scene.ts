@@ -42,6 +42,8 @@ export interface HeroOptions {
   /** The camera started moving to (or arrived at) a view. */
   onMode?: (mode: HeroMode, arrived: boolean) => void;
   reducedMotion?: boolean;
+  /** Let the camera drift slowly over the city (off on touch screens, where it makes fine detail shimmer). */
+  drift?: boolean;
   /** Length of the flight to the campus, seconds. */
   flightSeconds?: number;
   /** Screen areas (stage pixels) the place pins should keep out of, such as the headline. */
@@ -220,7 +222,7 @@ export function createHero(renderer: THREE.WebGLRenderer, el: HTMLElement, opts:
   const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
   function cityPose(t: number, out = pose) {
-    const drift = opts.reducedMotion ? 0 : Math.sin(t * 0.05) * 0.8;
+    const drift = opts.reducedMotion || opts.drift === false ? 0 : Math.sin(t * 0.05) * 0.8;
     const b = (VIEW.bearing + drift + pointer.x * 1.6) * RAD;
     const p = (VIEW.pitch + pointer.y * 0.6) * RAD;
     out.pos.copy(eye);

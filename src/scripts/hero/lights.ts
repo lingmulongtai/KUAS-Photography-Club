@@ -98,7 +98,7 @@ export function buildLamps(env: Env, hf: Heightfield, lines: LineFeature[], qual
         // a lamp is ~0.4 m across but blooms: keep at least a pixel, fade through the haze
         float px = clamp(uScale * 2.4 / dist, 1.2, 4.);
         float tr = hazeTransmittance(position);
-        float tw = .85 + .15 * sin(uTime * 3. + position.x * .7 + position.z * .3);
+        float tw = .94 + .06 * sin(uTime * 1.3 + position.x * .7 + position.z * .3);
         // lamps right below the viewpoint would flood the bloom: fade them by size
         float near = 1. - smoothstep(2.5, 4., uScale * 2.4 / dist) * .6;
         vColor = aTint * uCity * mix(tr, 1., .4) * tw * 2.2 * near;

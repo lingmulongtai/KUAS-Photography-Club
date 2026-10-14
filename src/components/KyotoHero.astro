@@ -107,6 +107,7 @@ import { club } from '../data/club';
           now: () => new Date(),
           quality,
           reducedMotion,
+          drift: !coarse,
           onStatus,
           onReady: () => hero.classList.add('is-ready'),
           onAction: (id) => id === 'kuas' && demo?.flyTo('campus'),
