@@ -183,7 +183,7 @@ const LANDMARKS: Record<string, Placed> = {
   heianTorii: { parts: torii(), lat: 35.0125663, lon: 135.7826821 },
   goldenPavilion: { parts: goldenPavilion(), lat: 35.0395092, lon: 135.7284548 },
   kiyomizuHall: { parts: kiyomizuHall(), lat: 34.9946668, lon: 135.7849382 },
-  togetsukyo: { parts: togetsukyo(), lat: 35.01287125, lon: 135.67776225 },
+  togetsukyo: { parts: togetsukyo().map(part=>({...part,geo:part.geo.rotateY(-5.8*Math.PI/180).translate(0,2,0)})), lat: 35.01287125, lon: 135.67776225 },
 };
 
 export function buildLandmarks(env: Env, hf: Heightfield) {
