@@ -1,0 +1,96 @@
+---
+/**
+ * The two ways to reach the club from outside: email (with the subject filled in) and Instagram DM.
+ */
+import { club } from '../data/club';
+
+interface Props {
+  /** Prefilled email subject */
+  subject?: string;
+}
+const { subject = '【お問い合わせ】KUAS Photography Club' } = Astro.props;
+const mailto = `mailto:${club.email}?subject=${encodeURIComponent(subject)}`;
+---
+<div class="ways">
+  <article class="way">
+    <p class="edge">EMAIL</p>
+    <h3>メールで送る</h3>
+    <p class="addr"><span class="select">{club.email}</span></p>
+    <p class="small muted">件名にご用件（撮影のご依頼・協賛・取材など）を入れていただけると助かります。</p>
+    <div class="row">
+      <a class="btn btn--primary" href={mailto}>メールを書く <span class="arrow" aria-hidden="true">→</span></a>
+      <button class="btn copy" type="button" data-copy={club.email}>アドレスをコピー</button>
+    </div>
+  </article>
+  <article class="way">
+    <p class="edge">INSTAGRAM</p>
+    <h3>DM を送る</h3>
+    <p class="addr">@{club.instagram.handle}</p>
+    <p class="small muted">ふだんの活動の様子もここで発信しています。気軽にメッセージをどうぞ。</p>
+    <div class="row">
+      <a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">Instagram を開く <span class="arrow" aria-hidden="true">↗</span></a>
+    </div>
+  </article>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.ways .copy').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const label = b.textContent;
+      try {
+        await navigator.clipboard.writeText(b.dataset.copy ?? '');
+        b.textContent = 'コピーしました';
+      } catch {
+        const el = b.closest('.way')?.querySelector('.select');
+        if (el) window.getSelection()?.selectAllChildren(el);
+        b.textContent = '選択しました';
+      }
+      setTimeout(() => (b.textContent = label), 2000);
+    }),
+  );
+</script>
+
+<style>
+  .ways {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .way {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    padding: 24px;
+    background: var(--raise);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .way h3 {
+    font-size: var(--step-2);
+  }
+
+  .addr {
+    font: 700 clamp(16px, 2vw, 19px) / 1.4 var(--latin);
+    overflow-wrap: anywhere;
+    color: var(--accent);
+  }
+
+  .select {
+    user-select: all;
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  @media (max-width: 700px) {
+    .ways {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
