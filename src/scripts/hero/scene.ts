@@ -29,6 +29,7 @@ import { createBuildingMask } from './vegetation-mask';
 import type { Woodland } from './woodland';
 import { buildWoodlandTexture } from './woodland-texture';
 import { infrastructureMask } from './forest-infrastructure';
+import { buildDaimonji, fireClearing } from './daimonji';
 
 export interface HeroStatus {
   minutes: number;
@@ -92,7 +93,7 @@ export const VIEWS = {
   /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
   kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 287, pitch: -8 },
   /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
-  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: DAIMONJI, ref: DAIMONJI, above: 24, bearing: 248, pitch: -7 },
+  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 252, 430), ref: DAIMONJI, above: 95, bearing: 72, pitch: -10 },
   /** An exterior composition: the whole tower against the northern city and mountains. */
   tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 320), ref: TOWER, above: 135, bearing: 350, pitch: -9 },
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 82, pitch: -4 },
@@ -200,7 +201,8 @@ export function createHero(
     );
     const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
     const roadsAndWater = infrastructureMask(lines, BUILDINGS_BOX);
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || roadsAndWater(x,z), forestArea);
+    scene.add(buildDaimonji(env,hf));
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || roadsAndWater(x,z) || fireClearing(x,z), forestArea);
     forest.plant(VIEW.eye, VIEW.bearing);
     plantTrees = forest.plant;
     scene.add(forest.group);
