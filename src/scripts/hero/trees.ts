@@ -59,7 +59,7 @@ export function createForest(
         const cedar = seed < .28;
         const s = .8 + seed * .65;
         pos.push(x, y - 0.5, z);
-        const cluster = lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
+        const cluster = lod === 3 ? quality>.75 ? 8 : 11 : lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
         size.push((cedar ? 2.6 : 4.2) * s * cluster, (cedar ? 15 : 10.5) * s);
         tint.push(c[0] * .9, Math.max(c[1], c[0] * 1.08), c[2] * .83);
         kind.push(cedar ? 1 : 0);
