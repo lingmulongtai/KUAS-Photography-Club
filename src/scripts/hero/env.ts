@@ -203,7 +203,8 @@ float sunShadow(vec3 wp, vec3 n){
   float s = 0.;
   for (int i = -1; i <= 1; i++)
     for (int j = -1; j <= 1; j++)
-      s += texture(uShadowMap, vec3(p.xy + (ax * float(i) + ay * float(j)) * .45, z));
+      // The depth map has one mip level; avoid implicit derivatives inside the filter loop.
+      s += textureLod(uShadowMap, vec3(p.xy + (ax * float(i) + ay * float(j)) * .45, z), 0.);
   return s / 9.;
 }
 `;
