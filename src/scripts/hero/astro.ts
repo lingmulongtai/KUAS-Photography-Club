@@ -119,3 +119,31 @@ export function jstParts(date: Date) {
   const jst = new Date(date.getTime() + 9 * 3600000);
   return { year: jst.getUTCFullYear(), month: jst.getUTCMonth() + 1, day: jst.getUTCDate() };
 }
+
+/**
+ * Sunrise and sunset (minutes past midnight JST) on the JST day of `ref`,
+ * when the sun's upper edge meets the horizon (altitude −0.833°).
+ */
+export function sunTimes(ref: Date) {
+  const h0 = -0.833 * RAD;
+  const alt = (m: number) => sunPosition(jstDateAt(ref, m)).altitude - h0;
+  const find = (from: number, to: number) => {
+    // coarse scan, then halve the bracket
+    let a = from;
+    for (let m = from + 10; m <= to; m += 10) {
+      if (Math.sign(alt(m)) !== Math.sign(alt(a))) {
+        let lo = a;
+        let hi = m;
+        for (let k = 0; k < 12; k++) {
+          const mid = (lo + hi) / 2;
+          if (Math.sign(alt(mid)) === Math.sign(alt(lo))) lo = mid;
+          else hi = mid;
+        }
+        return (lo + hi) / 2;
+      }
+      a = m;
+    }
+    return NaN;
+  };
+  return { sunrise: find(180, 720), sunset: find(720, 1260) };
+}
