@@ -6,7 +6,7 @@ These guidelines are our important rules to ensure that the activities of the KU
 - **Scope:** These rules apply to all club-organized, co-organized, or approved activities, including meetings, photo trips, and online communications.
 - **Contact:**
   - Instagram: @kuas_photographyclub
-  - Teams/Email: 2025m011@kuas.ac.jp
+  - Email: photography.club.in.kuas@gmail.com
 - **Regular Meetings:** Fridays from 18:00 in Room S306, Uzumasa Campus.
 
 ---

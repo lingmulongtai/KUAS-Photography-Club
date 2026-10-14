@@ -6,7 +6,7 @@ Panduan ini adalah aturan penting kami untuk memastikan bahwa kegiatan Klub Foto
 - **Lingkup Aplikasi:** Aturan-aturan ini berlaku untuk semua kegiatan yang diselenggarakan, disponsori bersama, atau disetujui oleh klub, termasuk pertemuan, sesi foto, dan komunikasi online.
 - **Kontak:**
   - Instagram: @kuas_photographyclub
-  - Teams/Email: 2025m011@kuas.ac.jp
+  - Email: photography.club.in.kuas@gmail.com
 - **Pertemuan Rutin:** Jumat mulai pukul 18:00 di Ruang S306, Kampus Uzumasa.
 
 ---
