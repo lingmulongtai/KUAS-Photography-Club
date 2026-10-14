@@ -13,7 +13,8 @@ import { loadBuildings } from './buildings-data';
 import { buildCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import { loadLines } from './lines-data';
-import { buildLamps, buildTraffic } from './lights';
+import { buildLamps } from './lights';
+import { buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
@@ -130,6 +131,7 @@ export function createHero(
   let groundAt: ((x: number, z: number) => number) | null = null;
   let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
+  let driveCars: ((dt: number) => void) | null = null;
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -193,9 +195,10 @@ export function createHero(
     scene.add(buildWater(env, hf, lines));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid);
     const lamps = buildLamps(env, hf, lines, opts.quality);
-    const traffic = buildTraffic(env, hf, lines, opts.quality);
-    pointLayers.push(lamps.uniforms, traffic.uniforms);
-    scene.add(lamps.points, traffic.points);
+    const cars = buildCars(env, hf, lines, opts.quality);
+    driveCars = cars.update;
+    pointLayers.push(lamps.uniforms, cars.uniforms);
+    scene.add(lamps.points, cars.group);
     updatePointScale();
     opts.onReady?.();
   })().catch((err) => console.error('Kyoto data failed to load', err));
@@ -460,6 +463,7 @@ export function createHero(
       clock = t;
       applyTime(opts.now(), t);
       placeCamera(t, dt);
+      if (dt > 0) driveCars?.(dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);
       meteors.update(t, dt, camera.position, { az: VIEW.bearing * RAD, half, top: (VIEW.pitch * RAD) + (camera.fov * RAD) / 2 }, env.uStars.value, pxPerM);
       post.render(t);
