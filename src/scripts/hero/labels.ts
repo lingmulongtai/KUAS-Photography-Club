@@ -159,6 +159,7 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
           const py = ((1 - v.y) / 2) * height;
           const w = it.def.action ? 150 : 96;
           const clash =
+            px < w / 2 + 8 || px > width - w / 2 - 8 ||
             placed.some((p) => Math.abs(p.x - px) < (p.w + w) / 2 && Math.abs(p.y - py) < 34) ||
             blocks.some((b) => px + w / 2 > b.x - 8 && px - w / 2 < b.x + b.w + 8 && py > b.y - 12 && py - 40 < b.y + b.h);
           if (clash) show = false;
