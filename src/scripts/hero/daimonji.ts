@@ -10,11 +10,11 @@ for(const [a,b] of [[[35,-65],[35,65]],[[85,0],[-90,-90]],[[20,0],[-90,90]]] as 
   const steps=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/4);
   for(let i=0;i<=steps;i++) FIRE_BEDS.push({x:center.x+a[0]+(b[0]-a[0])*i/steps,z:center.z+a[1]+(b[1]-a[1])*i/steps});
 }
-export const fireClearing=(x:number,z:number)=>Math.abs(x-center.x)<110&&Math.abs(z-center.z)<110&&FIRE_BEDS.some(p=>(p.x-x)**2+(p.z-z)**2<36);
+export const fireClearing=(x:number,z:number)=>Math.abs(x-center.x)<120&&Math.abs(z-center.z)<120&&FIRE_BEDS.some(p=>(p.x-x)**2+(p.z-z)**2<324);
 
 /** A static night-time illustration of the Gozan bonfires, explicitly labelled as an image. */
 export function buildDaimonji(env:Env,hf:Heightfield) {
-  const positions=FIRE_BEDS.flatMap(p=>[p.x,hf.height(p.x,p.z)+1.5,p.z]);
+  const positions=FIRE_BEDS.flatMap(p=>[p.x,hf.height(p.x,p.z)+4,p.z]);
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   const material=new THREE.ShaderMaterial({uniforms:env,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
@@ -25,7 +25,7 @@ export function buildDaimonji(env:Env,hf:Heightfield) {
     fragmentShader:`${ENV_GLSL}
       varying vec3 vWorld;
       void main(){float r=length(gl_PointCoord-.5)*2.;float light=exp(-r*r*6.);
-        gl_FragColor=vec4(vec3(1.9,.18,.025)*light,light*uCity);
+        gl_FragColor=vec4(vec3(2.4,.015,.004)*light,light*uCity);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
