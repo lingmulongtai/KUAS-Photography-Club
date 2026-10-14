@@ -106,14 +106,16 @@ vec3 skyColor(vec3 dir){
 
   vec2 sh = normalize(uSunDir.xz + 1e-5);
   vec2 dh = normalize(dir.xz + 1e-5);
-  float toward = dot(dh, sh) * .5 + .5;
+  float toward = clamp(dot(dh, sh) * .5 + .5, 0., 1.);
   float band = exp(-h * 11.);
   c *= .78 + .22 * toward;
   c += uGlow * band * pow(toward, 4.) * .45;
 
   // Belt of Venus over Earth's shadow, opposite the sun at twilight
-  float anti = pow(1. - toward, 2.);
-  c += vec3(.55, .22, .3) * uVenus * anti * exp(-pow((h - .13) / .07, 2.)) * .12;
+  // (pow() of a negative number is undefined in GLSL and turns into NaN on many GPUs: square by hand)
+  float anti = (1. - toward) * (1. - toward);
+  float belt = (h - .13) / .07;
+  c += vec3(.55, .22, .3) * uVenus * anti * exp(-belt * belt) * .12;
   c *= 1. - .3 * uVenus * anti * smoothstep(.09, 0., h);
 
   float cosA = dot(dir, uSunDir);

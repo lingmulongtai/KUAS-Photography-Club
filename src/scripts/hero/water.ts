@@ -63,7 +63,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[]) {
         vec3 v = normalize(vWorld - cameraPosition);
         vec3 r = reflect(v, n);
         r.y = abs(r.y);
-        float fres = .03 + .97 * pow(1. - max(dot(-v, n), 0.), 5.);
+        float fres = .03 + .97 * pow(clamp(1. - dot(-v, n), 0., 1.), 5.);
         vec3 deep = vec3(.006, .014, .014);
         vec3 col = deep * (uSunLight * max(uSunDir.y, 0.) + skyLight(vec3(0., 1., 0.))) + skyColor(r) * fres;
         col += uSunLight * pow(max(dot(r, uSunDir), 0.), 90.) * 2.;
