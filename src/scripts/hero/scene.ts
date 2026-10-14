@@ -76,6 +76,8 @@ const ahead = (p: { x: number; z: number }, bearing: number, m: number) => ({
 const KIYOMIZU = toLocal(34.9946668, 135.7849382); // 清水寺 本堂舞台
 const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
 const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
+const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
+const FUNAOKA = toLocal(35.0389964, 135.7417307); // OSM node/6611051734: 船岡山三角点
 
 /** The viewpoints. Coordinates from OpenStreetMap; heights from the elevation data. */
 export const VIEWS = {
@@ -87,6 +89,8 @@ export const VIEWS = {
   daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: DAIMONJI, ref: DAIMONJI, above: 24, bearing: 248, pitch: -7 },
   /** The observation deck of Kyoto Tower, 100 m up, looking north up the city. */
   tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 0, 9), ref: TOWER, above: 100, bearing: 2, pitch: -9 },
+  arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 82, pitch: -4 },
+  funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 28, bearing: 180, pitch: -5 },
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
