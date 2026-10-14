@@ -5,7 +5,7 @@ const lengths = [16, 24, 35, 50, 85, 135, 200];
 <figure class="demo">
   <div class="grid">
     <div class="stage" data-demo="focal" data-slider="focal-mm" style="--fb: linear-gradient(#2a241e, #15120f)">
-      <canvas aria-label="同じ大きさに写るよう距離を変えて、焦点距離ごとに石膏像の顔の写り方を比べるデモ"></canvas>
+      <canvas aria-label="同じ大きさに写る距離で、撮影する人と石膏像の遠近感を比べる3Dデモ"></canvas>
       <div class="hud">
         <div class="row"><span class="tag" data-readout>50mm · 画角 47° · 距離 1.0m</span></div>
         <div class="row">
@@ -39,9 +39,13 @@ const lengths = [16, 24, 35, 50, 85, 135, 200];
     <label for="focal-mm">焦点距離</label>
     <input type="range" id="focal-mm" min="0" max="1000" step="1" value="415" />
   </div>
+  <div class="choices">
+    <label>被写体<select data-focal-subject><option value="photographer">撮影する人（写真部ロゴより）</option><option value="plaster">石膏像</option></select></label>
+  </div>
+  <p class="hint" data-subject-status role="status"></p>
   <figcaption class="hint">
     どの焦点距離でも、頭と肩の上あたりまでが画面の高さに収まる距離から撮っています。カーソルを動かすと少し回り込めます。
-    <span class="credit">頭部モデル：<a href="https://www.ir-ltd.net/" target="_blank" rel="noopener">Infinite-Realities</a>「Lee Perry-Smith 3D Head Scan」（<a href="https://creativecommons.org/licenses/by/3.0/deed.ja" target="_blank" rel="noopener">CC BY 3.0</a>）を石膏像として表示</span>
+    <span class="credit" data-head-credit hidden>頭部モデル：<a href="https://www.ir-ltd.net/" target="_blank" rel="noopener">Infinite-Realities</a>「Lee Perry-Smith 3D Head Scan」（<a href="https://creativecommons.org/licenses/by/3.0/deed.ja" target="_blank" rel="noopener">CC BY 3.0</a>）を石膏像として表示</span>
   </figcaption>
 </figure>
 
@@ -75,6 +79,10 @@ const lengths = [16, 24, 35, 50, 85, 135, 200];
 </script>
 
 <style>
+  .choices { display: flex; flex-wrap: wrap; gap: 16px; }
+  .choices label { display: grid; gap: 6px; font-size: 14px; min-width: 0; }
+  .choices select { max-width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--raise); font: inherit; }
+  .credit[hidden] { display: none; }
   .credit {
     display: block;
     font-size: 12px;
