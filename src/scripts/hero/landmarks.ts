@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ENV_GLSL, type Env } from './env';
+import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
 
@@ -183,13 +183,14 @@ export function buildLandmarks(env: Env, hf: Heightfield) {
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
+      ${SHADOW_GLSL}
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying vec3 vColor;
       varying float vGlow;
       void main(){
         vec3 n = normalize(vNormal);
-        float sh = dot(n, uSunDir) > 0. ? sunShadow(vWorld, n) : 1.;
+        float sh = sunShadow(vWorld, n);
         vec3 col = shade(vColor, n, vWorld, sh);
         // floodlights from below after dark, warmer toward the ground
         float up = clamp(n.y * -.5 + .75, .35, 1.);

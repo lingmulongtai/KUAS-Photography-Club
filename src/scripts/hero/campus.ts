@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ENV_GLSL, type Env } from './env';
+import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CAMPUS_OUTLINE, inCampus } from './geo';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
@@ -187,6 +187,7 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
+      ${SHADOW_GLSL}
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vMat;
@@ -218,7 +219,7 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
           float joint = smoothstep(.0, .03, g.x) * smoothstep(.0, .03, g.y);
           albedo = vec3(.44, .43, .41) * (.85 + .15 * joint) * (.9 + .2 * vnoise(vCell * .2));
         }
-        float sh = dot(n, uSunDir) > 0. ? sunShadow(vWorld, n) : 1.;
+        float sh = sunShadow(vWorld, n);
         vec3 col = shade(albedo, n, vWorld, sh);
         gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), 1.);
       }

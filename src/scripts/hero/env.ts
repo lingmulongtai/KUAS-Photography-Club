@@ -30,7 +30,7 @@ export function createEnv() {
     uFogDensity: { value: 4.5e-5 },
     uFogFalloff: { value: 1 / 420 },
     uFogBase: { value: 40 },
-    /** sun shadow map (see shadow.ts) */
+    /** sun shadow map (see shadow.ts): a depth texture sampled with hardware comparison */
     uShadowMap: { value: null as THREE.Texture | null },
     uShadowMatrix: { value: new THREE.Matrix4() },
     uShadowOn: { value: 0 },
@@ -85,12 +85,6 @@ uniform float uVenus;
 uniform float uFogDensity;
 uniform float uFogFalloff;
 uniform float uFogBase;
-uniform sampler2D uShadowMap;
-uniform mat4 uShadowMatrix;
-uniform float uShadowOn;
-uniform vec2 uShadowTexel;
-uniform float uShadowWorld;
-uniform float uShadowBias;
 uniform float uHighlight;
 uniform vec2 uCampus;
 uniform float uCampusDetail;
@@ -154,19 +148,6 @@ vec3 applyHaze(vec3 lit, vec3 emit, vec3 wp){
   return mix(hazeColor(dir), lit, tr) + emit * mix(tr, 1., .35);
 }
 
-/* 1 = in sunlight, 0 = in shadow (3x3 PCF on the sun's depth map). */
-float sunShadow(vec3 wp, vec3 n){
-  if (uShadowOn < .5) return 1.;
-  vec4 sc = uShadowMatrix * vec4(wp + n * uShadowWorld * 1.5, 1.);
-  vec3 p = sc.xyz / sc.w * .5 + .5;
-  if (p.x <= 0. || p.x >= 1. || p.y <= 0. || p.y >= 1. || p.z >= 1.) return 1.;
-  float s = 0.;
-  for (int i = -1; i <= 1; i++)
-    for (int j = -1; j <= 1; j++)
-      s += step(p.z - uShadowBias, unpackRGBAToDepth(texture2D(uShadowMap, p.xy + vec2(float(i), float(j)) * uShadowTexel)));
-  return s / 9.;
-}
-
 /* Sky light reaching a surface facing n. */
 vec3 skyLight(vec3 n){
   vec3 up = mix(uZenith, uMid, .45) * .6 + uHorizon * .12;
@@ -181,5 +162,47 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wp, float sh){
   float moon = max(dot(n, uMoonDir), 0.);
   vec3 bounce = (uSunLight * max(uSunDir.y, 0.) * .06 + uHorizon * .04) * (.5 - .5 * n.y);
   return albedo * (uSunLight * sun + uMoonLight * moon + skyLight(n) + bounce);
+}
+`;
+
+/**
+ * Sun shadows, for fragment shaders only. Include after ENV_GLSL.
+ * sunShadow() takes screen-space derivatives, so call it from uniform control flow
+ * (not inside an if that depends on the fragment).
+ */
+export const SHADOW_GLSL = /* glsl */ `
+uniform highp sampler2DShadow uShadowMap;
+uniform mat4 uShadowMatrix;
+uniform float uShadowOn;
+uniform vec2 uShadowTexel;
+uniform float uShadowWorld;
+uniform float uShadowBias;
+
+/*
+ * 1 = in sunlight, 0 = in shadow. Nine hardware-filtered depth comparisons spread over the
+ * patch of shadow map this pixel covers: up close that is a soft 3x3 filter, far away it
+ * averages the many shadow texels inside one pixel instead of picking one at random, which
+ * is what made distant rooftops sparkle whenever the camera moved.
+ */
+float sunShadow(vec3 wp, vec3 n){
+  vec3 dx = dFdx(wp);
+  vec3 dy = dFdy(wp);
+  if (uShadowOn < .5) return 1.;
+  vec4 sc = uShadowMatrix * vec4(wp + n * uShadowWorld * 1.5, 1.);
+  vec3 p = sc.xyz / sc.w * .5 + .5;
+  if (p.x <= 0. || p.x >= 1. || p.y <= 0. || p.y >= 1. || p.z >= 1.) return 1.;
+  // the pixel's footprint on the shadow map (the sun's camera is orthographic), at least a texel
+  vec2 ax = (uShadowMatrix * vec4(dx, 0.)).xy * .5;
+  vec2 ay = (uShadowMatrix * vec4(dy, 0.)).xy * .5;
+  float t = uShadowTexel.x;
+  float lx = length(ax), ly = length(ay);
+  ax *= clamp(lx, t, t * 12.) / max(lx, 1e-7);
+  ay *= clamp(ly, t, t * 12.) / max(ly, 1e-7);
+  float z = p.z - uShadowBias;
+  float s = 0.;
+  for (int i = -1; i <= 1; i++)
+    for (int j = -1; j <= 1; j++)
+      s += texture(uShadowMap, vec3(p.xy + (ax * float(i) + ay * float(j)) * .45, z));
+  return s / 9.;
 }
 `;
