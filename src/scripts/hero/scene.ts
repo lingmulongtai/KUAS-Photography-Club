@@ -71,6 +71,8 @@ export interface ViewDef {
   ref: { x: number; z: number };
   above: number;
   bearing: number;
+  /** Centre a close landmark more tightly as the horizontal field narrows. */
+  focusBearing?: number;
   pitch: number;
 }
 
@@ -91,12 +93,12 @@ export const VIEWS = {
   /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
   shogunzuka: { ja: '将軍塚', en: 'Shogunzuka', eye: ahead(PLACES.shogunzuka, 265, 120), ref: PLACES.shogunzuka, above: 44, bearing: 265, pitch: -5 },
   /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
-  kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, pitch: -13 },
+  kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, focusBearing: 310, pitch: -13 },
   /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
   daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 252, 430), ref: DAIMONJI, above: 95, bearing: 72, pitch: -10 },
   /** An exterior composition: the whole tower against the northern city and mountains. */
-  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 320), ref: TOWER, above: 135, bearing: 350, pitch: -9 },
-  arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 82, pitch: -4 },
+  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 320), ref: TOWER, above: 135, bearing: 350, focusBearing: 360, pitch: -9 },
+  arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
   funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 45, bearing: 208, pitch: -4 },
   kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, pitch: -10 },
 } satisfies Record<string, ViewDef>;
@@ -306,7 +308,9 @@ export function createHero(
 
   function cityPose(t: number, out = pose) {
     const drift = opts.reducedMotion || opts.drift === false ? 0 : Math.sin(t * 0.05) * 0.8;
-    const b = (VIEW.bearing + drift + lookDrag.yaw) * RAD;
+    const focus=VIEW.focusBearing??VIEW.bearing;
+    const framing=THREE.MathUtils.clamp(camera.aspect/1.35,.35,1);
+    const b = (focus + (VIEW.bearing-focus)*framing + drift + lookDrag.yaw) * RAD;
     const p = THREE.MathUtils.clamp(VIEW.pitch + lookDrag.pitch, -80, 89) * RAD;
     out.pos.copy(eye);
     out.target.set(eye.x + Math.sin(b) * Math.cos(p) * 1000, eye.y + Math.sin(p) * 1000, eye.z - Math.cos(b) * Math.cos(p) * 1000);
