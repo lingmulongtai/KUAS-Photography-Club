@@ -36,3 +36,16 @@ python3 build_buildings.py
 - Place coordinates checked with OpenStreetMap / Nominatim (© OpenStreetMap contributors, ODbL).
 
 Both credits are shown in the site footer.
+
+## Mountain imagery only
+
+```sh
+python3 fetch.py photos
+python3 build_terrain.py --photos-only
+```
+
+This uses GSI seamlessphoto zoom 14 for the same 30 × 27 km area, at
+4096 × 3687 pixels (about 7.3 m/pixel). The additional WebP is capped at 3 MiB.
+Missing source tiles fail the build instead of becoming black patches.
+The existing 2048-pixel wide image remains the lightweight mobile variant.
+Elevation, building and road binaries are unchanged by these commands.
