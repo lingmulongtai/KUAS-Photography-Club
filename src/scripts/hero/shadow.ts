@@ -26,6 +26,7 @@ export function createSunShadow(renderer: THREE.WebGLRenderer, scene: THREE.Scen
   const white = new THREE.Color(1, 1, 1);
   const prevClear = new THREE.Color();
   let dirty = true;
+  let lastRender = 0;
   const swapped: [THREE.Mesh, THREE.Material | THREE.Material[]][] = [];
 
   function fit(sunDir: THREE.Vector3) {
@@ -71,6 +72,10 @@ export function createSunShadow(renderer: THREE.WebGLRenderer, scene: THREE.Scen
       env.uShadowOn.value = up ? 1 : 0;
       if (!up) return;
       if (!dirty && last.dot(sunDir) > Math.cos(0.0012)) return;
+      // while the sun sweeps (time switching) re-render at most five times a second
+      const now = performance.now();
+      if (!dirty && now - lastRender < 200) return;
+      lastRender = now;
       dirty = false;
       last.copy(sunDir);
       fit(sunDir);
