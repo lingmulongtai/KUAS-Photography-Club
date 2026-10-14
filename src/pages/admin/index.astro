@@ -6,10 +6,11 @@
  */
 import { getCollection } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import { SPOTS } from '../../data/spots';
 
 const trips = (await getCollection('trips'))
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
-  .map((t) => ({ slug: t.id, title: t.data.title, date: t.data.date.toISOString().slice(0, 10), photos: t.data.photos.length, sample: t.data.sample }));
+  .map((t) => ({ slug: t.id, title: t.data.title, date: t.data.date.toISOString().slice(0, 10), photos: t.data.photos.length, sample: t.data.sample, spot: t.data.spot ?? '' }));
 const months = (await getCollection('schedule')).map((m) => ({
   month: m.data.month,
   weeklyMeeting: m.data.weeklyMeeting,
@@ -54,6 +55,7 @@ const months = (await getCollection('schedule')).map((m) => ({
           <label>日付<input name="date" type="date" required /></label>
           <label>場所<input name="place" required maxlength="80" placeholder="例：京都市東山区（清水寺・高台寺）" /></label>
           <label>参加人数<input name="members" type="number" min="1" max="999" placeholder="任意" /></label>
+          <label>トップの場所ピン（任意）<select name="spot"><option value="">関連づけない</option>{SPOTS.filter((s) => s.id !== 'kuas').map((s) => <option value={s.id}>{s.ja}</option>)}</select></label>
         </div>
         <label>ひとこと紹介<input name="summary" required maxlength="140" placeholder="一覧に出る1文" /></label>
         <label>本文（撮影会のレポート・撮影メモ）<textarea name="body" rows="7" placeholder="段落は空行で区切ります。「## 撮影メモ」のように見出しも書けます。"></textarea></label>
@@ -75,12 +77,14 @@ const months = (await getCollection('schedule')).map((m) => ({
       <form class="card panel" data-panel="add" hidden>
         <h2>撮影会に写真を追加</h2>
         <label>撮影会<select name="slug" data-trip-select required></select></label>
+        <label>トップの場所ピン<select name="spot" data-trip-spot><option value="">関連づけない</option>{SPOTS.filter((s) => s.id !== 'kuas').map((s) => <option value={s.id}>{s.ja}</option>)}</select></label>
+        <p class="small muted">場所ピンだけの変更も保存できます。</p>
         <fieldset class="photos-field">
           <legend>写真</legend>
           <div class="photos" data-photos="add"></div>
         </fieldset>
         <div class="actions">
-          <button class="btn btn--primary" type="submit">追加して公開する</button>
+          <button class="btn btn--primary" type="submit">変更を公開する</button>
           <p class="status" data-status="add" aria-live="polite"></p>
         </div>
         <pre class="preview" data-preview="add" hidden></pre>
