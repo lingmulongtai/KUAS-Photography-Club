@@ -1,12 +1,11 @@
 ---
 import Base from '../layouts/Base.astro';
 import KyotoHero from '../components/KyotoHero.astro';
-import FilmStrip from '../components/FilmStrip.astro';
-import TripRow from '../components/TripRow.astro';
+import TripCard from '../components/TripCard.astro';
 import LearnCards from '../components/learn/LearnCards.astro';
 import InstagramSection from '../components/InstagramSection.astro';
 import UpcomingEvents from '../components/UpcomingEvents.astro';
-import { getTrips, stripsFrom } from '../lib/trips';
+import { getTrips } from '../lib/trips';
 import { club } from '../data/club';
 
 const trips = await getTrips();
@@ -57,9 +56,8 @@ const latest = trips.slice(0, 3);
         </div>
         <a class="link-arrow" href="/trips/">すべての撮影会 →</a>
       </div>
-      <FilmStrip strips={stripsFrom(latest)} label="最近の撮影会の写真が並んだフィルム" />
       <div class="list">
-        {latest.map((trip, i) => <TripRow trip={trip} roll={trips.length - i} />)}
+        {latest.map((trip) => <TripCard trip={trip} />)}
       </div>
     </div>
   </section>
@@ -156,8 +154,12 @@ const latest = trips.slice(0, 3);
   }
 
   .list {
-    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
   }
+
+  @media (max-width: 900px) { .list { grid-template-columns: 1fr; } }
 
   .cta {
     background: var(--brand-pale);
