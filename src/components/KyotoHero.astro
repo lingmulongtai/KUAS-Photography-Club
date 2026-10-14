@@ -35,6 +35,13 @@ import { club } from '../data/club';
         <span data-phase>—</span>
         <span class="moon" data-moon></span>
       </p>
+      <div class="times" role="group" aria-label="空の時間を切り替える">
+        <button type="button" data-time="now" aria-pressed="true">いま</button>
+        <button type="button" data-time="morning" aria-pressed="false">朝</button>
+        <button type="button" data-time="noon" aria-pressed="false">昼</button>
+        <button type="button" data-time="sunset" aria-pressed="false">夕焼け</button>
+        <button type="button" data-time="night" aria-pressed="false">夜</button>
+      </div>
       <p class="hint">空をタップすると流れ星。<span>「太秦キャンパス」を押すと近づけます。</span></p>
     </aside>
   </div>
@@ -61,7 +68,7 @@ import { club } from '../data/club';
   import { mountStage } from '../scripts/gl/stage';
   import { createHero, type HeroMode, type HeroStatus } from '../scripts/hero/scene';
   import { createLook, lookAt } from '../scripts/hero/palette';
-  import { sunPosition } from '../scripts/hero/astro';
+  import { jstDateAt, jstMinutes, sunPosition, sunTimes } from '../scripts/hero/astro';
 
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
   const hero = stage?.closest<HTMLElement>('.hero');
@@ -80,11 +87,51 @@ import { club } from '../data/club';
       const v = ((Math.floor(m) % 1440) + 1440) % 1440;
       return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
     };
+    /* the sky follows the real time unless someone picks another time of today */
+    const sky = { live: true, from: 0, delta: 0, start: 0, dur: 0 };
+    const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+    const shown = () => {
+      const real = jstMinutes(new Date());
+      if (!sky.dur) return sky.live ? real : sky.from + sky.delta;
+      const p = Math.min(1, (performance.now() - sky.start) / sky.dur);
+      const m = sky.from + sky.delta * ease(p);
+      if (p >= 1) {
+        sky.dur = 0;
+        sky.from = m;
+        sky.delta = 0;
+      }
+      return m;
+    };
+    const presets = (key: string) => {
+      const { sunrise, sunset } = sunTimes(new Date());
+      return { morning: sunrise - 6, noon: 12 * 60 + 30, sunset: sunset - 14, night: sunset + 100 }[key] ?? jstMinutes(new Date());
+    };
+    const timeButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-time]'));
+    timeButtons.forEach((b) =>
+      b.addEventListener('click', () => {
+        const key = b.dataset.time!;
+        const from = shown();
+        const to = key === 'now' ? jstMinutes(new Date()) : presets(key);
+        // take the short way round the clock
+        const delta = ((((to - from) % 1440) + 2160) % 1440) - 720;
+        sky.live = key === 'now';
+        sky.from = from;
+        sky.delta = delta;
+        sky.start = performance.now();
+        sky.dur = reducedMotion ? 0 : 2800;
+        if (!sky.dur) {
+          sky.from = from + delta;
+          sky.delta = 0;
+        }
+        timeButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      }),
+    );
+
     const onStatus = (s: HeroStatus) => {
       if (out.clock) out.clock.textContent = hhmm(s.minutes);
       if (out.phase) out.phase.textContent = s.phase;
       if (out.moon) out.moon.textContent = `月齢 ${s.moonAge.toFixed(1)}`;
-      if (out.status) out.status.textContent = `いま ${hhmm(s.minutes)} · ${s.phase}`;
+      if (out.status) out.status.textContent = `${sky.live ? 'いま' : '表示中'} ${hhmm(s.minutes)} · ${s.phase}`;
     };
 
     const setView = (mode: HeroMode, arrived: boolean) => {
@@ -104,7 +151,7 @@ import { club } from '../data/club';
       stage,
       (renderer, el) =>
         (demo = createHero(renderer, el, {
-          now: () => new Date(),
+          now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
           quality,
           reducedMotion,
           drift: !coarse,
@@ -283,6 +330,35 @@ import { club } from '../data/club';
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     max-width: 360px;
+  }
+
+  .times {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .times button {
+    appearance: none;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--on-dark);
+    font: 700 11px/1.4 var(--body);
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .times button:hover {
+    border-color: var(--brand);
+  }
+
+  .times button[aria-pressed='true'] {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-accent);
   }
 
   .now {
