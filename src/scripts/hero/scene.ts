@@ -26,7 +26,7 @@ import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds, coverForDay } from './clouds';
 import { createLookRotation, mountLookControls } from './look-controls';
 import { createBuildingMask } from './vegetation-mask';
-import { createWoodlandMask, type Woodland } from './woodland';
+import type { Woodland } from './woodland';
 import { buildWoodlandTexture } from './woodland-texture';
 import { infrastructureMask } from './forest-infrastructure';
 
@@ -180,8 +180,9 @@ export function createHero(
     shadow.invalidate();
     const [cityPhoto, buildings, lines, woodlandBytes] = await Promise.all([loadTexture(meta.aerialCity.file, aniso), loadBuildings(), loadLines(), loadBinary('woodland.json.gz')]);
     const woodlandData = JSON.parse(new TextDecoder().decode(woodlandBytes)) as {polygons: Woodland[]};
-    const forestArea = createWoodlandMask(woodlandData.polygons);
-    terrain.uniforms.uWoodland.value = buildWoodlandTexture(renderer, woodlandData.polygons, meta.aerialWide.box);
+    const woodlandRaster = buildWoodlandTexture(woodlandData.polygons, meta.aerialWide.box);
+    const forestArea = woodlandRaster.contains;
+    terrain.uniforms.uWoodland.value = woodlandRaster.texture;
     terrain.uniforms.uWoodlandOn.value = 1;
     terrain.uniforms.uAerialCity.value = cityPhoto;
     terrain.uniforms.uCityOn.value = 1;

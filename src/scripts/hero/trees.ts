@@ -54,7 +54,7 @@ export function createForest(
     const lods: number[] = [];
     for (const { x, z, lod, seed } of forestCells(eye, quality)) {
         const c = sample(x, z);
-        if (!c || (!forestArea(x, z) && !woodland(c)) || excluded(x, z)) continue;
+        if (!c || excluded(x, z) || (!woodland(c) && !forestArea(x, z))) continue;
         const y = hf.height(x, z);
         const cedar = seed < .28;
         const s = .8 + seed * .65;
