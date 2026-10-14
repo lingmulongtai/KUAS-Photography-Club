@@ -147,6 +147,16 @@ export function createHero(
       normalNearBox: meta.near.box,
     }, opts.quality > 0.75 ? 640 : 400);
     terrainRecenter = terrain.recenter;
+    // work out the other viewpoints' terrain while the browser is idle
+    const idle = (cb: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 500));
+    const pending = Object.values(VIEWS).filter((v) => v !== VIEW);
+    const prepNext = () => {
+      const v = pending.shift();
+      if (!v) return;
+      terrain.prepare(v.eye);
+      idle(prepNext);
+    };
+    idle(prepNext);
     scene.add(terrain.mesh);
     casts(terrain.mesh);
     shadow.invalidate();
