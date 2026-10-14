@@ -45,6 +45,8 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
     const node = document.createElement('div');
     node.className = `hero-pin${d.action ? ' is-action' : related.length ? ' is-linked' : ''}`;
     node.style.setProperty('--i', String(i));
+    node.setAttribute('aria-hidden', 'true');
+    node.inert = true;
     const trigger = document.createElement(d.action || related.length ? 'button' : 'span');
     trigger.className = 'pin-trigger';
     trigger.innerHTML = `<span class="pin-dot" aria-hidden="true"></span><span class="pin-text">${d.ja}<small>${d.en}</small></span>`;
@@ -160,7 +162,12 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
           it.shown = show;
           it.node.classList.toggle('is-shown', show);
         }
-        if (it.trigger instanceof HTMLButtonElement) it.trigger.tabIndex = show ? 0 : -1;
+        if (!show && it.node.contains(document.activeElement)) el.querySelector<HTMLButtonElement>('.views [aria-pressed="true"]')?.focus({ preventScroll: true });
+        it.node.inert = !show;
+        if (it.trigger instanceof HTMLButtonElement) {
+          it.trigger.tabIndex = show ? 0 : -1;
+          it.node.setAttribute('aria-hidden', String(!show));
+        }
         if (!show) { it.close(); continue; }
         const x = Math.round(((v.x + 1) / 2) * width);
         const y = Math.round(((1 - v.y) / 2) * height);
