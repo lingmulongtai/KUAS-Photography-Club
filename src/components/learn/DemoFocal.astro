@@ -1,6 +1,8 @@
 ---
 /** Same framing, different focal lengths: a plaster bust and a top-down diagram of where the camera stands. */
 const lengths = [16, 24, 35, 50, 85, 135, 200];
+import CameraDial from './CameraDial.astro';
+import { FOCAL_STOPS } from '../../data/camera-settings';
 ---
 <figure class="demo">
   <div class="grid">
@@ -35,9 +37,8 @@ const lengths = [16, 24, 35, 50, 85, 135, 200];
       </dl>
     </div>
   </div>
-  <div class="controls">
-    <label for="focal-mm">焦点距離</label>
-    <input type="range" id="focal-mm" min="0" max="1000" step="1" value="415" />
+  <div class="camera-controls">
+    <CameraDial id="focal-mm" label="焦点距離" values={FOCAL_STOPS.map((mm) => `${mm}mm`)} value={6} />
   </div>
   <div class="choices">
     <label>被写体<select data-focal-subject><option value="photographer">撮影する人（写真部ロゴより）</option><option value="plaster">石膏像</option></select></label>
@@ -80,6 +81,7 @@ const lengths = [16, 24, 35, 50, 85, 135, 200];
 </script>
 
 <style>
+  .camera-controls { max-width: 180px; }
   .choices { display: flex; flex-wrap: wrap; gap: 16px; }
   .choices label { display: grid; gap: 6px; font-size: 14px; min-width: 0; }
   .choices select { max-width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--raise); font: inherit; }
