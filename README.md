@@ -57,7 +57,8 @@ npm run build    # dist/ に書き出し
 - **撮影会を追加**：`src/content/trips/` に Markdown を1つ追加し、写真を `public/photos/<撮影会名>/` に置く（書き方は既存のファイルを参照）。撮影者名は `by` に書くと、ガイドライン第6章のクレジットが自動で付きます
 - **サンプルの差し替え**：`sample: true` の撮影会と写真はサンプルです。手順は `tools/sample-photos/README.md`
 - **仮の文章**：手書き風の点線メモがついている文章は、運営で書き換えてください
-- **申し込み・お問い合わせフォーム**：Google フォームか Microsoft Forms で作り、共有リンクを `src/data/club.ts` の `forms.join`（見学・入部）と `forms.contact`（撮影依頼・協賛など）に貼る。サイト自体は個人情報を集めません。リンクが空のあいだは「準備中」と出て、Instagram とメールに案内します
+- **見学・入部フォーム**：Microsoft Forms の共有リンクを `src/data/club.ts` の `forms.join` に貼る（差し替えるときもここ）。サイト自体は個人情報を集めません
+- **学外からの連絡先**：メール（`club.email`）と Instagram の DM だけです。アドレスを変えるときは `src/data/club.ts` を書き換えてください
 - **月ごとのスケジュール**：`src/content/schedule/` に `2026-12.md` のような Markdown を1つ追加（書き方は既存のファイルを参照）。金曜の定例ミーティングは自動で入ります
 - **Instagram の投稿**：`src/data/instagram.ts` に載せたい投稿を追加
 - **ガイドライン**：`guidelines/` の Markdown を編集すると、サイトにもそのまま反映されます
@@ -73,7 +74,7 @@ npm run build    # dist/ に書き出し
 - 入会・見学・撮影会の参加は、ミーティングで運営メンバーに気軽に声をかけてください
 - 連絡方法：
   - Instagram: [@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
-  - Teams/メール: [2025m011@kuas.ac.jp](mailto:2025m011@kuas.ac.jp)
+  - メール: [photography.club.in.kuas@gmail.com](mailto:photography.club.in.kuas@gmail.com)
 
 ## 貢献のしかた（ドキュメント編集）
 - 誤字修正や追記、提案があれば Issue や Pull Request で気軽にご連絡ください
@@ -136,7 +137,7 @@ This repository also holds the club website, a static Astro + three.js site: a 3
 - If you'd like to join, visit a meeting, or participate in a photo trip, just speak to one of the organizers at our weekly meetings.
 - **Contact Us:**
   - **Instagram:** [@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
-  - **Teams/Email:** [2025m011@kuas.ac.jp](mailto:2025m011@kuas.ac.jp)
+  - **Email:** [photography.club.in.kuas@gmail.com](mailto:photography.club.in.kuas@gmail.com)
 
 ## How to Contribute
 - If you find a typo or have a suggestion, feel free to open an Issue or a Pull Request.
