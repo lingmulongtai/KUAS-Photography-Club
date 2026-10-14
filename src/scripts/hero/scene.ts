@@ -340,7 +340,7 @@ export function createHero(
     const seconds = opts.flightSeconds ?? 5;
     modeSince = t + seconds;
     const viewChanged = nextView !== view;
-    const locationChanged = viewChanged || mode !== to;
+    const locationChanged = viewChanged || mode !== to || !!flight;
     if (viewChanged) {
       view = nextView;
       VIEW = VIEWS[view];
