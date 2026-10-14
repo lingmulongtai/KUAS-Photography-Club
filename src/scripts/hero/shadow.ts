@@ -9,14 +9,26 @@ export const SHADOW_LAYER = 1;
  * the part of the city in view, reaching far enough toward the sun that the western mountains
  * throw their evening shadow across the basin. Re-rendered only when the sun or the region moves.
  * Objects with custom vertex shaders (the instanced buildings) bring their own depth material
- * in userData.depthMaterial.
+ * in userData.depthMaterial. Shaders read the map through SHADOW_GLSL (env.ts) as a depth
+ * texture with hardware comparison, which gives bilinear-filtered shadow edges.
  */
 export function createSunShadow(renderer: THREE.WebGLRenderer, scene: THREE.Scene, env: Env, size: number) {
-  const target = new THREE.WebGLRenderTarget(size, size, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  const depth = new THREE.DepthTexture(size, size);
+  depth.compareFunction = THREE.LessEqualCompare;
+  depth.minFilter = THREE.LinearFilter;
+  depth.magFilter = THREE.LinearFilter;
+  const target = new THREE.WebGLRenderTarget(size, size, { depthTexture: depth, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 4000);
   camera.layers.set(SHADOW_LAYER);
   const fallback = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-  env.uShadowMap.value = target.texture;
+  env.uShadowMap.value = depth;
+  // allocate the depth texture now: until it exists, every shader that samples it would fail to draw
+  {
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(target);
+    renderer.clear(false, true, false);
+    renderer.setRenderTarget(prev);
+  }
   env.uShadowTexel.value.set(1 / size, 1 / size);
 
   const region = new THREE.Box3(new THREE.Vector3(-7500, 0, -6000), new THREE.Vector3(3200, 450, 6000));

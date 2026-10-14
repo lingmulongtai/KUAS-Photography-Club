@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ENV_GLSL, type Env } from './env';
+import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Box } from './geo';
 import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
@@ -125,6 +125,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
+      ${SHADOW_GLSL}
       uniform sampler2D uAerialWide;
       uniform vec4 uAerialWideBox;
       uniform sampler2D uAerialCity;
@@ -177,8 +178,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 albedo = photo * .62;
         albedo = mix(vec3(dot(albedo, vec3(.3, .55, .15))), albedo, .85);
 
-        float sh = 1.;
-        if (dot(n, uSunDir) > 0.) sh = sunShadow(vWorld, n);
+        float sh = sunShadow(vWorld, n);
         vec3 col = shade(albedo, n, vWorld, sh);
 
         vec3 emit = vec3(0.);

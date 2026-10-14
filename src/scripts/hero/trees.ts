@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ENV_GLSL, type Env } from './env';
+import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import type { Box } from './geo';
 import { rng } from './util';
@@ -115,6 +115,7 @@ export function createForest(
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
+      ${SHADOW_GLSL}
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying vec3 vTint;
@@ -127,7 +128,7 @@ export function createForest(
         alb *= .55 + .55 * smoothstep(.1, .9, vUp);
         float leaf = vnoise(vWorld.xz * 1.7 + vWorld.y * .9);
         alb *= .8 + .4 * leaf;
-        float sh = dot(n, uSunDir) > 0. ? sunShadow(vWorld, n) : 1.;
+        float sh = sunShadow(vWorld, n);
         vec3 col = shade(alb, n, vWorld, sh);
         gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
       }

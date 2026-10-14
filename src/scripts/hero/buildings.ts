@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ENV_GLSL, type Env } from './env';
+import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
 import { hash1 } from './util';
@@ -155,6 +155,7 @@ const POLY_VS = /* glsl */ `
 
 const BUILDING_FS = /* glsl */ `
   ${ENV_GLSL}
+  ${SHADOW_GLSL}
   varying vec3 vWorld;
   varying vec3 vNormal;
   varying vec2 vWall;
@@ -163,9 +164,11 @@ const BUILDING_FS = /* glsl */ `
   vec3 pick4(float r, vec3 a, vec3 b, vec3 c, vec3 d){ return r < .25 ? a : r < .5 ? b : r < .75 ? c : d; }
 
   void main(){
+    vec3 n = normalize(vNormal);
+    // shadows take screen-space derivatives: look them up before any branch or discard
+    float sh = sunShadow(vWorld, n);
     // the detailed campus model (campus.ts) stands in for these blocks up close
     if (vInfo.x > 767.5 && uCampusDetail > .5) discard;
-    vec3 n = normalize(vNormal);
     float campus = step(255.5, vInfo.x) * uHighlight;
     // codes arrive through interpolation, so 4.0 can turn up as 3.99999: round before taking them
     // apart, or a house flips between wood and concrete from one pixel to the next
@@ -247,8 +250,6 @@ const BUILDING_FS = /* glsl */ `
       emit += teal * .25 * campus * (roof ? .4 : 1.) * (.4 + uCity);
     }
 
-    float sh = 1.;
-    if (dot(n, uSunDir) > 0.) sh = sunShadow(vWorld, n);
     vec3 col = shade(albedo, n, vWorld, sh);
     gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
   }
