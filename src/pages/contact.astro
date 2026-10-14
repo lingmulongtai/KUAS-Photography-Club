@@ -1,8 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import PageHero from '../components/PageHero.astro';
-import FormLink from '../components/FormLink.astro';
-import { forms } from '../data/club';
+import ContactWays from '../components/ContactWays.astro';
 
 const topics = [
   {
@@ -32,11 +31,11 @@ const topics = [
   },
 ];
 ---
-<Base title="お問い合わせ" description="撮影のご依頼、協賛、取材など、KUAS Photography Club へのお問い合わせ窓口です。">
+<Base title="お問い合わせ" description="撮影のご依頼、協賛、取材など、KUAS Photography Club へのお問い合わせはメールか Instagram の DM で。">
   <PageHero
     edge="CONTACT ▸ FOR OUTSIDE PARTIES"
     title="お問い合わせ"
-    lead="撮影のご依頼、協賛、取材など、学外の方・大学の部署の方からのご連絡はこちらから。学生が運営しているため、お返事まで数日いただくことがあります。"
+    lead="撮影のご依頼、協賛、取材など、学外の方・大学の部署の方からのご連絡は、メールか Instagram の DM でお受けしています。学生が運営しているため、お返事まで数日いただくことがあります。"
   />
 
   <section class="wrap topics" aria-label="お問い合わせの種類">
@@ -55,14 +54,10 @@ const topics = [
         <p class="edge">SEND</p>
         <h2>ご連絡の方法</h2>
         <p class="muted">
-          お問い合わせフォームにご記入いただくのがいちばん確実です。お名前（団体名）、ご連絡先、ご用件の種類と内容をお書きください。
+          メールか Instagram の DM でご連絡ください。お名前（団体名）、ご連絡先、ご用件の種類と内容、ご希望の日時があればあわせてお書きください。
         </p>
       </div>
-      <FormLink
-        href={forms.contact}
-        label="お問い合わせフォームを開く"
-        pending="お問い合わせフォームは準備中です。それまでは Instagram の DM かメールでご連絡ください。"
-      />
+      <ContactWays />
     </div>
   </section>
 
@@ -130,9 +125,7 @@ const topics = [
 
   .cols {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 32px 72px;
-    align-items: start;
+    gap: 28px;
   }
 
   .note {
