@@ -88,10 +88,10 @@ export const VIEWS = {
   kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 258, 40), ref: KIYOMIZU, above: 30, bearing: 258, pitch: -3.5 },
   /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
   daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: DAIMONJI, ref: DAIMONJI, above: 24, bearing: 248, pitch: -7 },
-  /** The observation deck of Kyoto Tower, 100 m up, looking north up the city. */
-  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 0, 9), ref: TOWER, above: 100, bearing: 2, pitch: -9 },
+  /** An exterior composition: the whole tower against the northern city and mountains. */
+  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 320), ref: TOWER, above: 135, bearing: 350, pitch: -9 },
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 82, pitch: -4 },
-  funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 28, bearing: 180, pitch: -5 },
+  funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 45, bearing: 208, pitch: -4 },
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
@@ -305,9 +305,8 @@ export function createHero(
   }
 
   /** Region the sun shadows cover for a view: the city out in front of it. */
-  function shadowRegion(v: ViewDef, e: THREE.Vector3) {
-    const c = ahead(v.eye, v.bearing, 4600);
-    return new THREE.Box3(new THREE.Vector3(Math.min(c.x, e.x) - 5400, 0, Math.min(c.z, e.z) - 5400), new THREE.Vector3(Math.max(c.x, e.x) + 5400, 450, Math.max(c.z, e.z) + 5400));
+  function shadowRegion(_v: ViewDef, e: THREE.Vector3) {
+    return new THREE.Box3(new THREE.Vector3(e.x - 7000, 0, e.z - 7000), new THREE.Vector3(e.x + 7000, 900, e.z + 7000));
   }
 
   /** Fly to the campus, or to one of the viewpoints over the city. */
@@ -321,6 +320,7 @@ export function createHero(
     const seconds = opts.flightSeconds ?? 5;
     modeSince = t + seconds;
     const viewChanged = nextView !== view;
+    const locationChanged = viewChanged || mode !== to;
     if (viewChanged) {
       view = nextView;
       VIEW = VIEWS[view];
@@ -335,9 +335,10 @@ export function createHero(
 
     if (opts.reducedMotion) {
       // the stage clock stands still under reduced motion: cut straight to the new view
-      if (viewChanged) {
-        terrainRecenter?.(VIEW.eye);
-        plantTrees?.(VIEW.eye, VIEW.bearing);
+      if (locationChanged) {
+        const center = to === 'campus' ? CAMPUS_CENTER : VIEW.eye;
+        terrainRecenter?.(center);
+        plantTrees?.(center, VIEW.bearing);
         shadow.invalidate();
       }
       flight = null;
@@ -363,7 +364,7 @@ export function createHero(
       p1: p0.clone().lerp(p3, 0.3).add(lift),
       p2: p0.clone().lerp(p3, 0.75).add(lift.multiplyScalar(0.7)),
       p3,
-      regrow: viewChanged,
+      regrow: locationChanged,
     };
     opts.onMode?.(to, false);
   }
@@ -387,8 +388,9 @@ export function createHero(
       camera.position.copy(bez);
       if (flight.regrow && flight.t >= 0.5) {
         flight.regrow = false;
-        terrainRecenter?.(VIEW.eye);
-        plantTrees?.(VIEW.eye, VIEW.bearing);
+        const center = flight.to === 'campus' ? CAMPUS_CENTER : VIEW.eye;
+        terrainRecenter?.(center);
+        plantTrees?.(center, VIEW.bearing);
         shadow.invalidate();
       }
       const h = flight.to === 'campus' ? THREE.MathUtils.smoothstep(flight.t, 0.4, 1) : 1 - THREE.MathUtils.smoothstep(flight.t, 0, 0.5);
