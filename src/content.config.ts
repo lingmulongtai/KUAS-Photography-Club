@@ -1,6 +1,7 @@
 import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
+import { SPOT_IDS } from './data/spots';
 
 /**
  * One Markdown file per photo trip in src/content/trips/.
@@ -12,6 +13,7 @@ const trips = defineCollection({
     title: z.string(),
     date: z.coerce.date(),
     place: z.string(),
+    spot: z.enum(SPOT_IDS).optional(),
     /** How many members came. */
     members: z.number().int().positive().optional(),
     /** One sentence for lists and link previews. */

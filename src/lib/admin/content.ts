@@ -1,4 +1,5 @@
 import { parse, stringify } from 'yaml';
+import { SPOT_IDS } from '../../data/spots.ts';
 
 /* Markdown for trips and monthly schedules, in the same shape as the files in src/content/. */
 
@@ -16,6 +17,7 @@ export interface TripIn {
   title: string;
   date: string;
   place: string;
+  spot?: string | null;
   members?: number | null;
   summary: string;
   body: string;
@@ -45,6 +47,11 @@ const SLUG = /^[a-z0-9][a-z0-9-]{1,60}$/;
 const FILE = /^[a-z0-9][a-z0-9-]{0,60}\.jpg$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH = /^\d{4}-\d{2}$/;
+export function cleanSpot(value: unknown) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string' || !SPOT_IDS.includes(value as typeof SPOT_IDS[number])) throw new Error('場所のピンを選び直してください');
+  return value;
+}
 const KINDS = ['meeting', 'trip', 'event', 'deadline', 'other'];
 
 const text = (v: unknown, max: number, field: string, required = true) => {
@@ -95,6 +102,8 @@ export function tripMarkdown(input: TripIn) {
     place: text(input.place, 80, '場所'),
   };
   const members = Number(input.members);
+  const spot = cleanSpot(input.spot);
+  if (spot) front.spot = spot;
   if (Number.isInteger(members) && members > 0) front.members = members;
   front.summary = text(input.summary, 140, 'ひとこと紹介');
   front.photos = photos;
@@ -107,13 +116,18 @@ export function photoEntries(slug: string, photos: PhotoIn[]) {
 }
 
 /** An existing trip's Markdown with more photos added to the end of its list. */
-export function appendPhotos(md: string, slug: string, photos: PhotoIn[]) {
+export function appendPhotos(md: string, slug: string, photos: PhotoIn[], spot?: string | null) {
   const m = md.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!m) throw new Error('撮影会のファイルが読めませんでした');
   const front = parse(m[1]) as Record<string, unknown>;
   const list = Array.isArray(front.photos) ? front.photos : [];
   const added = cleanPhotos(checkSlug(slug), photos);
-  if (!added.length) throw new Error('写真を1枚以上追加してください');
+  if (!added.length && spot === undefined) throw new Error('写真を追加するか場所のピンを選んでください');
+  if (spot !== undefined) {
+    const selected = cleanSpot(spot);
+    if (selected) front.spot = selected;
+    else delete front.spot;
+  }
   front.photos = [...list, ...added];
   return markdown(front, m[2]);
 }
