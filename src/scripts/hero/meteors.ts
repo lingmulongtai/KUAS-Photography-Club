@@ -2,14 +2,13 @@ import * as THREE from 'three';
 import { rng } from './util';
 
 /*
- * Shooting stars that sparkle: a star-shaped head, a tapered tail that runs from white through
- * the club's teal to violet, and glitter shed along the path that twinkles and drifts after the
- * meteor has gone. Frequent after dark (with the odd burst and fireball), rarer and fainter by day.
+ * Occasional shooting stars with short, fine tails and a faint trace of glitter.
+ * Taps still summon a meteor; natural appearances are sparse, especially by day.
  */
 
-const MAX = 14;
+const MAX = 8;
 const SEG = 24;
-const GLITTER = 900;
+const GLITTER = 240;
 const R = 30000;
 
 interface Meteor {
@@ -64,8 +63,8 @@ export function buildMeteors(quality: number) {
         // soft core across the ribbon, broken up a little along it so it sparkles
         // with MSAA the edge pixels can see uv slightly outside 0..1: clamp, or pow() gives NaN
         float across = clamp(1. - abs(vUv.y * 2. - 1.), 0., 1.);
-        float core = pow(across, 2.2) + pow(across, 12.) * 2.;
-        float flick = .75 + .25 * sin(vUv.x * 90. - uTime * 40.);
+        float core = pow(across, 2.2) + pow(across, 12.) * .6;
+        float flick = .92 + .08 * sin(vUv.x * 90. - uTime * 18.);
         gl_FragColor = vec4(vColor.rgb * vColor.a * core * flick, 1.);
       }
     `,
@@ -107,7 +106,7 @@ export function buildMeteors(quality: number) {
         // a round glow with four thin rays: a twinkle
         float glow = exp(-d * d * 9.);
         float rays = exp(-abs(p.x) * 26.) * exp(-abs(p.y) * 2.6) + exp(-abs(p.y) * 26.) * exp(-abs(p.x) * 2.6);
-        float a = (glow + rays * .8) * vColor.a;
+        float a = (glow + rays * .16) * vColor.a;
         if (a < .004) discard;
         gl_FragColor = vec4(vColor.rgb * a, 1.);
       }
@@ -124,7 +123,7 @@ export function buildMeteors(quality: number) {
   const live: Meteor[] = [];
   const glitter = Array.from({ length: GLITTER }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), age: 1, life: 1, size: 2, col: new THREE.Color(), phase: 0 }));
   let gi = 0;
-  let next = 1.2;
+  let next = 10;
   const palette = [new THREE.Color(1, 1, 1), new THREE.Color(0.55, 0.95, 1), new THREE.Color(1, 0.88, 0.55), new THREE.Color(0.85, 0.7, 1)];
 
   const tmp = new THREE.Vector3();
@@ -158,9 +157,9 @@ export function buildMeteors(quality: number) {
       b,
       t: 0,
       dur: big ? 1.6 + r() * 0.8 : 0.55 + r() * 0.75,
-      len: big ? 0.65 : 0.45 + r() * 0.25,
-      width: big ? 3.4 : 1.6 + r() * 1.4,
-      bright: big ? 2.6 : 1 + r() * 0.9,
+      len: big ? 0.3 : 0.18 + r() * 0.12,
+      width: big ? 1.5 : 0.6 + r() * 0.5,
+      bright: big ? 1.2 : 0.55 + r() * 0.35,
       hue: r(),
     });
   }
@@ -185,11 +184,9 @@ export function buildMeteors(quality: number) {
       tailMat.uniforms.uTime.value = time;
       const vis = Math.max(night, 0.16);
       if (time > next && live.length < MAX) {
-        const big = r() < 0.08;
+        const big = r() < 0.02;
         spawn(view.az, view.half, view.top, big);
-        // now and then a little shower
-        if (night > 0.5 && r() < 0.18) for (let k = 0; k < 2 && live.length < MAX; k++) spawn(view.az, view.half, view.top, false);
-        const gap = night > 0.6 ? 0.8 + r() * 2.2 : night > 0.2 ? 2 + r() * 4 : 6 + r() * 8;
+        const gap = night > 0.6 ? 8 + r() * 18 : night > 0.2 ? 14 + r() * 24 : 24 + r() * 36;
         next = time + gap / Math.max(quality, 0.6);
       }
 
@@ -229,7 +226,7 @@ export function buildMeteors(quality: number) {
           // white at the head, then teal, then violet
           if (u < 0.3) c.copy(white).lerp(teal, u / 0.3);
           else c.copy(teal).lerp(violet, (u - 0.3) / 0.7);
-          const a = Math.pow(1 - u, 1.1) * life * s.bright * vis * 3;
+          const a = Math.pow(1 - u, 1.1) * life * s.bright * vis * 1.3;
           tailCol.set([c.r, c.g, c.b, a], o * 4);
           tailCol.set([c.r, c.g, c.b, a], o * 4 + 4);
           tailUv.set([u * s.len * 20, 0], o * 2);
@@ -238,10 +235,10 @@ export function buildMeteors(quality: number) {
         // head sprite
         const hp = head.clone().multiplyScalar(R).add(cam);
         spritePos.set([hp.x, hp.y, hp.z], m * 3);
-        spriteCol.set([1, 0.98, 0.94, life * s.bright * vis * 1.5], m * 4);
-        spriteSize[m] = (7 + s.width * 3.5) * (0.85 + 0.3 * Math.sin(time * 37 + m));
+        spriteCol.set([1, 0.98, 0.94, life * s.bright * vis * .7], m * 4);
+        spriteSize[m] = (3 + s.width * 1.8) * (0.95 + 0.05 * Math.sin(time * 18 + m));
         // shed glitter
-        const shed = Math.round((s.width > 3 ? 7 : 3) * Math.min(1, dt * 60) * (t < 1 ? 1 : 0));
+        const shed = Math.round(Math.min(1, dt * 60) * (t < 1 ? 1 : 0));
         for (let k = 0; k < shed; k++) {
           const g = glitter[gi];
           gi = (gi + 1) % GLITTER;
@@ -249,7 +246,7 @@ export function buildMeteors(quality: number) {
           g.v.copy(tan).multiplyScalar(-R * 0.01 * r()).add(new THREE.Vector3(0, -R * 0.004 * (0.5 + r()), 0));
           g.age = 0;
           g.life = 0.6 + r() * 1.4;
-          g.size = 3 + r() * 5;
+          g.size = 1 + r() * 2;
           g.col.copy(palette[Math.floor(r() * palette.length)]);
           g.phase = r() * 10;
         }
@@ -268,7 +265,7 @@ export function buildMeteors(quality: number) {
         const f = 1 - g.age / g.life;
         const tw = 0.4 + 0.6 * Math.max(0, Math.sin(time * 26 + g.phase * 7)) ** 2;
         spritePos.set([g.p.x, g.p.y, g.p.z], i * 3);
-        spriteCol.set([g.col.r, g.col.g, g.col.b, f * tw * vis * 1.3], i * 4);
+        spriteCol.set([g.col.r, g.col.g, g.col.b, Math.max(0, f) * tw * vis * .25], i * 4);
         spriteSize[i] = g.size * (0.6 + 0.4 * f);
       }
 
