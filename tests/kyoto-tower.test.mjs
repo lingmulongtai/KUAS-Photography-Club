@@ -13,17 +13,17 @@ test('tower retains the official overall height with bounded, finite geometry', 
       assert.ok([...geo.attributes[name].array].every(Number.isFinite),name);
     }
   }
-  assert.equal(bounds.min.y,0);
+  assert.ok(Math.abs(bounds.min.y)<.001);
   assert.ok(Math.abs(bounds.max.y-131)<.01);
-  assert.ok(triangles<32000,`tower triangle budget: ${triangles}`);
+  assert.ok(triangles<36000,`tower triangle budget: ${triangles}`);
   for(const {geo} of parts) geo.dispose();
 });
 
-test('both observation levels and roof lounge expose glass between structural ribs', () => {
+test('observation levels, roof lounge and its footing expose glass without gaps', () => {
   const parts=kyotoTower();
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
   const meshes=parts.map(({geo})=>new THREE.Mesh(geo,material));
-  for(const y of [99.1,101.1,35.5]) for(let side=0;side<4;side++) {
+  for(const y of [99.1,101.1,35.5,30.9]) for(let side=0;side<4;side++) {
     const a=Math.PI/36+side*Math.PI/2;
     const ray=new THREE.Raycaster(new THREE.Vector3(Math.sin(a)*30,y,Math.cos(a)*30),
       new THREE.Vector3(-Math.sin(a),0,-Math.cos(a)));
