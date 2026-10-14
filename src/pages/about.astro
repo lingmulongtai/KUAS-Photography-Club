@@ -9,12 +9,12 @@ const fmt = (iso: string) => iso.replaceAll('-', '.');
 const goals = [
   { no: '01', title: 'とにかく楽しむ', text: '上手い下手は気にしない。写真を撮りに出かけること自体を楽しむのがいちばんの目的です。' },
   { no: '02', title: '国や学年をこえてつながる', text: '日本人と留学生、1回生から院生まで。写真という共通の趣味で、普段は出会わない人とつながります。' },
-  { no: '03', title: '部活への昇格とクラブカメラ', text: '次の年度に「部活」へ昇格するのが目標です。カメラを持っていない人も撮影を楽しめるよう、共有カメラの購入を目指しています。' },
+  { no: '03', title: 'クラブカメラの整備', text: 'カメラを持っていない人も撮影を楽しめるよう、共有カメラの購入を目指しています。' },
 ];
 const timeline = [
-  { date: fmt(club.recognized), text: '学友会の公認サークルに' },
+  { date: fmt(club.recognized), text: '学友会の公認を受ける' },
   { date: fmt(club.membersAsOf), text: `メンバーが${club.members}人に` },
-  { date: '2026', text: '部活への昇格を目指して活動中', slot: true },
+  { date: '2026', text: '大学公認の文化系クラブ（部活動）として活動中' },
 ];
 const roles = ['代表', '副代表', '会計', '機材管理', '広報', '企画リーダー', '安全管理'];
 const year = [
@@ -26,14 +26,14 @@ const year = [
   { m: '3月', t: '写真展・1年の振り返り' },
 ];
 ---
-<Base title="サークルについて" description={`${club.nameJa}（${club.name}）について。活動の目的、これまでの歩み、1年の流れ、運営の役割。`}>
+<Base title="写真部について" description={`${club.nameJa}（${club.name}）について。活動の目的、これまでの歩み、1年の流れ、運営の役割。`}>
   <PageHero
     edge={`ABOUT ▸ SINCE ${club.recognized.slice(0, 4)} ▸ ${club.members} MEMBERS`}
-    title="サークルについて"
-    lead={`${club.name} は、写真を通して「楽しむ」と「つながる」を大切にするサークルです。国籍や学年、経験は問いません。スマホで撮る人も、フィルムカメラを持っている人も、同じ撮影会に出かけています。`}
+    title="写真部について"
+    lead={`${club.name} は、写真を通して「楽しむ」と「つながる」を大切にする写真部です。国籍や学年、経験は問いません。スマホで撮る人も、フィルムカメラを持っている人も、同じ撮影会に出かけています。`}
   />
 
-  <section class="wrap stats-wrap" aria-label="サークルの数字">
+  <section class="wrap stats-wrap" aria-label="写真部の数字">
     <div class="stats">
     <div><p class="value num">{club.members}<small>人</small></p><p class="label">メンバー（{fmt(club.membersAsOf)} 時点）</p></div>
     <div><p class="value num">{club.tripsPerMonth}<small>回 / 月</small></p><p class="label">撮影会</p></div>
@@ -69,7 +69,7 @@ const year = [
         </div>
         <ol class="timeline">
           {timeline.map((t) => (
-            <li><span class="num date">{t.date}</span><span>{t.text} {t.slot && <SlotNote note="予定に合わせて更新してください" />}</span></li>
+            <li><span class="num date">{t.date}</span><span>{t.text}</span></li>
           ))}
         </ol>
       </div>
