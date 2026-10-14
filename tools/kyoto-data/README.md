@@ -57,5 +57,6 @@ Elevation, building and road binaries are unchanged by these commands.
 python build_woodland.py /path/to/overpass.json
 ```
 
-relationの外周・穴を保持し、2m許容で簡略化して `public/kyoto/woodland.json.gz` を生成します。1MiBを上限とし、2026-10-14のデータは361,287 bytes。描画時にAPIを呼び出しません。© OpenStreetMap contributors / ODbL。一部は2006年の森林データ由来なので、PLATEAUの建物と国土地理院の道路・水域で植樹を除外します。
+relationの外周・穴は元の形状を保持し、単独wayだけ2m許容で簡略化して `public/kyoto/woodland.json.gz` を生成します。独立した森林タグを持つinner wayも保持します。1MiBを上限とし、2026-10-14のデータは405,535 bytes。描画時にAPIを呼び出しません。© OpenStreetMap contributors / ODbL。一部は2006年の森林データ由来なので、PLATEAUの建物と国土地理院の道路・水域（島の穴を保持）で植樹を除外します。
 
+2048pxの森林ラスタを一度だけ作り、地面の森の色と木の配置が同じalphaを参照します。樹形は距離で簡略化し、PCの詳細な枝葉は240m、スマホは160mまで。遠景の疎な森林群は10kmまで続きます。最近の3視点だけ配置バッファを保持し、古い配置は解放します。
