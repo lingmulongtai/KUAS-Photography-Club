@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { press, setText, type Demo } from '../gl/stage';
+import { buildPhotographer } from './focal-subjects';
 
 const FRAME_H = 0.36; // keep the head and the top of the shoulders (36 cm) filling the frame height
 const SENSOR_H = 0.024; // full-frame sensor height in metres
@@ -139,12 +140,40 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
   scene.add(wall, floor, stand, socle);
 
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  loadBust(aniso)
-    .then((bust) => {
-      bust.position.y = BUST_Y;
-      scene.add(bust);
-    })
-    .catch((err) => console.warn('Could not load the head scan', err));
+  const root = el.closest('.demo')!;
+  const subjectSelect = root.querySelector<HTMLSelectElement>('[data-focal-subject]')!;
+  const subjectStatus = root.querySelector('[data-subject-status]');
+  const headCredit = root.querySelector<HTMLElement>('[data-head-credit]');
+  const photographer = buildPhotographer();
+  photographer.position.y = BUST_Y;
+  scene.add(photographer);
+  let bust: THREE.Group | null = null;
+  let bustLoading: Promise<THREE.Group> | null = null;
+  subjectSelect.addEventListener('change', async () => {
+    const plaster = subjectSelect.value === 'plaster';
+    if (headCredit) headCredit.hidden = !plaster;
+    if (!plaster) {
+      photographer.visible = true;
+      if (bust) bust.visible = false;
+      setText(subjectStatus, '');
+      return;
+    }
+    setText(subjectStatus, bust ? '' : '石膏像を読み込んでいます…');
+    try {
+      bustLoading ??= loadBust(aniso);
+      const loaded = await bustLoading;
+      if (!bust) { bust = loaded; bust.position.y = BUST_Y; scene.add(bust); }
+      bust.visible = subjectSelect.value === 'plaster';
+      photographer.visible = !bust.visible;
+      setText(subjectStatus, '');
+    } catch {
+      bustLoading = null;
+      subjectSelect.value = 'photographer';
+      photographer.visible = true;
+      if (headCredit) headCredit.hidden = true;
+      setText(subjectStatus, '石膏像を読み込めませんでした。撮影する人に戻しました。');
+    }
+  });
 
   // Rembrandt-style key from the front left, a cool rim from behind, soft fill
   const focus = new THREE.Vector3(0, BUST_Y + HEAD_HALF_H + 0.035 - FRAME_H / 2, 0.04);
