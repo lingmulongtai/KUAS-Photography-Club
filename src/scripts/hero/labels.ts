@@ -60,7 +60,7 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
       clearTimeout(leaveTimer);
       popup.hidden = true;
       node.classList.remove('is-open');
-      if (related.length) trigger.setAttribute('aria-expanded', 'false');
+      if (related.length && !d.action) trigger.setAttribute('aria-expanded', 'false');
     };
     const open = () => {
       clearTimeout(leaveTimer);
@@ -69,24 +69,20 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
       });
       popup.hidden = false;
       node.classList.add('is-open');
-      trigger.setAttribute('aria-expanded', 'true');
+      if (!d.action) trigger.setAttribute('aria-expanded', 'true');
     };
     if (d.action || related.length) {
       (trigger as HTMLButtonElement).type = 'button';
       trigger.tabIndex = -1;
-      trigger.setAttribute('aria-label', `${d.ja}の撮影会を見る`);
-      if (!related.length && d.action) trigger.addEventListener('click', () => onAction(d.id));
+      trigger.setAttribute('aria-label', d.action ? `${d.ja}へ近づく` : `${d.ja}の撮影会を見る`);
+      if (d.action) trigger.addEventListener('click', () => { close(); onAction(d.id); });
       if (related.length) {
-        trigger.setAttribute('aria-controls', popup.id);
-        trigger.setAttribute('aria-expanded', 'false');
+        if (!d.action) {
+          trigger.setAttribute('aria-controls', popup.id);
+          trigger.setAttribute('aria-expanded', 'false');
+        }
         popup.setAttribute('role', 'region');
         popup.setAttribute('aria-label', `${d.ja}の撮影会`);
-        if(d.action) {
-          const fly=document.createElement('button'); fly.type='button';
-          fly.textContent='キャンパスへ近づく';
-          fly.addEventListener('click',()=>{close();onAction(d.id);});
-          popup.appendChild(fly);
-        }
         for (const trip of related) {
           const link = document.createElement('a');
           link.href = trip.href;
@@ -100,7 +96,7 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
           popup.appendChild(link);
         }
         node.appendChild(popup);
-        trigger.addEventListener('click', open);
+        if (!d.action) trigger.addEventListener('click', open);
         node.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') open(); });
         node.addEventListener('pointerleave', () => { leaveTimer = setTimeout(close, 180); });
         node.addEventListener('focusin', open);
