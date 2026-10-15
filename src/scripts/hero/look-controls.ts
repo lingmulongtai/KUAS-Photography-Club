@@ -57,7 +57,8 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
       el.classList.add('is-dragging');
     }
     const r = el.getBoundingClientRect();
-    rotation.move(e.clientX - drag.lastX, drag.touch ? 0 : e.clientY - drag.lastY, r.width, r.height, (e.timeStamp - drag.time) / 1000);
+    const horizontal = e.clientX - drag.lastX;
+    rotation.move(drag.touch ? horizontal : -horizontal, drag.touch ? 0 : e.clientY - drag.lastY, r.width, r.height, (e.timeStamp - drag.time) / 1000);
     drag.lastX = e.clientX;
     drag.lastY = e.clientY;
     drag.time = e.timeStamp;

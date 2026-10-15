@@ -32,14 +32,29 @@ test('flight input lock ignores drags and taps until the camera has arrived', (t
   assert.equal(h.look.state.yaw,0);assert.equal(h.taps(),0);assert.equal(h.captured.size,0);
   arrived=true;
   h.send('pointerdown',100,100);h.send('pointermove',240,100);h.send('pointerup',240,100);
-  assert.ok(h.look.state.yaw<0);
+  assert.ok(h.look.state.yaw>0);
 });
 test('short taps remain taps while horizontal drags and vertical touch scrolls do not fire them', (t) => {
   const h=setup(t);
   h.send('pointerdown',100,100); h.send('pointermove',103,100); h.send('pointerup',103,100);
   assert.equal(h.taps(),1);
   h.send('pointerdown',100,100); h.send('pointermove',120,100); h.send('pointerup',120,100);
-  assert.equal(h.taps(),1); assert.ok(h.look.state.yaw<0);
+  assert.equal(h.taps(),1); assert.ok(h.look.state.yaw>0);
   h.send('pointerdown',100,100,{pointerType:'touch'}); h.send('pointermove',101,130,{pointerType:'touch'}); h.send('pointerup',101,130,{pointerType:'touch'});
   assert.equal(h.taps(),1); assert.equal(h.look.state.dragging,false);
+});
+
+test('mouse reverses horizontal rotation while touch retains its accepted direction', (t)=>{
+  const h=setup(t);
+  for(const [end,mouseYaw] of [[180,-36],[420,36]]) {
+    for(const pointerType of ['mouse','touch']) {
+      h.look.reset();
+      h.send('pointerdown',300,100,{pointerType});
+      h.send('pointermove',end,100,{pointerType,timeStamp:30});
+      h.send('pointerup',end,100,{pointerType,timeStamp:50});
+      assert.equal(h.look.state.yaw,pointerType==='mouse'?mouseYaw:-mouseYaw);
+      assert.equal(h.look.state.pitch,0);
+      assert.equal(h.taps(),0);
+    }
+  }
 });
