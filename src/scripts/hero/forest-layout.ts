@@ -23,3 +23,11 @@ export function woodland(c: number[]) {
   const [r, g, b] = c;
   return g > r * .98 && g > b * 1.06 && g - Math.min(r, b) > .025 && (r + g + b) / 3 < .62;
 }
+
+/** Leafless / autumn canopy can be brown or neutral in the regional photo.
+ * Restrict this fallback to sloping ground; buildings, roads and water are excluded separately.
+ */
+export function seasonalWoodland(c:number[],normalY:number) {
+  const [r,g,b]=c,mean=(r+g+b)/3;
+  return normalY<.97 && mean>.08&&mean<.52 && g>r*.82&&g>b*.92&&r>b*.8 && Math.max(...c)-Math.min(...c)<.22;
+}
