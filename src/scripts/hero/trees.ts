@@ -4,7 +4,7 @@ import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import type { Box } from './geo';
 import { rng } from './util';
-import { forestCells, woodland } from './forest-layout';
+import { forestCells, woodland, seasonalWoodland } from './forest-layout';
 import { treeProfile, standDensity } from './tree-profile';
 
 /**
@@ -47,9 +47,12 @@ export function createForest(
   let regionalSample:ReturnType<typeof sampler> | undefined;
   let regionalBox:Box | undefined;
   const sample = (x: number, z: number) => regionalSample?.(x,z) ?? citySample(x, z) ?? wideSample?.(x, z) ?? null;
+  const slopeNormal={x:0,y:1,z:0};
+  const wooded=(c:number[],x:number,z:number) => woodland(c)||forestArea(x,z)||
+    (!!regionalSample?.(x,z)&&seasonalWoodland(c,hf.normal(x,z,10,slopeNormal).y));
   const contains = (x:number,z:number) => {
     const c=sample(x,z);
-    return !!c && !excluded(x,z) && (woodland(c)||forestArea(x,z));
+    return !!c && !excluded(x,z) && wooded(c,x,z);
   };
 
   function trees(eye: { x: number; z: number }) {
@@ -63,7 +66,7 @@ export function createForest(
     const detailed=regionalBox && eye.x>regionalBox[0]&&eye.x<regionalBox[2]&&eye.z>regionalBox[1]&&eye.z<regionalBox[3];
     for (const { x, z, lod, seed } of forestCells(eye, quality,!!detailed)) {
         const c = sample(x, z);
-        if (!c || excluded(x, z) || (!woodland(c) && !forestArea(x, z))) continue;
+        if (!c || excluded(x, z) || !wooded(c,x,z)) continue;
         if (lod<2 && seed>standDensity(x,z)) continue;
         const y = hf.height(x, z);
         const profile = treeProfile(x,z);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { forestCells, woodland } from '../src/scripts/hero/forest-layout.ts';
+import { forestCells, woodland, seasonalWoodland } from '../src/scripts/hero/forest-layout.ts';
 
 test('forest coverage surrounds a viewpoint and has a bounded lightweight population', () => {
   const center = {x: -8550, z: -1400};
@@ -35,4 +35,12 @@ test('regional canopy adds nearby coverage within a bounded budget and preserves
     assert.ok(detail.filter(c=>!far(c)).length>base.filter(c=>!far(c)).length*2);
     assert.equal(new Set(detail.map(c=>`${c.x},${c.z}`)).size,detail.length);
   }
+});
+
+test('regional seasonal canopy accepts muted wooded slopes and rejects flat ground, pale roofs and blue water',()=>{
+  for(const c of [[.38,.32,.22],[80/255,82/255,84/255],[65/255,74/255,71/255],[57/255,68/255,69/255],[.3,.3,.3]]) {
+    assert.equal(seasonalWoodland(c,.8),true);
+    assert.equal(seasonalWoodland(c,.99),false);
+  }
+  for(const c of [[.1,.25,.36],[.78,.8,.75],[.02,.02,.02],[.7,.3,.2]]) assert.equal(seasonalWoodland(c,.8),false);
 });
