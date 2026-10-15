@@ -57,5 +57,46 @@
    2048,
    1843
   ]
+ },
+ "arashiyama": {
+  "box": [
+   -10500,
+   -3200,
+   -6500,
+   800
+  ],
+  "file": "aerial-arashiyama.webp",
+  "size": [
+   2048,
+   2048
+  ],
+  "bytes": 738382,
+  "zoom": 16,
+  "mobile": {
+   "file": "aerial-arashiyama-mobile.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 227946
+  },
+  "elevation": {
+   "box": [
+    -10500,
+    -3200,
+    -6500,
+    800
+   ],
+   "step": 10,
+   "nx": 401,
+   "nz": 401,
+   "file": "terrain-arashiyama.bin",
+   "bytes": 161533
+  },
+  "water": {
+   "file": "water-arashiyama.json.gz",
+   "bytes": 45611,
+   "baseSha256": "1b872ebeb2e78d0d1a375a84bf37c9b470c2210cd338bc85457b1d3727f94ce6"
+  }
  }
 }
