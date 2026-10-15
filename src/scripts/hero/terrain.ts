@@ -41,6 +41,7 @@ export interface TerrainTextures {
   normalFarBox: Box;
   normalNear: THREE.Texture;
   normalNearBox: Box;
+  regional?: {normal:THREE.Texture;box:Box};
 }
 
 const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
@@ -115,6 +116,11 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uNormalFarBox: { value: v4(tex.normalFarBox) },
     uNormalNear: { value: tex.normalNear },
     uNormalNearBox: { value: v4(tex.normalNearBox) },
+    uRegionalBox: {value:v4(tex.regional?.box??tex.normalFarBox)},
+    uRegionalNormal: {value:tex.regional?.normal??tex.normalFar},
+    uRegionalOn: {value:tex.regional?1:0},
+    uRegionalPhoto: {value:tex.aerialWide},
+    uRegionalPhotoOn: {value:0},
     /** distance field of the streets and railways (see roads.ts) */
     uRoads: { value: null as THREE.Texture | null },
     uRoadBox: { value: new THREE.Vector4(0, 0, 1, 1) },
@@ -145,6 +151,11 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform vec4 uNormalFarBox;
       uniform sampler2D uNormalNear;
       uniform vec4 uNormalNearBox;
+      uniform vec4 uRegionalBox;
+      uniform sampler2D uRegionalNormal;
+      uniform float uRegionalOn;
+      uniform sampler2D uRegionalPhoto;
+      uniform float uRegionalPhotoOn;
       ${ROAD_GLSL}
       varying vec3 vWorld;
 
@@ -165,6 +176,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 nf = texture2D(uNormalFar, boxUv(uNormalFarBox, p)).xyz * 2. - 1.;
         vec3 nn = texture2D(uNormalNear, boxUv(uNormalNearBox, p)).xyz * 2. - 1.;
         vec3 n = normalize(mix(nf, nn, inside(uNormalNearBox, p, 300.)));
+        float regional = inside(uRegionalBox,p,120.)*uRegionalOn;
+        vec3 nr=texture2D(uRegionalNormal,boxUv(uRegionalBox,p)).xyz*2.-1.;
+        n=normalize(mix(n,nr,regional));
 
         // aerial photo: the sharper city sheet where we have it
         vec2 uw = boxUv(uAerialWideBox, p);
@@ -173,6 +187,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 city = texture2D(uAerialCity, vec2(uc.x, 1. - uc.y)).rgb;
         float mappedForest = texture2D(uWoodland, uw).a * uWoodlandOn;
         photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
+        // Sample outside spatial branches so automatic mip derivatives stay defined.
+        vec2 localUv=boxUv(uRegionalBox,p);
+        vec3 localPhoto=texture2D(uRegionalPhoto,vec2(localUv.x,1.-localUv.y)).rgb;
+        photo=mix(photo,localPhoto,regional*uRegionalPhotoOn);
 
         // forest: green and dark in the photo. Up close add canopy texture the photo can't resolve.
         float green = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * (1. - smoothstep(.05, .2, dot(photo, vec3(.33))));
@@ -186,9 +204,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float c1 = vnoise(p * .22);
           float c2 = vnoise(p * .55 + 7.);
           float canopy = mix(.5, c1, k1) * .65 + mix(.5, c2, k2) * .35;
-          photo *= mix(1., .55 + .9 * canopy, green * near);
+          float synthetic=green*near*mix(1.,.35,regional*uRegionalPhotoOn);
+          photo *= mix(1., .55 + .9 * canopy, synthetic);
           vec2 g = vec2(vnoise(p * .22 + vec2(.6, 0.)) - c1, vnoise(p * .22 + vec2(0., .6)) - c1);
-          n = normalize(n + vec3(-g.x, 0., -g.y) * 1.6 * green * near * k1);
+          n = normalize(n + vec3(-g.x, 0., -g.y) * 1.6 * synthetic * k1);
         }
 
         // photos carry their own midday light: bring them down to something like albedo
@@ -211,7 +230,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float moss = smoothstep(.34,.72,mossPatch)*smoothstep(.55,.95,n.y);
           vec3 earth = vec3(.075,.048,.026)*(.85+.3*grain);
           vec3 floorColor = mix(earth,vec3(.04,.075,.025),moss);
-          float cover = clamp(green*.86+garden*(.32+.34*green),0.,.96)*groundNear;
+          // Keep the aerial canopy on hillsides; moss/leaf litter belongs on flat forest floors.
+          float floorSlope=smoothstep(.9,.985,n.y);
+          float forestFloor=1.-smoothstep(80.,240.,dist);
+          float cover = clamp(green*.86*floorSlope*forestFloor+garden*(.32+.34*green),0.,.96)*groundNear;
           albedo = mix(albedo,floorColor,cover);
           n = normalize(n+vec3((grain-.5)*.035,0.,(mossPatch-.5)*.045)*cover);
         }
