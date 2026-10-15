@@ -37,6 +37,12 @@ export interface TerrainMeta {
   near: GridMeta;
   aerialWide: { box: Box; file: string; size: [number, number]; high?: { file: string; size: [number, number]; bytes: number; zoom: number } };
   aerialCity: { box: Box; file: string; size: [number, number] };
+  arashiyama?: {
+    box: Box; file: string; size: [number,number]; bytes: number; zoom: number;
+    mobile: {file:string;size:[number,number];bytes:number};
+    elevation: GridMeta;
+    water: {file:string;bytes:number;baseSha256:string};
+  };
 }
 
 /** An elevation grid in metres, decoded from decimetre deltas (see encode_heights in common.py). */

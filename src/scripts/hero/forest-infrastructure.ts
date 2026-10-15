@@ -20,6 +20,8 @@ export function infrastructureMask(lines: LineFeature[], box: Box) {
       ctx.closePath();
       while (n+1<lines.length && lines[n+1].kind===3) {path(lines[++n]);ctx.closePath();}
       ctx.fill('evenodd');
+      // Half a mask pixel of clearance keeps partially covered banks free of tree trunks.
+      ctx.lineWidth = Math.max(1/sx,1/sz);ctx.stroke();
     }
     else {ctx.lineWidth = (f.kind === 1 ? 6 : [6,8,12,18,26][Math.min(4,f.attr&15)]) + 8;ctx.stroke();}
   }

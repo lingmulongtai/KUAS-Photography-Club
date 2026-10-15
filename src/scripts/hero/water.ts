@@ -3,6 +3,10 @@ import { ENV_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { LINE, type LineFeature } from './lines-data';
 import { ROAD_GLSL } from './roads';
+import {refineWaterSurface} from './water-surface';
+import {toLocal} from './geo';
+
+const senkoji=toLocal(35.0157751,135.6655983);
 
 /**
  * Rivers, the castle moat and ponds from the GSI water areas. The surface mirrors the sky,
@@ -14,7 +18,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
   uRoads: { value: THREE.Texture | null };
   uRoadBox: { value: THREE.Vector4 };
   uRoadsOn: { value: number };
-}) {
+}, regionalEdge=18) {
   const pos: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     const f = lines[i];
@@ -23,12 +27,20 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
     const holes: THREE.Vector2[][] = [];
     while (i + 1 < lines.length && lines[i + 1].kind === LINE.waterHole) holes.push(toVec(lines[++i].pts));
     if (ring.length < 3) continue;
-    const all = ring.concat(...holes);
+    let all: {x:number;y:number}[] = ring.concat(...holes);
     let tris: number[][];
     try {
       tris = THREE.ShapeUtils.triangulateShape(ring, holes);
     } catch {
       continue;
+    }
+    if(f.attr===1) {
+      // A bounded fallback retains the complete shoreline if a pathological polygon is huge.
+      let refined;
+      for(const edge of [regionalEdge,regionalEdge*2,regionalEdge*4]) {
+        try {refined=refineWaterSurface(all,tris,edge,40000,{x:senkoji.x,y:senkoji.z});break;} catch { /* retry coarser, never drop water */ }
+      }
+      if(refined) {all=refined.points;tris=refined.triangles;}
     }
     for (const t of tris) {
       // face up
