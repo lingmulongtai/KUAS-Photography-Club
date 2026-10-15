@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
+import {waterChecksum} from '../src/scripts/hero/water-detail.ts';
 
 const root=new URL('../public/kyoto/',import.meta.url);
 test('regional detail stays within its transfer budgets and matches the original water source',async()=>{
@@ -21,6 +22,7 @@ test('regional detail stays within its transfer budgets and matches the original
   const water=JSON.parse(gunzipSync(await readFile(new URL(a.water.file,root))));
   assert.equal(createHash('sha256').update(original).digest('hex'),water.baseSha256);
   assert.equal(water.baseSha256,a.water.baseSha256);
+  assert.equal(waterChecksum(gunzipSync(original)),water.baseChecksum);
   assert.ok(water.replace.length>0&&water.polygons.length>0);
   assert.ok(water.polygons.some(p=>p.holes.length>0),'islands remain holes');
   assert.ok(water.polygons.some(p=>p.outer.some((v,i)=>i%2===0&&v< -9200)),'upstream water extends beyond the former city limit');
