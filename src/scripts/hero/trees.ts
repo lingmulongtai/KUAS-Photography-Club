@@ -44,7 +44,9 @@ export function createForest(
   };
   const citySample = sampler(photo, photoBox);
   const wideSample = fallback ? sampler(fallback.photo, fallback.box, quality > .75 ? 4096 : 2048) : null;
-  const sample = (x: number, z: number) => citySample(x, z) ?? wideSample?.(x, z) ?? null;
+  let regionalSample:ReturnType<typeof sampler> | undefined;
+  let regionalBox:Box | undefined;
+  const sample = (x: number, z: number) => regionalSample?.(x,z) ?? citySample(x, z) ?? wideSample?.(x, z) ?? null;
   const contains = (x:number,z:number) => {
     const c=sample(x,z);
     return !!c && !excluded(x,z) && (woodland(c)||forestArea(x,z));
@@ -58,7 +60,8 @@ export function createForest(
     const kind: number[] = [];
     const lods: number[] = [];
     const shapes: number[] = [];
-    for (const { x, z, lod, seed } of forestCells(eye, quality)) {
+    const detailed=regionalBox && eye.x>regionalBox[0]&&eye.x<regionalBox[2]&&eye.z>regionalBox[1]&&eye.z<regionalBox[3];
+    for (const { x, z, lod, seed } of forestCells(eye, quality,!!detailed)) {
         const c = sample(x, z);
         if (!c || excluded(x, z) || (!woodland(c) && !forestArea(x, z))) continue;
         if (lod<2 && seed>standDensity(x,z)) continue;
@@ -169,8 +172,10 @@ export function createForest(
   // Repeated visits reuse three recent populations; evicted instance buffers are released.
   const populations=new Map<string,{meshes:THREE.Mesh[];count:number}>();
   let count = 0;
+  let planted:{eye:{x:number;z:number};bearing:number} | undefined;
   /** All directions remain populated when the user turns; chunks outside the frustum are culled. */
   function plant(eye: { x: number; z: number }, _bearing: number) {
+    planted={eye:{x:eye.x,z:eye.z},bearing:_bearing};
     const key=`${Math.round(eye.x)},${Math.round(eye.z)}`;
     for (const m of [...group.children] as THREE.Mesh[]) {
       group.remove(m);
@@ -219,5 +224,12 @@ export function createForest(
       populations.delete(oldest);
     }
   }
-  return { group, plant, contains, get count() { return count; } };
+  const setRegionalPhoto = (photo:HTMLImageElement | ImageBitmap,box:Box) => {
+    regionalSample=sampler(photo,box);
+    regionalBox=box;
+    for(const population of populations.values()) for(const mesh of population.meshes) mesh.geometry.dispose();
+    populations.clear();
+    if(planted) plant(planted.eye,planted.bearing);
+  };
+  return { group, plant, contains, setRegionalPhoto, get count() { return count; } };
 }

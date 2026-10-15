@@ -1,8 +1,9 @@
 /** World-anchored, full-circle vegetation candidates; sparse outer rings bound the GPU cost. */
-export function* forestCells(eye: { x: number; z: number }, quality: number) {
+export function* forestCells(eye: { x: number; z: number }, quality: number, detailedNear=false) {
   const bands = quality > .75 ? [[32, 240, 8], [240, 1200, 18], [1200, 4800, 48], [4800,10000,128]] : [[40, 160, 12], [160, 1100, 27], [1100, 4200, 64], [4200,10000,192]];
-  for (let lod = 0; lod < bands.length; lod++) {
-    const [inner, outer, step] = bands[lod];
+  const rings=bands.flatMap(([inner,outer,step],lod)=>lod===1&&detailedNear ?
+    [[inner,650,quality>.75?8:12,lod],[650,outer,step,lod]] : [[inner,outer,step,lod]]);
+  for (const [inner,outer,step,lod] of rings) {
     for (let ix = Math.floor((eye.x - outer) / step); ix <= Math.ceil((eye.x + outer) / step); ix++) {
       for (let iz = Math.floor((eye.z - outer) / step); iz <= Math.ceil((eye.z + outer) / step); iz++) {
         const seed = Math.sin(ix * 127.1 + iz * 311.7) * 43758.5453;

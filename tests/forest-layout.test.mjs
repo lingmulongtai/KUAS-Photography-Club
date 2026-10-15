@@ -22,3 +22,17 @@ test('forest mask accepts mixed green canopy and rejects roofs and water', () =>
   assert.equal(woodland([.1,.25,.36]),false);
   assert.equal(woodland([.3,.3,.3]),false);
 });
+
+test('regional canopy adds nearby coverage within a bounded budget and preserves distant cells',()=>{
+  const center={x:-8550,z:-1400};
+  const far=c=>Math.hypot(c.x-center.x,c.z-center.z)>=650;
+  const pc=[...forestCells(center,1,true)],mobile=[...forestCells(center,.55,true)];
+  assert.ok(pc.length<80000);
+  assert.ok(mobile.length<pc.length/2);
+  for(const quality of [1,.55]) {
+    const base=[...forestCells(center,quality)],detail=[...forestCells(center,quality,true)];
+    assert.deepEqual(detail.filter(far),base.filter(far));
+    assert.ok(detail.filter(c=>!far(c)).length>base.filter(c=>!far(c)).length*2);
+    assert.equal(new Set(detail.map(c=>`${c.x},${c.z}`)).size,detail.length);
+  }
+});

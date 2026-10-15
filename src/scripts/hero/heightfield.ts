@@ -39,6 +39,7 @@ export class Heightfield {
   constructor(
     private far: Grid,
     private near: Grid,
+    private regional?: Grid,
   ) {}
 
   get bounds(): Box {
@@ -48,13 +49,18 @@ export class Heightfield {
   height(x: number, z: number) {
     const f = this.far.sample(x, z);
     const far = Number.isNaN(f) ? 0 : f;
-    const b = this.near.meta.box;
+    const near = this.blend(this.near,x,z,far,300);
+    return this.regional ? this.blend(this.regional,x,z,near,120) : near;
+  }
+
+  private blend(grid:Grid,x:number,z:number,base:number,margin:number) {
+    const b = grid.meta.box;
     const edge = Math.min(x - b[0], b[2] - x, z - b[1], b[3] - z);
-    if (edge <= 0) return far;
-    const n = this.near.sample(x, z);
-    if (Number.isNaN(n)) return far;
-    const w = smooth(0, 300, edge);
-    return far + (n - far) * w;
+    if (edge <= 0) return base;
+    const n = grid.sample(x, z);
+    if (Number.isNaN(n)) return base;
+    const w = smooth(0, margin, edge);
+    return base + (n - base) * w;
   }
 
   /** Unit normal from central differences, `e` metres apart. */
@@ -72,6 +78,11 @@ export class Heightfield {
 }
 
 export async function loadHeightfield(meta: TerrainMeta) {
-  const [far, near] = await Promise.all([loadGrid(meta.far), loadGrid(meta.near)]);
-  return new Heightfield(new Grid(meta.far, far), new Grid(meta.near, near));
+  const [far, near, regional] = await Promise.all([loadGrid(meta.far), loadGrid(meta.near),
+    meta.arashiyama ? loadGrid(meta.arashiyama.elevation).catch(error=>{
+      console.warn('Arashiyama elevation unavailable; using basin terrain',error);
+      return null;
+    }) : null]);
+  return new Heightfield(new Grid(meta.far, far), new Grid(meta.near, near),
+    regional && meta.arashiyama ? new Grid(meta.arashiyama.elevation,regional) : undefined);
 }
