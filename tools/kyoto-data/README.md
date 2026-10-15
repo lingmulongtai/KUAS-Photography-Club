@@ -60,3 +60,11 @@ python build_woodland.py /path/to/overpass.json
 relationの外周・穴は元の形状を保持し、単独wayだけ2m許容で簡略化して `public/kyoto/woodland.json.gz` を生成します。独立した森林タグを持つinner wayも保持します。1MiBを上限とし、2026-10-14のデータは405,535 bytes。描画時にAPIを呼び出しません。© OpenStreetMap contributors / ODbL。一部は2006年の森林データ由来なので、PLATEAUの建物と国土地理院の道路・水域（島の穴を保持）で植樹を除外します。
 
 2048pxの森林ラスタを一度だけ作り、地面の森の色と木の配置が同じalphaを参照します。樹形は距離で簡略化し、PCの詳細な枝葉は240m、スマホは160mまで。遠景の疎な森林群は10kmまで続きます。最近の3視点だけ配置バッファを保持し、古い配置は解放します。
+
+## 嵐山の局所データ
+
+`python build_arashiyama.py` は千光寺・渡月橋を含む4×4kmだけを取得します。
+GSI seamlessphoto z16からPC2048²・スマホ1024²のWebP、DEM5A z15（欠損時DEM z14）から10m格子、水域z16から島の穴を保持した輪郭を生成します。
+写真は1MiB/320KiB、標高350,000 bytes、水域gzip256KiBを上限とし、標高・写真の欠損はビルドを失敗させます。
+水域パッチは元の `lines.bin` のSHA256、展開後チェックサム、置換する水域のindexを持ち、対象boxの外側は元の水域を保持します。道路・線路・建物のバイナリは再生成しません。
+NumPy、Pillow、Shapely、mapbox-vector-tileが必要です。生のタイルは既存の `cache/` に保存し、公開ページから地理院へリクエストしません。既存の国土地理院クレジットを適用します。
