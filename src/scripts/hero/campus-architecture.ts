@@ -45,6 +45,7 @@ export class CampusBuilder {
     }
   }
   box(u0:number,u1:number,v0:number,v1:number,y0:number,y1:number,m:Material) {
+    if(Math.min(u1-u0,v1-v0,y1-y0)<1e-6)return;
     this.quad([u0,y0,v0],[u0,y1,v0],[u1,y1,v0],[u1,y0,v0],m);
     this.quad([u1,y0,v1],[u1,y1,v1],[u0,y1,v1],[u0,y0,v1],m);
     this.quad([u0,y0,v1],[u0,y1,v1],[u0,y1,v0],[u0,y0,v0],m);
@@ -70,6 +71,23 @@ export class CampusBuilder {
     for(let i=0;i<=n;i++)this.beam(at(i/n,0),at(i/n,1.1),.055,.055,CM.metal);
     if(glass)for(let i=0;i<n;i++)this.quad(at(i/n+.012,.12),at((i+1)/n-.012,.12),at((i+1)/n-.012,1.03),at(i/n+.012,1.03),CM.railing);
     else for(const h of [.35,.7])this.beam(at(0,h),at(1,h),.035,.035,CM.metal);
+  }
+  stairs(a:P,c:P,width:number,steps:number,m:Material=CM.concrete) {
+    const len=Math.hypot(c[0]-a[0],c[2]-a[2]),sx=-(c[2]-a[2])/len,sz=(c[0]-a[0])/len;
+    const at=(t:number,side:number,y:number):P=>[a[0]+(c[0]-a[0])*t+sx*side,y,a[2]+(c[2]-a[2])*t+sz*side];
+    for(let i=0;i<steps;i++) {
+      const y=a[1]+(c[1]-a[1])*(i+1)/steps,lower=y-(c[1]-a[1])/steps;
+      const l=i/steps,r=(i+1)/steps;
+      const p=at(l,-width/2,y),q=at(r,-width/2,y),s=at(r,width/2,y),t=at(l,width/2,y);
+      bQuad(this,p,q,s,t,m);
+      this.quad(at(l,width/2,lower),at(l,-width/2,lower),p,t,m);
+      this.quad(at(l,-width/2,lower),at(r,-width/2,lower),q,p,m);
+      this.quad(at(r,width/2,lower),at(l,width/2,lower),t,s,m);
+    }
+    for(const side of [-width/2+.12,width/2-.12]) {
+      this.beam(at(0,side,a[1]-.2),at(1,side,c[1]-.2),.16,.32,CM.steel);
+      this.rail(at(0,side,a[1]),at(1,side,c[1]));
+    }
   }
   /** Four pitched sheets around a recessed, flat service court; no random rooftop boxes. */
   hip(u0:number,u1:number,v0:number,v1:number,eave:number,ridge:number,inset:number) {
@@ -116,6 +134,12 @@ export class CampusBuilder {
     g.computeBoundingSphere();g.userData.parts=this.parts;
     return g;
   }
+}
+
+// Keep upward stair treads independent of the flight's compass direction.
+function bQuad(b:CampusBuilder,a:P,c:P,d:P,e:P,m:Material) {
+  const cross=(c[2]-a[2])*(d[0]-a[0])-(c[0]-a[0])*(d[2]-a[2]);
+  if(cross>0)b.quad(a,c,d,e,m);else b.quad(e,d,c,a,m);
 }
 
 /** Kyoto City 2013 1/400 plans and 1/500 elevations: 120 x 24 m North, 33 x 45 m East,
@@ -203,6 +227,63 @@ export function addBridges(b:CampusBuilder) {
   bridge('north-west-link',[-21,8,-56],[-35,9,-40],3.0);
 }
 
+/** West wing (2019), from the AIJ terrace survey and the contractor's courtyard photograph.
+ * Deep third-floor recesses, a projecting fourth floor and external flights are geometry,
+ * rather than a window texture on an undifferentiated extrusion.
+ */
+export function addWest(b:CampusBuilder) {
+  b.part('west-terraced-envelope',()=>{
+    for(const y of [0,4.5,9,13.5,18])b.box(-59,-24,-40,9,y-.25,y,CM.concrete);
+    for(const [a,c,len] of [ [[-59,9],[-59,-40],49],[[-59,-40],[-24,-40],35],[[-24,9],[-59,9],35] ] as [[number,number],[number,number],number][]) {
+      const wins:[number,number,number,number][]=[[1,len-1,.3,3.7]];
+      for(const y of [4.5,9,13.5])wins.push([1,len-1,y+.8,y+2.9]);
+      b.facade(a,c,0,18,wins);
+    }
+    // East-facing facade is set back by a different amount on each floor and terrace bay.
+    for(const [y0,y1,u,v0,v1] of [[0,4.5,-24,-40,9],[4.5,9,-21,-40,9],
+      [9,13.5,-23,-40,-29],[9,13.5,-13,-29,-15],[9,13.5,-23,-15,9],[13.5,18,-13,-40,9]]) {
+      const len=v1-v0;
+      b.facade([u,v1],[u,v0],y0,y1,[[.5,len-.5,y0+.25,y1-.35]]);
+      b.box(-24,u,v0,v1,y0-.24,y0,CM.concrete);
+      b.box(-24,u,v0,v1,y1-.24,y1,CM.concrete);
+    }
+    for(const [v,reverse] of [[-29,1],[-15,-1]])
+      b.facade([reverse>0?-23:-13,v],[reverse>0?-13:-23,v],9,13.5,[[.5,9.5,9.4,13.1]]);
+    for(const [y,v0,v1,u] of [[4.5,-40,-10,-19.5],[4.5,-10,9,-16],[9,-40,-29,-12],[9,-15,9,-12],[13.5,-40,9,-10.5]]) {
+      b.box(-24,u,v0,v1,y-.25,y,CM.concrete);
+      b.rail([u,y,v0],[u,y,v1]);
+      b.rail([-24,y,v0],[u,y,v0]);b.rail([u,y,v1],[-24,y,v1]);
+    }
+    // Glazed lecture-room bay and the slim columns below the long upper cantilever.
+    for(let v=-38;v<9;v+=8)b.box(-13.45,-13.05,v-.22,v+.22,0,13.5,CM.concrete);
+    b.hip(-60.5,-11.5,-41.5,10.5,18,21.7,7);
+  });
+  b.part('west-courtyard-stairs-and-deck',()=>{
+    // A continuous series of three external flights along the courtyard elevation.
+    const x=-9.6;
+    for(let f=0;f<3;f++) {
+      const v=-36+f*14.3,y=[1.5,4.5,9][f],top=[4.5,9,13.5][f];
+      b.stairs([x,y,v],[x,top,v+11],2.1,Math.round((top-y)/.167));
+      b.box(x-1.05,x+1.05,v+11,v+14.3,top-.22,top,CM.concrete);
+      b.rail([x-1.05,top,v+11],[x-1.05,top,v+14.3]);
+      b.rail([x+1.05,top,v+11],[x+1.05,top,v+14.3]);
+      b.box(-21,x+1.05,v+12,v+14.3,top-.22,top,CM.concrete);
+    }
+    // Timber amphitheatre beside the lawn, rising westward, with separate wide seat tiers.
+    b.box(-24,-16,-39,8,-.1,1.5,CM.timber);
+    for(let i=0;i<6;i++)b.box(-16+i*.72,-16+(i+1)*.72,-36,7,-.1,1.5-i*.25,CM.timber);
+    for(const v of [-31,-17,0]){
+      b.box(-23,-19,v,v+3,1.5,1.95,CM.wall);
+      b.box(-22.8,-19.2,v+.2,v+2.8,1.95,2.25,CM.leaves);
+    }
+    // A restrained set of fixed terrace tables, visible in the construction photograph.
+    for(const v of [-29,-21,-13,-5])for(const u of [-22,-18]){
+      b.box(u-.65,u+.65,v-.65,v+.65,2.2,2.3,CM.metal);
+      b.box(u-.08,u+.08,v-.08,v+.08,1.5,2.2,CM.steel);
+    }
+  });
+}
+
 export function campusArchitecture(ground:number) {
-  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);return b.geometry();
+  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);return b.geometry();
 }

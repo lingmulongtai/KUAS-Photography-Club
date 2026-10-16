@@ -23,7 +23,13 @@ test('measured academic wings have finite unit normals and actual roof relief',(
   }
   assert.ok(ray([-40,25,-68],[-40,0,-68]).length);
   assert.equal(ray([20,1,-49],[20,20,-49]).length,0,'space between the wings remains open');
-  assert.ok(p.count<150000,'retain a bounded static mesh for mobile');
+  assert.ok(p.count<300000,'retain a bounded static mesh for mobile');
+});
+test('West courtyard has deep third-floor recesses below its upper cantilever',()=>{
+  assert.equal(ray([-17,11,-35],[-14,11,-35]).length,0,'the recessed terrace is open');
+  assert.ok(ray([-17,14.5,-35],[-10,14.5,-35]).length,'upper floor projects over the recess');
+  assert.ok(ray([-9.6,20,-25],[-9.6,0,-25]).length,'external stair treads are physical surfaces');
+  assert.ok(ray([-14,10,-20],[-14,0,-20]).length,'amphitheatre has timber seating tiers');
 });
 test('both third-floor links have an open undercroft and a supported glazed deck',()=>{
   for(const [u,v,y] of [[42,-47.25,8],[-28,-48,8.5]]){
