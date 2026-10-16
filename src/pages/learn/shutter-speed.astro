@@ -4,7 +4,7 @@ import DemoExposure from '../../components/learn/DemoExposure.astro';
 ---
 <LearnPage
   slug="shutter-speed"
-  lead="シャッターが開いている時間が、写真に写る「時間の長さ」になります。速くすれば動きが止まり、遅くすれば光や動きが線になって流れます。"
+  lead="シャッターが開いている時間が、写真に写る「時間の長さ」になります。速くすれば動きを止めやすくなり、遅くすれば光や動きが線になって流れます。"
   description="シャッタースピードの基本。動きを止める・流す、手ブレの目安、花火や光跡の撮り方を、花火の長時間露光デモで体験できます。"
 >
   <DemoExposure slot="demo" />
@@ -47,13 +47,15 @@ import DemoExposure from '../../components/learn/DemoExposure.astro';
 
   <h2>花火の撮り方</h2>
   <ol>
-    <li>三脚にカメラを固定し、手ブレ補正は切る（三脚では誤作動することがあるため）</li>
+    <li>三脚にカメラを固定し、手ブレ補正の設定は機材の取扱説明書に従う</li>
     <li>モードは M（マニュアル）。f/8〜f/11・ISO 100 から始める</li>
     <li>ピントはマニュアルにして、最初の数発で合わせたら固定する</li>
     <li>シャッターはバルブ。打ち上げの音で開いて、開ききったら閉じる（2〜8秒）</li>
-    <li>レリーズかセルフタイマー（2秒）を使うと、押したときの揺れが写らない</li>
+    <li>レリーズかセルフタイマーを使い、ボタンを押すときの揺れを減らす</li>
   </ol>
-  <p>明るすぎたら絞る（f/11→f/16）か時間を短く、暗すぎたら開ける（f/8→f/5.6）か時間を長くします。</p>
+  <p>光跡そのものの明るさは主に絞りとISO感度で調整します。シャッター時間は光跡の長さや花火の重なりを変え、長く開けるほど背景も明るくなります。重なった光跡が白飛びすることもあるため、試し撮りで確認してください。</p>
+
+  <p class="small muted">参考：<a href="https://www.sony.com/electronics/support/articles/00223375">Sony：花火の撮影</a>、<a href="https://www.usa.canon.com/learning/training-articles/training-articles-list/photographing-fireworks">Canon：Photographing Fireworks</a></p>
 
   <h2>スマホで長時間露光を撮るには</h2>
   <p>
@@ -63,17 +65,11 @@ import DemoExposure from '../../components/learn/DemoExposure.astro';
   <div slot="aside" class="point">
     <h2>このページのポイント</h2>
     <ul>
-      <li>速い＝止まる、遅い＝流れる</li>
+      <li>速いほど動きを止めやすい。結果は被写体の動きや距離でも変わる</li>
       <li>時間が2倍で1段明るくなる</li>
       <li>手持ちは「1/焦点距離」秒より速く</li>
       <li>花火は三脚・f/8〜11・ISO 100・バルブ</li>
     </ul>
   </div>
-  <div slot="aside" class="point">
-    <h2>撮影会の記録から</h2>
-    <ul>
-      <li><a href="/trips/summer-fireworks/">夏の花火大会</a>：バルブで花火を重ね撮り</li>
-      <li><a href="/trips/arashiyama-randen/">嵐山と嵐電の桜</a>：走る電車を 1/500 秒で</li>
-    </ul>
-  </div>
+
 </LearnPage>

@@ -7,11 +7,12 @@
 import { getCollection } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import { SPOTS } from '../../data/spots';
+import { isPublicContent } from '../../lib/public-content';
 
-const trips = (await getCollection('trips'))
+const trips = (await getCollection('trips', isPublicContent))
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
   .map((t) => ({ slug: t.id, title: t.data.title, date: t.data.date.toISOString().slice(0, 10), photos: t.data.photos.length, sample: t.data.sample, spot: t.data.spot ?? '' }));
-const months = (await getCollection('schedule')).map((m) => ({
+const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
   month: m.data.month,
   weeklyMeeting: m.data.weeklyMeeting,
   noMeeting: m.data.noMeeting,
@@ -95,9 +96,10 @@ const months = (await getCollection('schedule')).map((m) => ({
         <h2>月のスケジュール</h2>
         <div class="grid2">
           <label>月<input name="month" type="month" required /></label>
-          <label class="check"><input name="weeklyMeeting" type="checkbox" checked /> 毎週金曜の定例ミーティングを自動で入れる</label>
+          <p class="small muted">定例ミーティングも、開催が確認できた日を予定として個別に入力してください。毎週の自動生成は行いません。</p>
+          <input name="weeklyMeeting" type="checkbox" hidden disabled />
         </div>
-        <fieldset>
+        <fieldset hidden disabled>
           <legend>ミーティングがお休みの金曜</legend>
           <div class="list" data-nomeeting></div>
           <button class="btn small-btn" type="button" data-add-off>＋ お休みの日を追加</button>

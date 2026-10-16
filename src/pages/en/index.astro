@@ -1,0 +1,18 @@
+---
+import Base from '../../layouts/Base.astro';
+import KyotoHero from '../../components/KyotoHero.astro';
+import ClubFacts from '../../components/ClubFacts.astro';
+import UpcomingEvents from '../../components/UpcomingEvents.astro';
+import { club } from '../../data/club';
+---
+<Base lang="en" overlayHeader title="Photography under Kyoto’s sky" description="The website operated by the KUAS Photography Club. Visit, join, check confirmed plans and learn photography.">
+  <KyotoHero lang="en" />
+  <section id="intro" class="section"><div class="wrap">
+    <div class="section-head"><p class="edge">KUAS PHOTOGRAPHY CLUB</p><h2>Enjoy photography together.</h2><p class="lead">This website is operated by the photography club at Kyoto University of Advanced Science. KUAS students, including international students, are welcome to visit. No experience or camera is required.</p></div>
+    <ClubFacts lang="en" /><p><a class="btn btn--primary" href="/en/join/">Plan a visit →</a></p>
+  </div></section>
+  <section class="section"><div class="wrap"><div class="section-head"><p class="edge">SCHEDULE</p><h2>Coming up</h2></div><UpcomingEvents lang="en" /><p><a href="/en/schedule/">See the schedule →</a></p></div></section>
+  <section class="section"><div class="wrap"><div class="section-head"><p class="edge">PHOTO TRIPS</p><h2>Outing records</h2><p>Members plan outings together. Public activity records are being prepared.</p></div><p><a href="/en/trips/">View outing records →</a></p></div></section>
+  <section class="section"><div class="wrap"><div class="section-head"><p class="edge">LEARN</p><h2>Explore photography.</h2><p>Learn about shutter speed, aperture, focal length and developing.</p></div><p><a class="btn" href="/en/learn/">Start learning →</a></p></div></section>
+  <section class="section"><div class="wrap"><div class="section-head"><p class="edge">INSTAGRAM</p><h2>Keep in touch.</h2><p>Visit the club’s profile for its latest posts or send an inquiry by DM.</p></div><p><a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">Open Instagram ↗</a></p></div></section>
+</Base>

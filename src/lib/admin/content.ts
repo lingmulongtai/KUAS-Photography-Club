@@ -27,10 +27,12 @@ export interface TripIn {
 export interface EventIn {
   date: string;
   title: string;
+  titleEn?: string;
   kind: 'meeting' | 'trip' | 'event' | 'deadline' | 'other';
   time?: string;
   place?: string;
   note?: string;
+  noteEn?: string;
   link?: string;
 }
 
@@ -142,8 +144,8 @@ export function scheduleMarkdown(input: ScheduleIn) {
     if (!inMonth(e?.date ?? '')) throw new Error(`予定 ${i + 1} の日付がこの月ではありません`);
     const kind = KINDS.includes(e.kind) ? e.kind : 'event';
     const out: Record<string, unknown> = { date: e.date, title: text(e.title, 80, `予定 ${i + 1} の内容`), kind };
-    for (const k of ['time', 'place', 'note', 'link'] as const) {
-      const v = text(e[k], k === 'note' ? 300 : 120, `予定 ${i + 1}`, false);
+    for (const k of ['titleEn', 'time', 'place', 'note', 'noteEn', 'link'] as const) {
+      const v = text(e[k], k === 'note' || k === 'noteEn' ? 300 : 120, `予定 ${i + 1}`, false);
       if (v) out[k] = v;
     }
     if (out.link && !/^(https?:\/\/|\/)/.test(out.link as string)) throw new Error(`予定 ${i + 1} のリンクは http(s):// か / で始めてください`);

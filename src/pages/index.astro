@@ -20,7 +20,7 @@ const latest = trips.slice(0, 3);
         <p class="edge">KUAS PHOTOGRAPHY CLUB</p>
         <h2>撮りに行こう。<br />京都と、その少し先まで。</h2>
         <p class="lead">
-          {club.name} は、{club.university}の写真部です。神社やお寺、花火大会、水族館、夜の街。月に{club.tripsPerMonth}回ほどの撮影会で、キャンパスの周りから近くの府県まで出かけています。日本人も留学生も、カメラがある人もスマホの人も一緒です。
+          {club.name} は、{club.university}の写真部です。部員で相談しながら撮影会を企画しています。日本人も留学生も、カメラがある人もスマホの人も一緒です。
         </p>
         <a class="link-arrow" href="/about/">写真部について →</a>
       </div>
@@ -28,7 +28,8 @@ const latest = trips.slice(0, 3);
         <p class="edge">MEETING ▸ EVERY WEEK</p>
         <p class="when">{club.meetings.day}</p>
         <p class="times num">{club.meetings.times.join(' / ')}</p>
-        <p class="where">{club.campus} {club.meetings.room} 教室</p>
+        <p class="where">通常は {club.campus} {club.meetings.room} 教室</p>
+        <a class="small" href="/schedule/">休会・教室変更などの最新案内を確認</a>
         <a class="btn btn--primary" href="/join/">見学を申し込む <span class="arrow" aria-hidden="true">→</span></a>
       </aside>
     </div>
@@ -56,6 +57,7 @@ const latest = trips.slice(0, 3);
         </div>
         <a class="link-arrow" href="/trips/">すべての撮影会 →</a>
       </div>
+      {latest.length === 0 && <p class="muted">活動記録を準備中です。</p>}
       <div class="list">
         {latest.map((trip) => <TripCard trip={trip} />)}
       </div>
@@ -82,7 +84,7 @@ const latest = trips.slice(0, 3);
     <div class="wrap cta-inner">
       <p class="edge">JOIN US</p>
       <h2>まずは、金曜の<br />ミーティングをのぞいてみませんか。</h2>
-      <p class="lead">経験もカメラもいりません。{club.meetings.day} {club.meetings.times.join(' / ')}、{club.campus} {club.meetings.room} 教室で待っています。</p>
+      <p class="lead">経験もカメラもいりません。通常は{club.meetings.day} {club.meetings.times.join(' / ')}、{club.campus} {club.meetings.room} 教室です。参加前にスケジュールと運営への確認をお願いします。</p>
       <div class="ctas">
         <a class="btn btn--primary" href="/join/">見学・入部について <span class="arrow" aria-hidden="true">→</span></a>
         <a class="btn" href="/guidelines/">ガイドラインを読む</a>

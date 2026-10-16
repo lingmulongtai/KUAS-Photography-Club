@@ -1,12 +1,17 @@
 ---
 import { club, nav } from '../data/club';
+import { languagePath } from '../lib/i18n';
+interface Props { lang?: string; }
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+const local = (href: string) => languagePath(href, en ? 'en' : 'ja');
 const year = new Date().getFullYear();
 ---
 <footer class="site-footer">
   <div class="arc" aria-hidden="true"></div>
   <div class="wrap grid">
     <div class="about">
-      <a class="brand" href="/">
+      <a class="brand" href={local('/')}>
         <img src="/brand/mark-192.webp" alt="" width="64" height="64" />
         <span>
           <span class="brand-ja">写真部</span>
@@ -14,42 +19,42 @@ const year = new Date().getFullYear();
         </span>
       </a>
       <p class="small">
-        写真を通して「楽しむ」と「つながる」を大切にする、{club.university}の写真部です。国籍・学年・経験は問いません。スマホで撮る人も大歓迎。
+        {en ? 'This website is operated by the KUAS Photography Club. Students of all nationalities and experience levels are welcome to visit. A smartphone is enough.' : `${club.nameJa}が運営するサイトです。国籍・学年・経験は問いません。スマホで撮る人も大歓迎。`}
       </p>
     </div>
 
     <div>
       <p class="label">MEETING</p>
       <p class="small">
-        {club.meetings.day} {club.meetings.times.join(' / ')}<br />
-        {club.campus} {club.meetings.room} 教室
+        {en ? 'Fridays from 18:00' : `${club.meetings.day} ${club.meetings.times.join(' / ')}`}<br />
+        {en ? 'Usually S306, Uzumasa Campus' : `通常は ${club.campus} ${club.meetings.room} 教室`}
       </p>
-      <a class="small" href="/schedule/">今月のスケジュール</a>
+      <a class="small" href={local('/schedule/')}>{en ? 'Check cancellations and changes' : '休会・変更の最新案内'}</a>
     </div>
 
     <div>
       <p class="label">CONTACT</p>
       <ul class="links small">
         <li><a href={club.instagram.url} rel="noopener" target="_blank">Instagram @{club.instagram.handle}</a></li>
-        <li><a href="/join/">見学・入部</a></li>
-        <li><a href="/contact/">撮影依頼・協賛などのお問い合わせ</a></li>
+        <li><a href={local('/join/')}>{en ? 'Visit / Join' : '見学・入部'}</a></li>
+        <li><a href={local('/contact/')}>{en ? 'Contact / Photography requests' : '撮影依頼・協賛などのお問い合わせ'}</a></li>
       </ul>
     </div>
 
     <div>
       <p class="label">PAGES</p>
       <ul class="links small">
-        {nav.map((item) => <li><a href={item.href}>{item.ja}</a></li>)}
+        {nav.map((item) => <li><a href={local(item.href)}>{en ? item.en : item.ja}</a></li>)}
       </ul>
     </div>
   </div>
 
   <div class="wrap base">
-    <p class="small">© {year} {club.name}. 掲載している写真の著作権は撮影者にあります。無断転載・無断使用はご遠慮ください。</p>
+    <p class="small">© {year} {club.name}. {en ? 'Photographs belong to their photographers. Please ask before reusing them.' : '掲載している写真の著作権は撮影者にあります。無断転載・無断使用はご遠慮ください。'}</p>
     <p class="small">
       トップページの京都：<a href="https://maps.gsi.go.jp/development/ichiran.html" rel="noopener" target="_blank">国土地理院</a>の地形・航空写真・地図、「<a href="https://www.mlit.go.jp/plateau/" rel="noopener" target="_blank">3D都市モデル（Project PLATEAU）京都市（2025年度）</a>」（国土交通省）を加工して作成 ·
       森林：<a href="https://www.openstreetmap.org/copyright" rel="noopener" target="_blank">© OpenStreetMap contributors（ODbL）</a> ·
-      <a href={club.github} rel="noopener" target="_blank">このサイトのソース</a>
+      <a href={club.github} rel="noopener" target="_blank">{en ? 'Website source' : 'このサイトのソース'}</a>
     </p>
   </div>
 </footer>

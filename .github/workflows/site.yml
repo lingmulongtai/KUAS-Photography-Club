@@ -21,3 +21,5 @@ jobs:
         run: npm run check
       - name: Build
         run: npm run build
+      - name: Verify public content and language links
+        run: node tools/verify-public-build.mjs

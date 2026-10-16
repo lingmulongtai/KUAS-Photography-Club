@@ -1,249 +1,37 @@
 ---
 import Base from '../layouts/Base.astro';
 import PageHero from '../components/PageHero.astro';
-import SlotNote from '../components/SlotNote.astro';
 import InstagramSection from '../components/InstagramSection.astro';
 import { club } from '../data/club';
-
-const fmt = (iso: string) => iso.replaceAll('-', '.');
 const goals = [
-  { no: '01', title: 'とにかく楽しむ', text: '上手い下手は気にしない。写真を撮りに出かけること自体を楽しむのがいちばんの目的です。' },
-  { no: '02', title: '国や学年をこえてつながる', text: '日本人と留学生、1回生から院生まで。写真という共通の趣味で、普段は出会わない人とつながります。' },
-  { no: '03', title: 'クラブカメラの整備', text: 'カメラを持っていない人も撮影を楽しめるよう、共有カメラの購入を目指しています。' },
-];
-const timeline = [
-  { date: fmt(club.recognized), text: '学友会の公認を受ける' },
-  { date: fmt(club.membersAsOf), text: `メンバーが${club.members}人に` },
-  { date: '2026', text: '大学公認の文化系クラブ（部活動）として活動中' },
-];
-const roles = ['代表', '副代表', '会計', '機材管理', '広報', '企画リーダー', '安全管理'];
-const year = [
-  { m: '4月', t: '新歓撮影会（桜）' },
-  { m: '6月', t: '社寺の撮影会' },
-  { m: '8月', t: '花火大会' },
-  { m: '11月', t: '紅葉の撮影会' },
-  { m: '1月', t: '夜の街スナップ' },
-  { m: '3月', t: '写真展・1年の振り返り' },
+  { title: '写真を楽しむ', text: '初心者も経験者も、スマートフォンで撮る方も参加できます。' },
+  { title: '写真を通してつながる', text: '日本人学生と留学生が、写真という共通の趣味で交流する写真部です。' },
+  { title: '共有機材の整備', text: '共有カメラ等の機材は整備を進めている段階です。利用できる機材については運営にお問い合わせください。' },
 ];
 ---
-<Base title="写真部について" description={`${club.nameJa}（${club.name}）について。活動の目的、これまでの歩み、1年の流れ、運営の役割。`}>
-  <PageHero
-    edge={`ABOUT ▸ SINCE ${club.recognized.slice(0, 4)} ▸ ${club.members} MEMBERS`}
-    title="写真部について"
-    lead={`${club.name} は、写真を通して「楽しむ」と「つながる」を大切にする写真部です。国籍や学年、経験は問いません。スマホで撮る人も、フィルムカメラを持っている人も、同じ撮影会に出かけています。`}
-  />
-
-  <section class="wrap stats-wrap" aria-label="写真部の数字">
-    <div class="stats">
-    <div><p class="value num">{club.members}<small>人</small></p><p class="label">メンバー（{fmt(club.membersAsOf)} 時点）</p></div>
-    <div><p class="value num">{club.tripsPerMonth}<small>回 / 月</small></p><p class="label">撮影会</p></div>
-    <div><p class="value num">{club.meetings.times.length}<small>回 / 週</small></p><p class="label">ミーティング（{club.meetings.day} {club.meetings.times.join(' / ')}）</p></div>
-    <div><p class="value num">{fmt(club.recognized)}</p><p class="label">学友会公認</p></div>
-    </div>
+<Base title="写真部について" description="京都先端科学大学 写真部が運営するサイト。部員数、定例ミーティング、部費、運営の役職をご案内します。">
+  <PageHero edge="ABOUT ▸ KUAS PHOTOGRAPHY CLUB" title="写真部について" lead="写真を通して「楽しむ」と「つながる」を大切にする、京都先端科学大学の写真部です。このサイトは写真部が運営しています。" />
+  <section class="wrap facts" aria-label="写真部の基本情報">
+    <div><h2>部員数</h2><p>{club.members}名（{club.membersAsOf}現在）</p></div>
+    <div><h2>ミーティング</h2><p>{club.meetings.day} {club.meetings.times.join(' / ')}<br />通常は{club.campus} {club.meetings.room}</p><a href="/schedule/">休会・教室変更の最新案内</a></div>
+    <div><h2>部費</h2><p>半期{club.feePerSemester.toLocaleString('ja-JP')}円</p><p class="small muted">撮影会の交通費や入場料等は別途各自負担です。</p></div>
   </section>
-
-  <section class="section">
-    <div class="wrap">
-      <div class="section-head">
-        <p class="edge">PURPOSE</p>
-        <h2>活動の目的</h2>
-      </div>
-      <ol class="goals">
-        {goals.map((g) => (
-          <li>
-            <span class="no">{g.no}</span>
-            <h3>{g.title}</h3>
-            <p>{g.text}</p>
-          </li>
-        ))}
-      </ol>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap two">
-      <div>
-        <div class="section-head">
-          <p class="edge">HISTORY</p>
-          <h2>これまで</h2>
-        </div>
-        <ol class="timeline">
-          {timeline.map((t) => (
-            <li><span class="num date">{t.date}</span><span>{t.text}</span></li>
-          ))}
-        </ol>
-      </div>
-      <div>
-        <div class="section-head">
-          <p class="edge">A YEAR</p>
-          <h2>1年の流れ（例）</h2>
-        </div>
-        <ul class="months">
-          {year.map((y) => <li><span class="num">{y.m}</span><span>{y.t}</span></li>)}
-        </ul>
-        <p class="small muted note">撮影会は毎月2回ほど。行き先はミーティングでみんなで決めます。 <SlotNote /></p>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      <div class="section-head">
-        <p class="edge">TEAM</p>
-        <h2>運営メンバー</h2>
-        <p class="muted">運営は役割を分担しています。困ったことがあれば、誰に声をかけても大丈夫です。</p>
-      </div>
-      <ul class="roles">
-        {roles.map((r) => (
-          <li><span class="role">{r}</span><span class="name">名前を入れてください</span></li>
-        ))}
-      </ul>
-      <p><SlotNote note="運営メンバーの名前（ニックネーム可）に差し替えてください" /></p>
-    </div>
-  </section>
-
+  <section class="section"><div class="wrap">
+    <div class="section-head"><p class="edge">PURPOSE</p><h2>活動について</h2></div>
+    <div class="goals">{goals.map(g => <article><h3>{g.title}</h3><p>{g.text}</p></article>)}</div>
+    <p>部員で相談しながら撮影会を企画しています。決まった予定は<a href="/schedule/">スケジュール</a>からご確認ください。</p>
+  </div></section>
+  <section class="section"><div class="wrap">
+    <div class="section-head"><p class="edge">TEAM</p><h2>運営の役職</h2></div>
+    <ul class="roles">{['部長', '副部長', '会計'].map(role => <li>{role}</li>)}</ul>
+    <p>活動や見学については、<a href="/contact/">お問い合わせ窓口</a>から運営にご相談ください。</p>
+  </div></section>
   <InstagramSection />
 </Base>
-
 <style>
-  .stats-wrap {
-    margin-bottom: clamp(56px, 8vw, 96px);
-  }
-
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1px;
-    background: var(--line);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-
-  .stats > div {
-    background: var(--base);
-    padding: 22px;
-    display: grid;
-    gap: 6px;
-    align-content: start;
-  }
-
-  .value {
-    font-size: clamp(30px, 4vw, 44px);
-    line-height: 1.1;
-    color: var(--accent);
-  }
-
-  .value small {
-    font-size: 15px;
-    margin-left: 4px;
-    color: var(--ink);
-  }
-
-  .label {
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  .goals {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 28px;
-  }
-
-  .goals li {
-    display: grid;
-    gap: 8px;
-    align-content: start;
-    padding-top: 16px;
-    border-top: 1px solid var(--line-strong);
-  }
-
-  .goals .no {
-    font: 700 12px/1 var(--latin);
-    color: var(--accent);
-    letter-spacing: 0.14em;
-  }
-
-  .goals h3 {
-    font-size: var(--step-2);
-  }
-
-  .two {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 48px 72px;
-    align-items: start;
-  }
-
-  .two > div {
-    display: grid;
-    gap: 24px;
-  }
-
-  .timeline,
-  .months {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-  }
-
-  .timeline li,
-  .months li {
-    display: grid;
-    grid-template-columns: 7.5em 1fr;
-    gap: 16px;
-    padding-block: 12px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .date,
-  .months .num {
-    color: var(--accent);
-  }
-
-  .note {
-    margin-top: 4px;
-  }
-
-  .roles {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
-  }
-
-  .roles li {
-    display: grid;
-    gap: 2px;
-    padding: 16px;
-    border: 1px dashed var(--line-strong);
-    border-radius: var(--radius);
-  }
-
-  .role {
-    font-weight: 700;
-  }
-
-  .name {
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  @media (max-width: 860px) {
-    .stats {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .goals,
-    .two {
-      grid-template-columns: 1fr;
-    }
-  }
+  .facts, .goals, .roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .facts > div, .goals article, .roles li { padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raise); }
+  .facts h2, .goals h3 { font-size: var(--step-2); margin-bottom: 12px; }
+  .roles { padding: 0; list-style: none; }
+  @media (max-width: 860px) { .facts, .goals, .roles { grid-template-columns: 1fr; } }
 </style>

@@ -7,28 +7,30 @@ import { club } from '../data/club';
 interface Props {
   /** Prefilled email subject */
   subject?: string;
+  lang?: string;
 }
-const { subject = '【お問い合わせ】KUAS Photography Club' } = Astro.props;
+const { subject = 'KUAS Photography Club inquiry', lang = 'ja' } = Astro.props;
+const en = lang === 'en';
 const mailto = `mailto:${club.email}?subject=${encodeURIComponent(subject)}`;
 ---
 <div class="ways">
   <article class="way">
     <p class="edge">EMAIL</p>
-    <h3>メールで送る</h3>
+    <h3>{en ? 'Email us' : 'メールで送る'}</h3>
     <p class="addr"><span class="select">{club.email}</span></p>
-    <p class="small muted">件名にご用件（撮影のご依頼・協賛・取材など）を入れていただけると助かります。</p>
+    <p class="small muted">{en ? 'Include a subject such as photography request, sponsorship or press inquiry.' : '件名にご用件（撮影のご依頼・協賛・取材など）を入れていただけると助かります。'}</p>
     <div class="row">
-      <a class="btn btn--primary" href={mailto}>メールを書く <span class="arrow" aria-hidden="true">→</span></a>
-      <button class="btn copy" type="button" data-copy={club.email}>アドレスをコピー</button>
+      <a class="btn btn--primary" href={mailto}>{en ? 'Write an email' : 'メールを書く'} <span class="arrow" aria-hidden="true">→</span></a>
+      <button class="btn copy" type="button" data-copy={club.email}>{en ? 'Copy address' : 'アドレスをコピー'}</button>
     </div>
   </article>
   <article class="way">
     <p class="edge">INSTAGRAM</p>
-    <h3>DM を送る</h3>
+    <h3>{en ? 'Send a DM' : 'DM を送る'}</h3>
     <p class="addr">@{club.instagram.handle}</p>
-    <p class="small muted">ふだんの活動の様子もここで発信しています。気軽にメッセージをどうぞ。</p>
+    <p class="small muted">{en ? 'You can also contact the club through its Instagram profile.' : 'Instagram のプロフィールからもお問い合わせできます。'}</p>
     <div class="row">
-      <a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">Instagram を開く <span class="arrow" aria-hidden="true">↗</span></a>
+      <a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">{en ? 'Open Instagram' : 'Instagram を開く'} <span class="arrow" aria-hidden="true">↗</span></a>
     </div>
   </article>
 </div>
@@ -39,11 +41,11 @@ const mailto = `mailto:${club.email}?subject=${encodeURIComponent(subject)}`;
       const label = b.textContent;
       try {
         await navigator.clipboard.writeText(b.dataset.copy ?? '');
-        b.textContent = 'コピーしました';
+        b.textContent = document.documentElement.lang === 'en' ? 'Copied' : 'コピーしました';
       } catch {
         const el = b.closest('.way')?.querySelector('.select');
         if (el) window.getSelection()?.selectAllChildren(el);
-        b.textContent = '選択しました';
+        b.textContent = document.documentElement.lang === 'en' ? 'Selected' : '選択しました';
       }
       setTimeout(() => (b.textContent = label), 2000);
     }),

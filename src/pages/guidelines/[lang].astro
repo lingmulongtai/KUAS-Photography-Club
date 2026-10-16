@@ -16,6 +16,6 @@ const { entry } = Astro.props;
 const language = guidelineLanguages.find((l) => l.id === entry.id);
 const title = entry.body?.match(/^#\s+(.+)$/m)?.[1] ?? 'Guidelines';
 ---
-<Base title={title} description={`KUAS Photography Club guidelines (${language?.name ?? entry.id}).`}>
+<Base lang="en" title={title} description={`KUAS Photography Club guidelines (${language?.name ?? entry.id}).`}>
   <GuidelinesView entry={entry} />
 </Base>
