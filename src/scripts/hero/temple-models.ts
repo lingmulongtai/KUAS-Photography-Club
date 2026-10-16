@@ -18,6 +18,8 @@ function roof(parts:Part[],w:number,d:number,h:number,y:number,z=0) {
     const a=ring*8+i,b=ring*8+(i+1)%8,c=a+8,e=b+8;
     for(const index of [a,c,b,b,c,e])vertices.push(...points[index]);
   }
+  // Close the upper ring. The ridge alone leaves the middle of the roof open from above.
+  for(let i=0;i<8;i++) vertices.push(0,y+h,z,...points[16+(i+1)%8],...points[16+i]);
   const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.computeVertexNormals();
   parts.push({geo,color:roofColor,glow:.2});
   box(parts,w,.3,d,0,y-.15,z,roofColor,.2);
