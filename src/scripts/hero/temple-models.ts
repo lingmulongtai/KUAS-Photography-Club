@@ -75,6 +75,41 @@ export function shishinden():Part[] {
   return parts;
 }
 
+/** Ryoan-ji's Hojo and south-facing rock garden. Footprint follows OSM way/374564926;
+ * timber details and the fifteen stones are illustrative, not a measured reconstruction. */
+export function ryoanji():Part[] {
+  const parts:Part[]=[];
+  const plaster:Part['color']=[.49,.45,.35], dark:Part['color']=[.045,.035,.024];
+  box(parts,25,1.2,21,0,.6,-3,wood,.15);
+  box(parts,21,4.8,17,0,3.5,-3,plaster,.15);
+  for(const side of [-1,1]) {
+    for(let i=0;i<=8;i++) {
+      const x=-11+i*2.75;
+      box(parts,.25,5.8,.25,x,3.8,-3+side*9.5,wood,.2);
+      if(i<8) box(parts,2.3,3.3,.18,x+1.375,3.2,-3+side*8.6,dark,.1);
+    }
+    for(const z of [-10,-6,-2,2,6]) box(parts,.25,5.8,.25,side*11.8,3.8,z,wood,.2);
+  }
+  box(parts,25,.18,2,0,1.3,8,wood,.2); // veranda facing the garden
+  roof(parts,28,24,5,6.8,-3);
+  box(parts,25,.25,10,0,.125,16,[.5,.47,.39],.08);
+  box(parts,26,1.8,.45,0,.9,21.2,[.26,.19,.12],.1);
+  for(const side of [-1,1]) box(parts,.45,1.8,11,side*12.8,.9,16,[.26,.19,.12],.1);
+  // Five groups, fifteen stones. Avoid thin unfiltered gravel lines that shimmer at distance.
+  const groups=[[-9,15,5],[-4,18,2],[0,13.5,3],[5.5,17.5,2],[9,14,3]];
+  for(const [x,z,n] of groups) {
+    const moss=new THREE.CylinderGeometry(1.6,1.6,.16,12);moss.scale(1,1,.58);moss.translate(x,.3,z);
+    parts.push({geo:moss,color:[.085,.13,.045],glow:.05});
+    for(let i=0;i<n;i++) {
+      const stone=new THREE.IcosahedronGeometry(.45+(i%2)*.18,0);
+      stone.scale(1,.8+(i%3)*.35,.65);stone.rotateY(i*1.7);
+      stone.translate(x+(i-(n-1)/2)*.6,.55+(i%3)*.13,z+Math.sin(i*2)*.4);
+      parts.push({geo:stone,color:[.19,.18,.15],glow:.08});
+    }
+  }
+  return parts;
+}
+
 /** Main hall and its cantilevered stage, supported by eighteen timber columns. */
 export function kiyomizuHall():Part[] {
   const parts:Part[]=[];

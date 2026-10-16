@@ -4,7 +4,7 @@ import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
 import { kyotoTower } from './kyoto-tower';
-import { goldenPavilion, kiyomizuHall, shishinden, togetsukyo } from './temple-models';
+import { goldenPavilion, kiyomizuHall, ryoanji, shishinden, togetsukyo } from './temple-models';
 import { SPOTS } from '../../data/spots';
 
 /*
@@ -132,6 +132,7 @@ const LANDMARKS: Record<string, Placed> = {
   heianTorii: { parts: torii(), lat: 35.0125663, lon: 135.7826821 },
   goldenPavilion: { parts: goldenPavilion(), lat: 35.0395092, lon: 135.7284548 },
   shishinden: { parts: shishinden(), lat: SPOTS.find(s=>s.id==='gosho')!.lat, lon: SPOTS.find(s=>s.id==='gosho')!.lon },
+  ryoanji: { parts: ryoanji(), lat: SPOTS.find(s=>s.id==='ryoanji')!.lat, lon: SPOTS.find(s=>s.id==='ryoanji')!.lon },
   kiyomizuHall: { parts: kiyomizuHall(), lat: 34.9946668, lon: 135.7849382 },
   togetsukyo: { parts: togetsukyo().map(part=>({...part,geo:part.geo.rotateY(-5.8*Math.PI/180).translate(0,2,0)})), lat: 35.01287125, lon: 135.67776225 },
 };
