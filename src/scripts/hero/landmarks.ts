@@ -48,8 +48,16 @@ function torii(): Part[] {
   nuki.translate(0, 17.2, 0);
   const shimaki = new THREE.BoxGeometry(31, 1.6, 2.4);
   shimaki.translate(0, 21.9, 0);
-  const kasagi = new THREE.BoxGeometry(33.9, 1.5, 3.2);
-  kasagi.translate(0, 23.4, 0);
+  const profile=new THREE.Shape();
+  const curve=(x:number)=>.8*(Math.abs(x)/16.95)**2.4;
+  for(let i=0;i<=16;i++) {
+    const x=-16.95+i*33.9/16,y=22.4+curve(x);
+    if(i===0)profile.moveTo(x,y);else profile.lineTo(x,y);
+  }
+  for(let i=16;i>=0;i--){const x=-16.95+i*33.9/16;profile.lineTo(x,23.6+curve(x));}
+  profile.closePath();
+  const kasagi = new THREE.ExtrudeGeometry(profile,{depth:3.2,bevelEnabled:false,steps:1});
+  kasagi.translate(0,0,-1.6);
   const plaque = new THREE.BoxGeometry(2.6, 4.4, 0.6);
   plaque.translate(0, 19.6, 0);
   parts.push(
@@ -58,6 +66,14 @@ function torii(): Part[] {
     { geo: kasagi, color: [0.025, 0.025, 0.028], glow: 0.7 },
     { geo: plaque, color: [0.04, 0.035, 0.03], glow: 0.8 },
   );
+  for(const x of [-9.1,9.1]) {
+    const joint=new THREE.BoxGeometry(2.8,.4,2.2);joint.translate(x,17.7,0);
+    parts.push({geo:joint,color:VERMILION,glow:1});
+  }
+  for(const [w,h,x,y] of [[.15,4.6,-1.4,19.6],[.15,4.6,1.4,19.6],[2.95,.15,0,21.9],[2.95,.15,0,17.3]]) {
+    const frame=new THREE.BoxGeometry(w,h,.12);frame.translate(x,y,.35);
+    parts.push({geo:frame,color:[.35,.23,.055],glow:.6});
+  }
   return parts;
 }
 
