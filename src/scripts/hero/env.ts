@@ -43,6 +43,12 @@ export function createEnv() {
     uCampus: { value: new THREE.Vector2() },
     /** 1 while the detailed campus model stands in for the plain blocks */
     uCampusDetail: { value: 0 },
+    /** building footprints for ambient occlusion (see building-occlusion.ts) */
+    uBuilt: { value: null as THREE.Texture | null },
+    uBuiltBox: { value: new THREE.Vector4(0, 0, 1, 1) },
+    uBuiltOn: { value: 0 },
+    /** metres per texel of uBuilt */
+    uBuiltTexel: { value: 8 },
   };
 }
 

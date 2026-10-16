@@ -58,7 +58,10 @@ export function buildLamps(env: Env, hf: Heightfield, lines: LineFeature[], qual
         float tw = .94 + .06 * sin(uTime * 1.3 + position.x * .7 + position.z * .3);
         // lamps right below the viewpoint would flood the bloom: fade them by size
         float near = 1. - smoothstep(2.5, 4., uScale * 2.4 / dist) * .6;
-        vColor = aTint * uCity * mix(tr, 1., .4) * tw * 2.2 * near;
+        // far away many lamps share one pixel and their sum blooms into white balls on the
+        // horizon: dim lamps that are drawn larger than they are
+        float far = pow(clamp(uScale * 2.4 / dist / 1.2, .12, 1.), .6);
+        vColor = aTint * uCity * mix(tr, 1., .4) * tw * 2.2 * near * far;
         gl_PointSize = px;
         gl_Position = projectionMatrix * mv;
       }

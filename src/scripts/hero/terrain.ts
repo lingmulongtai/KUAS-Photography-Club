@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import { ROAD_GLSL } from './roads';
+import { BUILT_GLSL } from './building-occlusion';
+import { STROKES } from './daimonji';
 import type { Box } from './geo';
 import { toLocal } from './geo';
 import type { Heightfield } from './heightfield';
@@ -121,6 +123,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uRegionalOn: {value:tex.regional?1:0},
     uRegionalPhoto: {value:tex.aerialWide},
     uRegionalPhotoOn: {value:0},
+    /** the mown strips of the 大 on Daimonji-yama */
+    uStrokes: { value: STROKES.map((s) => new THREE.Vector4(...s)) },
     /** distance field of the streets and railways (see roads.ts) */
     uRoads: { value: null as THREE.Texture | null },
     uRoadBox: { value: new THREE.Vector4(0, 0, 1, 1) },
@@ -157,9 +161,15 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform sampler2D uRegionalPhoto;
       uniform float uRegionalPhotoOn;
       ${ROAD_GLSL}
+      ${BUILT_GLSL}
+      uniform vec4 uStrokes[4];
       varying vec3 vWorld;
 
       vec2 boxUv(vec4 b, vec2 p){ return (p - b.xy) / (b.zw - b.xy); }
+      float segment(vec2 p, vec4 s){
+        vec2 ab = s.zw - s.xy;
+        return length(p - s.xy - ab * clamp(dot(p - s.xy, ab) / dot(ab, ab), 0., 1.));
+      }
       // 0 outside the box, rising to 1 within m metres of the edge
       float inside(vec4 b, vec2 p, float m){
         vec2 d = min(p - b.xy, b.zw - p);
@@ -193,9 +203,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         photo=mix(photo,localPhoto,regional*uRegionalPhotoOn);
 
         // forest: green and dark in the photo. Up close add canopy texture the photo can't resolve.
-        float green = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * (1. - smoothstep(.05, .2, dot(photo, vec3(.33))));
-        green = max(green, mappedForest);
-        photo = mix(photo, mix(photo, vec3(.12, .17, .075), .35), mappedForest);
+        float photoGreen = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * (1. - smoothstep(.05, .2, dot(photo, vec3(.33))));
+        float green = max(photoGreen, mappedForest);
+        // mapped woods that the photo shows bare (leafless or autumn imagery) lean further to canopy
+        photo = mix(photo, mix(photo, vec3(.12, .17, .075), mix(.6, .35, photoGreen)), mappedForest);
         float near = 1. - smoothstep(600., 3500., dist);
         if (near > 0.){
           // each layer of canopy fades to its average once its blobs shrink below a few pixels
@@ -205,9 +216,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float c2 = vnoise(p * .55 + 7.);
           float canopy = mix(.5, c1, k1) * .65 + mix(.5, c2, k2) * .35;
           float synthetic=green*near*mix(1.,.35,regional*uRegionalPhotoOn);
-          photo *= mix(1., .55 + .9 * canopy, synthetic);
+          // kept gentle: stronger contrast read as dark spots all over the hillsides
+          photo *= mix(1., .72 + .56 * canopy, synthetic);
           vec2 g = vec2(vnoise(p * .22 + vec2(.6, 0.)) - c1, vnoise(p * .22 + vec2(0., .6)) - c1);
-          n = normalize(n + vec3(-g.x, 0., -g.y) * 1.6 * synthetic * k1);
+          n = normalize(n + vec3(-g.x, 0., -g.y) * .9 * synthetic * k1);
         }
 
         // photos carry their own midday light: bring them down to something like albedo
@@ -222,6 +234,14 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         float neutral = 1. - smoothstep(.025,.095,chroma);
         float luminance = dot(albedo,vec3(.3,.55,.15));
         albedo = mix(albedo,albedo/(1.+luminance*2.8),neutral*garden);
+        // Under the 3D city the photo shows roofs and sunlit paving with their own highlights,
+        // which read as snow between the houses. Compress pale, neutral ground toward street and
+        // yard tones, hardest where the neighbourhood is densely built.
+        float dense = builtAt(p, 40.);
+        float urban = smoothstep(.04, .3, dense);
+        luminance = dot(albedo,vec3(.3,.55,.15));
+        float squeeze = mix(2.6, 5.5, urban);
+        albedo = mix(albedo, albedo / (1. + luminance * squeeze) * vec3(1.06, 1., .9), neutral);
         float groundNear = 1. - smoothstep(450.,1800.,dist);
         if (groundNear > 0.) {
           // Broad, world-fixed moss / leaf-litter patches; subpixel grain fades to its mean.
@@ -236,6 +256,13 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float cover = clamp(green*.86*floorSlope*forestFloor+garden*(.32+.34*green),0.,.96)*groundNear;
           albedo = mix(albedo,floorColor,cover);
           n = normalize(n+vec3((grain-.5)*.035,0.,(mossPatch-.5)*.045)*cover);
+        }
+
+        // the 大 on Daimonji-yama: mown strips of dry grass along the fire beds, readable by day
+        if (length(p - uStrokes[0].xy) < 260.) {
+          float bedDist = min(min(segment(p, uStrokes[0]), segment(p, uStrokes[1])), min(segment(p, uStrokes[2]), segment(p, uStrokes[3])));
+          float bed = 1. - smoothstep(4.5, 7.5 + fp, bedDist);
+          albedo = mix(albedo, vec3(.2, .17, .1) * (.85 + .3 * vnoise(p * .4)), bed * .9);
         }
 
         // ---- streets, from the distance field (roads.ts) ----
@@ -283,6 +310,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         albedo = mix(albedo, street, onRoad * .93);
         // railway ballast
         albedo = mix(albedo, vec3(.16, .145, .13), onRail * .9);
+        // ambient occlusion: the ground along walls and in narrow alleys gets little sky
+        float contact = builtAt(p, 9.);
+        albedo *= 1. - .5 * smoothstep(.05, .6, contact) - .22 * urban;
 
         float sh = sunShadow(vWorld, n);
         vec3 col = shade(albedo, n, vWorld, sh);

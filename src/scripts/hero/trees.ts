@@ -6,6 +6,7 @@ import type { Box } from './geo';
 import { rng } from './util';
 import { forestCells, woodland, seasonalWoodland } from './forest-layout';
 import { treeProfile, standDensity } from './tree-profile';
+import { SHADOW_LAYER } from './shadow';
 
 /**
  * Real trees on the slopes in front of the viewpoint, where the aerial photo shows forest.
@@ -102,6 +103,16 @@ export function createForest(
   trunk.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(trunk.getAttribute('position').count).fill(1),1));
   const closeCrown = mergeGeometries([crown, trunk]);
   const farCrown = new THREE.IcosahedronGeometry(.5, 0).scale(1, .65, 1).translate(0, .65, 0);
+  // The 20-face crown has flat normals and glinted like a cut gem from the hills: shade it as
+  // the ellipsoid it stands for.
+  {
+    const p = farCrown.getAttribute('position'), n = farCrown.getAttribute('normal');
+    const v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.set(p.getX(i) / .25, (p.getY(i) - .65) / (.325 * .325), p.getZ(i) / .25).normalize();
+      n.setXYZ(i, v.x, v.y, v.z);
+    }
+  }
   const cone = new THREE.ConeGeometry(0.5, .75, 7, 1, true).translate(0, .625, 0).toNonIndexed();
   for (const geo of [farCrown, cone]) {
     geo.deleteAttribute('uv');
@@ -109,9 +120,7 @@ export function createForest(
   }
   const closeCedar=mergeGeometries([cone,trunk]);
 
-  const material = new THREE.ShaderMaterial({
-    uniforms: env,
-    vertexShader: /* glsl */ `
+  const vertexShader = /* glsl */ `
       attribute vec3 iPos;
       attribute vec2 iSize;
       attribute vec3 iTint;
@@ -122,8 +131,10 @@ export function createForest(
       varying vec3 vNormal;
       varying vec3 vTint;
       varying float vUp;
+      varying float vBark;
       void main(){
         float foliage=1.-aBark;
+        vBark=aBark;
         vec3 scale=vec3(iSize.x*2.*iShape.x,iSize.y,iSize.x*2./iShape.x);
         vec3 p = position * scale;
         float upper=max(position.y-.4,0.);
@@ -146,7 +157,10 @@ export function createForest(
         vUp = position.y;
         gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.);
       }
-    `,
+    `;
+  const material = new THREE.ShaderMaterial({
+    uniforms: env,
+    vertexShader,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
       ${SHADOW_GLSL}
@@ -154,20 +168,41 @@ export function createForest(
       varying vec3 vNormal;
       varying vec3 vTint;
       varying float vUp;
+      varying float vBark;
       void main(){
         vec3 n = normalize(vNormal);
-        float sh = sunShadow(vWorld, n);
         float fp = max(length(dFdx(vWorld)), length(dFdy(vWorld)));
-        // photo colour as albedo, a little richer, darker inside the crown
-        vec3 alb = pow(vTint, vec3(2.2)) * 1.3;
-        alb = mix(vec3(dot(alb, vec3(.3, .55, .15))), alb, 1.1);
-        alb *= .55 + .55 * smoothstep(.1, .9, vUp);
-        // clumps of leaves, smoothed away once they are smaller than a couple of pixels
-        float leaf = mix(.5, vnoise(vWorld.xz * 1.7 + vWorld.y * .9), 1. - smoothstep(.25, .6, fp * 1.7));
-        alb *= .8 + .4 * leaf;
+        // clumps of leaves: world-space noise tilts the normal and opens darker gaps, so a crown
+        // reads as foliage rather than a smooth ball. Clumps under a couple of pixels fade out.
+        float k = (1. - smoothstep(.25, .6, fp * 1.1)) * (1. - vBark);
+        float c1 = .5;
+        if (k > 0.) {
+          // only near crowns pay for the clumps; nothing below takes derivatives
+          c1 = vnoise(vWorld.xz * 1.1 + vWorld.y * .7);
+          float c2 = vnoise(vWorld.zy * 1.1 + vWorld.x * .7 + 5.3);
+          n = normalize(n + vec3(c1 - .5, .25 * (c2 - .5), c2 - .5) * 1.1 * k);
+        }
+        float sh = sunShadow(vWorld, n);
+        // photo-based tint as albedo; the inside and underside of a crown stay in its own shade
+        vec3 alb = pow(vTint, vec3(2.2)) * 1.05;
+        float occ = mix(.42, 1., smoothstep(.15, 1., vUp)) * mix(1., .62 + .6 * c1, k);
+        alb *= mix(occ, .8, vBark);
         vec3 col = shade(alb, n, vWorld, sh);
+        // sunlight through the leaves when the tree stands against the sun
+        vec3 v = normalize(vWorld - cameraPosition);
+        float back = pow(max(dot(v, uSunDir), 0.), 5.) * (1. - vBark);
+        col += uSunLight * alb * vec3(.9, 1.15, .45) * back * (.25 + .75 * sh) * .55;
         gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
       }
+    `,
+  });
+  /** Trees cast sun shadows too, which settles them onto the ground (see shadow.ts). */
+  const depthMaterial = new THREE.ShaderMaterial({
+    uniforms: env,
+    vertexShader,
+    fragmentShader: /* glsl */ `
+      #include <packing>
+      void main(){ gl_FragColor = packDepthToRGBA(gl_FragCoord.z); }
     `,
   });
 
@@ -218,6 +253,8 @@ export function createForest(
       geo.boundingBox = bounds;
       geo.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
       const mesh = new THREE.Mesh(geo, material);
+      mesh.layers.enable(SHADOW_LAYER);
+      mesh.userData.depthMaterial = depthMaterial;
       group.add(mesh);
     }
     populations.set(key,{meshes:[...group.children] as THREE.Mesh[],count});
