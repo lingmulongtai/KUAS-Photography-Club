@@ -50,6 +50,26 @@ export function goldenPavilion():Part[] {
   return parts;
 }
 
+/** Simplified Shishinden: OSM way/554905814's 43 x 35 m footprint and nine front bays.
+ * Roof height and small details are illustrative, rather than a survey reconstruction. */
+export function shishinden():Part[] {
+  const parts:Part[]=[];
+  const timber:Part['color']=[.2,.12,.065], shutters:Part['color']=[.035,.032,.025];
+  box(parts,38,1.4,29,0,.7,0,[.24,.21,.17],.1);
+  box(parts,32,5.5,23,0,4.5,0,timber,.15);
+  for (const side of [-1,1]) {
+    for(let bay=0;bay<=9;bay++) {
+      const x=-16+bay*32/9;
+      box(parts,.5,7,.5,x,4.9,side*13,timber,.2);
+      if(bay<9) box(parts,32/9-.6,3.7,.2,x+16/9,4.4,side*11.6,shutters,.1);
+    }
+    for(let z=-9;z<=9;z+=4.5) box(parts,.5,7,.5,side*17,4.9,z,timber,.2);
+  }
+  roof(parts,43,35,9,8);
+  for(let step=0;step<5;step++) box(parts,6,.28,1.3,0,.14+step*.28,18-step*1.1,timber,.15);
+  return parts;
+}
+
 /** Main hall and its cantilevered stage, supported by eighteen timber columns. */
 export function kiyomizuHall():Part[] {
   const parts:Part[]=[];
