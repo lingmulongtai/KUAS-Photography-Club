@@ -5,6 +5,7 @@ import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
 import { hash1 } from './util';
 import { inCampus } from './geo';
 import { isDetailed } from './campus';
+import { BUILT_GLSL } from './building-occlusion';
 
 /*
  * The city: every PLATEAU building at its measured height.
@@ -164,6 +165,7 @@ const POLY_VS = /* glsl */ `
 const BUILDING_FS = /* glsl */ `
   ${ENV_GLSL}
   ${SHADOW_GLSL}
+  ${BUILT_GLSL}
   varying vec3 vWorld;
   varying vec3 vNormal;
   varying vec2 vWall;
@@ -218,6 +220,9 @@ const BUILDING_FS = /* glsl */ `
       // A darker plinth and the shadow below the eaves make a facade read as a building.
       wall *= mix(.73,1.,smoothstep(0.,2.,vWall.y));
       wall *= 1. - .22 * smoothstep(H-1.1,H-.15,vWall.y);
+      // in densely built blocks the lower floors look onto narrow alleys and get little sky
+      float block = smoothstep(.15, .65, builtAt(vWorld.xz, 30.));
+      wall *= 1. - .38 * block * (1. - smoothstep(1., 11., vWall.y));
 
       // windows on a floor grid
       float floorH = wooden ? 2.9 : (use == 4. ? 3.7 : 3.1);

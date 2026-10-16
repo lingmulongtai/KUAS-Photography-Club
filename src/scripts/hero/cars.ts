@@ -214,7 +214,9 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
         float px = clamp(uScale * 1.5 / dist, 1., 3.5);
         // only after dark, and not so big right under the viewpoint that they flood the bloom
         float near = 1. - smoothstep(2., 3.5, uScale * 1.5 / dist) * .6;
-        vColor = c * seen * uCity * near * mix(hazeTransmittance(position), 1., .4);
+        // lights drawn larger than they are, far away, would pile up into glare
+        float far = pow(clamp(uScale * 1.5 / dist, .12, 1.), .6);
+        vColor = c * seen * uCity * near * far * mix(hazeTransmittance(position), 1., .4);
         gl_PointSize = px;
         gl_Position = projectionMatrix * mv;
       }

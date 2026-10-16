@@ -12,7 +12,6 @@ import { createPost } from './post';
 import { loadBuildings } from './buildings-data';
 import { buildCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
-import { loadLines } from './lines-data';
 import { buildLamps } from './lights';
 import { buildCars } from './cars';
 import { buildRoadField } from './roads';
@@ -31,6 +30,10 @@ import { buildWoodlandTexture } from './woodland-texture';
 import { infrastructureMask } from './forest-infrastructure';
 import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit, type OrbitSite } from './landmark-orbit';
+import { buildOcclusion } from './building-occlusion';
+import { buildIslands } from './islands';
+import { islandMask } from './island-mask';
+import { LINE, loadLines } from './lines-data';
 
 export interface HeroStatus {
   minutes: number;
@@ -222,13 +225,20 @@ export function createHero(
     const city = buildCity(env, hf, modeledBuildings, (b) =>
       !replaced(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
     );
+    const builtSize = lite ? 1024 : 2048;
+    env.uBuilt.value = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
+    env.uBuiltBox.value.set(...BUILDINGS_BOX);
+    env.uBuiltTexel.value = (BUILDINGS_BOX[2] - BUILDINGS_BOX[0]) / builtSize;
+    env.uBuiltOn.value = 1;
     const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
     const regionalBox=meta.arashiyama?.box;
     const forestMaskBox:Box=regionalBox ? [Math.min(BUILDINGS_BOX[0],regionalBox[0]),Math.min(BUILDINGS_BOX[1],regionalBox[1]),
       Math.max(BUILDINGS_BOX[2],regionalBox[2]),Math.max(BUILDINGS_BOX[3],regionalBox[3])] : BUILDINGS_BOX;
     const roadsAndWater = infrastructureMask(lines, forestMaskBox);
     scene.add(buildDaimonji(env,hf));
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || roadsAndWater(x,z) || fireClearing(x,z), forestArea);
+    // the water mask is too coarse for garden islands, so they are tested on their outlines
+    const island = islandMask(lines.filter((f) => f.kind === LINE.waterHole).map((f) => f.pts));
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
     updateForestPhoto=photo=>{
       forest.setRegionalPhoto(photo.image as HTMLImageElement,meta.arashiyama!.box);
       shadow.invalidate();
@@ -255,7 +265,7 @@ export function createHero(
     terrain.uniforms.uRoads.value = buildRoadField(renderer, lines, opts.quality > 0.75 ? 4096 : 2048).texture;
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
     terrain.uniforms.uRoadsOn.value = 1;
-    scene.add(buildWater(env, hf, lines, terrain.uniforms,lite?28:18));
+    scene.add(buildWater(env, hf, lines, terrain.uniforms,lite?28:18), buildIslands(env, hf, lines));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips);
     const lamps = buildLamps(env, hf, lines, opts.quality);
     const cars = buildCars(env, hf, lines, opts.quality);
@@ -301,6 +311,7 @@ export function createHero(
 
     renderer.toneMappingExposure = look.exposure;
     post.bloom.strength = look.bloom;
+    post.grade.value = THREE.MathUtils.smoothstep(alt, -6, 8);
 
     const status: HeroStatus = { minutes, altitude: alt, phase: phaseName(alt, minutes), kelvin: kelvin(alt), moonAge: moon.age };
     const key = `${Math.floor(minutes)}|${status.phase}`;

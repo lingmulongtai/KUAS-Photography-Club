@@ -13,6 +13,8 @@ const FinishShader = {
     uTime: { value: 0 },
     uRes: { value: new THREE.Vector2(1, 1) },
     uGrain: { value: 0.018 },
+    /** 0..1: how much of the daylight print look to apply (none at night) */
+    uGrade: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -24,10 +26,18 @@ const FinishShader = {
     uniform float uTime;
     uniform vec2 uRes;
     uniform float uGrain;
+    uniform float uGrade;
     varying vec2 vUv;
     void main(){
       vec3 c = texture2D(tDiffuse, vUv).rgb;
       float l = dot(c, vec3(.299, .587, .114));
+      // daylight print look: a touch more contrast and colour, cool shade, warm highlights,
+      // so the grey city under a flat sky reads like a photograph rather than a model
+      vec3 graded = mix(vec3(l), c, 1.12);
+      graded = mix(graded, graded * graded * (3. - 2. * graded), .28);
+      graded += vec3(-.012, .002, .016) * (1. - l) * (1. - l) + vec3(.02, .008, -.016) * l * l;
+      c = mix(c, clamp(graded, 0., 1.), uGrade);
+      l = dot(c, vec3(.299, .587, .114));
       float v = 1. - smoothstep(.4, 1.25, length((vUv - .5) * vec2(1.1, 1.)));
       c *= mix(.78, 1., v);
       float g = hash12(vUv * uRes + fract(uTime * 7.31) * 517.) - .5;
@@ -87,6 +97,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   return {
     composer,
     bloom,
+    grade: finish.uniforms.uGrade,
     setSize(w: number, h: number, dpr: number) {
       composer.setPixelRatio(dpr);
       composer.setSize(w, h);
