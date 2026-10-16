@@ -318,10 +318,11 @@ export function addSouth(b:CampusBuilder) {
     }
     // Narrow cross-corridors connect the academic wings at each stair landing.
     for(let f=1;f<=4;f++) {
-      const y=f*4.4,v=22+f*11.7;
+      const y=f*4.4,v=22+f*11.7-2.2;
       b.box(-9,7,v,v+2.2,y-.32,y,CM.concrete);
-      b.rail([-9,y,v+2.2],[7,y,v+2.2]);
-      b.rail([-9,y,v],[-3,y,v]);b.rail([3,y,v],[7,y,v]);
+      for(const edge of [v,v+2.2]) {
+        b.rail([-9,y,edge],[-4.4,y,edge]);b.rail([2.4,y,edge],[7,y,edge]);
+      }
     }
     b.box(-9,7,68.8,73,17.6,17.65,CM.leaves);
     // The east wing's clock is individual ticks and hands on the brick, not a signboard.
@@ -355,6 +356,37 @@ export function addSouth(b:CampusBuilder) {
   });
 }
 
+/** Four straight outdoor flights lead from the plaza to the fifth-floor terrace. The
+ * tread/riser sizes are photograph-based estimates, not claimed as surveyed dimensions.
+ */
+export function addSouthStairs(b:CampusBuilder) {
+  b.part('south-grand-staircase',()=>{
+    for(let f=0;f<4;f++) {
+      const v=22+f*11.7,y=f*4.4;
+      b.stairs([-1,y,v],[-1,y+4.4,v+9.5],6.8,27);
+      b.box(-4.4,2.4,v+9.5,v+11.7,y+4.08,y+4.4,CM.concrete);
+      // The broad stair is split by a central metal handrail.
+      b.rail([-1,y,v],[-1,y+4.4,v+9.5],false);
+      for(const u of [-6.8,4.8])b.box(u-.2,u+.2,v+10.4,v+10.8,0,y+4.08,CM.concrete);
+    }
+    b.box(-4.4,2.4,16,22,-.12,0,CM.paving);
+  });
+  b.part('south-plaza-amphitheatre-and-planters',()=>{
+    for(const [u0,u1] of [[-41,-9],[7,69]]) {
+      for(let i=0;i<6;i++)b.box(u0,u1,15+i,16+i,-.1,(i+1)*.25,CM.timber);
+      b.box(u0,u1,21,22,-.1,1.5,CM.timber);
+      for(let u=u0+4;u<u1-4;u+=15) {
+        b.box(u,u+4,18.5,21,1,1.7,CM.wall);
+        b.box(u+.2,u+3.8,18.7,20.8,1.7,2,CM.leaves);
+      }
+      for(let u=u0+3;u<u1-3;u+=15) {
+        b.box(u,u+2.5,22.8,24.3,4.4,4.9,CM.wall);
+        b.box(u+.1,u+2.4,22.9,24.2,4.9,5.2,CM.leaves);
+      }
+    }
+  });
+}
+
 export function campusArchitecture(ground:number) {
-  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);addSouth(b);return b.geometry();
+  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);addSouth(b);addSouthStairs(b);return b.geometry();
 }

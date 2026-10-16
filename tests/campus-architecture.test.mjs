@@ -39,8 +39,27 @@ test('both third-floor links have an open undercroft and a supported glazed deck
   }
 });
 test('South academic wings leave the central stair slot open and only the residence has eight storeys',()=>{
-  assert.equal(ray([-1,2,24],[-1,2,70]).length,0);
+  assert.equal(ray([4,2,24],[4,2,70]).length,0,'ground-floor passage beside the stairs stays open');
   assert.equal(ray([30,26,45],[30,26,70]).length,0,'academic wing roof is below the residence');
   assert.ok(ray([-25,30,68],[-25,20,68]).length,'south-west residence rises above the academic roof');
   assert.ok(ray([30,4.3,21],[30,4.3,29]).length,'first stepped terrace is present');
+});
+test('South grand staircase rises through four flights with flat, traversable cross-landings',()=>{
+  const heights=[];
+  for(let f=0;f<4;f++) {
+    let previous=f*4.4;
+    for(let i=0;i<27;i++) {
+      const v=22+f*11.7+(i+.5)*9.5/27;
+      const hit=ray([0,30,v],[0,-1,v])[0];
+      assert.ok(hit,'every tread is modeled');
+      const height=hit.point.y-32.5;
+      assert.ok(Math.abs(height-(f*4.4+(i+1)*4.4/27))<.001);
+      assert.ok(height>previous);previous=height;
+    }
+    const v=22+f*11.7+10.5;
+    const level=ray([0,30,v],[0,-1,v])[0].point.y-32.5;
+    heights.push(level);
+    assert.equal(ray([-4,level+.6,v],[2,level+.6,v]).length,0,'no handrail or slab blocks the landing');
+  }
+  assert.deepEqual(heights.map(y=>Math.round(y*10)/10),[4.4,8.8,13.2,17.6]);
 });
