@@ -72,8 +72,8 @@ const RAD = Math.PI / 180;
 /** Sharper local photos and the views that look over them; each loads when one of its views is first chosen. */
 const REGIONAL_PHOTOS: { key: 'arashiyama' | 'higashiyama'; views: HeroView[]; seasonal: boolean }[] = [
   // photographed with the woods leafless or in autumn colour
-  { key: 'arashiyama', views: ['arashiyama'], seasonal: true },
-  { key: 'higashiyama', views: ['shogunzuka', 'kiyomizu'], seasonal: false },
+  { key: 'arashiyama', views: ['arashiyama','togetsukyo'], seasonal: true },
+  { key: 'higashiyama', views: ['shogunzuka', 'kiyomizu','yasaka'], seasonal: false },
 ];
 
 export function createHero(
