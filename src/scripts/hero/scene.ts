@@ -111,6 +111,13 @@ export const VIEWS = {
 
 export type HeroView = keyof typeof VIEWS;
 
+/** Sharper local photos and the views that look over them; each loads when one of its views is first chosen. */
+const REGIONAL_PHOTOS: { key: 'arashiyama' | 'higashiyama'; views: HeroView[]; seasonal: boolean }[] = [
+  // photographed with the woods leafless or in autumn colour
+  { key: 'arashiyama', views: ['arashiyama'], seasonal: true },
+  { key: 'higashiyama', views: ['shogunzuka', 'kiyomizu'], seasonal: false },
+];
+
 export function createHero(
   renderer: THREE.WebGLRenderer,
   el: HTMLElement,
@@ -152,7 +159,7 @@ export function createHero(
   let groundAt: ((x: number, z: number) => number) | null = null;
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
-  let ensureRegionalPhoto: (()=>void) | null = null;
+  let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let driveCars: ((dt: number) => void) | null = null;
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
@@ -166,6 +173,10 @@ export function createHero(
     groundAt = (x, z) => hf.height(x, z);
     eye.copy(eyeOf(VIEW));
     campus.y = hf.height(campus.x, campus.z) + 14;
+    const regions = REGIONAL_PHOTOS.flatMap((r) => {
+      const m = meta[r.key];
+      return m ? [{ ...r, meta: m }] : [];
+    });
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
       aerialWideBox: meta.aerialWide.box,
@@ -176,21 +187,21 @@ export function createHero(
       normalNear: normalTexture(hf, meta.near),
       normalNearBox: meta.near.box,
       regional: meta.arashiyama ? {box:meta.arashiyama.box,normal:normalTexture(hf,meta.arashiyama.elevation)} : undefined,
+      photos: regions.map((r) => r.meta.box),
     }, opts.quality > 0.75 ? 640 : 400);
-    let regionalPhoto: Promise<unknown> | undefined;
-    let detailedPhoto:THREE.Texture | undefined;
-    let updateForestPhoto:((photo:THREE.Texture)=>void) | undefined;
-    ensureRegionalPhoto = () => {
-      if (!meta.arashiyama || regionalPhoto) return;
-      const file=opts.quality<.75?meta.arashiyama.mobile.file:meta.arashiyama.file;
-      regionalPhoto=loadTexture(file,aniso).then(photo=>{
-        detailedPhoto=photo;
-        terrain.uniforms.uRegionalPhoto.value=photo;
-        terrain.uniforms.uRegionalPhotoOn.value=1;
-        updateForestPhoto?.(photo);
-      }).catch(error=>{regionalPhoto=undefined;console.warn('Arashiyama imagery unavailable',error);});
-    };
-    if(VIEW===VIEWS.arashiyama) ensureRegionalPhoto();
+    const regionalPhotos: (Promise<unknown> | undefined)[] = [];
+    const detailedPhotos: (THREE.Texture | undefined)[] = [];
+    let updateForestPhoto:((photo:THREE.Texture,i:number)=>void) | undefined;
+    ensureRegionalPhoto = (v) => regions.forEach((r, i) => {
+      if (!r.views.includes(v) || regionalPhotos[i]) return;
+      const file=opts.quality<.75?r.meta.mobile.file:r.meta.file;
+      regionalPhotos[i]=loadTexture(file,aniso).then(photo=>{
+        detailedPhotos[i]=photo;
+        terrain.setPhoto(i,photo);
+        updateForestPhoto?.(photo,i);
+      }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
+    });
+    ensureRegionalPhoto(view);
     terrainRecenter = terrain.recenter;
     // work out the other viewpoints' terrain while the browser is idle
     const idle = (cb: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 500));
@@ -231,19 +242,19 @@ export function createHero(
     env.uBuiltTexel.value = (BUILDINGS_BOX[2] - BUILDINGS_BOX[0]) / builtSize;
     env.uBuiltOn.value = 1;
     const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
-    const regionalBox=meta.arashiyama?.box;
-    const forestMaskBox:Box=regionalBox ? [Math.min(BUILDINGS_BOX[0],regionalBox[0]),Math.min(BUILDINGS_BOX[1],regionalBox[1]),
-      Math.max(BUILDINGS_BOX[2],regionalBox[2]),Math.max(BUILDINGS_BOX[3],regionalBox[3])] : BUILDINGS_BOX;
+    const forestMaskBox=regions.reduce<Box>((a,{meta:{box:b}})=>[Math.min(a[0],b[0]),Math.min(a[1],b[1]),
+      Math.max(a[2],b[2]),Math.max(a[3],b[3])],BUILDINGS_BOX);
     const roadsAndWater = infrastructureMask(lines, forestMaskBox);
     scene.add(buildDaimonji(env,hf));
     // the water mask is too coarse for garden islands, so they are tested on their outlines
     const island = islandMask(lines.filter((f) => f.kind === LINE.waterHole).map((f) => f.pts));
     const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
-    updateForestPhoto=photo=>{
-      forest.setRegionalPhoto(photo.image as HTMLImageElement,meta.arashiyama!.box);
+    const forestPhoto=(photo:THREE.Texture,i:number)=>{
+      forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal);
       shadow.invalidate();
     };
-    if(detailedPhoto) updateForestPhoto(detailedPhoto);
+    updateForestPhoto=forestPhoto;
+    detailedPhotos.forEach((photo,i)=>photo&&forestPhoto(photo,i));
     orbitObstruction = (x,z) => {
       const center=landscapeCenter(VIEW);
       const canopy=Math.hypot(x-center.x,z-center.z)>24 && forest.contains(x,z);
@@ -405,7 +416,7 @@ export function createHero(
       view = nextView;
       VIEW = VIEWS[view];
       eye.copy(eyeOf(VIEW));
-      if(view==='arashiyama') ensureRegionalPhoto?.();
+      ensureRegionalPhoto?.(view);
     }
     const region =
       to === 'campus'

@@ -44,6 +44,8 @@ export interface TerrainTextures {
   normalNear: THREE.Texture;
   normalNearBox: Box;
   regional?: {normal:THREE.Texture;box:Box};
+  /** areas with a sharper photo (RegionalPhotoMeta in data.ts), each drawn once setPhoto() fills it */
+  photos?: Box[];
 }
 
 const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
@@ -121,8 +123,6 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uRegionalBox: {value:v4(tex.regional?.box??tex.normalFarBox)},
     uRegionalNormal: {value:tex.regional?.normal??tex.normalFar},
     uRegionalOn: {value:tex.regional?1:0},
-    uRegionalPhoto: {value:tex.aerialWide},
-    uRegionalPhotoOn: {value:0},
     /** the mown strips of the 大 on Daimonji-yama */
     uStrokes: { value: STROKES.map((s) => new THREE.Vector4(...s)) },
     /** distance field of the streets and railways (see roads.ts) */
@@ -130,8 +130,11 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uRoadBox: { value: new THREE.Vector4(0, 0, 1, 1) },
     uRoadsOn: { value: 0 },
   };
+  // One set of uniforms per sharper photo: GLSL can't index an array of samplers in a loop.
+  const photos = (tex.photos ?? []).map((box) => ({ box: { value: v4(box) }, map: { value: tex.aerialWide }, on: { value: 0 } }));
+  const photoUniforms = Object.fromEntries(photos.flatMap((u, i) => [[`uPhotoBox${i}`, u.box], [`uPhoto${i}`, u.map], [`uPhotoOn${i}`, u.on]]));
   const material = new THREE.ShaderMaterial({
-    uniforms,
+    uniforms: { ...uniforms, ...photoUniforms },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
       void main(){
@@ -158,8 +161,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform vec4 uRegionalBox;
       uniform sampler2D uRegionalNormal;
       uniform float uRegionalOn;
-      uniform sampler2D uRegionalPhoto;
-      uniform float uRegionalPhotoOn;
+      ${photos.map((_, i) => `uniform vec4 uPhotoBox${i}; uniform sampler2D uPhoto${i}; uniform float uPhotoOn${i};`).join('\n')}
       ${ROAD_GLSL}
       ${BUILT_GLSL}
       uniform vec4 uStrokes[4];
@@ -197,10 +199,16 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 city = texture2D(uAerialCity, vec2(uc.x, 1. - uc.y)).rgb;
         float mappedForest = texture2D(uWoodland, uw).a * uWoodlandOn;
         photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
-        // Sample outside spatial branches so automatic mip derivatives stay defined.
-        vec2 localUv=boxUv(uRegionalBox,p);
-        vec3 localPhoto=texture2D(uRegionalPhoto,vec2(localUv.x,1.-localUv.y)).rgb;
-        photo=mix(photo,localPhoto,regional*uRegionalPhotoOn);
+        // Sharper local photos. Only a uniform condition guards the samples, never a spatial
+        // one, so automatic mip derivatives stay defined.
+        float detail = 0.;
+        ${photos.map((_, i) => `
+        if (uPhotoOn${i} > 0.) {
+          vec2 du = boxUv(uPhotoBox${i}, p);
+          float k = inside(uPhotoBox${i}, p, 120.);
+          photo = mix(photo, texture2D(uPhoto${i}, vec2(du.x, 1. - du.y)).rgb, k);
+          detail = max(detail, k);
+        }`).join('')}
 
         // forest: green and dark in the photo. Up close add canopy texture the photo can't resolve.
         float photoGreen = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * (1. - smoothstep(.05, .2, dot(photo, vec3(.33))));
@@ -215,7 +223,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float c1 = vnoise(p * .22);
           float c2 = vnoise(p * .55 + 7.);
           float canopy = mix(.5, c1, k1) * .65 + mix(.5, c2, k2) * .35;
-          float synthetic=green*near*mix(1.,.35,regional*uRegionalPhotoOn);
+          float synthetic=green*near*mix(1.,.35,detail);
           // kept gentle: stronger contrast read as dark spots all over the hillsides
           photo *= mix(1., .72 + .56 * canopy, synthetic);
           vec2 g = vec2(vnoise(p * .22 + vec2(.6, 0.)) - c1, vnoise(p * .22 + vec2(0., .6)) - c1);
@@ -358,5 +366,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   const recenter = (c: { x: number; z: number }) => {
     geo.setAttribute('position', new THREE.BufferAttribute(prepare(c), 3));
   };
-  return { mesh, uniforms, recenter, prepare };
+  /** Show the sharper photo for tex.photos[i]. */
+  const setPhoto = (i: number, photo: THREE.Texture) => {
+    photos[i].map.value = photo;
+    photos[i].on.value = 1;
+  };
+  return { mesh, uniforms, recenter, prepare, setPhoto };
 }
