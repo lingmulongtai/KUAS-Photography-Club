@@ -78,12 +78,29 @@ export function goldenPavilion():Part[] {
     box(parts,w,.25,d,0,y,0,wall,.7);
     box(parts,w,h*.58,d,0,y+h*.45,0,wall,.6);
     for(const side of [-1,1]) {
-      for(let x=-w*.4;x<=w*.41;x+=w/5) {
+      for(let bay=0;bay<=5;bay++) {
+        const x=-w*.47+bay*w*.94/5;
         box(parts,.22,h,.22,x,y+h*.5,side*d*.51,wall,.7);
-        box(parts,w/5-.28,h*.5,.16,x+w/10,y+h*.55,side*d*.515,[.018,.025,.021],.1);
+        if(bay<5)box(parts,w*.94/5-.25,h*.5,.16,x+w*.94/10,y+h*.55,side*d*.515,[.018,.025,.021],.1);
+        box(parts,.5,.18,.65,x,y+h-.1,side*d*.51,wall,.5);
       }
-      for(let z=-d*.4;z<=d*.41;z+=d/5) box(parts,.22,h,.22,side*w*.51,y+h*.5,z,wall,.7);
+      for(let bay=0;bay<=5;bay++) {
+        const z=-d*.47+bay*d*.94/5;
+        box(parts,.22,h,.22,side*w*.51,y+h*.5,z,wall,.7);
+        if(bay<5)box(parts,.16,h*.5,d*.94/5-.25,side*w*.515,y+h*.55,z+d*.94/10,[.018,.025,.021],.1);
+        box(parts,.65,.18,.5,side*w*.51,y+h-.1,z,wall,.5);
+      }
       box(parts,w,.16,.18,0,y+h*.18,side*d*.54,wall,.55);
+      if(y===4) {
+        for(const level of [.3,.8]) {
+          box(parts,w*1.12,.1,.1,0,y+level,side*d*.59,wall,.5);
+          box(parts,.1,.1,d*1.12,side*w*.59,y+level,0,wall,.5);
+        }
+        for(let i=0;i<=8;i++) {
+          box(parts,.1,.8,.1,(i-4)*w*.135,y+.4,side*d*.59,wall,.5);
+          box(parts,.1,.8,.1,side*w*.59,y+.4,(i-4)*d*.135,wall,.5);
+        }
+      }
     }
     roof(parts,w*1.35,d*1.35,1.35,y+h);
   }
