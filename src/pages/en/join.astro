@@ -1,0 +1,21 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageHero from '../../components/PageHero.astro';
+import ClubFacts from '../../components/ClubFacts.astro';
+import ContactWays from '../../components/ContactWays.astro';
+import { forms } from '../../data/club';
+---
+<Base lang="en" title="Visit / Join" description="Visit the KUAS Photography Club. Meeting times, costs, membership procedures and contact information in English.">
+  <PageHero edge="JOIN ▸ KUAS PHOTOGRAPHY CLUB" title="Visit / Join" lead="No camera or experience is required. A smartphone is enough. KUAS students, including international students, are welcome to visit. Check the latest schedule and contact the organizers before coming." />
+  <section class="wrap"><ClubFacts lang="en" /></section>
+  <section class="section"><div class="wrap prose">
+    <h2>Who can take part?</h2><p>Students of all nationalities and experience levels can visit. Staff, alumni and people outside KUAS should contact the organizers about participation and eligibility for formal membership. Shared cameras and other equipment are still being prepared; ask what is available.</p>
+    <h2>From a visit to formal membership</h2>
+    <ol><li>Request a visit using Microsoft Forms, Instagram DM or email.</li><li>Confirm the meeting date and room with the organizers, then visit for an introduction.</li><li>Ask about outings you are interested in. Arrange participation, late arrival or early departure with the organizers in advance.</li><li>The organizers will explain the required formal membership procedures. Applying for a visit or joining a LINE or other communication chat alone does not complete membership.</li></ol>
+    <p>Ask the organizers about activity registration, insurance procedures and eligibility before taking part. Do not assume that joining a chat or applying automatically provides insurance coverage.</p>
+    <h2>Request a visit</h2><p>The Microsoft Forms page requires sign-in. If you cannot respond, contact us by Instagram DM or email. Information you provide is used to arrange visits or participation and respond to inquiries.</p>
+    <p><a class="btn btn--primary" href={forms.join} target="_blank" rel="noopener">Open Microsoft Forms ↗</a></p>
+    <p>For a visit later in the semester, or an absence or cancellation, contact the organizers to make arrangements.</p>
+  </div></section>
+  <section class="section"><div class="wrap"><ContactWays lang="en" /></div></section>
+</Base>

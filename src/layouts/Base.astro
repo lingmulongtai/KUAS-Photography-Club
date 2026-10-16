@@ -3,6 +3,7 @@ import '../styles/global.css';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { club } from '../data/club';
+import { languagePath } from '../lib/i18n';
 
 interface Props {
   /** Page name. The club name is appended automatically. */
@@ -18,7 +19,7 @@ interface Props {
 
 const {
   title,
-  description = '京都先端科学大学の写真部「KUAS Photography Club」。撮影会の記録と、シャッタースピード・絞り・焦点距離・現像など写真の基礎を、触って学べるページを公開しています。',
+  description = '京都先端科学大学の写真部「KUAS Photography Club」。写真部が運営するサイトです。活動・入部のご案内と、シャッタースピード・絞り・焦点距離・現像など写真の基礎を、触って学べるページを公開しています。',
   overlayHeader = false,
   lang = 'ja',
   dir = 'ltr',
@@ -37,6 +38,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
+    {!noindex && <><link rel="alternate" hreflang="ja" href={new URL(languagePath(Astro.url.pathname, 'ja'), Astro.site)} /><link rel="alternate" hreflang="en" href={new URL(languagePath(Astro.url.pathname, 'en'), Astro.site)} /></>}
     <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="icon" href="/brand/favicon-48.png" sizes="48x48" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -47,7 +49,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:locale" content={lang === 'en' ? 'en_US' : 'ja_JP'} />
     <meta property="og:image" content={new URL('/brand/og.jpg', Astro.site)} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -59,15 +61,16 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Quicksand:wght@500;600;700&family=Yomogi&family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&display=swap"
     />
+    <script>import '../scripts/language';</script>
     <slot name="head" />
   </head>
   <body>
-    <a class="skip" href="#main">本文へ移動</a>
-    <SiteHeader overlay={overlayHeader} />
+    <a class="skip" href="#main">{lang === 'en' ? 'Skip to content' : '本文へ移動'}</a>
+    <SiteHeader overlay={overlayHeader} lang={lang} />
     <main id="main">
       <slot />
     </main>
-    <SiteFooter />
+    <SiteFooter lang={lang} />
   </body>
 </html>
 
