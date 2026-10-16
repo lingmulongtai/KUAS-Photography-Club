@@ -21,10 +21,12 @@ interface TripRef {
 interface EventData {
   date: string;
   title: string;
+  titleEn?: string;
   kind: string;
   time?: string;
   place?: string;
   note?: string;
+  noteEn?: string;
   link?: string;
 }
 
@@ -395,6 +397,8 @@ export function startAdmin(root: HTMLElement) {
       <input data-k="place" value="${esc(ev.place ?? '')}" placeholder="場所" aria-label="場所" />
       <button type="button" aria-label="消す">✕</button>
       <input class="note" data-k="note" value="${esc(ev.note ?? '')}" placeholder="メモ（任意）" aria-label="メモ" />
+      <input class="note" data-k="titleEn" value="${esc(ev.titleEn ?? '')}" placeholder="English title（任意）" aria-label="英語の内容" />
+      <input class="note" data-k="noteEn" value="${esc(ev.noteEn ?? '')}" placeholder="English note（任意）" aria-label="英語のメモ" />
       <input class="note" data-k="link" value="${esc(ev.link ?? '')}" placeholder="リンク（任意：/trips/... や https://...）" aria-label="リンク" />`;
     row.querySelector('button')!.addEventListener('click', () => row.remove());
     evList.appendChild(row);
