@@ -69,9 +69,8 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
   for (const f of footprints) {
     const ring = f.ring;
     const m = ring.length;
-    const centerX=ring.reduce((sum,p)=>sum+p[0],0)/m;
     const centerZ=ring.reduce((sum,p)=>sum+p[1],0)/m;
-    if(centerZ < -742 || (centerX > -3723 && centerZ < -688)) continue;
+    if(centerZ < -688) continue;
     let area = 0;
     for (let i = 0; i < m; i++) {
       const j = (i + 1) % m;
