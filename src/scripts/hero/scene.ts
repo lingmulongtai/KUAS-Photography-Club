@@ -284,7 +284,8 @@ export function createHero(
     clouds.uniforms.uCover.value = coverForDay(ymd.year, ymd.month, ymd.day);
 
     renderer.toneMappingExposure = look.exposure;
-    post.bloom.strength = look.bloom;
+    post.bloom.strength = look.bloom * (1 + .12 * look.city);
+    post.bloom.radius = .5 + .18 * look.city;
     post.grade.value = THREE.MathUtils.smoothstep(alt, -6, 8);
 
     const status: HeroStatus = { minutes, altitude: alt, phase: phaseName(alt, minutes), kelvin: kelvin(alt), moonAge: moon.age };
