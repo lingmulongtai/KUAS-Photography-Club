@@ -16,7 +16,7 @@ function setup(t, enabled=()=>true) {
   const look = createLookRotation(); let taps=0;
   mountLookControls(el,look,()=>taps++,enabled);
   const send=(type,x,y,extra={})=>listeners.get(type)({type,isPrimary:true,button:0,pointerType:'mouse',pointerId:1,clientX:x,clientY:y,timeStamp:10,target:{closest(){return null;}},...extra});
-  return {send,look,captured,taps:()=>taps};
+  return {el,send,look,captured,taps:()=>taps};
 }
 test('small mouse release outside is captured, cancelled and never becomes a later hover drag', (t) => {
   const h=setup(t); h.send('pointerdown',599,100);
@@ -24,6 +24,34 @@ test('small mouse release outside is captured, cancelled and never becomes a lat
   h.send('pointerup',602,100);
   h.send('pointermove',300,100);
   assert.equal(h.look.state.yaw,0); assert.equal(h.taps(),0);
+});
+test('touch capture transferred from a child canvas keeps every swipe movement', (t) => {
+  const h=setup(t);
+  const touch={pointerType:'touch'};
+  h.send('pointerdown',100,100,touch);
+  h.send('pointermove',120,101,{...touch,timeStamp:30});
+  h.send('lostpointercapture',120,101,{...touch,timeStamp:31});
+  assert.equal(h.look.state.dragging,true);
+  h.send('pointermove',220,110,{...touch,timeStamp:50});
+  h.send('pointermove',340,115,{...touch,timeStamp:70});
+  assert.equal(h.look.state.yaw,-72);
+  h.send('pointerup',340,115,{...touch,timeStamp:80});
+  assert.equal(h.look.state.dragging,false);
+  assert.equal(h.taps(),0);
+  h.send('pointermove',400,115,{...touch,timeStamp:90});
+  assert.equal(h.look.state.yaw,-72);
+});
+test('losing the stage capture ends the drag and clears inertia', (t) => {
+  const h=setup(t);
+  h.send('pointerdown',100,100);
+  h.send('pointermove',220,100,{timeStamp:30});
+  const yaw=h.look.state.yaw;
+  h.send('lostpointercapture',220,100,{target:h.el,timeStamp:40});
+  h.send('pointermove',340,100,{timeStamp:50});
+  h.look.step(.1,false);
+  assert.equal(h.look.state.yaw,yaw);
+  assert.equal(h.look.state.dragging,false);
+  assert.equal(h.look.state.vx,0);
 });
 test('flight input lock ignores drags and taps until the camera has arrived', (t)=>{
   let arrived=false;
