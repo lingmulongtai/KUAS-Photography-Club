@@ -1,26 +1,31 @@
 ---
 import { club } from '../data/club';
-import { instagramPosts } from '../data/instagram';
 
-const posts = instagramPosts.slice(0, 6);
+interface Props {
+  lang?: 'ja' | 'en';
+}
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+const embedUrl = new URL('embed/', `${club.instagram.url.replace(/\/$/, '')}/`);
 ---
 <section class="section insta" aria-labelledby="insta-title">
   <div class="wrap grid">
     <div class="intro">
       <p class="edge">INSTAGRAM ▸ @{club.instagram.handle}</p>
-      <h2 id="insta-title">Instagram からも<br />お問い合わせできます。</h2>
-      <p class="muted">写真部の Instagram はこちらです。最新の発信はプロフィールからご覧ください。</p>
-      <a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">Instagram を見る <span class="arrow" aria-hidden="true">↗</span></a>
+      <h2 id="insta-title">{en ? 'A glimpse of our photography.' : '写真部の Instagram を、のぞいてみませんか。'}</h2>
+      <p class="muted">{en ? 'Explore the club’s posts in the official Instagram preview. You can also contact us by DM from our profile.' : '公式の埋め込みから、写真部の投稿をご覧いただけます。プロフィールから DM でのお問い合わせもできます。'}</p>
+      <a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">{en ? 'Open Instagram' : 'Instagram を見る'} <span class="arrow" aria-hidden="true">↗</span></a>
+      <p class="small muted">{en ? 'If the preview does not load, open our profile using the button above.' : '埋め込みが表示されない場合は、上のボタンからプロフィールをご覧ください。'}</p>
     </div>
-    {posts.length > 0 && <ul class="tiles">
-      {posts.map((p) => (
-        <li>
-          <a href={p.url} target="_blank" rel="noopener" aria-label="Instagram で見る">
-            <img src={p.image} alt={p.alt} loading="lazy" decoding="async" width="400" height="400" />
-          </a>
-        </li>
-      ))}
-    </ul>}
+    <div class="embed">
+      <iframe
+        src={embedUrl.href}
+        title={en ? 'KUAS Photography Club Instagram profile and posts' : '京都先端科学大学 写真部の Instagram プロフィールと投稿'}
+        width="540"
+        height="648"
+        loading="lazy"
+      ></iframe>
+    </div>
   </div>
 </section>
 
@@ -42,31 +47,23 @@ const posts = instagramPosts.slice(0, 6);
     font-size: var(--step-4);
   }
 
-  .tiles {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-
-  .tiles a {
-    display: block;
-    aspect-ratio: 1;
-    overflow: hidden;
-    background: var(--brand-pale);
-  }
-
-  .tiles img {
+  .embed {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.5s, opacity 0.3s;
+    max-width: 540px;
+    justify-self: center;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
   }
 
-  .tiles a:hover img {
-    transform: scale(1.05);
+  iframe {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 5 / 6;
+    min-height: 460px;
+    border: 0;
   }
 
   @media (max-width: 860px) {
