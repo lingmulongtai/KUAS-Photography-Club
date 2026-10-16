@@ -261,6 +261,7 @@ const BUILDING_FS = /* glsl */ `
       emit += lampCol * lit * pane * strength * uCity;
       // shopfronts glow along the street
       if ((use == 3. || use == 5.) && id.y < .5) emit += warm * smoothstep(.1, .5, f.y) * valid * mix(1.2, .05, tiny) * uCity;
+      emit *= cityLightShimmer(vWorld);
     }
 
     // the campus, when it is in focus: clean white facades, a teal line along the roofs, teal windows at night

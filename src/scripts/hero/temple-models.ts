@@ -7,21 +7,67 @@ const box = (parts:Part[],w:number,h:number,d:number,x:number,y:number,z:number,
 };
 
 /** Eight-sided eave rings: curved corners and an overhanging fascia, not a pyramid. */
-function roof(parts:Part[],w:number,d:number,h:number,y:number,z=0) {
+export function roof(parts:Part[],w:number,d:number,h:number,y:number,z=0,color=roofColor,pyramidal=false) {
   const points:number[][]=[];
   const outline=[[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0]];
-  for (const [scale,height] of [[1,0],[.72,.32],[.28,1]]) for (const [x,v] of outline) {
-    points.push([x*w*.5*scale,y+h*height+(height===0&&x!==0&&v!==0?.3:0),z+v*d*.5*scale]);
+  const profile=[[1,0],[.94,.035],[.82,.16],[.65,.39],[.43,.7],[.28,1]];
+  for (const [scale,height] of profile) for (const [x,v] of outline) {
+    const turn=x!==0&&v!==0?.3*Math.max(0,(scale-.8)/.2):0;
+    points.push([x*w*.5*(height===1&&pyramidal?.018:scale),y+h*height+turn,z+v*d*.5*(height===1?.018:scale)]);
   }
   const vertices:number[]=[];
-  for (let ring=0;ring<2;ring++) for(let i=0;i<8;i++) {
+  for (let ring=0;ring<profile.length-1;ring++) for(let i=0;i<8;i++) {
     const a=ring*8+i,b=ring*8+(i+1)%8,c=a+8,e=b+8;
     for(const index of [a,c,b,b,c,e])vertices.push(...points[index]);
   }
+  // Close the upper ring. The ridge alone leaves the middle of the roof open from above.
+  const top=(profile.length-1)*8;
+  for(let i=0;i<8;i++) vertices.push(0,y+h,z,...points[top+(i+1)%8],...points[top+i]);
   const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.computeVertexNormals();
-  parts.push({geo,color:roofColor,glow:.2});
-  box(parts,w,.3,d,0,y-.15,z,roofColor,.2);
-  box(parts,w*.3,.28,.35,0,y+h,z,roofColor,.3);
+  parts.push({geo,color,glow:.2});
+  box(parts,w,.22,d,0,y-.11,z,color,.2);
+  box(parts,pyramidal?.35:w*.3,.28,.35,0,y+h,z,color,.3);
+}
+
+/** Curved pagoda roofs with visible timber bays, brackets and balustrades on all four faces. */
+export function pagoda(storeys:number,base:number,top:number,height:number,spire:number,body:Part['color'],roofTone:Part['color']):Part[] {
+  const parts:Part[]=[];
+  const bronze:Part['color']=[.06,.05,.03], plaster:Part['color']=[.42,.4,.36];
+  const step=(height-spire-1.2)/storeys;
+  box(parts,base*1.5,1.2,base*1.5,0,.6,0,[.2,.19,.17],.6);
+  let y=1.2;
+  for(let i=0;i<storeys;i++) {
+    const s=base+(top-base)*i/Math.max(1,storeys-1),bodyH=step*.58,roofH=step*.42;
+    box(parts,s,bodyH,s,0,y+bodyH/2,0,body,.8);
+    const panels:Part['color']=body[0]>.3?body:plaster;
+    for(let side=0;side<4;side++) {
+      const start=parts.length;
+      box(parts,s*.94,bodyH*.5,.12,0,y+bodyH*.48,s*.505,panels,.65);
+      box(parts,s*.28,bodyH*.48,.16,0,y+bodyH*.4,s*.52,[.025,.022,.018],.15);
+      for(const x of [-s*.48,-s*.16,s*.16,s*.48]) {
+        box(parts,.25,bodyH,.27,x,y+bodyH/2,s*.52,body,.65);
+        box(parts,.65,.23,.8,x,y+bodyH-.12,s*.53,body,.6);
+        box(parts,.42,.23,1.05,x,y+bodyH+.08,s*.53,body,.6);
+      }
+      for(const level of [.12,.78])box(parts,s*1.06,.18,.26,0,y+bodyH*level,s*.53,body,.6);
+      box(parts,s*1.22,.16,.65,0,y+.08,s*.55,body,.4);
+      if(i>0) {
+        box(parts,s*1.2,.12,.12,0,y+.8,s*.64,body,.5);
+        for(let j=0;j<5;j++)box(parts,.12,.8,.12,(j-2)*s*.27,y+.4,s*.64,body,.5);
+      }
+      for(const {geo} of parts.slice(start))geo.rotateY(side*Math.PI/2);
+    }
+    roof(parts,s*2.05,s*2.05,roofH,y+bodyH,0,roofTone,true);
+    y+=step;
+  }
+  const mast=new THREE.CylinderGeometry(.18,.3,spire-.4,12);mast.translate(0,y+(spire-.4)/2,0);
+  parts.push({geo:mast,color:bronze,glow:.6});
+  for(let k=0;k<9;k++) {
+    const ring=new THREE.TorusGeometry(.8-k*.035,.09,4,16);ring.rotateX(Math.PI/2);ring.translate(0,y+spire*(.22+k*.065),0);
+    parts.push({geo:ring,color:bronze,glow:.6});
+  }
+  const ball=new THREE.SphereGeometry(.3,10,8);ball.translate(0,height-.3,0);parts.push({geo:ball,color:bronze,glow:.6});
+  return parts;
 }
 
 /** Three distinct storeys, gold upper walls, dark openings and a roof phoenix. */
@@ -32,12 +78,29 @@ export function goldenPavilion():Part[] {
     box(parts,w,.25,d,0,y,0,wall,.7);
     box(parts,w,h*.58,d,0,y+h*.45,0,wall,.6);
     for(const side of [-1,1]) {
-      for(let x=-w*.4;x<=w*.41;x+=w/5) {
+      for(let bay=0;bay<=5;bay++) {
+        const x=-w*.47+bay*w*.94/5;
         box(parts,.22,h,.22,x,y+h*.5,side*d*.51,wall,.7);
-        box(parts,w/5-.28,h*.5,.16,x+w/10,y+h*.55,side*d*.515,[.018,.025,.021],.1);
+        if(bay<5)box(parts,w*.94/5-.25,h*.5,.16,x+w*.94/10,y+h*.55,side*d*.515,[.018,.025,.021],.1);
+        box(parts,.5,.18,.65,x,y+h-.1,side*d*.51,wall,.5);
       }
-      for(let z=-d*.4;z<=d*.41;z+=d/5) box(parts,.22,h,.22,side*w*.51,y+h*.5,z,wall,.7);
+      for(let bay=0;bay<=5;bay++) {
+        const z=-d*.47+bay*d*.94/5;
+        box(parts,.22,h,.22,side*w*.51,y+h*.5,z,wall,.7);
+        if(bay<5)box(parts,.16,h*.5,d*.94/5-.25,side*w*.515,y+h*.55,z+d*.94/10,[.018,.025,.021],.1);
+        box(parts,.65,.18,.5,side*w*.51,y+h-.1,z,wall,.5);
+      }
       box(parts,w,.16,.18,0,y+h*.18,side*d*.54,wall,.55);
+      if(y===4) {
+        for(const level of [.3,.8]) {
+          box(parts,w*1.12,.1,.1,0,y+level,side*d*.59,wall,.5);
+          box(parts,.1,.1,d*1.12,side*w*.59,y+level,0,wall,.5);
+        }
+        for(let i=0;i<=8;i++) {
+          box(parts,.1,.8,.1,(i-4)*w*.135,y+.4,side*d*.59,wall,.5);
+          box(parts,.1,.8,.1,side*w*.59,y+.4,(i-4)*d*.135,wall,.5);
+        }
+      }
     }
     roof(parts,w*1.35,d*1.35,1.35,y+h);
   }
@@ -67,6 +130,46 @@ export function shishinden():Part[] {
   }
   roof(parts,43,35,9,8);
   for(let step=0;step<5;step++) box(parts,6,.28,1.3,0,.14+step*.28,18-step*1.1,timber,.15);
+  return parts;
+}
+
+/** Ryoan-ji's Hojo and south-facing rock garden. Footprint follows OSM way/374564926;
+ * timber details and the fifteen stones are illustrative, not a measured reconstruction. */
+export function ryoanji():Part[] {
+  const parts:Part[]=[];
+  const plaster:Part['color']=[.49,.45,.35], dark:Part['color']=[.045,.035,.024];
+  // A terrace absorbs the sloping 10m DEM; its skirt reaches the ground beneath the garden.
+  box(parts,25,5,21,0,-.5,-3,[.22,.2,.16],.08);
+  const hallStart=parts.length;
+  box(parts,25,1.2,21,0,.6,-3,wood,.15);
+  box(parts,21,4.8,17,0,3.5,-3,plaster,.15);
+  for(const side of [-1,1]) {
+    for(let i=0;i<=8;i++) {
+      const x=-11+i*2.75;
+      box(parts,.25,5.8,.25,x,3.8,-3+side*9.5,wood,.2);
+      if(i<8) box(parts,2.3,3.3,.18,x+1.375,3.2,-3+side*8.6,dark,.1);
+    }
+    for(const z of [-10,-6,-2,2,6]) box(parts,.25,5.8,.25,side*11.8,3.8,z,wood,.2);
+  }
+  box(parts,25,.18,2,0,1.3,8,wood,.2); // veranda facing the garden
+  roof(parts,28,24,5,6.8,-3);
+  for(const {geo} of parts.slice(hallStart))geo.translate(0,2,0);
+  box(parts,25,4,10,0,-2,16,[.27,.24,.18],.08);
+  box(parts,25,.25,10,0,.125,16,[.5,.47,.39],.08);
+  box(parts,26,1.8,.45,0,.9,21.2,[.26,.19,.12],.1);
+  for(const side of [-1,1]) box(parts,.45,1.8,11,side*12.8,.9,16,[.26,.19,.12],.1);
+  // Five groups, fifteen stones. Avoid thin unfiltered gravel lines that shimmer at distance.
+  const groups=[[-9,15,5],[-4,18,2],[0,13.5,3],[5.5,17.5,2],[9,14,3]];
+  for(const [x,z,n] of groups) {
+    const moss=new THREE.CylinderGeometry(1.6,1.6,.16,12);moss.scale(1,1,.58);moss.translate(x,.3,z);
+    parts.push({geo:moss,color:[.085,.13,.045],glow:.05});
+    for(let i=0;i<n;i++) {
+      const stone=new THREE.IcosahedronGeometry(.45+(i%2)*.18,0);
+      stone.scale(1,.8+(i%3)*.35,.65);stone.rotateY(i*1.7);
+      stone.translate(x+(i-(n-1)/2)*.6,.55+(i%3)*.13,z+Math.sin(i*2)*.4);
+      parts.push({geo:stone,color:[.19,.18,.15],glow:.08});
+    }
+  }
   return parts;
 }
 

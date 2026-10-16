@@ -339,7 +339,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // from far away the avenues read as lines of light with a little haze around them
           float halo = smoothstep(900., 4000., dist);
           emit += vec3(1., .74, .46) * exp(-max(rd.avenue, 0.) / 14.) * (1. - smoothstep(16., 30., rd.avenue)) * halo * .18;
-          emit *= uCity;
+          emit *= uCity * cityLightShimmer(vWorld);
         }
         // a teal ring that pulses around the campus when it is in focus
         if (uHighlight > 0.){

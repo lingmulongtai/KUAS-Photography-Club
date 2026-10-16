@@ -91,3 +91,5 @@ The English website includes visit/join, about, schedule, contact, records and l
 For development use `npm ci`, `npm test`, `npm run check`, `npm run build`, then `node tools/verify-public-build.mjs`. Sample/draft content is excluded from public routes and payloads. Do not publish placeholder content by simply removing its sample flag. Publication of real photos requires checking the photographer, depicted people and facility conditions for each intended use. Submitting a work for exhibition or sale does not authorize web publication.
 
 The repository document licence remains under consideration. Ask the organizers about external use of club documents or photographs.
+
+The [2026-10-17 model and night-lighting audit](docs/model-night-quality-2026-10-17.md) records landmark detail, restored PLATEAU housing near Arashiyama, light stability checks and the remaining limits of the simplified 3D scene.

@@ -10,6 +10,7 @@ import { buildTerrain, normalTexture } from './terrain';
 import { buildCelestial, buildSkyDome } from './sky';
 import { createPost } from './post';
 import { loadBuildings } from './buildings-data';
+import { buildingCutout } from './building-cutout';
 import { buildCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import { buildLamps } from './lights';
@@ -188,9 +189,11 @@ export function createHero(
     const lite = opts.quality < 0.75;
     const eyes = Object.values(VIEWS).map((v) => v.eye);
     const landmarks = buildLandmarks(env, hf);
-    const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48}];
+    const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30}];
     const replaced = (x:number,z:number) => replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
-    const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>{
+    const hojo=landmarks.positions.ryoanji;
+    const hojoBox:Box=[hojo.x-14.5,hojo.z-15.5,hojo.x+14.5,hojo.z+10.5];
+    const modeledBuildings = {...buildings,polys:buildings.polys.flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
       let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}
       return !replaced(x/(p.ring.length/2),z/(p.ring.length/2));
     })};
@@ -209,7 +212,9 @@ export function createHero(
     scene.add(buildDaimonji(env,hf));
     // the water mask is too coarse for garden islands, so they are tested on their outlines
     const island = islandMask(lines.filter((f) => f.kind === LINE.waterHole).map((f) => f.pts));
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
+    const garden=landmarks.positions.ryoanji;
+    const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || rockGarden(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
     const forestPhoto=(photo:THREE.Texture,i:number)=>{
       forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal);
       shadow.invalidate();
@@ -282,7 +287,8 @@ export function createHero(
     clouds.uniforms.uCover.value = coverForDay(ymd.year, ymd.month, ymd.day);
 
     renderer.toneMappingExposure = look.exposure;
-    post.bloom.strength = look.bloom;
+    post.bloom.strength = look.bloom * (1 + .12 * look.city);
+    post.bloom.radius = .5 + .18 * look.city;
     post.grade.value = THREE.MathUtils.smoothstep(alt, -6, 8);
 
     const status: HeroStatus = { minutes, altitude: alt, phase: phaseName(alt, minutes), kelvin: kelvin(alt), moonAge: moon.age };
