@@ -10,6 +10,7 @@ import { buildTerrain, normalTexture } from './terrain';
 import { buildCelestial, buildSkyDome } from './sky';
 import { createPost } from './post';
 import { loadBuildings } from './buildings-data';
+import { buildingCutout } from './building-cutout';
 import { buildCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import { buildLamps } from './lights';
@@ -190,7 +191,9 @@ export function createHero(
     const landmarks = buildLandmarks(env, hf);
     const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30}];
     const replaced = (x:number,z:number) => replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
-    const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>{
+    const hojo=landmarks.positions.ryoanji;
+    const hojoBox:Box=[hojo.x-14.5,hojo.z-15.5,hojo.x+14.5,hojo.z+10.5];
+    const modeledBuildings = {...buildings,polys:buildings.polys.flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
       let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}
       return !replaced(x/(p.ring.length/2),z/(p.ring.length/2));
     })};
