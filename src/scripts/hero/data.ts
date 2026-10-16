@@ -32,17 +32,23 @@ export interface GridMeta {
   file: string;
 }
 
+/** A sharper photo over a bounded area, loaded once a view that looks at it is chosen. */
+export interface RegionalPhotoMeta {
+  box: Box; file: string; size: [number,number]; bytes: number; zoom: number;
+  mobile: {file:string;size:[number,number];bytes:number};
+}
+
 export interface TerrainMeta {
   far: GridMeta;
   near: GridMeta;
   aerialWide: { box: Box; file: string; size: [number, number]; high?: { file: string; size: [number, number]; bytes: number; zoom: number } };
   aerialCity: { box: Box; file: string; size: [number, number] };
-  arashiyama?: {
-    box: Box; file: string; size: [number,number]; bytes: number; zoom: number;
-    mobile: {file:string;size:[number,number];bytes:number};
+  arashiyama?: RegionalPhotoMeta & {
     elevation: GridMeta;
     water: {file:string;bytes:number;baseSha256:string};
   };
+  /** the slopes below Shogunzuka and Kiyomizu-dera (build_higashiyama.py) */
+  higashiyama?: RegionalPhotoMeta;
 }
 
 /** An elevation grid in metres, decoded from decimetre deltas (see encode_heights in common.py). */
