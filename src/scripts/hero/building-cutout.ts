@@ -7,10 +7,8 @@ export function buildingCutout(building:PolyBuilding, box:Box, height:(x:number,
   let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
   for(let i=0;i<ring.length;i+=2){minX=Math.min(minX,ring[i]);maxX=Math.max(maxX,ring[i]);minZ=Math.min(minZ,ring[i+1]);maxZ=Math.max(maxZ,ring[i+1]);}
   if(maxX<=box[0]||minX>=box[2]||maxZ<=box[1]||minZ>=box[3]) return [building];
-  const ground=(r:ArrayLike<number>)=>{
-    let x=0,z=0;for(let i=0;i<r.length;i+=2){x+=r[i];z+=r[i+1];}
-    return height(x/(r.length/2),z/(r.length/2));
-  };
+  // buildCity anchors polygon elevation at its first decoded vertex, not its centroid.
+  const ground=(r:ArrayLike<number>)=>height(r[0],r[1]);
   const originalGround=ground(ring)+building.ground;
   const clip=(input:number[],axis:number,edge:number,sign:number)=>{
     const out:number[]=[];
@@ -31,7 +29,10 @@ export function buildingCutout(building:PolyBuilding, box:Box, height:(x:number,
     const outside=clip(inside,axis,edge,-sign);
     let area=0;
     for(let i=0;i<outside.length;i+=2){const j=(i+2)%outside.length;area+=outside[i]*outside[j+1]-outside[j]*outside[i+1];}
-    if(Math.abs(area)>.5) parts.push({...building,ring:new Float32Array(outside),ground:originalGround-ground(outside)});
+    if(Math.abs(area)>.5) {
+      const decoded=new Float32Array(outside);
+      parts.push({...building,ring:decoded,ground:originalGround-ground(decoded)});
+    }
     inside=clip(inside,axis,edge,sign);
     if(!inside.length)break;
   }

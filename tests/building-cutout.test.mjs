@@ -16,7 +16,6 @@ test('a hall cutout preserves the connected east wing when its centroid is outsi
   assert.deepEqual(buildingCutout(source,[-20,-20,70,20]),[]);
   const slope=(x)=>x*.1;
   for(const p of buildingCutout(source,[-14.5,-15.5,14.5,10.5],slope)) {
-    let x=0;for(let i=0;i<p.ring.length;i+=2)x+=p.ring[i];
-    assert.ok(Math.abs(slope(x/(p.ring.length/2))+p.ground-(slope(22.5)+source.ground))<1e-5);
+    assert.ok(Math.abs(slope(p.ring[0])+p.ground-(slope(source.ring[0])+source.ground))<1e-5);
   }
 });
