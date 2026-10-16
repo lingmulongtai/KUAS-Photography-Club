@@ -284,6 +284,77 @@ export function addWest(b:CampusBuilder) {
   });
 }
 
+/** South academic wings step back from the plaza. Only the narrow south-west residence
+ * reaches eight storeys (KUAS Dormitory A: seven residential floors, all rooms south-facing).
+ * The central 16 m slot is kept open for the grand staircase.
+ */
+export function addSouth(b:CampusBuilder) {
+  b.part('south-stepped-academic-wings',()=>{
+    for(const [u0,u1,back] of [[-42,-9,61],[7,70,73]]) {
+      for(let f=0;f<5;f++) {
+        const y=f*4.4,front=f===0?22:f===1?28:30;
+        const len=u1-u0;
+        const wins:[number,number,number,number][]=[[1,len-1,y+(f<2?.3:1.1),y+(f<2?3.8:2.8)]];
+        b.facade([u0,front],[u1,front],y,y+4.4,wins);
+        b.facade([u1,back],[u0,back],y,y+4.4,[[1,len-1,y+1.1,y+2.8]]);
+        b.facade([u1,front],[u1,back],y,y+4.4,[[1,back-front-1,y+.7,y+3.4]]);
+        b.facade([u0,back],[u0,front],y,y+4.4,[[1,back-front-1,y+.7,y+3.4]]);
+        b.box(u0,u1,front,back,y-.25,y,CM.concrete);
+        b.box(u0,u1,front,back,y+4.15,y+4.4,CM.concrete);
+      }
+      for(const [y,front] of [[4.4,22],[8.8,25]]) {
+        b.box(u0,u1,front,30,y-.25,y,CM.concrete);
+        b.rail([u0,y,front],[u1,y,front]);
+        b.rail([u0,y,30],[u0,y,front]);b.rail([u1,y,front],[u1,y,30]);
+      }
+      b.hip(u0-1,u1+1,29,back+1,22,24.8,6);
+    }
+    // Glazed winter gardens occupy the outer ends of the third-floor terrace.
+    for(const [u0,u1] of [[-42,-30],[54,70]]) {
+      b.facade([u0,22],[u1,22],8.8,13.2,[[.2,u1-u0-.2,9,13]]);
+      b.facade([u1,22],[u1,30],8.8,13.2,[[.2,7.8,9,13]]);
+      b.facade([u0,30],[u0,22],8.8,13.2,[[.2,7.8,9,13]]);
+      b.box(u0,u1,22,30,13.05,13.3,CM.metal);
+    }
+    // Narrow cross-corridors connect the academic wings at each stair landing.
+    for(let f=1;f<=4;f++) {
+      const y=f*4.4,v=22+f*11.7;
+      b.box(-9,7,v,v+2.2,y-.32,y,CM.concrete);
+      b.rail([-9,y,v+2.2],[7,y,v+2.2]);
+      b.rail([-9,y,v],[-3,y,v]);b.rail([3,y,v],[7,y,v]);
+    }
+    b.box(-9,7,68.8,73,17.6,17.65,CM.leaves);
+    // The east wing's clock is individual ticks and hands on the brick, not a signboard.
+    const u=10.6,v=29.94,y=19.7,r=1.0;
+    for(let i=0;i<12;i++) {
+      const a=i*Math.PI/6;
+      b.beam([u+Math.sin(a)*r,y+Math.cos(a)*r,v],[u+Math.sin(a)*r*.78,y+Math.cos(a)*r*.78,v],.07,.07,CM.steel);
+    }
+    b.beam([u,y,v],[u-.6,y+.3,v],.07,.07,CM.steel);
+    b.beam([u,y,v],[u+.1,y+.75,v],.055,.055,CM.steel);
+  });
+  b.part('south-west-eight-storey-residence',()=>{
+    const u0=-42,u1=-9,v0=61,v1=75;
+    for(let f=0;f<8;f++) {
+      const y=f*3.2;
+      b.box(u0,u1,v0,v1,y-.2,y,CM.concrete);
+      // Ten south-facing rooms, with deep balcony recesses and their privacy partitions.
+      for(let room=0;room<10;room++){
+        const a=u1-room*3.3,c=a-3.3;
+        b.facade([a,v1-1.3],[c,v1-1.3],y,y+3.2,[[.2,3.1,y+.25,y+2.8]]);
+        b.box(c,c+.12,v1-1.3,v1+.5,y,y+3.2,CM.brick);
+        b.box(c,a,v1-1.3,v1+.5,y-.2,y,CM.concrete);
+        b.rail([c,y,v1+.5],[a,y,v1+.5],false);
+      }
+      b.facade([u0,v0],[u1,v0],y,y+3.2,[[1,32,y+1.2,y+2.2]]);
+      for(const u of [u0,u1])b.box(u-.1,u+.1,v0,v1,y,y+3.2,CM.brick);
+    }
+    b.hip(-43,-8,60,77,25.6,28.5,5);
+    // Exposed glazed stair tower on the west end, as in the official dormitory photograph.
+    b.facade([-42.2,74],[-42.2,62],0,25.6,[[.3,11.7,.3,25.3]]);
+  });
+}
+
 export function campusArchitecture(ground:number) {
-  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);return b.geometry();
+  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);addSouth(b);return b.geometry();
 }

@@ -38,3 +38,9 @@ test('both third-floor links have an open undercroft and a supported glazed deck
     assert.ok(ray([u-5,y+1.5,v],[u+5,y+1.5,v]).length,'glazed sides are present');
   }
 });
+test('South academic wings leave the central stair slot open and only the residence has eight storeys',()=>{
+  assert.equal(ray([-1,2,24],[-1,2,70]).length,0);
+  assert.equal(ray([30,26,45],[30,26,70]).length,0,'academic wing roof is below the residence');
+  assert.ok(ray([-25,30,68],[-25,20,68]).length,'south-west residence rises above the academic roof');
+  assert.ok(ray([30,4.3,21],[30,4.3,29]).length,'first stepped terrace is present');
+});
