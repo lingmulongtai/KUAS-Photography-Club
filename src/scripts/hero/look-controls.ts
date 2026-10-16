@@ -33,16 +33,18 @@ export function createLookRotation() {
 }
 
 /** Keep vertical touch scrolling native and leave controls and short taps alone. */
-export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true) {
-  let drag: { id: number; x: number; y: number; lastX: number; lastY: number; time: number; touch: boolean; moved: boolean } | null = null;
+export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true, orbiting:()=>boolean=()=>false) {
+  let drag: { id: number; x: number; y: number; lastX: number; lastY: number; time: number; touch: boolean; pin: boolean; moved: boolean } | null = null;
   let suppressClick = false;
   const interactive = (e: PointerEvent) => (e.target as Element).closest('button, a, input, select, textarea, [role="slider"]');
   el.addEventListener('pointerdown', (e) => {
     suppressClick = false;
-    if (!enabled() || !e.isPrimary || e.button !== 0 || interactive(e)) return;
+    const pin=!!(e.target as Element).closest('.pin-trigger');
+    if (!enabled() || !e.isPrimary || e.button !== 0 || (!pin && interactive(e))) return;
     rotation.stop();
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, time: e.timeStamp, touch: e.pointerType !== 'mouse', moved: false };
-    if (!drag.touch) el.setPointerCapture(e.pointerId);
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, time: e.timeStamp, touch: e.pointerType !== 'mouse', pin, moved: false };
+    // Leave short pin taps with their button; a swipe takes capture after the threshold.
+    if (!drag.touch && !pin) el.setPointerCapture(e.pointerId);
   });
   el.addEventListener('pointermove', (e) => {
     if (!drag || drag.id !== e.pointerId) return;
@@ -58,12 +60,17 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     }
     const r = el.getBoundingClientRect();
     const horizontal = e.clientX - drag.lastX;
-    rotation.move(drag.touch ? horizontal : -horizontal, drag.touch ? 0 : e.clientY - drag.lastY, r.width, r.height, (e.timeStamp - drag.time) / 1000);
+    // Turning at a viewpoint and moving around an object need opposite yaw to
+    // keep the scenery following the hand, on both mouse and touch screens.
+    rotation.move(orbiting() ? -horizontal : horizontal, drag.touch ? 0 : e.clientY - drag.lastY, r.width, r.height, (e.timeStamp - drag.time) / 1000);
     drag.lastX = e.clientX;
     drag.lastY = e.clientY;
     drag.time = e.timeStamp;
   });
   const finish = (e: PointerEvent) => {
+    // Touch starts with implicit capture on the canvas. Transferring capture to
+    // the stage bubbles the canvas's loss here without ending the stage's drag.
+    if (e.type === 'lostpointercapture' && e.target !== el) return;
     if (!drag || drag.id !== e.pointerId) return;
     const previous = drag;
     drag = null;
@@ -74,7 +81,7 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     if (e.type !== 'pointerup' || e.timeStamp - previous.time > 80) rotation.stop();
     const r = el.getBoundingClientRect();
     const inside = e.clientX >= r.left && e.clientX <= r.left + r.width && e.clientY >= r.top && e.clientY <= r.top + r.height;
-    if (inside && e.type === 'pointerup' && !previous.moved && Math.hypot(e.clientX - previous.x, e.clientY - previous.y) < 6) onTap(e);
+    if (!previous.pin && inside && e.type === 'pointerup' && !previous.moved && Math.hypot(e.clientX - previous.x, e.clientY - previous.y) < 6) onTap(e);
   };
   el.addEventListener('pointerup', finish);
   el.addEventListener('pointercancel', finish);
