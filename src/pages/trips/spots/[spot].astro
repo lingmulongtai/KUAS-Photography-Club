@@ -1,24 +1,18 @@
 ---
 import Base from '../../../layouts/Base.astro';
 import { SPOTS } from '../../../data/spots';
-import { SPOT_SAMPLES } from '../../../data/spot-samples';
 import { getTrips } from '../../../lib/trips';
 export function getStaticPaths() {
   return SPOTS.map(spot=>({params:{spot:spot.id},props:{spot}}));
 }
 const {spot}=Astro.props;
-const sample=SPOT_SAMPLES.find(s=>s.spot===spot.id)!;
 const related=(await getTrips()).filter(t=>t.data.spot===spot.id);
 ---
-<Base title={`${spot.ja}の撮影会`} description={`${spot.ja}の撮影会とサンプルプレビュー。`}>
+<Base title={`${spot.ja}の撮影会`} description={`${spot.ja}の活動記録。公開できる記録を準備中です。`}>
   <section class="wrap section spot-sample">
     <p class="edge">PHOTO TRIPS ▸ {spot.en}</p>
     <h1>{spot.ja}の撮影会</h1>
     {related.some(t=>!t.data.sample) ? <p>この場所の撮影会記録をご覧ください。</p> : <p>この場所の実際の撮影会記録はまだありません。</p>}
-    <figure>
-      <img src={sample.src} alt={sample.alt} width="960" height="540" />
-      <figcaption>サンプル · 構図確認用のイラストです。この場所で撮影した写真ではありません。</figcaption>
-    </figure>
     {related.map(t=><p><a class="link-arrow" href={`/trips/${encodeURIComponent(t.id)}/`}>{t.data.title}{t.data.sample ? '（サンプル）' : ''} →</a></p>)}
     <p><a class="link-arrow" href="/trips/">撮影会の一覧を見る →</a></p>
     <p><a class="link-arrow" href="/">京都の眺めに戻る →</a></p>

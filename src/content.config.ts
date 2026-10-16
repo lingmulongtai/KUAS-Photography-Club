@@ -18,8 +18,9 @@ const trips = defineCollection({
     members: z.number().int().positive().optional(),
     /** One sentence for lists and link previews. */
     summary: z.string(),
-    /** Sample content shipped with the site; shown with a badge until replaced. */
+    /** Development content; excluded from every public collection boundary. */
     sample: z.boolean().default(false),
+    draft: z.boolean().default(false),
     photos: z
       .array(
         z.object({
@@ -62,6 +63,7 @@ const schedule = defineCollection({
     /** Fridays without the weekly meeting, as YYYY-MM-DD. */
     noMeeting: z.array(day).default([]),
     sample: z.boolean().default(false),
+    draft: z.boolean().default(false),
     events: z
       .array(
         z.object({

@@ -5,7 +5,11 @@ import {completeSpotPreviews,SPOT_SAMPLES} from '../src/data/spot-samples.ts';
 test('every spot has a clearly marked preview and stable detail URL',()=>{
   const previews=completeSpotPreviews([]);
   assert.deepEqual(previews.map(t=>t.spot),SPOTS.map(s=>s.id));
-  assert.ok(previews.every(t=>t.sample&&t.href===`/trips/spots/${t.spot}/`&&t.credit.includes('サンプル')));
+  assert.ok(previews.every(t=>t.sample&&t.href===`/trips/spots/${t.spot}/`&&!t.src&&t.credit.includes('準備中')));
+});
+test('sample trip records never replace neutral destinations',()=>{
+  const sample={...SPOT_SAMPLES[0],href:'/trips/fabricated/',src:'/photos/samples/test.jpg'};
+  assert.deepEqual(completeSpotPreviews([sample]),completeSpotPreviews([]));
 });
 test('published records replace design samples for their spot',()=>{
   const real={...SPOT_SAMPLES[0],sample:false,href:'/trips/real/'};
