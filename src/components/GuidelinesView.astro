@@ -22,7 +22,7 @@ const href = (id: string) => (id === 'ja' ? '/guidelines/' : `/guidelines/${id}/
     <ul>
       {guidelineLanguages.map((l) => (
         <li>
-          <a href={href(l.id)} lang={l.lang} aria-current={l.id === entry.id ? 'page' : undefined}>{l.name}</a>
+          <a href={href(l.id)} lang={l.lang} data-language={l.id} aria-current={l.id === entry.id ? 'page' : undefined}>{l.name}</a>
         </li>
       ))}
     </ul>
