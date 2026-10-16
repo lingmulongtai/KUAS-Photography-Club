@@ -4,6 +4,7 @@ import type { Heightfield } from './heightfield';
 import { LINE, type LineFeature } from './lines-data';
 import { ROAD_WIDTH } from './roads';
 import { rng } from './util';
+import { trafficSegments } from './traffic-access';
 import { lightSpriteGeometry, LIGHT_SPRITE_VERTEX, LIGHT_SPRITE_FRAGMENT } from './light-sprites';
 
 /*
@@ -66,13 +67,14 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
     if (f.kind !== LINE.road) continue;
     const rank = f.attr & 15;
     if (rank < 2) continue;
-    const p = f.pts;
-    const n = p.length / 2;
-    const cum = new Float32Array(n);
-    for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(p[i * 2] - p[i * 2 - 2], p[i * 2 + 1] - p[i * 2 - 1]);
-    if (cum[n - 1] < 80) continue;
-    paths.push({ pts: p, cum, rank });
-    weight.push(cum[n - 1] * DENSITY[rank] * 2);
+    for (const p of trafficSegments(f.pts)) {
+      const n = p.length / 2;
+      const cum = new Float32Array(n);
+      for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(p[i * 2] - p[i * 2 - 2], p[i * 2 + 1] - p[i * 2 - 1]);
+      if (cum[n - 1] < 80) continue;
+      paths.push({ pts: p, cum, rank });
+      weight.push(cum[n - 1] * DENSITY[rank] * 2);
+    }
   }
   const total = weight.reduce((a, b) => a + b, 0);
   const count = Math.round(Math.min(total, quality > 0.75 ? 12000 : 4000) * Math.min(1, quality * 1.1));
