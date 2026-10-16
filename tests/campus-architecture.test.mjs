@@ -73,3 +73,14 @@ test('courtyard walls and stair risers face the viewer with normal back-face cul
   assert.ok(ray([4,1.4,25],[2,1.4,25]).length,'stair flight side faces east');
   mesh.material.side=saved;
 });
+test('connecting passages have actual door openings and the West exterior stair joins its deck',()=>{
+  for(const [a,c] of [
+    [[42,9.5,-54],[42,9.5,-58]],[[42,9.5,-40],[42,9.5,-37]],
+    [[-21,9.5,-54],[-21,9.5,-58]],
+    [[-33.88,10.5,-41.28],[-35.56,10.5,-39.36]],
+  ])assert.equal(ray(a,c).length,0,'doorways must not contain window glass or mullions');
+  for(const u of [-15,-13,-11,-9.6]) {
+    const hit=ray([u,3,-37],[u,0,-37])[0];
+    assert.ok(hit&&Math.abs(hit.point.y-32.5-1.5)<.001,'stair foot and timber deck form a continuous landing');
+  }
+});
