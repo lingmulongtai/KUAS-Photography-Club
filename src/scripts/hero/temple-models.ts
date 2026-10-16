@@ -80,6 +80,9 @@ export function shishinden():Part[] {
 export function ryoanji():Part[] {
   const parts:Part[]=[];
   const plaster:Part['color']=[.49,.45,.35], dark:Part['color']=[.045,.035,.024];
+  // A terrace absorbs the sloping 10m DEM; its skirt reaches the ground beneath the garden.
+  box(parts,25,5,21,0,-.5,-3,[.22,.2,.16],.08);
+  const hallStart=parts.length;
   box(parts,25,1.2,21,0,.6,-3,wood,.15);
   box(parts,21,4.8,17,0,3.5,-3,plaster,.15);
   for(const side of [-1,1]) {
@@ -92,6 +95,8 @@ export function ryoanji():Part[] {
   }
   box(parts,25,.18,2,0,1.3,8,wood,.2); // veranda facing the garden
   roof(parts,28,24,5,6.8,-3);
+  for(const {geo} of parts.slice(hallStart))geo.translate(0,2,0);
+  box(parts,25,4,10,0,-2,16,[.27,.24,.18],.08);
   box(parts,25,.25,10,0,.125,16,[.5,.47,.39],.08);
   box(parts,26,1.8,.45,0,.9,21.2,[.26,.19,.12],.1);
   for(const side of [-1,1]) box(parts,.45,1.8,11,side*12.8,.9,16,[.26,.19,.12],.1);
