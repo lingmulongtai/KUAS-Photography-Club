@@ -45,12 +45,14 @@ export function createForest(
   };
   const citySample = sampler(photo, photoBox);
   const wideSample = fallback ? sampler(fallback.photo, fallback.box, quality > .75 ? 4096 : 2048) : null;
-  let regionalSample:ReturnType<typeof sampler> | undefined;
-  let regionalBox:Box | undefined;
-  const sample = (x: number, z: number) => regionalSample?.(x,z) ?? citySample(x, z) ?? wideSample?.(x, z) ?? null;
+  /** sharper local photos (setRegionalPhoto), which take precedence over the city sheet */
+  const regions:{box:Box;sample:ReturnType<typeof sampler>;seasonal:boolean}[]=[];
+  const inBox=(b:Box,x:number,z:number)=>x>=b[0]&&x<b[2]&&z>=b[1]&&z<b[3];
+  const regionAt=(x:number,z:number)=>regions.find(r=>inBox(r.box,x,z));
+  const sample = (x: number, z: number) => regionAt(x,z)?.sample(x,z) ?? citySample(x, z) ?? wideSample?.(x, z) ?? null;
   const slopeNormal={x:0,y:1,z:0};
   const wooded=(c:number[],x:number,z:number) => woodland(c)||forestArea(x,z)||
-    (!!regionalSample?.(x,z)&&seasonalWoodland(c,hf.normal(x,z,10,slopeNormal).y));
+    (!!regionAt(x,z)?.seasonal&&seasonalWoodland(c,hf.normal(x,z,10,slopeNormal).y));
   const contains = (x:number,z:number) => {
     const c=sample(x,z);
     return !!c && !excluded(x,z) && wooded(c,x,z);
@@ -64,8 +66,8 @@ export function createForest(
     const kind: number[] = [];
     const lods: number[] = [];
     const shapes: number[] = [];
-    const detailed=regionalBox && eye.x>regionalBox[0]&&eye.x<regionalBox[2]&&eye.z>regionalBox[1]&&eye.z<regionalBox[3];
-    for (const { x, z, lod, seed } of forestCells(eye, quality,!!detailed)) {
+    const detailed=regions.some(r=>inBox(r.box,eye.x,eye.z));
+    for (const { x, z, lod, seed } of forestCells(eye, quality,detailed)) {
         const c = sample(x, z);
         if (!c || excluded(x, z) || !wooded(c,x,z)) continue;
         if (lod<2 && seed>standDensity(x,z)) continue;
@@ -264,9 +266,12 @@ export function createForest(
       populations.delete(oldest);
     }
   }
-  const setRegionalPhoto = (photo:HTMLImageElement | ImageBitmap,box:Box) => {
-    regionalSample=sampler(photo,box);
-    regionalBox=box;
+  /** Use a sharper photo over `box`. `seasonal` imagery (leafless or autumn) also accepts muted
+   * canopy on slopes; summer imagery doesn't need that and would catch cemeteries on the hills. */
+  const setRegionalPhoto = (photo:HTMLImageElement | ImageBitmap,box:Box,seasonal=false) => {
+    const region={box,sample:sampler(photo,box),seasonal};
+    const i=regions.findIndex(r=>r.box.every((v,k)=>v===box[k]));
+    if(i<0) regions.push(region); else regions[i]=region;
     for(const population of populations.values()) for(const mesh of population.meshes) mesh.geometry.dispose();
     populations.clear();
     if(planted) plant(planted.eye,planted.bearing);
