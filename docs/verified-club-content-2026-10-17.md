@@ -1,6 +1,7 @@
 # 公開情報整理・日英対応の検証記録
 
-確認日：2026年10月17日（日本時間）  
+確認日：2026年10月17日（日本時間）
+
 PR：[日英対応と公開情報の整合](https://github.com/lingmulongtai/KUAS-Photography-Club/pull/3)
 
 ## 変更と公開範囲
@@ -32,6 +33,10 @@ PR：[日英対応と公開情報の整合](https://github.com/lingmulongtai/KUA
 ブラウザ確認は生成済みのローカル静的サイトに対して実施したものです。スマホ実機での受け入れ確認とは区別します。D3Dのシェーダー最適化に関する警告はありましたが、ページ例外や描画失敗は確認していません。
 
 システムのNode 22.20.0では、Windows上のビルドがプリレンダリング後に0xC0000409で異常終了しました。原因は未特定です。Node 24でのローカル完走と、Ubuntu/Node 22のCI成功を別々の証拠として扱います。依存バージョンや既存デプロイ設定は変更していません。
+
+## 最終レビューと操作確認
+
+独立した読み取りレビューで、ガイドライン本文タブの言語選択と、絞りの導入文の断定表現を指摘・修正しました。追加の具体的な公開経路の問題は見つかっていません。メニューのアニメーション完了後の390px表示も目視確認し、メニューから紹介ページへの移動、3D地点の「記録を準備中」表示、キャンパスへの移動と戻る操作を確認しました。
 
 ## フォーム・非表示・要確認事項
 
@@ -73,3 +78,4 @@ Microsoft Formsの共有URLは開き、未認証の質問取得リクエスト�
 | `5e43c50` | fix(i18n): advertise alternates only for translated pages |
 | `28bef9e` | docs: require verified records before publishing real photography |
 | `eb2e34b` | test(content): guard generated routes and language links in CI |
+| `229d702` | docs: record content verification and remaining organizer confirmations |
