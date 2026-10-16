@@ -69,10 +69,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
         <button type="button" data-time="sunset" aria-pressed="false">{en ? 'Sunset' : '夕焼け'}</button>
         <button type="button" data-time="night" aria-pressed="false">{en ? 'Night' : '夜'}</button>
       </div>
-      <div class="times landmark-angles" role="group" aria-label="名所を見る角度" hidden>
-        <button type="button" data-landmark-elevation="oblique" aria-pressed="true">{en ? 'Oblique' : '斜めから'}</button>
-        <button type="button" data-landmark-elevation="overhead" aria-pressed="false">{en ? 'Overhead' : '真上から'}</button>
-      </div>
       <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. The night-time bonfires are illustrative.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。夜景の送り火はイメージです。'}</span></p>
     </aside>
   </div>
@@ -81,10 +77,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
     <p class="edge">OUR CAMPUS</p>
     <h2>{en ? <>Kyoto University of Advanced Science<br />Uzumasa Campus</> : <>京都先端科学大学<br />太秦キャンパス</>}</h2>
     <p class="small">{en ? 'Our usual meeting place.' : '写真部はここで集まっています。'}</p>
-    <div class="times campus-angles" role="group" aria-label="キャンパスを見る角度">
-      <button type="button" data-elevation="oblique" aria-pressed="true">{en ? 'Oblique' : '斜めから'}</button>
-      <button type="button" data-elevation="overhead" aria-pressed="false">{en ? 'Overhead' : '真上から'}</button>
-    </div>
     <dl>
       <div><dt>{en ? 'Meeting' : 'ミーティング'}</dt><dd>{en ? 'Fridays' : club.meetings.day} {club.meetings.times.join(' / ')}</dd></div>
       <div><dt>{en ? 'Usual room' : '通常の教室'}</dt><dd>{club.meetings.room}</dd></div>
@@ -121,8 +113,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const card = hero.querySelector<HTMLElement>('.campus-card')!;
     const back = card.querySelector<HTMLButtonElement>('.back')!;
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
-    const landmarkAngles=hero.querySelector<HTMLElement>('.landmark-angles')!;
-    const landmarkButtons=Array.from(landmarkAngles.querySelectorAll<HTMLButtonElement>('button'));
     const cameraHint=hero.querySelector('.hint')!.firstChild!;
     const spotSelect=hero.querySelector<HTMLSelectElement>('.spot-select')!;
     const spotReturn=hero.querySelector<HTMLButtonElement>('.spot-return')!;
@@ -197,15 +187,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
         ? (en ? `Now viewing ${placeName}.` : `${placeName}を表示しています。`)
         : (en ? 'Moving to the selected place.' : '選んだ地点へ移動しています。');
       viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(mode==='city' && b.dataset.view===demo?.view)));
-      hero.querySelectorAll<HTMLButtonElement>('[data-elevation],[data-landmark-elevation]').forEach(b=>b.disabled=!arrived);
-      landmarkAngles.hidden = mode!=='city' || !demo?.orbiting;
       cameraHint.textContent = demo?.orbiting && mode==='city'
         ? (en ? 'Drag or swipe to orbit this place.' : 'ドラッグでスポットを中心に360°回れます。スマホは横スワイプ。')
         : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
-      if (!arrived) landmarkButtons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.landmarkElevation==='oblique')));
       if (mode === 'campus') {
         card.hidden = false;
-        if(!arrived) hero.querySelectorAll<HTMLButtonElement>('[data-elevation]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.elevation==='oblique')));
         if (arrived) back.focus({ preventScroll: true });
       } else if (!arrived) card.hidden = true;
       if (arrived && !atPanorama && mode==='city') spotSelect.focus({preventScroll:true});
@@ -251,15 +237,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
     spotSelect.addEventListener('change',()=>{
       if (SPOTS.some(spot=>spot.id===spotSelect.value)) demo?.flyTo(spotDestination(spotSelect.value as SpotId));
     });
-    const angleButtons=Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-elevation]'));
-    angleButtons.forEach(b=>b.addEventListener('click',()=>{
-      demo?.setElevation(b.dataset.elevation==='overhead');
-      angleButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
-    }));
-    landmarkButtons.forEach(b=>b.addEventListener('click',()=>{
-      demo?.setElevation(b.dataset.landmarkElevation==='overhead');
-      landmarkButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
-    }));
     hero.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && (demo?.mode === 'campus'||demo?.orbiting)) returnToPanorama();
     });
