@@ -176,6 +176,33 @@ export function addNorthEast(b:CampusBuilder) {
   });
 }
 
+/** Third-floor links: straight North–East and diagonal North–West. Their open undercrofts
+ * are essential: PLATEAU LOD1 incorrectly extrudes these bridge footprints from the ground.
+ * Widths/diagonal endpoints use the surveyed roof outlines; elevations use the 3F plan.
+ */
+export function addBridges(b:CampusBuilder) {
+  const bridge=(name:string,a:P,c:P,width:number)=>b.part(name,()=>{
+    const len=Math.hypot(c[0]-a[0],c[2]-a[2]),sx=-(c[2]-a[2])/len,sz=(c[0]-a[0])/len;
+    const p=(t:number,side:number,h:number):P=>[a[0]+(c[0]-a[0])*t+sx*side,a[1]+(c[1]-a[1])*t+h,a[2]+(c[2]-a[2])*t+sz*side];
+    b.beam(p(0,0,-.2),p(1,0,-.2),width,.4,CM.concrete);
+    b.beam(p(0,0,3.45),p(1,0,3.45),width+.45,.25,CM.metal);
+    for(const side of [-width/2,width/2]) {
+      const n=Math.ceil(len/1.5);
+      for(let i=0;i<n;i++){
+        const l=i/n,r=(i+1)/n;
+        const q=[p(l,side,.25),p(r,side,.25),p(r,side,3.25),p(l,side,3.25)];
+        if(side<0)q.reverse();
+        b.quad(q[0],q[1],q[2],q[3],CM.glass);
+      }
+      for(let i=0;i<=n;i++)b.beam(p(i/n,side,0),p(i/n,side,3.4),.09,.09,CM.white);
+      for(const h of [.15,1.1,3.3])b.beam(p(0,side,h),p(1,side,h),.08,.09,CM.white);
+      b.beam(p(0,side,-.42),p(1,side,-.42),.17,.32,CM.steel);
+    }
+  });
+  bridge('north-east-link',[42,8,-56],[42,8,-38.5],4.4);
+  bridge('north-west-link',[-21,8,-56],[-35,9,-40],3.0);
+}
+
 export function campusArchitecture(ground:number) {
-  const b=new CampusBuilder(ground);addNorthEast(b);return b.geometry();
+  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);return b.geometry();
 }

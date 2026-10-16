@@ -25,3 +25,10 @@ test('measured academic wings have finite unit normals and actual roof relief',(
   assert.equal(ray([20,1,-49],[20,20,-49]).length,0,'space between the wings remains open');
   assert.ok(p.count<150000,'retain a bounded static mesh for mobile');
 });
+test('both third-floor links have an open undercroft and a supported glazed deck',()=>{
+  for(const [u,v,y] of [[42,-47.25,8],[-28,-48,8.5]]){
+    assert.equal(ray([u-6,2,v],[u+6,2,v]).length,0,'never fill beneath a bridge');
+    assert.ok(ray([u,7,v],[u,14,v]).length,'deck and canopy span the real gap');
+    assert.ok(ray([u-5,y+1.5,v],[u+5,y+1.5,v]).length,'glazed sides are present');
+  }
+});
