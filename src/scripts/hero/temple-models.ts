@@ -7,13 +7,13 @@ const box = (parts:Part[],w:number,h:number,d:number,x:number,y:number,z:number,
 };
 
 /** Eight-sided eave rings: curved corners and an overhanging fascia, not a pyramid. */
-export function roof(parts:Part[],w:number,d:number,h:number,y:number,z=0,color=roofColor) {
+export function roof(parts:Part[],w:number,d:number,h:number,y:number,z=0,color=roofColor,pyramidal=false) {
   const points:number[][]=[];
   const outline=[[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0]];
   const profile=[[1,0],[.94,.035],[.82,.16],[.65,.39],[.43,.7],[.28,1]];
   for (const [scale,height] of profile) for (const [x,v] of outline) {
     const turn=x!==0&&v!==0?.3*Math.max(0,(scale-.8)/.2):0;
-    points.push([x*w*.5*scale,y+h*height+turn,z+v*d*.5*(height===1?.018:scale)]);
+    points.push([x*w*.5*(height===1&&pyramidal?.018:scale),y+h*height+turn,z+v*d*.5*(height===1?.018:scale)]);
   }
   const vertices:number[]=[];
   for (let ring=0;ring<profile.length-1;ring++) for(let i=0;i<8;i++) {
@@ -26,7 +26,48 @@ export function roof(parts:Part[],w:number,d:number,h:number,y:number,z=0,color=
   const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.computeVertexNormals();
   parts.push({geo,color,glow:.2});
   box(parts,w,.22,d,0,y-.11,z,color,.2);
-  box(parts,w*.3,.28,.35,0,y+h,z,color,.3);
+  box(parts,pyramidal?.35:w*.3,.28,.35,0,y+h,z,color,.3);
+}
+
+/** Curved pagoda roofs with visible timber bays, brackets and balustrades on all four faces. */
+export function pagoda(storeys:number,base:number,top:number,height:number,spire:number,body:Part['color'],roofTone:Part['color']):Part[] {
+  const parts:Part[]=[];
+  const bronze:Part['color']=[.06,.05,.03], plaster:Part['color']=[.42,.4,.36];
+  const step=(height-spire-1.2)/storeys;
+  box(parts,base*1.5,1.2,base*1.5,0,.6,0,[.2,.19,.17],.6);
+  let y=1.2;
+  for(let i=0;i<storeys;i++) {
+    const s=base+(top-base)*i/Math.max(1,storeys-1),bodyH=step*.58,roofH=step*.42;
+    box(parts,s,bodyH,s,0,y+bodyH/2,0,body,.8);
+    const panels:Part['color']=body[0]>.3?body:plaster;
+    for(let side=0;side<4;side++) {
+      const start=parts.length;
+      box(parts,s*.94,bodyH*.5,.12,0,y+bodyH*.48,s*.505,panels,.65);
+      box(parts,s*.28,bodyH*.48,.16,0,y+bodyH*.4,s*.52,[.025,.022,.018],.15);
+      for(const x of [-s*.48,-s*.16,s*.16,s*.48]) {
+        box(parts,.25,bodyH,.27,x,y+bodyH/2,s*.52,body,.65);
+        box(parts,.65,.23,.8,x,y+bodyH-.12,s*.53,body,.6);
+        box(parts,.42,.23,1.05,x,y+bodyH+.08,s*.53,body,.6);
+      }
+      for(const level of [.12,.78])box(parts,s*1.06,.18,.26,0,y+bodyH*level,s*.53,body,.6);
+      box(parts,s*1.22,.16,.65,0,y+.08,s*.55,body,.4);
+      if(i>0) {
+        box(parts,s*1.2,.12,.12,0,y+.8,s*.64,body,.5);
+        for(let j=0;j<5;j++)box(parts,.12,.8,.12,(j-2)*s*.27,y+.4,s*.64,body,.5);
+      }
+      for(const {geo} of parts.slice(start))geo.rotateY(side*Math.PI/2);
+    }
+    roof(parts,s*2.05,s*2.05,roofH,y+bodyH,0,roofTone,true);
+    y+=step;
+  }
+  const mast=new THREE.CylinderGeometry(.18,.3,spire-.4,12);mast.translate(0,y+(spire-.4)/2,0);
+  parts.push({geo:mast,color:bronze,glow:.6});
+  for(let k=0;k<9;k++) {
+    const ring=new THREE.TorusGeometry(.8-k*.035,.09,4,16);ring.rotateX(Math.PI/2);ring.translate(0,y+spire*(.22+k*.065),0);
+    parts.push({geo:ring,color:bronze,glow:.6});
+  }
+  const ball=new THREE.SphereGeometry(.3,10,8);ball.translate(0,height-.3,0);parts.push({geo:ball,color:bronze,glow:.6});
+  return parts;
 }
 
 /** Three distinct storeys, gold upper walls, dark openings and a roof phoenix. */
