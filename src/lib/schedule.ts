@@ -6,10 +6,12 @@ export type EventKind = 'meeting' | 'trip' | 'event' | 'deadline' | 'other';
 export interface ScheduleEvent {
   date: string;
   title: string;
+  titleEn?: string;
   kind: EventKind;
   time?: string;
   place?: string;
   note?: string;
+  noteEn?: string;
   link?: string;
 }
 
@@ -28,6 +30,9 @@ export const kindLabel: Record<EventKind, string> = {
   event: 'イベント',
   deadline: '締切',
   other: 'お知らせ',
+};
+export const kindLabelEn: Record<EventKind, string> = {
+  meeting: 'Meeting', trip: 'Photo outing', event: 'Event', deadline: 'Deadline', other: 'Notice',
 };
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];

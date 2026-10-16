@@ -1,22 +1,24 @@
 ---
 /** One month: a Monday-first calendar with the events marked, and the list of events below it. */
 import SampleBadge from './SampleBadge.astro';
-import { calendarCells, formatDay, kindLabel, renderNotes, weekday, type ScheduleMonth } from '../lib/schedule';
+import { calendarCells, formatDay, kindLabel, kindLabelEn, renderNotes, weekday, type ScheduleMonth } from '../lib/schedule';
 
 interface Props {
   month: ScheduleMonth;
+  lang?: 'ja' | 'en';
 }
-const { month } = Astro.props;
+const { month, lang = 'ja' } = Astro.props;
+const en = lang === 'en';
 const cells = calendarCells(month.year, month.month);
 const byDate = new Map<string, typeof month.events>();
 for (const e of month.events) byDate.set(e.date, [...(byDate.get(e.date) ?? []), e]);
 const { Content } = await renderNotes(month);
-const heads = ['月', '火', '水', '木', '金', '土', '日'];
+const heads = en ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['月', '火', '水', '木', '金', '土', '日'];
 ---
 <section class="month" id={`m-${month.id}`} data-month={month.entry.data.month} aria-labelledby={`t-${month.id}`}>
   <header class="head">
-    <h2 id={`t-${month.id}`}><span class="num">{month.year}</span>年 <span class="num big">{month.month}</span>月</h2>
-    <span class="now-tag">今月</span>
+    <h2 id={`t-${month.id}`}><span class="num">{month.year}</span>{en ? ' / ' : '年 '}<span class="num big">{month.month}</span>{!en && '月'}</h2>
+    <span class="now-tag">{en ? 'This month' : '今月'}</span>
     {month.sample && <SampleBadge />}
   </header>
 
@@ -40,18 +42,18 @@ const heads = ['月', '火', '水', '木', '金', '土', '日'];
     <ol class="list">
       {month.events.map((e) => (
         <li class={`ev k-${e.kind}`} data-date={e.date}>
-          <span class="date num">{formatDay(e.date)}</span>
+          <span class="date num">{en ? e.date : formatDay(e.date)}</span>
           <span class="body">
-            <span class="kind">{kindLabel[e.kind]}</span>
-            <b class="title">{e.link ? <a href={e.link}>{e.title}</a> : e.title}</b>
+            <span class="kind">{(en ? kindLabelEn : kindLabel)[e.kind]}</span>
+            <b class="title" lang={en && !e.titleEn ? 'ja' : lang}>{e.link ? <a href={e.link}>{en ? (e.titleEn ?? `${e.title} (Japanese)`) : e.title}</a> : en ? (e.titleEn ?? `${e.title} (Japanese)`) : e.title}</b>
             {(e.time || e.place) && <span class="meta">{[e.time, e.place].filter(Boolean).join(' · ')}</span>}
-            {e.note && <span class="note">{e.note}</span>}
+            {e.note && <span class="note" lang={en && !e.noteEn ? 'ja' : lang}>{en ? (e.noteEn ?? `${e.note} (Japanese)`) : e.note}</span>}
           </span>
         </li>
       ))}
     </ol>
   </div>
-  <div class="notes prose"><Content /></div>
+  {!en && <div class="notes prose"><Content /></div>}
 </section>
 
 <style>
