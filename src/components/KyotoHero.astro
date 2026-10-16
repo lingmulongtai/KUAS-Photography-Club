@@ -5,10 +5,9 @@
  * Tap the sky for a shooting star; the campus pin flies the camera to the Uzumasa campus.
  */
 import { club } from '../data/club';
-import { getCollection } from 'astro:content';
-import { credit } from '../lib/trips';
+import { credit, getTrips } from '../lib/trips';
 import { completeSpotPreviews } from '../data/spot-samples';
-const pinTrips = completeSpotPreviews((await getCollection('trips'))
+const pinTrips = completeSpotPreviews((await getTrips())
   .filter((t) => t.data.spot)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
   .map((t) => ({ spot: t.data.spot!, title: t.data.title, href: `/trips/${encodeURIComponent(t.id)}/`, src: t.data.photos[0].src, alt: t.data.photos[0].alt, credit: credit(t.data.photos[0], t.data.date), sample: t.data.sample })));

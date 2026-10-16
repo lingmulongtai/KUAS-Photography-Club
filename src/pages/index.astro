@@ -56,6 +56,7 @@ const latest = trips.slice(0, 3);
         </div>
         <a class="link-arrow" href="/trips/">すべての撮影会 →</a>
       </div>
+      {latest.length === 0 && <p class="muted">活動記録を準備中です。</p>}
       <div class="list">
         {latest.map((trip) => <TripCard trip={trip} />)}
       </div>

@@ -9,7 +9,7 @@ import Base from '../../layouts/Base.astro';
 import { SPOTS } from '../../data/spots';
 import { isPublicContent } from '../../lib/public-content';
 
-const trips = (await getCollection('trips'))
+const trips = (await getCollection('trips', isPublicContent))
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
   .map((t) => ({ slug: t.id, title: t.data.title, date: t.data.date.toISOString().slice(0, 10), photos: t.data.photos.length, sample: t.data.sample, spot: t.data.spot ?? '' }));
 const months = (await getCollection('schedule', isPublicContent)).map((m) => ({

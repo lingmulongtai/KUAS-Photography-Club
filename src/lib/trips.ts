@@ -1,12 +1,13 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { club } from '../data/club';
+import { isPublicContent } from './public-content';
 
 export type Trip = CollectionEntry<'trips'>;
 export type TripPhoto = Trip['data']['photos'][number];
 
 /** All trips, newest first. */
 export async function getTrips(): Promise<Trip[]> {
-  const trips = await getCollection('trips');
+  const trips = await getCollection('trips', isPublicContent);
   return trips.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 }
 
