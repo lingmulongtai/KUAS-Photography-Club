@@ -403,7 +403,7 @@ export function startAdmin(root: HTMLElement) {
     offList.innerHTML = '';
     evList.innerHTML = '';
     const m = months.find((x) => x.month === monthInput.value);
-    weekly.checked = m ? m.weeklyMeeting : true;
+    weekly.checked = false;
     notes.value = m?.notes ?? '';
     (m?.noMeeting ?? []).forEach((d) => addOff(d));
     (m?.events ?? []).forEach((ev) => addEvent(ev));
