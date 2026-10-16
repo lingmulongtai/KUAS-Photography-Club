@@ -72,19 +72,25 @@ def heightfield():
 
     far = sampler(meta['far'], load(meta['far']))
     near = sampler(meta['near'], load(meta['near']))
-    nb = meta['near']['box']
+    regional_meta = meta.get('arashiyama', {}).get('elevation')
+    regional = sampler(regional_meta, load(regional_meta)) if regional_meta else None
+
+    def blend(m, sample, x, z, base, margin):
+        box = m['box']
+        edge = min(x - box[0], box[2] - x, z - box[1], box[3] - z)
+        if edge <= 0:
+            return base
+        n = sample(x, z)
+        if n is None:
+            return base
+        t = min(1, max(0, edge / margin))
+        w = t * t * (3 - 2 * t)
+        return base + (n - base) * w
 
     def height(x, z):
         f = far(x, z) or 0.0
-        edge = min(x - nb[0], nb[2] - x, z - nb[1], nb[3] - z)
-        if edge <= 0:
-            return f
-        n = near(x, z)
-        if n is None:
-            return f
-        t = min(1, max(0, edge / 300))
-        w = t * t * (3 - 2 * t)
-        return f + (n - f) * w
+        n = blend(meta['near'], near, x, z, f, 300)
+        return blend(regional_meta, regional, x, z, n, 120) if regional else n
     return height
 
 
@@ -121,6 +127,15 @@ def replaced(cx, cz):
     return None
 
 
+def west_corridor(x, z):
+    """Keep residential detail within 1 km of KUAS--Togetsukyo, including Sagano."""
+    ax, az = R.to_local(*R.PLACES['kuas'])
+    bx, bz = R.to_local(35.01287125, 135.67776225)
+    dx, dz = bx - ax, bz - az
+    t = min(1, max(0, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)))
+    return math.hypot(x - ax - t * dx, z - az - t * dz) < 1000
+
+
 def keep(b, area, cx, cz):
     if replaced(cx, cz) == -1:
         return False
@@ -132,7 +147,7 @@ def keep(b, area, cx, cz):
         return False
     if area < 14:
         return False
-    if d_cam < 3500 or d_kuas < 1500:
+    if d_cam < 3500 or d_kuas < 1500 or west_corridor(cx, cz):
         return True
     if d_cam < 6500:
         return area >= 30 or b['height'] >= 9
@@ -177,7 +192,8 @@ def main():
             names.append({'name': b['name'], 'x': round(c.x, 1), 'z': round(c.y, 1), 'h': round(h, 1)})
         cam = R.to_local(*R.PLACES['shogunzuka'])
         kuas = R.to_local(*R.PLACES['kuas'])
-        close = math.hypot(c.x - cam[0], c.y - cam[1]) < 3000 or math.hypot(c.x - kuas[0], c.y - kuas[1]) < 900
+        close = (math.hypot(c.x - cam[0], c.y - cam[1]) < 3000
+                 or math.hypot(c.x - kuas[0], c.y - kuas[1]) < 900 or west_corridor(c.x, c.y))
         rect = poly.minimum_rotated_rectangle
         rc = np.array(rect.exterior.coords)[:4]
         e1 = rc[1] - rc[0]
