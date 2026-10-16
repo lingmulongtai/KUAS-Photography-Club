@@ -103,14 +103,23 @@ export class CampusBuilder {
     for(const [p,q] of [[a,b],[b,c],[c,d],[d,a]] as [P,P][])this.beam(p,q,.16,.18,CM.metal);
   }
   /** Facade with real openings, recessed glazing, deep reveals and individual metal frames. */
-  facade(a:[number,number],b:[number,number],y0:number,y1:number,openings:readonly [number,number,number,number][],m:Material=CM.brick) {
+  facade(a:[number,number],b:[number,number],y0:number,y1:number,windows:readonly [number,number,number,number][],m:Material=CM.brick,doors:readonly [number,number,number,number][]=[] ) {
     const len=Math.hypot(b[0]-a[0],b[1]-a[1]),dx=(b[0]-a[0])/len,dz=(b[1]-a[1])/len;
     const p=(u:number,y:number,inset=0):P=>[a[0]+dx*u-dz*inset,y,a[1]+dz*u+dx*inset];
-    const us=[0,len,...openings.flatMap(o=>[o[0],o[1]])].sort((a,b)=>a-b);
-    const ys=[y0,y1,...openings.flatMap(o=>[o[2],o[3]])].sort((a,b)=>a-b);
+    // Subtract doors from both the masonry and the glazing, including window mullions.
+    let openings=windows.map(w=>[...w] as [number,number,number,number]);
+    for(const [l,r,lo,hi] of doors)openings=openings.flatMap(w=>{
+      const a=Math.max(w[0],l),c=Math.min(w[1],r),bottom=Math.max(w[2],lo),top=Math.min(w[3],hi);
+      if(a>=c||bottom>=top)return [w];
+      return [[w[0],a,w[2],w[3]],[c,w[1],w[2],w[3]],[a,c,w[2],bottom],[a,c,top,w[3]]]
+        .filter(o=>o[1]-o[0]>.001&&o[3]-o[2]>.001) as [number,number,number,number][];
+    });
+    const us=[0,len,...[...openings,...doors].flatMap(o=>[o[0],o[1]])].sort((a,b)=>a-b);
+    const ys=[y0,y1,...[...openings,...doors].flatMap(o=>[o[2],o[3]])].sort((a,b)=>a-b);
     for(let i=0;i<us.length-1;i++)for(let j=0;j<ys.length-1;j++){
       const u=(us[i]+us[i+1])/2,y=(ys[j]+ys[j+1])/2;
       if(us[i+1]-us[i]<.001||ys[j+1]-ys[j]<.001)continue;
+      if(doors.some(o=>u>o[0]&&u<o[1]&&y>o[2]&&y<o[3]))continue;
       const glass=openings.some(o=>u>o[0]&&u<o[1]&&y>o[2]&&y<o[3]);
       const inset=glass?.3:0;
       this.quad(p(us[i],ys[j+1],inset),p(us[i+1],ys[j+1],inset),p(us[i+1],ys[j],inset),p(us[i],ys[j],inset),glass?CM.glass:m);
@@ -161,7 +170,8 @@ export function addNorthEast(b:CampusBuilder) {
     // The middle 8 m is an open ground-floor passage, not a solid LOD1 prism.
     for(const [lo,hi] of [[-52,4],[12,68]]) {
       const width=hi-lo;
-      b.facade([hi,-56],[lo,-56],0,16,[[0,width,0,2.8],[1,width-1,4.1,6.8],[1,width-1,8.1,10.8],[1,width-1,12.1,14.8]]);
+      const door: [number,number,number,number]=lo<0?[23.5,26.5,8,11.2]:[24.3,27.7,8,11.2];
+      b.facade([hi,-56],[lo,-56],0,16,[[0,width,0,2.8],[1,width-1,4.1,6.8],[1,width-1,8.1,10.8],[1,width-1,12.1,14.8]],CM.brick,[door]);
       b.box(lo,hi,-80,-56,-.3,0,CM.concrete);
       for(const y of [4,8,12,16])b.box(lo,hi,-80,-56,y-.24,y,CM.concrete);
     }
@@ -188,7 +198,7 @@ export function addNorthEast(b:CampusBuilder) {
       wins.push([1,len-1,.15,3.65]);
       for(const y of [4,8,12])wins.push([1,len-1,y+.75,y+2.5]);
       if(len===45)wins.push([4,12,4,11.7]);
-      b.facade(a,c,0,16,wins);
+      b.facade(a,c,0,16,wins,CM.brick,a[1]===v0&&c[1]===v0?[[5.3,8.7,8,11.2]]:[]);
     }
     for(const y of [0,4,8,12,16])b.box(u0,u1,v0,v1,y-.25,y,CM.concrete);
     b.hip(u0-1.5,u1+1.5,v0-1.5,v1+1.5,16,19.6,7);
@@ -237,7 +247,7 @@ export function addWest(b:CampusBuilder) {
     for(const [a,c,len] of [ [[-59,9],[-59,-40],49],[[-59,-40],[-24,-40],35],[[-24,9],[-59,9],35] ] as [[number,number],[number,number],number][]) {
       const wins:[number,number,number,number][]=[[1,len-1,.3,3.7]];
       for(const y of [4.5,9,13.5])wins.push([1,len-1,y+.8,y+2.9]);
-      b.facade(a,c,0,18,wins);
+      b.facade(a,c,0,18,wins,CM.brick,a[1]===-40&&c[1]===-40?[[22.5,25.5,9,12.2]]:[]);
     }
     // East-facing facade is set back by a different amount on each floor and terrace bay.
     for(const [y0,y1,u,v0,v1] of [[0,4.5,-24,-40,9],[4.5,9,-21,-40,9],
@@ -261,6 +271,9 @@ export function addWest(b:CampusBuilder) {
   b.part('west-courtyard-stairs-and-deck',()=>{
     // A continuous series of three external flights along the courtyard elevation.
     const x=-9.6;
+    b.box(-16,x+1.05,-38,-36,1.25,1.5,CM.timber);
+    b.rail([-16,1.5,-38],[x+1.05,1.5,-38]);
+    b.rail([x+1.05,1.5,-38],[x+1.05,1.5,-36]);
     for(let f=0;f<3;f++) {
       const v=-36+f*14.3,y=[1.5,4.5,9][f],top=[4.5,9,13.5][f];
       b.stairs([x,y,v],[x,top,v+11],2.1,Math.round((top-y)/.167));
