@@ -358,13 +358,16 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   mesh.frustumCulled = false;
   // positions for other viewpoints, worked out ahead of time so switching doesn't stall a frame
   const cache = new Map<string, Float32Array>([[`${center.x},${center.z}`, pos]]);
+  const position = geo.getAttribute('position') as THREE.BufferAttribute;
   const prepare = (c: { x: number; z: number }) => {
     const key = `${c.x},${c.z}`;
     if (!cache.has(key)) cache.set(key, terrainPositions(hf, c, segments));
     return cache.get(key)!;
   };
   const recenter = (c: { x: number; z: number }) => {
-    geo.setAttribute('position', new THREE.BufferAttribute(prepare(c), 3));
+    // Keep one GPU attribute while switching equal-sized terrain grids.
+    position.array = prepare(c);
+    position.needsUpdate = true;
   };
   /** Show the sharper photo for tex.photos[i]. */
   const setPhoto = (i: number, photo: THREE.Texture) => {

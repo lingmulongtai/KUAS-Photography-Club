@@ -30,7 +30,7 @@ import { buildWoodlandTexture } from './woodland-texture';
 import { infrastructureMask } from './forest-infrastructure';
 import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
-import { VIEWS, type ViewDef, type HeroView } from './views';
+import { VIEWS, PANORAMA_VIEWS, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
 import { buildOcclusion } from './building-occlusion';
@@ -163,9 +163,10 @@ export function createHero(
     });
     ensureRegionalPhoto(view);
     terrainRecenter = terrain.recenter;
-    // work out the other viewpoints' terrain while the browser is idle
+    // Warm only the scenic views. Map destinations are prepared when visited,
+    // so adding places does not make phones build every terrain mesh at startup.
     const idle = (cb: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 500));
-    const pending = Object.values(VIEWS).filter((v) => v !== VIEW);
+    const pending = PANORAMA_VIEWS.map(id=>VIEWS[id]).filter((v) => v !== VIEW);
     const prepNext = () => {
       const v = pending.shift();
       if (!v) return;
