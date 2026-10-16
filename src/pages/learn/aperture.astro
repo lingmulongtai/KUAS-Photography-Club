@@ -43,7 +43,7 @@ import DemoBokeh from '../../components/learn/DemoBokeh.astro';
 
   <h2>絞りすぎに注意：回折</h2>
   <p>
-    f/16 より絞ると、光が穴のふちで回り込む「回折」で、写真全体が少し甘くなります。いちばんシャープに写るのは、多くのレンズで開放から2〜3段絞った f/5.6〜f/8 あたりです。
+    絞り込むほど、光が回り込む「回折」による解像感の低下が目立つ場合があります。見え方はレンズや画素サイズ、出力サイズ等で変わり、f/16が一律の境界ではありません。開放から少し絞ると収差が減ることがありますが、最適な絞りは機材や撮影条件に応じて確認してください。例えば、開放f/1.4から2段ならf/2.8、開放f/2.8から2段ならf/5.6です。
   </p>
   <div class="table-wrap">
     <table class="data">
@@ -59,10 +59,14 @@ import DemoBokeh from '../../components/learn/DemoBokeh.astro';
     </table>
   </div>
 
+  <p class="small muted">参考：<a href="https://download.nikonimglib.com/archive3/3MTAX009BPUv03iOpyF65nWOL127/D800_TG_%28En%2901.pdf">Nikon D800 Technical Guide（回折、p.26）</a>、<a href="https://nij.nikon.com/learn/phototech/manual/04/05.html">Nikon：露出の組合せ</a></p>
+
   <h2>スマホの場合</h2>
   <p>
-    スマホのレンズは絞りが固定のものがほとんどです。背景のボケは「ポートレートモード」が距離を推定して後から作っています。髪の毛や眼鏡のふちが不自然になることがあるので、背景と被写体の距離をあけると失敗しにくくなります。
+    スマホでも、機材・撮影距離・背景までの距離によって自然な光学的ボケが生じます。ポートレートモード等では、画像処理でボケを加える機能もあります。画像処理では髪の毛や眼鏡のふちが不自然になる場合があるため、仕上がりを確認しましょう。
   </p>
+
+  <p class="small muted">参考：<a href="https://www.sony.jp/xperia/products/xperia1m7/">Sony Xperia：ぼけモード</a>、<a href="https://www.sony.co.uk/store/product/xq-be52-b1ukcx2/Xperia-PRO-I-1-0-type-image-sensor-camera-with-full-smartphone-capabilities">Sony Xperia PRO-I：自然なボケ</a></p>
 
   <div slot="aside" class="point">
     <h2>このページのポイント</h2>
@@ -70,7 +74,7 @@ import DemoBokeh from '../../components/learn/DemoBokeh.astro';
       <li>f値が小さい＝明るい・よくボケる</li>
       <li>1段で光は半分（f/2.8 → f/4）</li>
       <li>ボケは「開ける・近づく・背景を離す・望遠」</li>
-      <li>くっきり写すなら f/5.6〜f/8</li>
+      <li>絞りの目安は機材・距離・仕上げるサイズに合わせて確認</li>
     </ul>
   </div>
 
