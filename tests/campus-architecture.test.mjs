@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { CampusBuilder, campusArchitecture } from '../src/scripts/hero/campus-architecture.ts';
+import { CampusBuilder, campusArchitecture, CAMPUS_TREES } from '../src/scripts/hero/campus-architecture.ts';
 
 const builder=new CampusBuilder(32.5);
 const geometry=campusArchitecture(32.5);
@@ -62,4 +62,7 @@ test('South grand staircase rises through four flights with flat, traversable cr
     assert.equal(ray([-4,level+.6,v],[2,level+.6,v]).length,0,'no handrail or slab blocks the landing');
   }
   assert.deepEqual(heights.map(y=>Math.round(y*10)/10),[4.4,8.8,13.2,17.6]);
+});
+test('campus planting stays clear of the academic facades and stair flights',()=>{
+  for(const [u,v] of CAMPUS_TREES)assert.equal(ray([u,2,v],[u,7,v]).length,0,`tree at ${u},${v} intersects the architecture`);
 });
