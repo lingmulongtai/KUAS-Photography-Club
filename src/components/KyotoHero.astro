@@ -2,7 +2,7 @@
 /**
  * Full-bleed top-page hero: Kyoto in 3D from real geodata (GSI terrain and aerial photos,
  * PLATEAU buildings), seen from Shogunzuka. The sky follows the real time in Kyoto.
- * Tap the sky for a shooting star; the campus pin flies the camera to the Uzumasa campus.
+ * Tap a map pin to explore its spot, or the sky for a shooting star.
  */
 import { club } from '../data/club';
 import { languagePath } from '../lib/i18n';
@@ -12,6 +12,8 @@ const en = lang === 'en';
 const local = (href: string) => languagePath(href, lang);
 import { credit, getTrips } from '../lib/trips';
 import { completeSpotPreviews } from '../data/spot-samples';
+import { SPOTS } from '../data/spots';
+import { PANORAMA_VIEWS, VIEWS } from '../scripts/hero/views';
 const pinTrips = completeSpotPreviews((await getTrips())
   .filter((t) => t.data.spot)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
@@ -19,17 +21,21 @@ const pinTrips = completeSpotPreviews((await getTrips())
 ---
 <section class="hero" aria-labelledby="hero-title" data-view="city" data-lang={lang}>
   <div class="stage hero-stage" data-demo="hero" data-trips={JSON.stringify(pinTrips)}>
-    <canvas aria-label="将軍塚から西を望む京都の街の3D。実際の地形と建物のデータから作り、空は京都の現在時刻に合わせて変わります"></canvas>
-    <nav class="views" aria-label="眺める場所">
+    <canvas aria-label={en ? 'Explore Kyoto in 3D using real terrain and building data. Drag to look around and select a place to move closer.' : '実際の地形と建物データから作った京都の3D。ドラッグで見回し、地点を選ぶと近づけます。'}></canvas>
+    <nav class="views" aria-label={en ? 'Scenic viewpoints' : '展望地点'}>
       <span class="views-label">VIEW</span>
-      <button type="button" data-view="shogunzuka" aria-pressed="true">{en ? 'Shogunzuka' : '将軍塚'}</button>
-      <button type="button" data-view="kiyomizu" aria-pressed="false">{en ? 'Kiyomizu' : '清水の舞台'}</button>
-      <button type="button" data-view="daimonji" aria-pressed="false">{en ? 'Daimonji' : '大文字山'}</button>
-      <button type="button" data-view="tower" aria-pressed="false">{en ? 'Kyoto Tower' : '京都タワー'}</button>
-      <button type="button" data-view="arashiyama" aria-pressed="false">{en ? 'Arashiyama' : '嵐山・大悲閣'}</button>
-      <button type="button" data-view="atago" aria-pressed="false">{en ? 'Mt. Atago' : '愛宕山'}</button>
-      <button type="button" data-view="kinkaku" aria-pressed="false">{en ? 'Kinkakuji' : '金閣寺'}</button>
+      {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed={view==='shogunzuka'} disabled>{VIEWS[view][lang]}</button>)}
     </nav>
+    <div class="spot-nav">
+      <label class="visually-hidden" for="hero-spot">{en ? 'Explore a place in 3D' : '3Dで近づくスポット'}</label>
+      <select id="hero-spot" class="spot-select" disabled>
+        <option value="" selected disabled>{en ? 'Explore a place' : 'スポットへ移動'}</option>
+        {SPOTS.map(spot => <option value={spot.id}>{spot[lang]}</option>)}
+      </select>
+      <button type="button" class="spot-return" hidden>{en ? 'Back to view' : '展望へ戻る'}</button>
+      <a class="spot-records" hidden>{en ? 'Outing records' : '活動記録'}</a>
+      <span class="visually-hidden" role="status" data-place-status></span>
+    </div>
     <div class="loading" aria-hidden="true">
       <span class="spin"></span>
       <span>{en ? 'Loading Kyoto' : '京都の街を読み込んでいます'}</span>
@@ -67,7 +73,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
         <button type="button" data-landmark-elevation="oblique" aria-pressed="true">{en ? 'Oblique' : '斜めから'}</button>
         <button type="button" data-landmark-elevation="overhead" aria-pressed="false">{en ? 'Overhead' : '真上から'}</button>
       </div>
-      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap the sky for a shooting star. Select Uzumasa Campus to fly closer. The night-time bonfires are illustrative.' : '空をタップすると流れ星。「太秦キャンパス」から近づけます。夜景の送り火はイメージです。'}</span></p>
+      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. The night-time bonfires are illustrative.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。夜景の送り火はイメージです。'}</span></p>
     </aside>
   </div>
 
@@ -99,6 +105,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { createHero, type HeroMode, type HeroStatus, type HeroView } from '../scripts/hero/scene';
   import { createLook, lookAt } from '../scripts/hero/palette';
   import { jstDateAt, jstMinutes, sunPosition, sunTimes } from '../scripts/hero/astro';
+  import { SPOTS, type SpotId } from '../data/spots';
+  import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
 
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
   const hero = stage?.closest<HTMLElement>('.hero');
@@ -116,6 +124,12 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const landmarkAngles=hero.querySelector<HTMLElement>('.landmark-angles')!;
     const landmarkButtons=Array.from(landmarkAngles.querySelectorAll<HTMLButtonElement>('button'));
     const cameraHint=hero.querySelector('.hint')!.firstChild!;
+    const spotSelect=hero.querySelector<HTMLSelectElement>('.spot-select')!;
+    const spotReturn=hero.querySelector<HTMLButtonElement>('.spot-return')!;
+    const spotRecords=hero.querySelector<HTMLAnchorElement>('.spot-records')!;
+    const placeStatus=hero.querySelector('[data-place-status]')!;
+    const viewButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('button[data-view]'));
+    let panorama: HeroView='shogunzuka';
 
     const hhmm = (m: number) => {
       const v = ((Math.floor(m) % 1440) + 1440) % 1440;
@@ -171,10 +185,22 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
     const setView = (mode: HeroMode, arrived: boolean) => {
       hero.dataset.view = mode;
+      const atPanorama=mode==='city' && PANORAMA_VIEWS.some(id=>id===demo?.view);
+      if (atPanorama && demo) panorama=demo.view;
+      const selected=SPOTS.find(spot=>spotDestination(spot.id)===(mode==='campus'?'campus':demo?.view));
+      spotSelect.value=atPanorama?'':selected?.id??'';
+      spotReturn.hidden=mode==='campus'||atPanorama;
+      spotRecords.hidden=spotReturn.hidden||!selected;
+      if (selected) spotRecords.href=en?'/en/trips/':`/trips/spots/${selected.id}/`;
+      const placeName=selected?.[en?'en':'ja']??VIEWS[demo?.view??'shogunzuka'][en?'en':'ja'];
+      placeStatus.textContent=arrived
+        ? (en ? `Now viewing ${placeName}.` : `${placeName}を表示しています。`)
+        : (en ? 'Moving to the selected place.' : '選んだ地点へ移動しています。');
+      viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(mode==='city' && b.dataset.view===demo?.view)));
       hero.querySelectorAll<HTMLButtonElement>('[data-elevation],[data-landmark-elevation]').forEach(b=>b.disabled=!arrived);
       landmarkAngles.hidden = mode!=='city' || !demo?.orbiting;
       cameraHint.textContent = demo?.orbiting && mode==='city'
-        ? (en ? 'Drag or swipe to orbit the building.' : 'ドラッグで建物を中心に360°回れます。スマホは横スワイプ。')
+        ? (en ? 'Drag or swipe to orbit this place.' : 'ドラッグでスポットを中心に360°回れます。スマホは横スワイプ。')
         : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
       if (!arrived) landmarkButtons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.landmarkElevation==='oblique')));
       if (mode === 'campus') {
@@ -182,6 +208,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
         if(!arrived) hero.querySelectorAll<HTMLButtonElement>('[data-elevation]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.elevation==='oblique')));
         if (arrived) back.focus({ preventScroll: true });
       } else if (!arrived) card.hidden = true;
+      if (arrived && !atPanorama && mode==='city') spotSelect.focus({preventScroll:true});
+      if (arrived && atPanorama) viewButtons.find(b=>b.dataset.view===panorama)?.focus({preventScroll:true});
     };
 
     const coarse = matchMedia('(pointer: coarse)').matches;
@@ -195,17 +223,18 @@ const pinTrips = completeSpotPreviews((await getTrips())
         (demo = createHero(renderer, el, {
           now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
           quality,
+          lang: en?'en':'ja',
           trips: JSON.parse(stage.dataset.trips ?? '[]'),
           get reducedMotion() { return motion.matches; },
           drift: !coarse,
           onStatus,
-          onReady: () => hero.classList.add('is-ready'),
-          onAction: (id) => id === 'kuas' && demo?.flyTo('campus'),
+          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false; viewButtons.forEach(b=>b.disabled=false); },
+          onAction: (id) => demo?.flyTo(spotDestination(id)),
           onMode: setView,
           avoid: () => {
             const base = stage.getBoundingClientRect();
             // the header and the view bar float over the top of the stage: no pin under them either
-            return [hero.querySelector('.copy'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views')]
+            return [hero.querySelector('.copy'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views'), hero.querySelector('.spot-nav')]
               .filter((n): n is Element => !!n)
               .map((n) => {
                 const r = n.getBoundingClientRect();
@@ -216,7 +245,12 @@ const pinTrips = completeSpotPreviews((await getTrips())
       { maxDpr: quality < 1 ? 1.5 : 2, alwaysOn: false },
     );
 
-    back.addEventListener('click', () => demo && demo.flyTo(demo.view));
+    const returnToPanorama=()=>demo?.flyTo(panorama);
+    back.addEventListener('click', returnToPanorama);
+    spotReturn.addEventListener('click', returnToPanorama);
+    spotSelect.addEventListener('change',()=>{
+      if (SPOTS.some(spot=>spot.id===spotSelect.value)) demo?.flyTo(spotDestination(spotSelect.value as SpotId));
+    });
     const angleButtons=Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-elevation]'));
     angleButtons.forEach(b=>b.addEventListener('click',()=>{
       demo?.setElevation(b.dataset.elevation==='overhead');
@@ -227,15 +261,13 @@ const pinTrips = completeSpotPreviews((await getTrips())
       landmarkButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
     }));
     hero.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && demo?.mode === 'campus') demo.flyTo(demo.view);
+      if (e.key === 'Escape' && (demo?.mode === 'campus'||demo?.orbiting)) returnToPanorama();
     });
 
-    const viewButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-view]'));
     viewButtons.forEach((b) =>
       b.addEventListener('click', () => {
         if (!demo) return;
         demo.flyTo(b.dataset.view as HeroView);
-        viewButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
       }),
     );
 
@@ -333,6 +365,38 @@ const pinTrips = completeSpotPreviews((await getTrips())
     background: var(--brand);
     color: var(--on-accent);
   }
+
+  .spot-nav {
+    position: absolute;
+    z-index: 3;
+    top: calc(var(--header-h) + 64px);
+    left: max(var(--gutter), calc((100% - var(--maxw)) / 2));
+    max-width: calc(100% - var(--gutter) * 2);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    color: var(--on-dark);
+    opacity: 0;
+    transition: opacity 0.8s 0.6s;
+  }
+
+  .is-ready .spot-nav { opacity: 1; }
+  .no-3d .views, .no-3d .spot-nav { display: none; }
+  .spot-select, .spot-return, .spot-records {
+    min-height: 36px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 18px;
+    background: rgba(10, 18, 28, 0.7);
+    color: inherit;
+    font: 600 11px/1.4 var(--body);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .spot-select { width: clamp(120px, 40vw, 190px); }
+  .spot-select option { color: var(--ink); background: var(--raise); }
+  .spot-nav [hidden] { display: none; }
 
   .loading {
     position: absolute;
