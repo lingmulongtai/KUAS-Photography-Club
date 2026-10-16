@@ -14,7 +14,7 @@ const year = new Date().getFullYear();
         </span>
       </a>
       <p class="small">
-        写真を通して「楽しむ」と「つながる」を大切にする、{club.university}の写真部です。国籍・学年・経験は問いません。スマホで撮る人も大歓迎。
+        {club.nameJa}が運営するサイトです。国籍・学年・経験は問いません。スマホで撮る人も大歓迎。
       </p>
     </div>
 
@@ -22,9 +22,9 @@ const year = new Date().getFullYear();
       <p class="label">MEETING</p>
       <p class="small">
         {club.meetings.day} {club.meetings.times.join(' / ')}<br />
-        {club.campus} {club.meetings.room} 教室
+        通常は {club.campus} {club.meetings.room} 教室
       </p>
-      <a class="small" href="/schedule/">今月のスケジュール</a>
+      <a class="small" href="/schedule/">休会・変更の最新案内</a>
     </div>
 
     <div>

@@ -37,7 +37,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <p class="edge eyebrow">KYOTO ▸ <span data-status>いまの空</span></p>
       <h1 id="hero-title">京都の空の下で、<br />写真を撮っています。</h1>
       <p class="lead">
-        {club.nameJa}です。月に2回の撮影会で、京都の街や近くの府県へ写真を撮りに出かけています。カメラがなくても、スマホひとつで参加できます。
+        {club.nameJa}です。部員で相談しながら撮影会を企画しています。カメラがなくても、スマホひとつで参加できます。
       </p>
       <div class="ctas">
         <a class="btn btn--primary" href="/trips/">撮影会の記録を見る <span class="arrow" aria-hidden="true">→</span></a>
@@ -76,8 +76,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
     </div>
     <dl>
       <div><dt>ミーティング</dt><dd>{club.meetings.day} {club.meetings.times.join(' / ')}</dd></div>
-      <div><dt>教室</dt><dd>{club.meetings.room}</dd></div>
+      <div><dt>通常の教室</dt><dd>{club.meetings.room}</dd></div>
     </dl>
+    <a class="small" href="/schedule/">休会・教室変更の最新案内を確認</a>
     <div class="card-actions">
       <a class="btn btn--primary" href="/join/">見学に行く <span class="arrow" aria-hidden="true">→</span></a>
       <button class="btn btn--glass back" type="button">← 街の眺めに戻る</button>
