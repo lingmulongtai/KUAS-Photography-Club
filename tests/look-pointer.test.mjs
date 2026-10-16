@@ -53,6 +53,29 @@ test('losing the stage capture ends the drag and clears inertia', (t) => {
   assert.equal(h.look.state.dragging,false);
   assert.equal(h.look.state.vx,0);
 });
+test('map pin swipes rotate instead of navigating, while short taps stay with the pin', (t) => {
+  const h=setup(t);
+  const pin={closest:()=>({})};
+  for (const pointerType of ['mouse','touch']) {
+    h.look.reset();
+    h.send('pointerdown',100,100,{pointerType,target:pin});
+    assert.equal(h.captured.size,0);
+    h.send('pointerup',102,100,{pointerType,target:pin,timeStamp:20});
+    let blocked=false;
+    h.send('click',102,100,{preventDefault(){blocked=true;},stopPropagation(){}});
+    assert.equal(blocked,false);
+    assert.equal(h.taps(),0);
+    h.send('pointerdown',100,100,{pointerType,target:pin});
+    h.send('pointermove',160,100,{pointerType,target:pin,timeStamp:30});
+    h.send('lostpointercapture',160,100,{pointerType,target:pin,timeStamp:31});
+    h.send('pointermove',280,100,{pointerType,timeStamp:50});
+    h.send('pointerup',280,100,{pointerType,timeStamp:60});
+    assert.equal(h.look.state.yaw,-54);
+    h.send('click',280,100,{preventDefault(){blocked=true;},stopPropagation(){}});
+    assert.equal(blocked,true);
+    assert.equal(h.taps(),0);
+  }
+});
 test('flight input lock ignores drags and taps until the camera has arrived', (t)=>{
   let arrived=false;
   const h=setup(t,()=>arrived);
