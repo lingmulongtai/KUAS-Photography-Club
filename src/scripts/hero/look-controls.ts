@@ -64,6 +64,9 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     drag.time = e.timeStamp;
   });
   const finish = (e: PointerEvent) => {
+    // Touch starts with implicit capture on the canvas. Transferring capture to
+    // the stage bubbles the canvas's loss here without ending the stage's drag.
+    if (e.type === 'lostpointercapture' && e.target !== el) return;
     if (!drag || drag.id !== e.pointerId) return;
     const previous = drag;
     drag = null;
