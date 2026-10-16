@@ -58,10 +58,10 @@ export function shishinden():Part[] {
   box(parts,38,1.4,29,0,.7,0,[.24,.21,.17],.1);
   box(parts,32,5.5,23,0,4.5,0,timber,.15);
   for (const side of [-1,1]) {
-    for(let bay=0;bay<9;bay++) {
-      const x=-16+bay*4;
+    for(let bay=0;bay<=9;bay++) {
+      const x=-16+bay*32/9;
       box(parts,.5,7,.5,x,4.9,side*13,timber,.2);
-      if(bay<8) box(parts,3.4,3.7,.2,x+2,4.4,side*11.6,shutters,.1);
+      if(bay<9) box(parts,32/9-.6,3.7,.2,x+16/9,4.4,side*11.6,shutters,.1);
     }
     for(let z=-9;z<=9;z+=4.5) box(parts,.5,7,.5,side*17,4.9,z,timber,.2);
   }
