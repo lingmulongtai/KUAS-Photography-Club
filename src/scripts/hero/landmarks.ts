@@ -4,7 +4,7 @@ import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
 import { kyotoTower } from './kyoto-tower';
-import { goldenPavilion, kiyomizuHall, shishinden, togetsukyo } from './temple-models';
+import { goldenPavilion, kiyomizuHall, pagoda, ryoanji, shishinden, togetsukyo } from './temple-models';
 import { SPOTS } from '../../data/spots';
 
 /*
@@ -29,63 +29,9 @@ function paint({ geo, color, glow }: Part) {
   return g;
 }
 
-/** A square frustum (pagoda roof) or prism, its sides facing the axes. */
-function square(bottom: number, top: number, height: number) {
-  const g = new THREE.CylinderGeometry(top / Math.SQRT2, bottom / Math.SQRT2, height, 4, 1);
-  g.rotateY(Math.PI / 4);
-  g.translate(0, height / 2, 0);
-  return g;
-}
-
 const WOOD: [number, number, number] = [0.07, 0.042, 0.025];
-const PLASTER: [number, number, number] = [0.42, 0.4, 0.36];
 const ROOF: [number, number, number] = [0.035, 0.038, 0.042];
-const BRONZE: [number, number, number] = [0.06, 0.05, 0.03];
 const VERMILION: [number, number, number] = [0.6, 0.075, 0.025];
-
-/** A pagoda: storeys of shrinking size, each with a wide overhanging roof, and the sorin spire. */
-function pagoda(storeys: number, base: number, top: number, height: number, spire: number, body: [number, number, number], roof: [number, number, number]) {
-  const parts: Part[] = [];
-  const stack = height - spire;
-  const step = stack / storeys;
-  let y = 0;
-  parts.push({ geo: square(base * 1.5, base * 1.4, 1.2), color: [0.2, 0.19, 0.17], glow: 0.6 });
-  y = 1.2;
-  for (let i = 0; i < storeys; i++) {
-    const t = storeys > 1 ? i / (storeys - 1) : 0;
-    const s = base + (top - base) * t;
-    const bodyH = step * 0.58;
-    const roofH = step * 0.42;
-    const b = square(s, s, bodyH);
-    b.translate(0, y, 0);
-    parts.push({ geo: b, color: body, glow: 1 });
-    // a lighter band of plaster walls between the posts
-    const wall = square(s * 1.002, s * 1.002, bodyH * 0.5);
-    wall.translate(0, y + bodyH * 0.2, 0);
-    if (body === WOOD) parts.push({ geo: wall, color: PLASTER, glow: 1 });
-    const eave = s * 2.05;
-    const fascia = square(eave, eave, roofH * 0.18);
-    fascia.translate(0, y + bodyH, 0);
-    parts.push({ geo: fascia, color: roof, glow: 0.5 });
-    const r = square(eave, s * 0.62, roofH * 0.82);
-    r.translate(0, y + bodyH + roofH * 0.18, 0);
-    parts.push({ geo: r, color: roof, glow: 0.35 });
-    y += step;
-  }
-  // sorin: the bronze spire with its nine rings
-  const mast = new THREE.CylinderGeometry(0.22, 0.32, spire, 8);
-  mast.translate(0, y + spire / 2, 0);
-  parts.push({ geo: mast, color: BRONZE, glow: 0.6 });
-  for (let k = 0; k < 9; k++) {
-    const ring = new THREE.CylinderGeometry(0.9 - k * 0.04, 0.9 - k * 0.04, 0.22, 10);
-    ring.translate(0, y + spire * (0.22 + k * 0.065), 0);
-    parts.push({ geo: ring, color: BRONZE, glow: 0.6 });
-  }
-  const ball = new THREE.SphereGeometry(0.45, 10, 8);
-  ball.translate(0, y + spire, 0);
-  parts.push({ geo: ball, color: BRONZE, glow: 0.6 });
-  return parts;
-}
 
 /** The great torii of Heian Shrine on Jingu-michi: 24 m tall, its beam running east–west. */
 function torii(): Part[] {
@@ -102,8 +48,16 @@ function torii(): Part[] {
   nuki.translate(0, 17.2, 0);
   const shimaki = new THREE.BoxGeometry(31, 1.6, 2.4);
   shimaki.translate(0, 21.9, 0);
-  const kasagi = new THREE.BoxGeometry(33.9, 1.5, 3.2);
-  kasagi.translate(0, 23.4, 0);
+  const profile=new THREE.Shape();
+  const curve=(x:number)=>.8*(Math.abs(x)/16.95)**2.4;
+  for(let i=0;i<=16;i++) {
+    const x=-16.95+i*33.9/16,y=22.4+curve(x);
+    if(i===0)profile.moveTo(x,y);else profile.lineTo(x,y);
+  }
+  for(let i=16;i>=0;i--){const x=-16.95+i*33.9/16;profile.lineTo(x,23.6+curve(x));}
+  profile.closePath();
+  const kasagi = new THREE.ExtrudeGeometry(profile,{depth:3.2,bevelEnabled:false,steps:1});
+  kasagi.translate(0,0,-1.6);
   const plaque = new THREE.BoxGeometry(2.6, 4.4, 0.6);
   plaque.translate(0, 19.6, 0);
   parts.push(
@@ -112,6 +66,14 @@ function torii(): Part[] {
     { geo: kasagi, color: [0.025, 0.025, 0.028], glow: 0.7 },
     { geo: plaque, color: [0.04, 0.035, 0.03], glow: 0.8 },
   );
+  for(const x of [-9.1,9.1]) {
+    const joint=new THREE.BoxGeometry(2.8,.4,2.2);joint.translate(x,17.7,0);
+    parts.push({geo:joint,color:VERMILION,glow:1});
+  }
+  for(const [w,h,x,y] of [[.15,4.6,-1.4,19.6],[.15,4.6,1.4,19.6],[2.95,.15,0,21.9],[2.95,.15,0,17.3]]) {
+    const frame=new THREE.BoxGeometry(w,h,.12);frame.translate(x,y,.35);
+    parts.push({geo:frame,color:[.35,.23,.055],glow:.6});
+  }
   return parts;
 }
 
@@ -132,6 +94,7 @@ const LANDMARKS: Record<string, Placed> = {
   heianTorii: { parts: torii(), lat: 35.0125663, lon: 135.7826821 },
   goldenPavilion: { parts: goldenPavilion(), lat: 35.0395092, lon: 135.7284548 },
   shishinden: { parts: shishinden(), lat: SPOTS.find(s=>s.id==='gosho')!.lat, lon: SPOTS.find(s=>s.id==='gosho')!.lon },
+  ryoanji: { parts: ryoanji(), lat: SPOTS.find(s=>s.id==='ryoanji')!.lat, lon: SPOTS.find(s=>s.id==='ryoanji')!.lon },
   kiyomizuHall: { parts: kiyomizuHall(), lat: 34.9946668, lon: 135.7849382 },
   togetsukyo: { parts: togetsukyo().map(part=>({...part,geo:part.geo.rotateY(-5.8*Math.PI/180).translate(0,2,0)})), lat: 35.01287125, lon: 135.67776225 },
 };

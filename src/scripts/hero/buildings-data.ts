@@ -1,4 +1,4 @@
-import { loadBinary, loadJSON } from './data';
+import { loadBinary, loadJSON } from './data.ts';
 import type { Box } from './geo';
 
 /** Building classes and uses as stored in buildings.bin (see tools/kyoto-data/build_buildings.py). */

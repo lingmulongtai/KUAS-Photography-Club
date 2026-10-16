@@ -11,7 +11,7 @@ sources once into `cache/` (not committed, about 2 GB) and write compact files t
 | `aerial-wide.webp`, `aerial-city.webp` | Aerial photos draped over the terrain | GSI 全国最新写真（シームレス） |
 | `aerial-arashiyama*.webp`, `aerial-higashiyama*.webp` | Sharper photos of Arashiyama and of the slopes below Shogunzuka and Kiyomizu-dera, PC and mobile sizes | GSI 全国最新写真（シームレス） z16 / z17 |
 | `lines.bin` | Roads (by width), above-ground railways, rivers and ponds | GSI ベクトルタイル |
-| `buildings.bin` | Every building's footprint and measured height | PLATEAU 京都市 2025 LOD1 |
+| `buildings.bin` | Selected building footprints and measured heights; dense detail near viewpoints and KUAS--Arashiyama | PLATEAU 京都市 2025 LOD1 |
 
 The scene uses local metres on a plane tangent at Shijo-Karasuma (+x east, +z south,
 +y metres above sea level); `region.py` and `src/scripts/hero/geo.ts` must agree.
@@ -26,7 +26,15 @@ python3 build_terrain.py
 python3 build_lines.py
 python3 extract_buildings.py  # decodes the tiles into cache/buildings.pkl
 python3 build_buildings.py
+python3 -m unittest discover -s . -p 'test_*.py'
 ```
+
+The building exporter keeps houses of at least 14m² within 1km of the KUAS--Togetsukyo
+corridor; small open sheds remain excluded. This area also uses the near-viewpoint
+outline tolerance (0.6m) and rectangle fit threshold (0.86). Ground offsets blend
+the far, near and Arashiyama regional grids in the same order as `heightfield.ts`.
+The 2026-10-17 rebuild contains 282,150 buildings in 1,972,029 gzip bytes.
+See [the model/night quality audit](../../docs/model-night-quality-2026-10-17.md).
 
 ## Credits and licences
 

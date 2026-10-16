@@ -40,7 +40,8 @@ const FinishShader = {
       l = dot(c, vec3(.299, .587, .114));
       float v = 1. - smoothstep(.4, 1.25, length((vUv - .5) * vec2(1.1, 1.)));
       c *= mix(.78, 1., v);
-      float g = hash12(vUv * uRes + fract(uTime * 7.31) * 517.) - .5;
+      // Static fine grain: temporal screen noise must not look like unstable city lights.
+      float g = hash12(vUv * uRes) - .5;
       c += g * uGrain * (1. - l * .7);
       gl_FragColor = vec4(c, 1.);
     }
