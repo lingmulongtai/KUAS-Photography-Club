@@ -45,6 +45,7 @@ GitHub Actionsはテスト・型チェック・ビルド・公開出力の確認
 ### 更新する場所
 
 - 基本情報・窓口：`src/data/club.ts`
+- ホームの3D地点・カメラ：`src/data/spots.ts` と `src/scripts/hero/views.ts`。[スマホ操作・地図移動の仕様と検証](docs/mobile-hero-navigation-2026-10-17.md)
 - 予定：`src/content/schedule/`。開催確認済みのイベントを個別に入力します。定例ミーティングの自動生成はしません。`weeklyMeeting` / `noMeeting` は旧ファイルとの互換性のため残っていますが、公開予定を生成しません
 - 撮影会記録：`src/content/trips/`。実際の記録と公開条件を確認できた写真だけを追加します
 - `sample: true` / `draft: true` の記録・月別予定は、トップ・一覧・詳細ルート・3D地点・管理画面初期データを含む公開経路から除外します。開発サンプルはローカルで編集し、フラグだけを消して公開しないでください
