@@ -27,7 +27,7 @@ const KIYOMIZU = toLocal(34.9946668, 135.7849382); // 清水寺 本堂舞台
 const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
 const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
-const FUNAOKA = toLocal(35.0389964, 135.7417307); // OSM node/6611051734: 船岡山三角点
+const ATAGO = toLocal(35.0600453, 135.6342851); // 愛宕山（地図の地点と共通）
 const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
 
 /** The viewpoints. Coordinates from OpenStreetMap; heights from the elevation data. */
@@ -41,9 +41,8 @@ export const VIEWS = {
   /** An exterior composition: the whole tower against the northern city and mountains. */
   tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 260), ref: TOWER, above: 112, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
-  funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 45, bearing: 208, pitch: -4 },
+  atago: { ja: '愛宕山', en: 'Mt. Atago', eye: ahead(ATAGO, 130, 60), ref: ATAGO, above: 75, bearing: 130, pitch: -7 },
   kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
-

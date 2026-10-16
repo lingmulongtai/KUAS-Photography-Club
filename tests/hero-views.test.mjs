@@ -20,8 +20,11 @@ test('landmark destinations keep their named model centred through full turns', 
 });
 
 test('panoramas turn at a fixed observation point', () => {
-  for (const id of ['shogunzuka','daimonji','arashiyama','funaoka']) {
+  for (const id of ['shogunzuka','daimonji','arashiyama','atago']) {
     assert.equal(VIEWS[id].orbit,undefined);
     assert.ok(VIEWS[id].above>0);
   }
+  const atago=SPOTS.find(s=>s.id==='atago');
+  assert.deepEqual(VIEWS.atago.ref,toLocal(atago.lat,atago.lon));
+  assert.equal('funaoka' in VIEWS,false);
 });
