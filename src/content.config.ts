@@ -39,7 +39,7 @@ const trips = defineCollection({
 /** The club guidelines, read straight from the repository's guidelines/ folder. */
 const guidelines = defineCollection({
   loader: glob({
-    pattern: ['club_guidelines.md', 'club_guidelines_en.md', 'multilingual-support/club_guidelines_*.md'],
+    pattern: ['club_guidelines.md', 'club_guidelines_en.md'],
     base: './guidelines',
     generateId: ({ entry }) => {
       const m = entry.match(/club_guidelines_([\w-]+)\.md$/);
