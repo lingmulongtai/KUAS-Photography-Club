@@ -80,9 +80,9 @@ export class CampusBuilder {
       const l=i/steps,r=(i+1)/steps;
       const p=at(l,-width/2,y),q=at(r,-width/2,y),s=at(r,width/2,y),t=at(l,width/2,y);
       bQuad(this,p,q,s,t,m);
-      this.quad(at(l,width/2,lower),at(l,-width/2,lower),p,t,m);
-      this.quad(at(l,-width/2,lower),at(r,-width/2,lower),q,p,m);
-      this.quad(at(r,width/2,lower),at(l,width/2,lower),t,s,m);
+      this.quad(t,p,at(l,-width/2,lower),at(l,width/2,lower),m);
+      this.quad(p,q,at(r,-width/2,lower),at(l,-width/2,lower),m);
+      this.quad(s,t,at(l,width/2,lower),at(r,width/2,lower),m);
     }
     for(const side of [-width/2+.12,width/2-.12]) {
       this.beam(at(0,side,a[1]-.2),at(1,side,c[1]-.2),.16,.32,CM.steel);
@@ -95,7 +95,7 @@ export class CampusBuilder {
     const ia:P=[u0+inset,ridge,v0+inset],ib:P=[u1-inset,ridge,v0+inset],ic:P=[u1-inset,ridge,v1-inset],id:P=[u0+inset,ridge,v1-inset];
     this.quad(a,ia,ib,b,CM.roof);this.quad(b,ib,ic,c,CM.roof);
     this.quad(c,ic,id,d,CM.roof);this.quad(d,id,ia,a,CM.roof);
-    this.box(u0+inset,u1-inset,v0+inset,v1-inset,eave-.2,eave,CM.roof);
+    this.box(u0+inset,u1-inset,v0+inset,v1-inset,eave-.15,eave+.05,CM.roof);
     this.quad(ia,[ia[0],eave,ia[2]],[ib[0],eave,ib[2]],ib,CM.roof);
     this.quad(ib,[ib[0],eave,ib[2]],[ic[0],eave,ic[2]],ic,CM.roof);
     this.quad(ic,[ic[0],eave,ic[2]],[id[0],eave,id[2]],id,CM.roof);
@@ -243,7 +243,7 @@ export function addWest(b:CampusBuilder) {
     for(const [y0,y1,u,v0,v1] of [[0,4.5,-24,-40,9],[4.5,9,-21,-40,9],
       [9,13.5,-23,-40,-29],[9,13.5,-13,-29,-15],[9,13.5,-23,-15,9],[13.5,18,-13,-40,9]]) {
       const len=v1-v0;
-      b.facade([u,v1],[u,v0],y0,y1,[[.5,len-.5,y0+.25,y1-.35]]);
+      b.facade([u,v0],[u,v1],y0,y1,[[.5,len-.5,y0+.25,y1-.35]]);
       b.box(-24,u,v0,v1,y0-.24,y0,CM.concrete);
       b.box(-24,u,v0,v1,y1-.24,y1,CM.concrete);
     }

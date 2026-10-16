@@ -66,3 +66,10 @@ test('South grand staircase rises through four flights with flat, traversable cr
 test('campus planting stays clear of the academic facades and stair flights',()=>{
   for(const [u,v] of CAMPUS_TREES)assert.equal(ray([u,2,v],[u,7,v]).length,0,`tree at ${u},${v} intersects the architecture`);
 });
+test('courtyard walls and stair risers face the viewer with normal back-face culling',()=>{
+  const saved=mesh.material.side;mesh.material.side=THREE.FrontSide;
+  assert.ok(ray([0,11,-35],[-25,11,-35]).length,'West glass faces the courtyard');
+  assert.ok(ray([0,.08,21],[0,.08,22.3]).length,'first stair riser faces north');
+  assert.ok(ray([4,1.4,25],[2,1.4,25]).length,'stair flight side faces east');
+  mesh.material.side=saved;
+});
