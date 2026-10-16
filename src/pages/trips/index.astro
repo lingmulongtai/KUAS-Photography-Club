@@ -4,7 +4,6 @@ import PageHero from '../../components/PageHero.astro';
 import FilmStrip from '../../components/FilmStrip.astro';
 import TripRow from '../../components/TripRow.astro';
 import { getTrips, stripsFrom } from '../../lib/trips';
-import { club } from '../../data/club';
 
 const trips = await getTrips();
 const strips = stripsFrom(trips);
@@ -14,12 +13,12 @@ const photoCount = trips.reduce((n, t) => n + t.data.photos.length, 0);
   <PageHero
     edge={`PHOTO TRIPS ▸ ${trips.length} ROLLS ▸ ${photoCount} FRAMES`}
     title="撮影会の記録"
-    lead={`月に${club.tripsPerMonth}回ほど、京都の街や近くの府県へ写真を撮りに出かけています。撮影会ごとに1本のフィルムとして、撮った写真と撮影メモを残しています。`}
+    lead="部員で相談しながら撮影会を企画しています。公開できる活動記録は、準備ができ次第掲載します。"
   />
 
-  <section class="wrap film-wrap" aria-label="最近の撮影会の写真">
+  {strips.length > 0 && <section class="wrap film-wrap" aria-label="最近の撮影会の写真">
     <FilmStrip strips={strips} label="最近の撮影会の写真が並んだフィルム" />
-  </section>
+  </section>}
 
   <section class="section">
     <div class="wrap">
@@ -27,6 +26,7 @@ const photoCount = trips.reduce((n, t) => n + t.data.photos.length, 0);
         <p class="edge">ARCHIVE</p>
         <h2>撮影会のアーカイブ</h2>
       </div>
+      {trips.length === 0 && <p class="muted">活動記録を準備中です。</p>}
       <div class="list">
         {trips.map((trip, i) => <TripRow trip={trip} roll={trips.length - i} />)}
       </div>

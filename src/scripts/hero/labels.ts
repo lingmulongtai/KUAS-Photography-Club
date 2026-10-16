@@ -89,10 +89,11 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: st
           const img = document.createElement('img');
           img.src = trip.src; img.alt = trip.alt; img.width = 240; img.height = 135; img.loading = 'lazy';
           const title = document.createElement('strong');
-          title.textContent = trip.title + (trip.sample ? '（サンプル）' : '');
+          title.textContent = trip.title;
           const credit = document.createElement('small');
           credit.textContent = trip.credit;
-          link.append(img, title, credit);
+          if (trip.src) link.append(img);
+          link.append(title, credit);
           popup.appendChild(link);
         }
         node.appendChild(popup);

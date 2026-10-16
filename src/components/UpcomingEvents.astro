@@ -1,27 +1,29 @@
 ---
 /** The next few events from the schedule. Past ones are hidden in the browser, so the list stays current between deploys. */
-import { formatDay, getSchedule, kindLabel } from '../lib/schedule';
+import { formatDay, getSchedule, kindLabel, kindLabelEn } from '../lib/schedule';
 
 interface Props {
   count?: number;
+  lang?: 'ja' | 'en';
 }
-const { count = 4 } = Astro.props;
+const { count = 4, lang = 'ja' } = Astro.props;
+const en = lang === 'en';
 const events = (await getSchedule()).flatMap((m) => m.events);
 ---
 <div class="upcoming" data-count={count}>
   <ol class="events">
     {events.map((e) => (
       <li class={`k-${e.kind}`} data-date={e.date} hidden>
-        <span class="date"><span class="num">{formatDay(e.date)}</span></span>
+        <span class="date"><span class="num">{en ? e.date : formatDay(e.date)}</span></span>
         <span class="body">
-          <span class="kind">{kindLabel[e.kind]}</span>
-          <b>{e.title}</b>
+          <span class="kind">{(en ? kindLabelEn : kindLabel)[e.kind]}</span>
+          <b lang={en && !e.titleEn ? 'ja' : lang}>{en ? (e.titleEn ?? `${e.title} (Japanese)`) : e.title}</b>
           {(e.time || e.place) && <span class="meta">{[e.time, e.place].filter(Boolean).join(' · ')}</span>}
         </span>
       </li>
     ))}
   </ol>
-  <p class="empty muted" hidden>これからの予定は、決まりしだいここに載せます。</p>
+  <p class="empty muted" hidden>{en ? 'Future plans will be announced once confirmed.' : '今後の予定は、決まり次第お知らせします。'}</p>
 </div>
 
 <script>

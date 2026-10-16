@@ -14,6 +14,7 @@ const scenes = [
   { id: 'night', label: '夜の街', ev: 4, img: '/photos/samples/kawaramachi-night/01.jpg' },
 ];
 ---
+<p class="small muted">仕組みを理解するための簡易表現です。実際の写りは機材・撮影距離・被写体の動きなどで異なります。画像はプログラムで描いた学習用図解で、部員の撮影写真や活動記録ではありません。</p>
 <div class="sim" data-sim data-scenes={JSON.stringify(scenes)}>
   <div class="preview">
     <img src={scenes[0].img} alt="選んだ設定で撮ったときの明るさのイメージ" width="1400" height="933" />
@@ -47,7 +48,7 @@ const scenes = [
     </div>
 
     <ul class="effects">
-      <li><span>ブレ</span><b data-eff="blur">止まる</b></li>
+      <li><span>ブレ</span><b data-eff="blur">ブレを抑えやすい</b></li>
       <li><span>背景のボケ</span><b data-eff="bokeh">小さい</b></li>
       <li><span>ノイズ</span><b data-eff="noise">少ない</b></li>
     </ul>
@@ -117,8 +118,8 @@ const scenes = [
       grain.style.opacity = String(Math.min(0.55, Math.max(0, (Math.log2(s / 100) - 2) * 0.09)));
       const r = Math.round(d * 3) / 3;
       verdict.textContent = Math.abs(d) < 0.34 ? '適正露出' : d > 0 ? `${r.toFixed(1)}段 明るすぎ` : `${Math.abs(r).toFixed(1)}段 暗すぎ`;
-      eff('blur').textContent = t >= 1 / 15 ? '三脚が必要' : t >= 1 / 60 ? '手ブレ注意' : t >= 1 / 250 ? '止まる' : 'しっかり止まる';
-      eff('bokeh').textContent = n <= 2 ? '大きい' : n <= 4 ? 'ややある' : n <= 8 ? '小さい' : 'ほぼなし';
+      eff('blur').textContent = t >= 1 / 15 ? '固定して撮影を検討' : t >= 1 / 60 ? '手ブレに注意' : t >= 1 / 250 ? 'ブレを抑えやすい' : '速い動きにも試す';
+      eff('bokeh').textContent = n <= 2 ? '大きくなりやすい' : n <= 4 ? 'やや小さく' : n <= 8 ? '小さくなりやすい' : 'さらに小さくなる傾向';
       eff('noise').textContent = s <= 400 ? '少ない' : s <= 1600 ? 'ややある' : s <= 6400 ? '目立つ' : 'かなり目立つ';
       [ss, f, iso].forEach(syncCameraDial);
     };

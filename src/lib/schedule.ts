@@ -1,15 +1,17 @@
 import { getCollection, render, type CollectionEntry } from 'astro:content';
-import { club } from '../data/club';
+import { isPublicContent } from './public-content';
 
 export type EventKind = 'meeting' | 'trip' | 'event' | 'deadline' | 'other';
 
 export interface ScheduleEvent {
   date: string;
   title: string;
+  titleEn?: string;
   kind: EventKind;
   time?: string;
   place?: string;
   note?: string;
+  noteEn?: string;
   link?: string;
 }
 
@@ -29,6 +31,9 @@ export const kindLabel: Record<EventKind, string> = {
   deadline: '締切',
   other: 'お知らせ',
 };
+export const kindLabelEn: Record<EventKind, string> = {
+  meeting: 'Meeting', trip: 'Photo outing', event: 'Event', deadline: 'Deadline', other: 'Notice',
+};
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -44,27 +49,15 @@ export const formatDay = (date: string) => {
 function expand(entry: CollectionEntry<'schedule'>): ScheduleMonth {
   const [year, month] = entry.data.month.split('-').map(Number);
   const events: ScheduleEvent[] = entry.data.events.map((e) => ({ ...e }));
-  if (entry.data.weeklyMeeting) {
-    const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    for (let d = 1; d <= days; d++) {
-      const date = `${year}-${pad(month)}-${pad(d)}`;
-      if (weekday(date) !== 5 || entry.data.noMeeting.includes(date)) continue;
-      events.push({
-        date,
-        title: '定例ミーティング',
-        kind: 'meeting',
-        time: club.meetings.times.join(' / '),
-        place: `${club.campus} ${club.meetings.room}`,
-      });
-    }
-  }
+  // A usual weekly time is not confirmation of an individual meeting.
+  // Publish explicit dates only; legacy weeklyMeeting/noMeeting fields are not expanded.
   events.sort((a, b) => (a.date === b.date ? (a.kind === 'meeting' ? -1 : 1) : a.date < b.date ? -1 : 1));
   return { id: entry.id, year, month, sample: entry.data.sample, events, entry };
 }
 
 /** Every month on file, oldest first. */
 export async function getSchedule(): Promise<ScheduleMonth[]> {
-  const entries = await getCollection('schedule');
+  const entries = await getCollection('schedule', isPublicContent);
   return entries.map(expand).sort((a, b) => (a.entry.data.month < b.entry.data.month ? -1 : 1));
 }
 

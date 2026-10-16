@@ -5,30 +5,34 @@
  * Tap the sky for a shooting star; the campus pin flies the camera to the Uzumasa campus.
  */
 import { club } from '../data/club';
-import { getCollection } from 'astro:content';
-import { credit } from '../lib/trips';
+import { languagePath } from '../lib/i18n';
+interface Props { lang?: 'ja' | 'en'; }
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+const local = (href: string) => languagePath(href, lang);
+import { credit, getTrips } from '../lib/trips';
 import { completeSpotPreviews } from '../data/spot-samples';
-const pinTrips = completeSpotPreviews((await getCollection('trips'))
+const pinTrips = completeSpotPreviews((await getTrips())
   .filter((t) => t.data.spot)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
-  .map((t) => ({ spot: t.data.spot!, title: t.data.title, href: `/trips/${encodeURIComponent(t.id)}/`, src: t.data.photos[0].src, alt: t.data.photos[0].alt, credit: credit(t.data.photos[0], t.data.date), sample: t.data.sample })));
+  .map((t) => ({ spot: t.data.spot!, title: t.data.title, href: `/trips/${encodeURIComponent(t.id)}/`, src: t.data.photos[0].src, alt: t.data.photos[0].alt, credit: credit(t.data.photos[0], t.data.date), sample: t.data.sample }))).map(t => en && t.sample ? { ...t, title: 'Activity records', credit: 'Records are being prepared', href: '/en/trips/' } : t);
 ---
-<section class="hero" aria-labelledby="hero-title" data-view="city">
+<section class="hero" aria-labelledby="hero-title" data-view="city" data-lang={lang}>
   <div class="stage hero-stage" data-demo="hero" data-trips={JSON.stringify(pinTrips)}>
     <canvas aria-label="将軍塚から西を望む京都の街の3D。実際の地形と建物のデータから作り、空は京都の現在時刻に合わせて変わります"></canvas>
     <nav class="views" aria-label="眺める場所">
       <span class="views-label">VIEW</span>
-      <button type="button" data-view="shogunzuka" aria-pressed="true">将軍塚</button>
-      <button type="button" data-view="kiyomizu" aria-pressed="false">清水の舞台</button>
-      <button type="button" data-view="daimonji" aria-pressed="false">大文字山</button>
-      <button type="button" data-view="tower" aria-pressed="false">京都タワー</button>
-      <button type="button" data-view="arashiyama" aria-pressed="false">嵐山・大悲閣</button>
-      <button type="button" data-view="funaoka" aria-pressed="false">船岡山</button>
-      <button type="button" data-view="kinkaku" aria-pressed="false">金閣寺</button>
+      <button type="button" data-view="shogunzuka" aria-pressed="true">{en ? 'Shogunzuka' : '将軍塚'}</button>
+      <button type="button" data-view="kiyomizu" aria-pressed="false">{en ? 'Kiyomizu' : '清水の舞台'}</button>
+      <button type="button" data-view="daimonji" aria-pressed="false">{en ? 'Daimonji' : '大文字山'}</button>
+      <button type="button" data-view="tower" aria-pressed="false">{en ? 'Kyoto Tower' : '京都タワー'}</button>
+      <button type="button" data-view="arashiyama" aria-pressed="false">{en ? 'Arashiyama' : '嵐山・大悲閣'}</button>
+      <button type="button" data-view="funaoka" aria-pressed="false">{en ? 'Funaokayama' : '船岡山'}</button>
+      <button type="button" data-view="kinkaku" aria-pressed="false">{en ? 'Kinkakuji' : '金閣寺'}</button>
     </nav>
     <div class="loading" aria-hidden="true">
       <span class="spin"></span>
-      <span>京都の街を読み込んでいます</span>
+      <span>{en ? 'Loading Kyoto' : '京都の街を読み込んでいます'}</span>
     </div>
   </div>
   <div class="scrim" aria-hidden="true"></div>
@@ -36,13 +40,13 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
   <div class="hero-inner">
     <div class="copy">
       <p class="edge eyebrow">KYOTO ▸ <span data-status>いまの空</span></p>
-      <h1 id="hero-title">京都の空の下で、<br />写真を撮っています。</h1>
+      <h1 id="hero-title">{en ? <>Photography,<br />under Kyoto’s sky.</> : <>京都の空の下で、<br />写真を撮っています。</>}</h1>
       <p class="lead">
-        {club.nameJa}です。月に2回の撮影会で、京都の街や近くの府県へ写真を撮りに出かけています。カメラがなくても、スマホひとつで参加できます。
+        {en ? 'We are the photography club at Kyoto University of Advanced Science. Members plan photo outings together. A smartphone is enough to take part.' : `${club.nameJa}です。部員で相談しながら撮影会を企画しています。カメラがなくても、スマホひとつで参加できます。`}
       </p>
       <div class="ctas">
-        <a class="btn btn--primary" href="/trips/">撮影会の記録を見る <span class="arrow" aria-hidden="true">→</span></a>
-        <a class="btn btn--glass" href="/join/">見学・入部について</a>
+        <a class="btn btn--primary" href={local('/trips/')}>{en ? 'View outing records' : '撮影会の記録を見る'}<span class="arrow" aria-hidden="true">→</span></a>
+        <a class="btn btn--glass" href={local('/join/')}>{en ? 'Visit / Join' : '見学・入部について'}</a>
       </div>
     </div>
 
@@ -53,35 +57,36 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
         <span class="moon" data-moon></span>
       </p>
       <div class="times" role="group" aria-label="空の時間を切り替える">
-        <button type="button" data-time="now" aria-pressed="true">いま</button>
-        <button type="button" data-time="morning" aria-pressed="false">朝</button>
-        <button type="button" data-time="noon" aria-pressed="false">昼</button>
-        <button type="button" data-time="sunset" aria-pressed="false">夕焼け</button>
-        <button type="button" data-time="night" aria-pressed="false">夜</button>
+        <button type="button" data-time="now" aria-pressed="true">{en ? 'Now' : 'いま'}</button>
+        <button type="button" data-time="morning" aria-pressed="false">{en ? 'Morning' : '朝'}</button>
+        <button type="button" data-time="noon" aria-pressed="false">{en ? 'Day' : '昼'}</button>
+        <button type="button" data-time="sunset" aria-pressed="false">{en ? 'Sunset' : '夕焼け'}</button>
+        <button type="button" data-time="night" aria-pressed="false">{en ? 'Night' : '夜'}</button>
       </div>
       <div class="times landmark-angles" role="group" aria-label="名所を見る角度" hidden>
-        <button type="button" data-landmark-elevation="oblique" aria-pressed="true">斜めから</button>
-        <button type="button" data-landmark-elevation="overhead" aria-pressed="false">真上から</button>
+        <button type="button" data-landmark-elevation="oblique" aria-pressed="true">{en ? 'Oblique' : '斜めから'}</button>
+        <button type="button" data-landmark-elevation="overhead" aria-pressed="false">{en ? 'Overhead' : '真上から'}</button>
       </div>
-      <p class="hint">ドラッグで360°見回せます。スマホは横スワイプ。<span>空をタップすると流れ星。「太秦キャンパス」から近づけます。夜景の送り火はイメージです。</span></p>
+      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap the sky for a shooting star. Select Uzumasa Campus to fly closer. The night-time bonfires are illustrative.' : '空をタップすると流れ星。「太秦キャンパス」から近づけます。夜景の送り火はイメージです。'}</span></p>
     </aside>
   </div>
 
   <div class="campus-card" role="region" aria-label="太秦キャンパス" hidden>
     <p class="edge">OUR CAMPUS</p>
-    <h2>京都先端科学大学<br />太秦キャンパス</h2>
-    <p class="small">写真部はここで集まっています。</p>
+    <h2>{en ? <>Kyoto University of Advanced Science<br />Uzumasa Campus</> : <>京都先端科学大学<br />太秦キャンパス</>}</h2>
+    <p class="small">{en ? 'Our usual meeting place.' : '写真部はここで集まっています。'}</p>
     <div class="times campus-angles" role="group" aria-label="キャンパスを見る角度">
-      <button type="button" data-elevation="oblique" aria-pressed="true">斜めから</button>
-      <button type="button" data-elevation="overhead" aria-pressed="false">真上から</button>
+      <button type="button" data-elevation="oblique" aria-pressed="true">{en ? 'Oblique' : '斜めから'}</button>
+      <button type="button" data-elevation="overhead" aria-pressed="false">{en ? 'Overhead' : '真上から'}</button>
     </div>
     <dl>
-      <div><dt>ミーティング</dt><dd>{club.meetings.day} {club.meetings.times.join(' / ')}</dd></div>
-      <div><dt>教室</dt><dd>{club.meetings.room}</dd></div>
+      <div><dt>{en ? 'Meeting' : 'ミーティング'}</dt><dd>{en ? 'Fridays' : club.meetings.day} {club.meetings.times.join(' / ')}</dd></div>
+      <div><dt>{en ? 'Usual room' : '通常の教室'}</dt><dd>{club.meetings.room}</dd></div>
     </dl>
+    <a class="small" href={local('/schedule/')}>{en ? 'Check cancellations and room changes' : '休会・教室変更の最新案内を確認'}</a>
     <div class="card-actions">
-      <a class="btn btn--primary" href="/join/">見学に行く <span class="arrow" aria-hidden="true">→</span></a>
-      <button class="btn btn--glass back" type="button">← 街の眺めに戻る</button>
+      <a class="btn btn--primary" href={local('/join/')}>{en ? 'Plan a visit' : '見学に行く'}<span class="arrow" aria-hidden="true">→</span></a>
+      <button class="btn btn--glass back" type="button">{en ? '← Back to Kyoto' : '← 街の眺めに戻る'}</button>
     </div>
   </div>
 
@@ -98,6 +103,7 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
   const hero = stage?.closest<HTMLElement>('.hero');
   if (stage && hero) {
+    const en = hero.dataset.lang === 'en';
     const out = {
       status: hero.querySelector('[data-status]'),
       clock: hero.querySelector('[data-clock]'),
@@ -157,9 +163,10 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
 
     const onStatus = (s: HeroStatus) => {
       if (out.clock) out.clock.textContent = hhmm(s.minutes);
-      if (out.phase) out.phase.textContent = s.phase;
-      if (out.moon) out.moon.textContent = `月齢 ${s.moonAge.toFixed(1)}`;
-      if (out.status) out.status.textContent = `${sky.live ? 'いま' : '表示中'} ${hhmm(s.minutes)} · ${s.phase}`;
+      const phase = en ? (s.altitude < -12 ? 'Night' : s.altitude < 0 ? 'Twilight' : s.altitude < 20 ? 'Low sunlight' : 'Day') : s.phase;
+      if (out.phase) out.phase.textContent = phase;
+      if (out.moon) out.moon.textContent = `${en ? 'Moon age' : '月齢'} ${s.moonAge.toFixed(1)}`;
+      if (out.status) out.status.textContent = `${sky.live ? (en ? 'Now' : 'いま') : (en ? 'Viewing' : '表示中')} ${hhmm(s.minutes)} · ${phase}`;
     };
 
     const setView = (mode: HeroMode, arrived: boolean) => {
@@ -167,8 +174,8 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
       hero.querySelectorAll<HTMLButtonElement>('[data-elevation],[data-landmark-elevation]').forEach(b=>b.disabled=!arrived);
       landmarkAngles.hidden = mode!=='city' || !demo?.orbiting;
       cameraHint.textContent = demo?.orbiting && mode==='city'
-        ? 'ドラッグで建物を中心に360°回れます。スマホは横スワイプ。'
-        : 'ドラッグで360°見回せます。スマホは横スワイプ。';
+        ? (en ? 'Drag or swipe to orbit the building.' : 'ドラッグで建物を中心に360°回れます。スマホは横スワイプ。')
+        : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
       if (!arrived) landmarkButtons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.landmarkElevation==='oblique')));
       if (mode === 'campus') {
         card.hidden = false;

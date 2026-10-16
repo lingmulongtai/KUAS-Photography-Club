@@ -18,11 +18,11 @@ const href = (id: string) => (id === 'ja' ? '/guidelines/' : `/guidelines/${id}/
 ---
 <div class="wrap guide">
   <nav class="langs" aria-label="言語 / Language">
-    <p class="edge">GUIDELINES ▸ 11 LANGUAGES</p>
+    <p class="edge">GUIDELINES ▸ 日本語 / ENGLISH</p>
     <ul>
       {guidelineLanguages.map((l) => (
         <li>
-          <a href={href(l.id)} lang={l.lang} aria-current={l.id === entry.id ? 'page' : undefined}>{l.name}</a>
+          <a href={href(l.id)} lang={l.lang} data-language={l.id} aria-current={l.id === entry.id ? 'page' : undefined}>{l.name}</a>
         </li>
       ))}
     </ul>

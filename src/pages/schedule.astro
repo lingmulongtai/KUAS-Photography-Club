@@ -12,10 +12,11 @@ const kinds = Object.keys(kindLabel) as EventKind[];
   <PageHero
     edge="SCHEDULE ▸ MONTHLY"
     title="スケジュール"
-    lead={`定例ミーティングは${club.meetings.day} ${club.meetings.times.join(' / ')}、${club.campus} ${club.meetings.room} 教室です。撮影会やイベントの予定は毎月ここに載せます。`}
+    lead={`定例ミーティングは${club.meetings.day} ${club.meetings.times.join(' / ')}、${club.campus} ${club.meetings.room} 教室です。休会や教室変更があるため、参加前に運営へ最新案内をご確認ください。確定した予定とお知らせを掲載します。`}
   />
 
   <div class="wrap">
+    <p><a href="/contact/">運営へ最新の開催・教室を確認する</a>。今後の予定は、決まり次第お知らせします。</p>
     <ul class="legend" aria-label="予定の種類">
       {kinds.map((k) => <li class={`k-${k}`}><i></i>{kindLabel[k]}</li>)}
     </ul>

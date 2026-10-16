@@ -1,0 +1,10 @@
+---
+import Base from '../../../layouts/Base.astro';
+import PageHero from '../../../components/PageHero.astro';
+import { learnTopics } from '../../../data/learn';
+---
+<Base lang="en" title="Learn photography" description="English introductions to shutter speed, aperture, focal length and developing.">
+  <PageHero edge="LEARN ▸ PHOTOGRAPHY" title="Learn photography" lead="Explore the ideas behind camera settings. These introductions explain the basics; the detailed Japanese articles also include interactive demonstrations." />
+  <section class="wrap section"><div class="cards">{learnTopics.map(topic => <article><p class="edge">{topic.no}</p><h2><a href={`/en/learn/${topic.slug}/`}>{topic.en}</a></h2></article>)}</div></section>
+</Base>
+<style>.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; } article { padding: 24px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--radius); } h2 { font-size: var(--step-2); }</style>

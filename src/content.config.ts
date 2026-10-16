@@ -18,8 +18,9 @@ const trips = defineCollection({
     members: z.number().int().positive().optional(),
     /** One sentence for lists and link previews. */
     summary: z.string(),
-    /** Sample content shipped with the site; shown with a badge until replaced. */
+    /** Development content; excluded from every public collection boundary. */
     sample: z.boolean().default(false),
+    draft: z.boolean().default(false),
     photos: z
       .array(
         z.object({
@@ -38,7 +39,7 @@ const trips = defineCollection({
 /** The club guidelines, read straight from the repository's guidelines/ folder. */
 const guidelines = defineCollection({
   loader: glob({
-    pattern: ['club_guidelines.md', 'club_guidelines_en.md', 'multilingual-support/club_guidelines_*.md'],
+    pattern: ['club_guidelines.md', 'club_guidelines_en.md'],
     base: './guidelines',
     generateId: ({ entry }) => {
       const m = entry.match(/club_guidelines_([\w-]+)\.md$/);
@@ -49,7 +50,7 @@ const guidelines = defineCollection({
 
 /**
  * One Markdown file per month in src/content/schedule/ (e.g. 2026-10.md).
- * Every Friday gets the weekly meeting automatically unless listed in noMeeting.
+ * Only explicitly confirmed events are published; legacy recurrence fields are retained for old files.
  */
 /** YAML turns 2026-10-24 into a Date; keep dates as plain YYYY-MM-DD strings. */
 const day = z.preprocess((v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
@@ -58,19 +59,22 @@ const schedule = defineCollection({
   loader: glob({ pattern: '*.md', base: './src/content/schedule' }),
   schema: z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/),
-    weeklyMeeting: z.boolean().default(true),
+    weeklyMeeting: z.boolean().default(false),
     /** Fridays without the weekly meeting, as YYYY-MM-DD. */
     noMeeting: z.array(day).default([]),
     sample: z.boolean().default(false),
+    draft: z.boolean().default(false),
     events: z
       .array(
         z.object({
           date: day,
           title: z.string(),
+          titleEn: z.string().optional(),
           kind: z.enum(['meeting', 'trip', 'event', 'deadline', 'other']).default('event'),
           time: z.string().optional(),
           place: z.string().optional(),
           note: z.string().optional(),
+          noteEn: z.string().optional(),
           link: z.string().optional(),
         }),
       )

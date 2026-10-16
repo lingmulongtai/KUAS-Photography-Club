@@ -1,29 +1,18 @@
 ---
 import { club } from '../data/club';
 import { instagramPosts } from '../data/instagram';
-import SampleBadge from './SampleBadge.astro';
 
-const samples = [
-  '/photos/samples/arashiyama-randen/01.jpg',
-  '/photos/samples/higashiyama-autumn/02.jpg',
-  '/photos/samples/kyoto-aquarium/01.jpg',
-  '/photos/samples/summer-fireworks/02.jpg',
-  '/photos/samples/fushimi-inari/01.jpg',
-  '/photos/samples/kawaramachi-night/01.jpg',
-].map((image) => ({ url: club.instagram.url, image, alt: 'サンプル画像' }));
-const posts = instagramPosts.length ? instagramPosts.slice(0, 6) : samples;
-const usingSamples = instagramPosts.length === 0;
+const posts = instagramPosts.slice(0, 6);
 ---
 <section class="section insta" aria-labelledby="insta-title">
   <div class="wrap grid">
     <div class="intro">
       <p class="edge">INSTAGRAM ▸ @{club.instagram.handle}</p>
-      <h2 id="insta-title">撮った写真は<br />Instagram でも。</h2>
-      <p class="muted">撮影会のお知らせや、メンバーが撮った写真を投稿しています。</p>
+      <h2 id="insta-title">Instagram からも<br />お問い合わせできます。</h2>
+      <p class="muted">写真部の Instagram はこちらです。最新の発信はプロフィールからご覧ください。</p>
       <a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">Instagram を見る <span class="arrow" aria-hidden="true">↗</span></a>
-      {usingSamples && <SampleBadge />}
     </div>
-    <ul class="tiles">
+    {posts.length > 0 && <ul class="tiles">
       {posts.map((p) => (
         <li>
           <a href={p.url} target="_blank" rel="noopener" aria-label="Instagram で見る">
@@ -31,7 +20,7 @@ const usingSamples = instagramPosts.length === 0;
           </a>
         </li>
       ))}
-    </ul>
+    </ul>}
   </div>
 </section>
 
