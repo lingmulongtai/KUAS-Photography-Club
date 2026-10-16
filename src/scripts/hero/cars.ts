@@ -4,6 +4,7 @@ import type { Heightfield } from './heightfield';
 import { LINE, type LineFeature } from './lines-data';
 import { ROAD_WIDTH } from './roads';
 import { rng } from './util';
+import { lightSpriteGeometry, LIGHT_SPRITE_VERTEX, LIGHT_SPRITE_FRAGMENT } from './light-sprites';
 
 /*
  * Traffic: small cars driving on the left along the real avenues and main streets. Each car
@@ -185,56 +186,47 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
   bodies.frustumCulled = false;
 
   /* ---- lights, which stay visible as points of light from far away ---- */
-  const lgeo = new THREE.BufferGeometry();
-  const lpos = new THREE.BufferAttribute(new Float32Array(count * 2 * 3), 3);
-  const ldir = new THREE.BufferAttribute(new Float32Array(count * 2 * 2), 2);
+  const lpos = new THREE.InstancedBufferAttribute(new Float32Array(count * 2 * 3), 3);
+  const ldir = new THREE.InstancedBufferAttribute(new Float32Array(count * 2 * 2), 2);
+  const lgeo = lightSpriteGeometry(lpos);
   lpos.setUsage(THREE.DynamicDrawUsage);
   ldir.setUsage(THREE.DynamicDrawUsage);
   const head = new Float32Array(count * 2);
   for (let i = 0; i < count; i++) head[i * 2] = 1;
-  lgeo.setAttribute('position', lpos);
   lgeo.setAttribute('aDir', ldir);
-  lgeo.setAttribute('aHead', new THREE.BufferAttribute(head, 1));
+  lgeo.setAttribute('aHead', new THREE.InstancedBufferAttribute(head, 1));
   const lightMat = new THREE.ShaderMaterial({
     uniforms: { ...env, uScale: { value: 1 } },
     vertexShader: /* glsl */ `
       ${ENV_GLSL}
+      ${LIGHT_SPRITE_VERTEX}
       attribute vec2 aDir;
       attribute float aHead;
-      uniform float uScale;
       varying vec3 vColor;
       void main(){
-        vec3 toCam = normalize(cameraPosition - position);
+        vec3 toCam = normalize(cameraPosition - aLightPosition);
         float facing = dot(vec3(aDir.x, 0., aDir.y), toCam);
         // headlights are seen from in front, tail lights from behind
-        float seen = aHead > .5 ? smoothstep(-.1, .3, facing) : smoothstep(.1, -.3, facing);
+        float seen = aHead > .5 ? smoothstep(-.1, .3, facing) : 1. - smoothstep(-.3, .1, facing);
         vec3 c = aHead > .5 ? vec3(1., .9, .72) * 2.4 : vec3(1., .07, .03) * 1.7;
-        vec4 mv = viewMatrix * vec4(position, 1.);
-        float dist = -mv.z;
-        float px = clamp(uScale * 1.5 / dist, 1., 3.5);
+        vec4 mv = viewMatrix * vec4(aLightPosition, 1.);
+        float dist = max(-mv.z,.01);
+        float core = clamp(uScale * 1.5 / dist, 1., 3.5);
+        float px = max(4.,core*2.);
         // only after dark, and not so big right under the viewpoint that they flood the bloom
         float near = 1. - smoothstep(2., 3.5, uScale * 1.5 / dist) * .6;
         // lights drawn larger than they are, far away, would pile up into glare
         float far = pow(clamp(uScale * 1.5 / dist, .12, 1.), .6);
-        vColor = c * seen * uCity * near * far * mix(hazeTransmittance(position), 1., .4);
-        gl_PointSize = px;
-        gl_Position = projectionMatrix * mv;
+        vColor = c * seen * uCity * near * far * mix(hazeTransmittance(aLightPosition), 1., .4) * (core*core/(px*px));
+        gl_Position = lightSprite(mv,px);
       }
     `,
-    fragmentShader: /* glsl */ `
-      varying vec3 vColor;
-      void main(){
-        float d = length(gl_PointCoord - .5) * 2.;
-        float a = exp(-d * d * 3.);
-        if (a < .02 || dot(vColor, vec3(1.)) < .001) discard;
-        gl_FragColor = vec4(vColor * a, 1.);
-      }
-    `,
+    fragmentShader: LIGHT_SPRITE_FRAGMENT,
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
-  const points = new THREE.Points(lgeo, lightMat);
+  const points = new THREE.Mesh(lgeo, lightMat);
   points.frustumCulled = false;
 
   /* ---- driving ---- */
