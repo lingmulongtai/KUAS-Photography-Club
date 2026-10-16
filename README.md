@@ -1,173 +1,90 @@
 # KUAS Photography Club（京都先端科学大学 写真部）
 
-KUAS Photography Club は、写真撮影を通じて「楽しむ」と「つながる」を大切にする写真部です。大学公認の文化系クラブ（部活動）として、国籍や学年を問わず、写真という共通の趣味で交流しています。
+京都先端科学大学 写真部が運営するサイトです。部員で相談しながら撮影会を企画しています。初心者・経験者、在学生・留学生の見学を受け付けています。スマートフォンでも参加できます。
 
-- 学友会公認: 2025/05/21
-- メンバー数: 55名（2025/10/29 現在）
-- ミーティング: 毎週 金曜 18:00〜（太秦キャンパス S306 教室）
+- 部員数：74名（2026年10月現在）
+- 定例ミーティング：毎週金曜18:00から、通常は太秦キャンパスS306
+- 2026年10月23日は龍尾祭準備のため、通常の定例ミーティングは休会
+- 部費：半期1,000円。撮影会の交通費・入場料等は別途各自負担
+- 運営の役職：部長、副部長、会計
+- 共有カメラ等の機材は整備中。利用できる機材は運営に確認してください
 
-## 活動目的
-- 写真撮影を通して、とにかく楽しむ
-- 留学生・日本人を問わず交流を広げる
-- クラブ機材（共有カメラ）の整備を進める
-  - カメラ未所持のメンバーも気軽に撮影を楽しめるよう、クラブのカメラ購入を目標にします
+休会・教室変更があるため、参加前に[スケジュール](https://kuas-photography-club.vercel.app/schedule/)と運営への確認をお願いします。学外の方・卒業生・教職員等の参加・正式入部の可否は、お問い合わせください。公認年月日は情報の確認ができるまで掲載していません。
 
-## 活動概要（Photo Trip）
-- 月2回ほどの撮影会で、キャンパス周辺から近隣の府県まで足を運び、美しい景色やイベントを撮影します
-- 例：花火大会、神社仏閣、水族館、街スナップ など
-- 撮影に向けたアイデア共有・企画準備のため、毎週ミーティングを行います
+## 見学・入部・お問い合わせ
 
-## このリポジトリについて
-このリポジトリは、KUAS Photography Club の運営に関するドキュメントを作成・保存・更新する場所です。今後、メンバーとともに内容を改善しながら整備していきます。
+[見学・参加の連絡フォーム（Microsoft Forms）](https://forms.cloud.microsoft/r/ZGB8GdNTUC)またはInstagramのDM・メールからご連絡ください。見学申込み・正式入部・連絡用チャットへの参加は別です。LINE等への参加だけでは正式な入部手続きは完了しません。必要な手続きは運営からご案内します。活動登録・保険の手続きや適用条件も運営にご確認ください。
 
-想定する主なドキュメント（予定）:
-- ガイドライン（活動方針・参加ルール・安全面の注意事項）
-- 撮影会の企画テンプレート（行程・持ち物・予算・リスク管理）
-- 広報・告知テンプレート（フライヤー文面、SNS投稿案）
-- 機材管理（共有カメラの運用方針・貸出ルール）
-- 会計関連（費用分担の考え方・テンプレート）
+フォームは未ログイン時にサインインを要求します。質問内容、使用言語、許可されるアカウントの範囲は今回確認できていません。回答できない場合は、次の窓口へご相談ください。いただく情報は、見学・参加の案内とお問い合わせへの対応に使用します。
 
-推奨フォルダ構成（予定）:
-- `guidelines/` … ガイドライン本体（サイトのガイドラインページもここから作られます）
-- `src/`・`public/`・`tools/` … ウェブサイト（下の「ウェブサイト」を参照）
-- `templates/` … 企画・広報・会計などのテンプレート
-- `equipment/` … 機材リスト・貸出ルール
-- `docs/` … 参考資料・記録 など
+- Instagram：[@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
+- メール：[photography.club.in.kuas@gmail.com](mailto:photography.club.in.kuas@gmail.com)
+- [問い合わせ](https://kuas-photography-club.vercel.app/contact/)：撮影依頼・協賛・取材は対応可否・費用・納期・写真の利用条件等を個別に相談します
 
-## ウェブサイト
-このリポジトリには、写真部の公式サイト（Astro + three.js。ページは静的で、管理画面の API だけ Vercel の関数で動きます）も入っています。
+部員への通常連絡はLINE等、運営が案内する連絡用チャットで行います。部員用参加リンク、名簿、学籍番号、個人連絡先、口座情報、個人別支払状況、未公開作品、提出用フォルダ等を一般公開しません。
 
-- トップ：京都の現在時刻に合わせて空が変わる 3D の京都
-- 撮影会：撮影会ごとに1本のフィルムとして写真と撮影メモを掲載
-- 写真を学ぶ：シャッタースピード・絞り・焦点距離・現像を、触って試せるデモつきで解説
-- 写真部について／見学・入部（フォームつき）／ガイドライン（11言語）
+## サイトの開発
 
-### 手元で動かす
-Node.js 22.12 以上が必要です。
+[公開サイト](https://kuas-photography-club.vercel.app/) / [English](https://kuas-photography-club.vercel.app/en/)
+
+Astro + Three.js。公開ページは静的で、管理APIのみVercel Functionsで動きます。既存の国土地理院・PLATEAU・OpenStreetMap等の出典表記を維持してください。
+
+Node.js 22.12以上を使用します。
 
 ```sh
-npm install
-npm run dev      # http://localhost:4321 で確認
-npm run check    # 型チェック
-npm run build    # dist/ と .vercel/output/ に書き出し
+npm ci
+npm run dev
+npm test
+npm run check
+npm run build
+node tools/verify-public-build.mjs
 ```
 
-### よくある更新
-- **ミーティングの時間・教室・メンバー数・連絡先**：`src/data/club.ts`
-- **撮影会を追加**：`src/content/trips/` に Markdown を1つ追加し、写真を `public/photos/<撮影会名>/` に置く（書き方は既存のファイルを参照）。撮影者名は `by` に書くと、ガイドライン第6章のクレジットが自動で付きます
-- **サンプルの差し替え**：`sample: true` の撮影会と写真はサンプルです。手順は `tools/sample-photos/README.md`
-- **仮の文章**：手書き風の点線メモがついている文章は、運営で書き換えてください
-- **見学・入部フォーム**：Microsoft Forms の共有リンクを `src/data/club.ts` の `forms.join` に貼る（差し替えるときもここ）。サイト自体は個人情報を集めません
-- **学外からの連絡先**：メール（`club.email`）と Instagram の DM だけです。アドレスを変えるときは `src/data/club.ts` を書き換えてください
-- **月ごとのスケジュール**：`src/content/schedule/` に `2026-12.md` のような Markdown を1つ追加（書き方は既存のファイルを参照）。金曜の定例ミーティングは自動で入ります
-- **Instagram の投稿**：`src/data/instagram.ts` に載せたい投稿を追加
-- **ガイドライン**：`guidelines/` の Markdown を編集すると、サイトにもそのまま反映されます
+GitHub Actionsはテスト・型チェック・ビルド・公開出力の確認を実行します。mainへのマージで既存のVercel連携が自動デプロイします。専用ブランチとPRを使い、検証後にマージしてください。
 
-### 公開（Vercel）
-1. [Vercel](https://vercel.com/) に GitHub アカウントでログインし、「Add New → Project」でこのリポジトリを選ぶ
-2. Framework は自動で「Astro」になるので、そのまま Deploy
-3. 以後は main ブランチに push すると自動で更新されます。プルリクエストごとにプレビュー URL も作られます
+### 更新する場所
 
-公開 URL が決まったら、`astro.config.mjs` の `site` を書き換えてください（OGP や canonical に使われます）。
+- 基本情報・窓口：`src/data/club.ts`
+- 予定：`src/content/schedule/`。開催確認済みのイベントを個別に入力します。定例ミーティングの自動生成はしません。`weeklyMeeting` / `noMeeting` は旧ファイルとの互換性のため残っていますが、公開予定を生成しません
+- 撮影会記録：`src/content/trips/`。実際の記録と公開条件を確認できた写真だけを追加します
+- `sample: true` / `draft: true` の記録・月別予定は、トップ・一覧・詳細ルート・3D地点・管理画面初期データを含む公開経路から除外します。開発サンプルはローカルで編集し、フラグだけを消して公開しないでください
+- 日英の予定：イベントの `titleEn` / `noteEn` に翻訳を記入します。未翻訳の本文は日本語であることを表示します。数値・日時・場所・費用・参加条件の意味を変えないでください
+- Instagram：`src/data/instagram.ts`。実投稿画像の公開条件を確認したものだけを追加します。空の場合はプロフィール案内のみで、仮画像を補完しません
+- 学習図解：`public/photos/samples/` のプログラムで描いた画像は学習用にのみ使います。部員の写真・活動実績として表示しません
+- ガイドライン：`guidelines/club_guidelines.md` と英語版。現在は確認済みの参加案内であり、正式規程の改定承認を示す文書ではありません
+- 2025年の旧規約：`guidelines/archive/`。未更新の他言語原本：`guidelines/multilingual-support/`。どちらもサイトのローダー対象外です。現行規程として公開しません
+- 日本語・英語：`/` と `/en/`。ガイドライン英語版は既存の `/guidelines/en/` を維持しています。ヘッダーから切り替えられ、手動選択をブラウザ内に保存します。初回はブラウザが提示する最初の対応言語を選び、日英がなければ英語にします。言語情報を外部サービスへ送りません
 
-### 管理画面（写真・撮影会・スケジュールの更新）
-サイトの `/admin/` から、ログインして次のことができます。公開すると GitHub に自動でコミットされ、Vercel が1〜2分でサイトを更新します。
+### 管理画面
 
-- **撮影会を追加**：タイトル・日付・場所・本文と写真を入れて公開
-- **写真を追加**：あとから撮影会に写真を足す
-- **スケジュール**：月ごとの予定・ミーティングがお休みの金曜・お知らせを書く
+`/admin/` では撮影会・写真・予定を編集できます。未設定時はデモモード（パスワード `demo`）で、公開しません。公開時は画像の公開条件とクレジットに使う表示名の了承を確認してください。写真はブラウザで長辺2000pxのJPEGへ変換しますが、写り込んだ個人情報や権利条件は別途確認が必要です。
 
-写真は送る前にブラウザの中で長い辺 2000px の JPEG に縮小され、位置情報（GPS）などのデータも消えます。
+本番設定はVercel側で管理してください。トークン・パスワード・ローカル環境ファイルはコミットしません。
 
-**いまはデモモードです**（パスワード `demo`）。試せますが、サイトには何も公開されません。本番にするには、Vercel のプロジェクトの「Settings → Environment Variables」に次を設定して再デプロイしてください。
-
-| 名前 | 中身 |
+| 変数 | 用途 |
 | --- | --- |
-| `ADMIN_PASSWORD` | 管理画面のパスワード（長めのものにしてください）。設定するとデモの `demo` は使えなくなります |
-| `GITHUB_TOKEN` | GitHub の Fine-grained personal access token。対象をこのリポジトリだけにし、権限は「Contents: Read and write」だけ |
-| `SESSION_SECRET`（任意） | ログイン状態の署名に使うランダムな文字列。変えると全員ログアウトされます |
-| `GITHUB_REPO` / `GITHUB_BRANCH`（任意） | 書き込み先。既定は `lingmulongtai/KUAS-Photography-Club` の `main` |
+| `ADMIN_PASSWORD` | 管理画面用パスワード。設定するとデモ用パスワードは無効 |
+| `GITHUB_TOKEN` | このリポジトリのみ、Contents read/writeのFine-grained token |
+| `SESSION_SECRET`（任意） | セッション署名 |
+| `GITHUB_REPO` / `GITHUB_BRANCH`（任意） | 既定は `lingmulongtai/KUAS-Photography-Club` / `main` |
 
-トークンとパスワードは Vercel の中だけに置き、リポジトリやチャットには書かないでください。
+## English
 
-## 参加・問い合わせ
-- 入会・見学・撮影会の参加は、ミーティングで運営メンバーに気軽に声をかけてください
-- 連絡方法：
-  - Instagram: [@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
-  - メール: [photography.club.in.kuas@gmail.com](mailto:photography.club.in.kuas@gmail.com)
+This website is operated by the Kyoto University of Advanced Science Photography Club.
 
-## 貢献のしかた（ドキュメント編集）
-- 誤字修正や追記、提案があれば Issue や Pull Request で気軽にご連絡ください
-- GitHub の使い方が不安な場合は、ミーティングで運営に相談してください
+- 74 members as of October 2026
+- Regular meetings: Fridays from 18:00, usually S306 at Uzumasa Campus; check cancellations and room changes before visiting
+- The regular meeting on October 23, 2026 is cancelled for campus festival preparations
+- Dues: JPY 1,000 per semester; transport, admission and other outing expenses are paid separately by each participant
+- A smartphone is enough. Shared equipment is still being prepared. Members plan outings together
+- Staff, alumni and people outside KUAS should ask about participation and eligibility for formal membership
 
-## ライセンス / 取り扱い
-- 本リポジトリの文書のライセンスは検討中です（後日追記）
-- 写真部内での利用を前提として運用します。外部利用については運営までご相談ください
+A visit request and joining a LINE or other communication chat do not complete formal membership. Organizers will explain the required procedures. Ask about activity registration and insurance conditions; automatic coverage is not guaranteed.
 
----
-最終更新: 2025-10-29
+The Microsoft Forms page requires sign-in. Its questions, actual language and permitted account scope were not verified. If you cannot respond, use email or Instagram DM. Information provided is used to arrange visits or participation and respond to inquiries. Photography requests, sponsorship and press inquiries are discussed individually, including availability, fees, deadlines and image usage conditions.
 
----
+The English website includes visit/join, about, schedule, contact, records and learning introductions. Detailed interactive lessons are available in Japanese and are labelled as such. The current Japanese and English guides cover the same information; historical regulations and unrevised translations are not published as current rules.
 
-# KUAS Photography Club (English)
+For development use `npm ci`, `npm test`, `npm run check`, `npm run build`, then `node tools/verify-public-build.mjs`. Sample/draft content is excluded from public routes and payloads. Do not publish placeholder content by simply removing its sample flag. Publication of real photos requires checking the photographer, depicted people and facility conditions for each intended use. Submitting a work for exhibition or sale does not authorize web publication.
 
-The KUAS Photography Club is a group for students who love photography. Our main goals are to have fun, connect with others, and share our passion for taking pictures. We welcome students of all nationalities and academic years. We are currently an informal group, but we aim to become an official university club next year.
-
-- **Official Recognition:** Approved by the Student Union on May 21, 2025
-- **Members:** 55 (as of October 29, 2025)
-- **Meetings:** Fridays from 18:00 in Room S306, Uzumasa Campus
-
-## Our Goals
-- To enjoy photography above all else.
-- To foster a community for both international and Japanese students.
-- To prepare for official club status by acquiring shared equipment, such as cameras that all members can use.
-  - Our goal is to purchase club cameras so that members who don't own one can still participate freely.
-
-## What We Do (Photo Trips)
-- We organize photo outings about twice a month to capture beautiful scenery and events, both on campus and in neighboring prefectures.
-- **Examples:** Fireworks festivals, temples, shrines, aquariums, and street photography.
-- We hold weekly meetings to plan these trips and share ideas.
-
-## About This Repository
-This repository is where we create, store, and update documents for the KUAS Photography Club. We plan to improve these documents over time with feedback from our members.
-
-**Planned Documents:**
-- **Guidelines:** Our club's policies, rules, and safety precautions.
-- **Templates:** For planning photo trips, managing budgets, and creating promotional materials.
-- **Equipment:** Rules for borrowing and managing shared cameras.
-- **Finances:** Policies for sharing costs and managing funds.
-
-**Recommended Folder Structure:**
-- `guidelines/`: Guideline documents (the website's guidelines pages are built from these).
-- `src/`, `public/`, `tools/`: The website (see "Website" below).
-- `templates/`: Templates for planning, announcements, and finances.
-- `equipment/`: Equipment lists and lending rules.
-- `docs/`: Reference materials and records.
-
-## Website
-This repository also holds the club website, an Astro + three.js site (static pages plus a small admin API on Vercel): a 3D Kyoto on the top page built from real data (GSI terrain and aerial photos, PLATEAU buildings with measured heights) and seen from Shogunzuka, with the live sky of Kyoto, sparkling shooting stars and a flight to the Uzumasa campus, photo trip reports shown as rolls of film, hands-on lessons on shutter speed, aperture, focal length and developing, a monthly schedule, an about page, join and contact pages that link to the club's own forms, and the guidelines in 11 languages.
-
-- Develop: `npm install`, then `npm run dev` (Node.js 22.12+). `npm run check` type-checks, `npm run build` writes `dist/`.
-- Club facts and the links to the club's Google/Microsoft Forms: `src/data/club.ts`. Monthly schedules: one Markdown file per month in `src/content/schedule/`. Trips: one Markdown file per trip in `src/content/trips/`, photos in `public/photos/`.
-- Sample trips and photos are marked `sample: true`; see `tools/sample-photos/README.md` to replace them.
-- The top-page Kyoto data lives in `public/kyoto/` and is rebuilt with the scripts in `tools/kyoto-data/` (sources, licences and steps in its README).
-- Deploy: import the repository in Vercel (framework preset: Astro). Pushes to `main` deploy automatically. Update `site` in `astro.config.mjs` once the URL is final.
-
-- Admin panel: `/admin/` lets organizers add a photo trip, add photos to a trip and edit a month's schedule; publishing commits to this repository and Vercel redeploys. Photos are resized to 2000 px JPEG in the browser, which also strips GPS data. Without settings it runs as a demo (password `demo`) that publishes nothing. To go live, set `ADMIN_PASSWORD` and `GITHUB_TOKEN` (a fine-grained token for this repository only, with Contents read and write) in the Vercel project's environment variables; `SESSION_SECRET`, `GITHUB_REPO` and `GITHUB_BRANCH` are optional.
-
-## Get Involved
-- If you'd like to join, visit a meeting, or participate in a photo trip, just speak to one of the organizers at our weekly meetings.
-- **Contact Us:**
-  - **Instagram:** [@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
-  - **Email:** [photography.club.in.kuas@gmail.com](mailto:photography.club.in.kuas@gmail.com)
-
-## How to Contribute
-- If you find a typo or have a suggestion, feel free to open an Issue or a Pull Request.
-- If you're not sure how to use GitHub, ask an organizer for help during a meeting.
-
-## License & Usage
-- The license for this repository is still under consideration.
-- These documents are intended for internal club use. Please consult with an organizer before using them for any other purpose.
-
----
-Last Updated: 2025-10-29
+The repository document licence remains under consideration. Ask the organizers about external use of club documents or photographs.
