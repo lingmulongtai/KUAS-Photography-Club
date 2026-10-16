@@ -341,7 +341,7 @@ export function createHero(
     const r = el.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, 1 - (e.clientY - r.top) / r.height * 2), camera);
     if (ray.ray.direction.y > .01) meteors.burst(1);
-  },()=>!flight);
+  },()=>!flight,()=>mode==='campus'||!!VIEW.orbit);
 
   let mode: HeroMode = 'city';
   let modeSince = 0;
