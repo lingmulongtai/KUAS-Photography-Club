@@ -98,5 +98,28 @@
    "bytes": 45611,
    "baseSha256": "1b872ebeb2e78d0d1a375a84bf37c9b470c2210cd338bc85457b1d3727f94ce6"
   }
+ },
+ "higashiyama": {
+  "box": [
+   1000,
+   -1000,
+   3000,
+   1600
+  ],
+  "file": "aerial-higashiyama.webp",
+  "size": [
+   1576,
+   2048
+  ],
+  "bytes": 743638,
+  "zoom": 17,
+  "mobile": {
+   "file": "aerial-higashiyama-mobile.webp",
+   "size": [
+    788,
+    1024
+   ],
+   "bytes": 240998
+  }
  }
 }
