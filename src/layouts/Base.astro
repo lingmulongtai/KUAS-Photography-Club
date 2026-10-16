@@ -28,6 +28,9 @@ const {
 
 const fullTitle = title ? `${title} | ${club.name}` : `${club.name} | ${club.nameJa}`;
 const canonical = new URL(Astro.url.pathname, Astro.site);
+const japanesePath = languagePath(Astro.url.pathname, 'ja');
+const englishPath = languagePath(Astro.url.pathname, 'en');
+const hasLanguagePair = languagePath(englishPath, 'ja') === japanesePath;
 ---
 <!doctype html>
 <html lang={lang} dir={dir}>
@@ -38,7 +41,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
-    {!noindex && <><link rel="alternate" hreflang="ja" href={new URL(languagePath(Astro.url.pathname, 'ja'), Astro.site)} /><link rel="alternate" hreflang="en" href={new URL(languagePath(Astro.url.pathname, 'en'), Astro.site)} /></>}
+    {!noindex && hasLanguagePair && <><link rel="alternate" hreflang="ja" href={new URL(japanesePath, Astro.site)} /><link rel="alternate" hreflang="en" href={new URL(englishPath, Astro.site)} /></>}
     <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="icon" href="/brand/favicon-48.png" sizes="48x48" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
