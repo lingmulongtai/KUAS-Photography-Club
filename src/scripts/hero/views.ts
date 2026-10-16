@@ -1,0 +1,49 @@
+import { PLACES, toLocal } from './geo.ts';
+import type { OrbitSite } from './landmark-orbit.ts';
+
+const RAD = Math.PI / 180;
+
+/** A place to look at Kyoto from. `ref` is where the ground height is taken; the eye floats `above` it. */
+export interface ViewDef {
+  ja: string;
+  en: string;
+  eye: { x: number; z: number };
+  ref: { x: number; z: number };
+  above: number;
+  bearing: number;
+  /** Centre a close landmark more tightly as the horizontal field narrows. */
+  focusBearing?: number;
+  /** Object-centred camera instead of turning at a fixed observation point. */
+  orbit?: OrbitSite;
+  pitch: number;
+}
+
+const ahead = (p: { x: number; z: number }, bearing: number, m: number) => ({
+  x: p.x + Math.sin(bearing * RAD) * m,
+  z: p.z - Math.cos(bearing * RAD) * m,
+});
+
+const KIYOMIZU = toLocal(34.9946668, 135.7849382); // 清水寺 本堂舞台
+const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
+const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
+const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
+const FUNAOKA = toLocal(35.0389964, 135.7417307); // OSM node/6611051734: 船岡山三角点
+const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
+
+/** The viewpoints. Coordinates from OpenStreetMap; heights from the elevation data. */
+export const VIEWS = {
+  /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
+  shogunzuka: { ja: '将軍塚', en: 'Shogunzuka', eye: ahead(PLACES.shogunzuka, 265, 120), ref: PLACES.shogunzuka, above: 44, bearing: 265, pitch: -5 },
+  /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
+  kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, orbit: {center:KIYOMIZU,targetHeight:16}, pitch: -13 },
+  /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
+  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 270, 430), ref: DAIMONJI, above: 95, bearing: 90, pitch: -10 },
+  /** An exterior composition: the whole tower against the northern city and mountains. */
+  tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 260), ref: TOWER, above: 112, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
+  arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
+  funaoka: { ja: '船岡山', en: 'Funaokayama', eye: FUNAOKA, ref: FUNAOKA, above: 45, bearing: 208, pitch: -4 },
+  kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
+} satisfies Record<string, ViewDef>;
+
+export type HeroView = keyof typeof VIEWS;
+
