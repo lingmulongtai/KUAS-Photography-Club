@@ -69,10 +69,12 @@ const schedule = defineCollection({
         z.object({
           date: day,
           title: z.string(),
+          titleEn: z.string().optional(),
           kind: z.enum(['meeting', 'trip', 'event', 'deadline', 'other']).default('event'),
           time: z.string().optional(),
           place: z.string().optional(),
           note: z.string().optional(),
+          noteEn: z.string().optional(),
           link: z.string().optional(),
         }),
       )

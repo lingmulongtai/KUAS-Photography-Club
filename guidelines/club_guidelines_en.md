@@ -11,7 +11,7 @@ Staff, alumni and people outside KUAS should ask the organizers whether particip
 
 ## 2. Meetings and communication
 
-Regular meetings are on Fridays from 18:00, usually in S306 at Uzumasa Campus. The regular meeting on October 23, 2026 is cancelled for Ryubisai festival preparations. Check the [schedule](/en/schedule/) and confirm with the organizers before visiting, as meetings may be cancelled or moved.
+Regular meetings are on Fridays from 18:00, usually in S306 at Uzumasa Campus. The regular meeting on October 23, 2026 is cancelled for campus festival preparations. Check the [schedule](/en/schedule/) and confirm with the organizers before visiting, as meetings may be cancelled or moved.
 
 Members receive routine notices through LINE or other communication chats introduced by the organizers. General inquiries go through [email or Instagram DM](/en/contact/). Member group invitation links are not published publicly.
 
