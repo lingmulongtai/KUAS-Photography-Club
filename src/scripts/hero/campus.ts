@@ -3,7 +3,7 @@ import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CAMPUS_OUTLINE, inCampus } from './geo';
 import { CLASS } from './buildings-data';
-import { campusArchitecture } from './campus-architecture';
+import { campusArchitecture, CampusBuilder, CAMPUS_TREES } from './campus-architecture';
 
 /*
  * Source-backed architecture replaces the campus's coarse PLATEAU LOD1 blocks up close.
@@ -12,7 +12,7 @@ import { campusArchitecture } from './campus-architecture';
 
 /** Campus buildings that get the detailed model (the plain block is hidden while it shows). */
 export function isDetailed(kind: number, h: number, x: number, z: number) {
-  return (kind & 3) === CLASS.sturdy && h >= 9 && inCampus(x, z);
+  return (kind & 3) === CLASS.sturdy && h >= 9 && inCampus(x, z) && x < -3680;
 }
 
 export function buildCampus(env: Env, hf: Heightfield) {
@@ -60,8 +60,6 @@ export function buildCampus(env: Env, hf: Heightfield) {
         vMat = aMat;
         vCell = aCell;
         vec3 p = position;
-        // the plaza sits on the ground: pull it toward the camera so the terrain never covers it
-        if (abs(aMat-6.)<.1){ vec3 toCam = cameraPosition - p; float d = length(toCam); p += toCam / d * min(d * .003, 6.); }
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
       }
     `,
@@ -122,6 +120,7 @@ export function buildCampus(env: Env, hf: Heightfield) {
         else if (m == 11) albedo=vec3(.15,.18,.19);
         else if (m == 12) albedo=vec3(.67,.68,.65);
         else if (m == 13){albedo=vec3(.7,.66,.5);emit=vec3(1.,.77,.42)*uCity;}
+        else if (m == 14) albedo=vec3(.18,.29,.1)*(.92+.16*vnoise(vCell*1.5));
         vec3 col = shade(albedo, n, vWorld, sh);
         gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), 1.);
       }
@@ -132,22 +131,11 @@ export function buildCampus(env: Env, hf: Heightfield) {
   return { mesh, count: 4 };
 }
 
-/** Trees along the inside of the campus edge, as tree positions for the forest layer. */
+/** Source-backed planting positions, clear of the architecture and the central stair axis. */
 export function campusTreeSpots(hf: Heightfield) {
-  const spots: { x: number; y: number; z: number }[] = [];
-  const p = CAMPUS_OUTLINE;
-  for (let i = 0; i < p.length; i++) {
-    const [ax, az] = p[i];
-    const [bx, bz] = p[(i + 1) % p.length];
-    const len = Math.hypot(bx - ax, bz - az);
-    for (let t = 4; t < len - 4; t += 9) {
-      const x = ax + ((bx - ax) * t) / len;
-      const z = az + ((bz - az) * t) / len;
-      // step a few metres inward toward the middle
-      const ix = x + (-3755 - x) * 0.04;
-      const iz = z + (-700 - z) * 0.04;
-      spots.push({ x: ix, y: hf.height(ix, iz), z: iz });
-    }
-  }
-  return spots;
+  const frame=new CampusBuilder(0);
+  return CAMPUS_TREES.map(([u,v])=>{
+    const [x,,z]=frame.point([u,0,v]);
+    return {x,y:hf.height(x,z),z};
+  });
 }

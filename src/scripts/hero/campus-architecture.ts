@@ -7,7 +7,7 @@ import { CAMPUS_CENTER } from './geo.ts';
  */
 export const CAMPUS_YAW = -1.58 * Math.PI / 180;
 export const CM = { wall:0, glass:1, concrete:2, roof:3, plant:4, metal:5, paving:6,
-  brick:7, railing:8, timber:9, leaves:10, steel:11, white:12, lamp:13 } as const;
+  brick:7, railing:8, timber:9, leaves:10, steel:11, white:12, lamp:13, lawn:14 } as const;
 type P = [number,number,number];
 type Material = typeof CM[keyof typeof CM];
 export type CampusPart = { name:string; start:number; count:number };
@@ -387,6 +387,40 @@ export function addSouthStairs(b:CampusBuilder) {
   });
 }
 
+/** Centre plaza: lawn cut by the axial and diagonal paths, rather than trees planted through
+ * the building facades. Positions follow the current official campus map and courtyard photo.
+ */
+export const CAMPUS_TREES:readonly [number,number][]=[
+  [-48,-86],[-32,-86],[-16,-86],[24,-86],[42,-86],[61,-86],
+  [76,-63],[76,-30],[76,-2],[76,28],[76,54],
+  [-65,-32],[-65,0],[-65,30],[-65,58],[-51,80],[-5,80],[28,80],[60,80],
+  [-7,-39],[23,-34],[-6,-15],[23,-3],[16,10],
+];
+export function addCourtyard(b:CampusBuilder) {
+  b.part('centre-plaza-lawns-and-paths',()=>{
+    b.box(-12,33,-54,14,-.12,.02,CM.lawn);
+    // A four-metre axial path links the North entrance to the South staircase.
+    b.box(3,7,-56,16,.025,.08,CM.paving);
+    b.box(-2,3,10,16,.025,.08,CM.paving);
+    // Two diagonal pedestrian paths cross the lawns and meet the side entrances.
+    for(const [a,c] of [ [[-12,.08,-36],[33,.08,-12]], [[-12,.08,7],[33,.08,-38]] ] as [P,P][])
+      b.beam(a,c,2.2,.08,CM.paving);
+    for(const [u,v] of CAMPUS_TREES.slice(-5)) {
+      b.box(u-.75,u+.75,v-.75,v+.75,.03,.09,CM.paving);
+      b.box(u-.6,u+.6,v-.6,v+.6,.09,.11,CM.leaves);
+    }
+    // Campus benches and low, warm bollards stay beside the paths, clear of the stairs.
+    for(const [u,v] of [[27,-29],[27,-20],[-8,-22],[-8,1]]) {
+      b.box(u-.35,u+.35,v-1.2,v+1.2,.4,.5,CM.timber);
+      for(const z of [v-.8,v+.8])b.box(u-.15,u+.15,z-.08,z+.08,0,.4,CM.steel);
+    }
+    for(const [u,v] of [[1,-44],[9,-22],[1,0],[9,12]]){
+      b.box(u-.12,u+.12,v-.12,v+.12,0,.75,CM.metal);
+      b.box(u-.13,u+.13,v-.13,v+.13,.6,.7,CM.lamp);
+    }
+  });
+}
+
 export function campusArchitecture(ground:number) {
-  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);addSouth(b);addSouthStairs(b);return b.geometry();
+  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);addSouth(b);addSouthStairs(b);addCourtyard(b);return b.geometry();
 }
