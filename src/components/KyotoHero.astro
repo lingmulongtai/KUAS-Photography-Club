@@ -197,7 +197,8 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
           onMode: setView,
           avoid: () => {
             const base = stage.getBoundingClientRect();
-            return [hero.querySelector('.copy'), hero.querySelector('.sky-chip'), card.hidden ? null : card]
+            // the header and the view bar float over the top of the stage: no pin under them either
+            return [hero.querySelector('.copy'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views')]
               .filter((n): n is Element => !!n)
               .map((n) => {
                 const r = n.getBoundingClientRect();
@@ -501,7 +502,9 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
   .hint {
     font-size: 12px;
     line-height: 1.6;
-    opacity: 0.8;
+    /* the global .hint grey is for light pages; on the dark glass it sank below legibility */
+    color: var(--hud);
+    opacity: 0.78;
   }
 
   .hint span {
@@ -815,6 +818,9 @@ const pinTrips = completeSpotPreviews((await getCollection('trips'))
       height: auto;
       align-self: end;
       min-height: 35%;
+      /* fade all the way into the hero's own background, or the stage ends in a hard line
+         through the headline */
+      background: linear-gradient(rgba(11, 20, 36, 0), rgba(11, 20, 36, 0.55) 45%, #0b1424);
     }
 
     .hero-inner {
