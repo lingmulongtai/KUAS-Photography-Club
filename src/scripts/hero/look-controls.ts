@@ -33,7 +33,7 @@ export function createLookRotation() {
 }
 
 /** Keep vertical touch scrolling native and leave controls and short taps alone. */
-export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true) {
+export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true, orbiting:()=>boolean=()=>false) {
   let drag: { id: number; x: number; y: number; lastX: number; lastY: number; time: number; touch: boolean; moved: boolean } | null = null;
   let suppressClick = false;
   const interactive = (e: PointerEvent) => (e.target as Element).closest('button, a, input, select, textarea, [role="slider"]');
@@ -58,7 +58,9 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     }
     const r = el.getBoundingClientRect();
     const horizontal = e.clientX - drag.lastX;
-    rotation.move(drag.touch ? horizontal : -horizontal, drag.touch ? 0 : e.clientY - drag.lastY, r.width, r.height, (e.timeStamp - drag.time) / 1000);
+    // Turning at a viewpoint and moving around an object need opposite yaw to
+    // keep the scenery following the hand, on both mouse and touch screens.
+    rotation.move(orbiting() ? -horizontal : horizontal, drag.touch ? 0 : e.clientY - drag.lastY, r.width, r.height, (e.timeStamp - drag.time) / 1000);
     drag.lastX = e.clientX;
     drag.lastY = e.clientY;
     drag.time = e.timeStamp;
