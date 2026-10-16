@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
+import { SPOTS } from '../src/data/spots.ts';
+import { PANORAMA_VIEWS } from '../src/scripts/hero/views.ts';
 
 const output = resolve(process.argv[2] ?? 'dist/client');
 const html = [];
@@ -15,6 +17,14 @@ function walk(dir) {
 walk(output);
 assert.ok(html.length > 20, 'A complete prerendered site is required');
 const byPath = new Map(html);
+for (const spot of SPOTS) assert.ok(byPath.has(`trips/spots/${spot.id}/index.html`), `Missing map spot record page: ${spot.id}`);
+for (const path of ['index.html','en/index.html']) {
+  const source=byPath.get(path);
+  assert.deepEqual([...source.matchAll(/<button\b[^>]*data-view="([^"]+)"/g)].map(m=>m[1]),PANORAMA_VIEWS, `Scenic view menu: ${path}`);
+  const select=source.match(/<select\b[^>]*id="hero-spot"[^>]*>([\s\S]*?)<\/select>/)?.[1];
+  assert.ok(select, `Missing map spot selector: ${path}`);
+  assert.deepEqual([...select.matchAll(/<option\b[^>]*value="([^"]+)"/g)].map(m=>m[1]),SPOTS.map(s=>s.id), `Unreachable map spot: ${path}`);
+}
 for (const route of ['index.html', 'about/index.html', 'join/index.html', 'schedule/index.html', 'trips/index.html',
   'contact/index.html', 'guidelines/index.html', 'guidelines/en/index.html', 'learn/index.html',
   'en/index.html', 'en/about/index.html', 'en/join/index.html', 'en/schedule/index.html', 'en/trips/index.html', 'en/contact/index.html']) {

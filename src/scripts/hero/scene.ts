@@ -31,6 +31,7 @@ import { infrastructureMask } from './forest-infrastructure';
 import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
 import { VIEWS, type ViewDef, type HeroView } from './views';
+import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
 import { buildOcclusion } from './building-occlusion';
 import { buildIslands } from './islands';
@@ -46,14 +47,15 @@ export interface HeroStatus {
 }
 
 export interface HeroOptions {
+  lang?: 'ja' | 'en';
   /** Date to render for this frame. */
   now: () => Date;
   quality: number;
   trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
   onReady?: () => void;
-  /** A pin with an action was pressed (the campus). */
-  onAction?: (id: string) => void;
+  /** A map destination was selected. */
+  onAction?: (id: SpotId) => void;
   /** The camera started moving to (or arrived at) a view. */
   onMode?: (mode: HeroMode, arrived: boolean) => void;
   reducedMotion?: boolean;
@@ -235,7 +237,7 @@ export function createHero(
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
     terrain.uniforms.uRoadsOn.value = 1;
     scene.add(buildWater(env, hf, lines, terrain.uniforms,lite?28:18), buildIslands(env, hf, lines));
-    labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips);
+    labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, opts.lang);
     const lamps = buildLamps(env, hf, lines, opts.quality);
     const cars = buildCars(env, hf, lines, opts.quality);
     driveCars = cars.update;
