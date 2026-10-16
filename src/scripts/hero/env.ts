@@ -147,6 +147,15 @@ float hazeTransmittance(vec3 wp){
   return exp(-tau);
 }
 
+/* Slow atmospheric scintillation: nearby lights stay quiet, distant neighbourhoods breathe.
+ * Use only on static city emission, never car lights. uTime freezes with reduced motion. */
+float cityLightShimmer(vec3 wp){
+  float distant=smoothstep(900.,6000.,length(wp-cameraPosition));
+  float wave=.65*sin(uTime*.55+wp.x*.013+wp.z*.009)
+            +.35*sin(uTime*.91-wp.x*.017+wp.z*.011);
+  return 1.+(.012+.09*distant)*wave;
+}
+
 /* lit: reflected light, emit: self-lit (windows, lamps). */
 vec3 applyHaze(vec3 lit, vec3 emit, vec3 wp){
   float tr = hazeTransmittance(wp);
