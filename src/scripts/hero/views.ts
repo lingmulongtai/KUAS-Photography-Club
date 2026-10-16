@@ -46,7 +46,8 @@ export const VIEWS = {
   /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
   kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, orbit: {center:KIYOMIZU,targetHeight:16}, pitch: -13 },
   /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
-  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 270, 430), ref: DAIMONJI, above: 95, bearing: 90, pitch: -10 },
+  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 250, 18), ref: DAIMONJI, above: 8, bearing: 245, pitch: -6 },
+  daimonjiFirebed: spotOrbit('daimonji',430,150,270,0),
   /** An exterior composition: the whole tower against the northern city and mountains. */
   tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 260), ref: TOWER, above: 112, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
@@ -75,5 +76,6 @@ export const PANORAMA_VIEWS = ['shogunzuka','daimonji','arashiyama','atago'] as 
 export function spotDestination(id: SpotId): HeroDestination {
   if (id==='kuas') return 'campus';
   if (id==='arashiyama') return 'togetsukyo';
+  if (id==='daimonji') return 'daimonjiFirebed';
   return id;
 }

@@ -17,6 +17,7 @@ export const SPOTS = [
   { id: 'ryoanji', rank: 2, ja: '龍安寺', en: 'Ryoan-ji', lat: 35.0345180, lon: 135.7182196, above: 30 },
   { id: 'arashiyama', rank: 2, ja: '嵐山', en: 'Arashiyama', lat: 35.0128713, lon: 135.6777623, above: 80 },
   { id: 'atago', rank: 3, ja: '愛宕山', en: 'Mt. Atago', lat: 35.0600453, lon: 135.6342851, above: 60 },
+  { id: 'daimonji', rank: 2, ja: '大文字', en: 'Daimonji Firebed', lat: 35.0230738, lon: 135.804312, above: 35 },
   { id: 'kuas', rank: 0, ja: '太秦キャンパス', en: 'KUAS Uzumasa Campus', lat: 35.0099245, lon: 135.7184382, above: 48, action: true },
 ] as const;
 
