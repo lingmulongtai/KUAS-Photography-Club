@@ -7,23 +7,26 @@ const box = (parts:Part[],w:number,h:number,d:number,x:number,y:number,z:number,
 };
 
 /** Eight-sided eave rings: curved corners and an overhanging fascia, not a pyramid. */
-function roof(parts:Part[],w:number,d:number,h:number,y:number,z=0) {
+export function roof(parts:Part[],w:number,d:number,h:number,y:number,z=0,color=roofColor) {
   const points:number[][]=[];
   const outline=[[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0]];
-  for (const [scale,height] of [[1,0],[.72,.32],[.28,1]]) for (const [x,v] of outline) {
-    points.push([x*w*.5*scale,y+h*height+(height===0&&x!==0&&v!==0?.3:0),z+v*d*.5*scale]);
+  const profile=[[1,0],[.94,.035],[.82,.16],[.65,.39],[.43,.7],[.28,1]];
+  for (const [scale,height] of profile) for (const [x,v] of outline) {
+    const turn=x!==0&&v!==0?.3*Math.max(0,(scale-.8)/.2):0;
+    points.push([x*w*.5*scale,y+h*height+turn,z+v*d*.5*(height===1?.018:scale)]);
   }
   const vertices:number[]=[];
-  for (let ring=0;ring<2;ring++) for(let i=0;i<8;i++) {
+  for (let ring=0;ring<profile.length-1;ring++) for(let i=0;i<8;i++) {
     const a=ring*8+i,b=ring*8+(i+1)%8,c=a+8,e=b+8;
     for(const index of [a,c,b,b,c,e])vertices.push(...points[index]);
   }
   // Close the upper ring. The ridge alone leaves the middle of the roof open from above.
-  for(let i=0;i<8;i++) vertices.push(0,y+h,z,...points[16+(i+1)%8],...points[16+i]);
+  const top=(profile.length-1)*8;
+  for(let i=0;i<8;i++) vertices.push(0,y+h,z,...points[top+(i+1)%8],...points[top+i]);
   const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.computeVertexNormals();
-  parts.push({geo,color:roofColor,glow:.2});
-  box(parts,w,.3,d,0,y-.15,z,roofColor,.2);
-  box(parts,w*.3,.28,.35,0,y+h,z,roofColor,.3);
+  parts.push({geo,color,glow:.2});
+  box(parts,w,.22,d,0,y-.11,z,color,.2);
+  box(parts,w*.3,.28,.35,0,y+h,z,color,.3);
 }
 
 /** Three distinct storeys, gold upper walls, dark openings and a roof phoenix. */

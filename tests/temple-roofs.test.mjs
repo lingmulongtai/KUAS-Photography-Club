@@ -4,9 +4,9 @@ import * as THREE from 'three';
 import { goldenPavilion, kiyomizuHall, shishinden } from '../src/scripts/hero/temple-models.ts';
 
 for (const [name, build, z, roofY] of [
-  ['Shishinden', shishinden, 2, 17],
-  ['Kiyomizu main hall', kiyomizuHall, -11, 25.5],
-  ['Golden Pavilion', goldenPavilion, .6, 11.55],
+  ['Shishinden', shishinden, 2, 16],
+  ['Kiyomizu main hall', kiyomizuHall, -11, 24.5],
+  ['Golden Pavilion', goldenPavilion, .6, 11],
 ]) test(`${name} has an upward-facing surface across the roof centre`, () => {
   const parts=build();
   const material=new THREE.MeshBasicMaterial();
