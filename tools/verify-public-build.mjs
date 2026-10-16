@@ -49,4 +49,16 @@ for (const id of ['ar', 'de', 'es', 'fr', 'hi', 'id', 'ko', 'pt', 'zh-CN']) {
 assert.match(byPath.get('en/join/index.html'), /JPY 1,000/);
 assert.match(byPath.get('join/index.html'), /1,000円/);
 assert.match(byPath.get('en/join/index.html'), /chat alone does not complete membership/);
+for (const path of ['index.html', 'about/index.html', 'en/index.html', 'en/about/index.html']) {
+  const source = byPath.get(path);
+  const section = source.match(/<section\b[^>]*aria-labelledby="insta-title"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+  assert.ok(section, `Missing Instagram section: ${path}`);
+  const iframe = section.match(/<iframe\b[^>]*>/)?.[0];
+  assert.ok(iframe, `Missing official Instagram embed: ${path}`);
+  assert.match(iframe, /src="https:\/\/www\.instagram\.com\/kuas_photographyclub\/embed\/"/);
+  assert.match(iframe, /loading="lazy"/);
+  assert.match(iframe, path.startsWith('en/') ? /title="[^"]*Instagram profile and posts"/ : /title="[^"]*プロフィールと投稿"/);
+  // The profile remains reachable when Instagram or scripts are blocked.
+  assert.match(section.replace(/<iframe\b[\s\S]*?<\/iframe>/g, ''), /<a\b[^>]*href="https:\/\/www\.instagram\.com\/kuas_photographyclub"/);
+}
 console.log(`Public output verified: ${html.length} HTML files, ${sampleSlugs.length} sample trip routes excluded, local links intact.`);
