@@ -1,0 +1,10 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageHero from '../../components/PageHero.astro';
+import { getTrips } from '../../lib/trips';
+const trips = await getTrips();
+---
+<Base lang="en" title="Photo outing records" description="KUAS Photography Club outing records. Public records are being prepared.">
+  <PageHero edge="PHOTO TRIPS ▸ ARCHIVE" title="Photo outing records" lead="Members plan photo outings together. Records will be published when ready for public viewing." />
+  <section class="wrap section"><p>{trips.length ? 'Available outing records (Japanese):' : 'Activity records are being prepared.'}</p>{trips.map(trip => <p><a href={`/trips/${trip.id}/`} lang="ja">{trip.data.title} (Japanese)</a></p>)}<p><a class="link-arrow" href="/en/schedule/">See confirmed upcoming dates →</a></p></section>
+</Base>

@@ -1,17 +1,21 @@
 ---
 import { nav } from '../data/club';
+import { languagePath } from '../lib/i18n';
 
 interface Props {
   /** Float over a full-bleed hero instead of sitting on the page background. */
   overlay?: boolean;
+  lang?: string;
 }
-const { overlay = false } = Astro.props;
-const path = Astro.url.pathname;
+const { overlay = false, lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+const local = (href: string) => languagePath(href, en ? 'en' : 'ja');
+const path = languagePath(Astro.url.pathname, 'ja');
 const isCurrent = (href: string) => path === href || path.startsWith(href);
 ---
 <header class:list={['site-header', { overlay }]}>
   <div class="bar">
-    <a class="brand" href="/" aria-label="写真部 KUAS Photography Club トップへ">
+    <a class="brand" href={local('/')} aria-label={en ? 'KUAS Photography Club home' : '写真部 KUAS Photography Club トップへ'}>
       <img class="mark" src="/brand/mark-192.webp" alt="" width="48" height="48" />
       <span class="brand-text">
         <span class="brand-ja">写真部</span>
@@ -19,24 +23,26 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
       </span>
     </a>
 
+    <a class="language-switch" href={languagePath(Astro.url.pathname, en ? 'ja' : 'en')} data-language={en ? 'ja' : 'en'} lang={en ? 'ja' : 'en'} aria-label={en ? '日本語に切り替える' : 'Switch to English'}>{en ? '日本語' : 'English'}</a>
+
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">
       <span class="menu-icon" aria-hidden="true"><i></i><i></i></span>
       <span class="menu-label">MENU</span>
     </button>
 
-    <nav id="site-nav" class="nav" aria-label="メインメニュー">
+    <nav id="site-nav" class="nav" aria-label={en ? 'Main menu' : 'メインメニュー'}>
       <ul>
         {nav.map((item, i) => (
           <li style={`--i: ${i}`}>
-            <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
-              <span class="en">{item.en}</span>
-              <span class="ja">{item.ja}</span>
+            <a href={local(item.href)} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+              <span class="en">{en ? item.ja : item.en}</span>
+              <span class="ja">{en ? item.en : item.ja}</span>
             </a>
           </li>
         ))}
         <li class="cta-item" style={`--i: ${nav.length}`}>
-          <a class="btn btn--primary cta" href="/join/" aria-current={isCurrent('/join/') ? 'page' : undefined}>
-            見学・入部 <span class="arrow" aria-hidden="true">→</span>
+          <a class="btn btn--primary cta" href={local('/join/')} aria-current={isCurrent('/join/') ? 'page' : undefined}>
+            {en ? 'Visit / Join' : '見学・入部'} <span class="arrow" aria-hidden="true">→</span>
           </a>
         </li>
       </ul>
@@ -242,6 +248,8 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     font-size: 13px;
   }
 
+  .language-switch { margin-left: auto; padding: 9px 12px; border: 1px solid currentColor; border-radius: 999px; font-size: 13px; font-weight: 700; line-height: 1.2; text-decoration: none; white-space: nowrap; }
+
   .menu-btn {
     display: none;
     appearance: none;
@@ -278,7 +286,8 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     transform: translateY(-3.25px) rotate(-45deg);
   }
 
-  @media (max-width: 960px) {
+  @media (max-width: 1120px) {
+    .bar { gap: 12px; }
     .menu-btn {
       display: inline-flex;
     }
