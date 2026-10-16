@@ -83,7 +83,7 @@ export function createHero(
   renderer: THREE.WebGLRenderer,
   el: HTMLElement,
   opts: HeroOptions,
-): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void; setElevation(overhead:boolean):void; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
+): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
   const env = createEnv();
   const scene = new THREE.Scene();
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
@@ -506,16 +506,6 @@ export function createHero(
       return view;
     },
     get orbiting() { return !!VIEW.orbit; },
-    setElevation(overhead) {
-      rotation.stop();
-      let base=Math.atan2(ORBIT.height-45,ORBIT.radius)/RAD;
-      if ((flight?.to??mode)==='city') {
-        if (!VIEW.orbit) return;
-        const c=VIEW.orbit.center, y=(groundAt?.(c.x,c.z)??40)+VIEW.orbit.targetHeight;
-        base=Math.atan2(eye.y-y,Math.hypot(eye.x-c.x,eye.z-c.z))/RAD;
-      }
-      lookDrag.pitch=overhead ? 89-base : 0;
-    },
     t0: 0,
     resize(w, h, d) {
       maxDpr = d;
