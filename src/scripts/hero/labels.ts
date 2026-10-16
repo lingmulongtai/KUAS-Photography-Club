@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
 import { SPOTS, type SpotId } from '../../data/spots';
+import { pinBounds, overlaps, type ScreenRect } from './pin-layout';
 
 export interface LabelDef {
   id: SpotId;
@@ -99,11 +100,11 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
       node.addEventListener('close-pin', close);
     }
     layer.appendChild(node);
-    return { def: d, node, trigger, close, anchor: new THREE.Vector3(p.x, ground + d.above, p.z), ground: new THREE.Vector3(p.x, ground, p.z), shown: false, x: 0, y: 0 };
+    return { def: d, node, trigger, close, text: trigger.querySelector<HTMLElement>('.pin-text')!, labelWidth: 0, labelHeight: 0, anchor: new THREE.Vector3(p.x, ground + d.above, p.z), ground: new THREE.Vector3(p.x, ground, p.z), shown: false, x: 0, y: 0 };
   });
   el.addEventListener('pointerdown', (e) => { if (!(e.target as Element).closest('.hero-pin')) items.forEach((it) => it.close()); });
   const byRank = [...items].sort((a, b) => a.def.rank - b.def.rank);
-  const placed: { x: number; y: number; w: number }[] = [];
+  const placed: ScreenRect[] = [];
   let blocks: { x: number; y: number; w: number; h: number }[] = [];
   let frame = 0;
   const v = new THREE.Vector3();
@@ -134,7 +135,12 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
       if (moved) lastCam.copy(camera.position);
       placed.length = 0;
       // re-measure the areas to keep clear now and then (they only move on resize and scroll-in)
-      if (avoid && (frame++ % 30 === 0 || moved)) blocks = avoid();
+      const measure=frame++ % 30===0;
+      if (avoid && (measure || moved)) blocks = avoid();
+      if (measure) for (const it of items) {
+        it.labelWidth=it.text.offsetWidth;
+        it.labelHeight=it.text.offsetHeight;
+      }
       for (const it of byRank) {
         if (moved) occluded.set(it.def.id, blocked(camera.position, it.ground.clone().setY(it.ground.y + 6)));
         // a place you are standing on (Kyoto Tower from its own deck) needs no pin
@@ -146,13 +152,13 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
           // keep pins from piling up: a lower-ranked pin gives way
           const px = ((v.x + 1) / 2) * width;
           const py = ((1 - v.y) / 2) * height;
-          const w = it.def.action ? 150 : 96;
+          const box=pinBounds(px,py,it.labelWidth,it.labelHeight);
           const clash =
-            px < w / 2 + 8 || px > width - w / 2 - 8 ||
-            placed.some((p) => Math.abs(p.x - px) < (p.w + w) / 2 && Math.abs(p.y - py) < 34) ||
-            blocks.some((b) => px + w / 2 > b.x - 8 && px - w / 2 < b.x + b.w + 8 && py > b.y - 12 && py - 40 < b.y + b.h);
+            box.x < 8 || box.x+box.w > width-8 || box.y < 8 || box.y+box.h > height-8 ||
+            placed.some((p) => overlaps(box,p)) ||
+            blocks.some((b) => overlaps(box,{x:b.x-8,y:b.y-8,w:b.w+16,h:b.h+16}));
           if (clash) show = false;
-          else placed.push({ x: px, y: py, w });
+          else placed.push(box);
         }
         if (show !== it.shown) {
           it.shown = show;
