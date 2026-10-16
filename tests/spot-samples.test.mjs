@@ -15,5 +15,5 @@ test('published records replace design samples for their spot',()=>{
   const real={...SPOT_SAMPLES[0],sample:false,href:'/trips/real/'};
   const previews=completeSpotPreviews([SPOT_SAMPLES[0],real]);
   assert.deepEqual(previews.filter(t=>t.spot===real.spot),[real]);
-  assert.equal(new Set(previews.map(t=>t.spot)).size,17);
+  assert.equal(new Set(previews.map(t=>t.spot)).size,SPOTS.length);
 });

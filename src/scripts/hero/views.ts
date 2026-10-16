@@ -1,5 +1,6 @@
 import { PLACES, toLocal } from './geo.ts';
 import type { OrbitSite } from './landmark-orbit.ts';
+import { SPOTS, type SpotId } from '../../data/spots.ts';
 
 const RAD = Math.PI / 180;
 
@@ -30,6 +31,14 @@ const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲
 const ATAGO = toLocal(35.0600453, 135.6342851); // 愛宕山（地図の地点と共通）
 const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
 
+/** Frame the named structure or area using the same centre as its map pin. */
+function spotOrbit(id: SpotId, distance: number, above: number, bearing: number, targetHeight: number): ViewDef {
+  const spot=SPOTS.find(s=>s.id===id)!;
+  const center=toLocal(spot.lat,spot.lon);
+  return {ja:spot.ja,en:spot.en,eye:ahead(center,bearing,distance),ref:center,above,
+    bearing:(bearing+180)%360,pitch:-15,orbit:{center,targetHeight}};
+}
+
 /** The viewpoints. Coordinates from OpenStreetMap; heights from the elevation data. */
 export const VIEWS = {
   /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
@@ -43,6 +52,28 @@ export const VIEWS = {
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
   atago: { ja: '愛宕山', en: 'Mt. Atago', eye: ahead(ATAGO, 130, 60), ref: ATAGO, above: 75, bearing: 130, pitch: -7 },
   kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
+  station: spotOrbit('station',420,230,180,40),
+  toji: spotOrbit('toji',190,86,180,28),
+  yasaka: spotOrbit('yasaka',140,78,220,23),
+  gion: spotOrbit('gion',360,220,210,8),
+  kawaramachi: spotOrbit('kawaramachi',400,230,200,25),
+  sanjo: spotOrbit('sanjo',180,120,180,8),
+  gojo: spotOrbit('gojo',180,120,180,8),
+  kamo: spotOrbit('kamo',380,230,180,4),
+  nijo: spotOrbit('nijo',600,350,180,15),
+  // OSM way/554905814: 紫宸殿; way/374564926: 龍安寺方丈.
+  gosho: spotOrbit('gosho',350,220,180,10),
+  heian: spotOrbit('heian',150,85,180,12),
+  ryoanji: spotOrbit('ryoanji',240,150,180,8),
+  togetsukyo: spotOrbit('arashiyama',330,160,180,8),
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
+export type HeroDestination = 'campus' | HeroView;
+export const PANORAMA_VIEWS = ['shogunzuka','daimonji','arashiyama','atago'] as const satisfies readonly HeroView[];
+
+export function spotDestination(id: SpotId): HeroDestination {
+  if (id==='kuas') return 'campus';
+  if (id==='arashiyama') return 'togetsukyo';
+  return id;
+}
