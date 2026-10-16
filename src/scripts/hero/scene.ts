@@ -229,7 +229,7 @@ export function createHero(
     forest.plant(landscapeCenter(VIEW), VIEW.bearing);
     plantTrees = forest.plant;
     scene.add(forest.group);
-    campusModel = buildCampus(env, hf, buildings).mesh;
+    campusModel = buildCampus(env, hf).mesh;
     scene.add(campusModel);
     casts(campusModel);
     scene.add(city.group, landmarks.mesh);
