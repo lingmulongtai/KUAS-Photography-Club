@@ -8,22 +8,20 @@ export const club = {
   shortJa: 'KUAS 写真部',
   university: '京都先端科学大学',
   campus: '太秦キャンパス',
-  /** Recognised by the student union. */
-  recognized: '2025-05-21',
-  members: 55,
-  membersAsOf: '2025-10-29',
+  members: 74,
+  membersAsOf: '2026年10月',
   meetings: {
     day: '毎週金曜',
     dayEn: 'Fridays',
     times: ['18:00〜'],
     room: 'S306',
   },
-  tripsPerMonth: 2,
+  feePerSemester: 1000,
   instagram: {
     handle: 'kuas_photographyclub',
     url: 'https://www.instagram.com/kuas_photographyclub',
   },
-  /** Public contact address (the club's Gmail; messages are forwarded to the organisers). */
+  /** Public contact address. */
   email: 'photography.club.in.kuas@gmail.com',
   github: 'https://github.com/lingmulongtai/KUAS-Photography-Club',
 } as const;
@@ -33,7 +31,7 @@ export const club = {
  * people to Instagram and email instead. Outside parties contact the club by Instagram DM or email only.
  */
 export const forms = {
-  /** 見学・入部の申し込み (Microsoft Forms, KUAS accounts only; English for now) */
+  /** Microsoft Forms. Sign-in required; questions, language and permitted account scope unverified. */
   join: 'https://forms.cloud.microsoft/r/ZGB8GdNTUC',
 };
 
