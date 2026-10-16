@@ -4,6 +4,7 @@ import type { Heightfield } from './heightfield';
 import { CAMPUS_OUTLINE, inCampus } from './geo';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
 import { rng } from './util';
+import { campusArchitecture } from './campus-architecture';
 
 /*
  * The Uzumasa campus up close. PLATEAU only has plain blocks for these buildings, so they are
@@ -68,6 +69,9 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
   for (const f of footprints) {
     const ring = f.ring;
     const m = ring.length;
+    const centerX=ring.reduce((sum,p)=>sum+p[0],0)/m;
+    const centerZ=ring.reduce((sum,p)=>sum+p[1],0)/m;
+    if(centerZ < -754 || (centerX > -3723 && centerZ < -688)) continue;
     let area = 0;
     for (let i = 0; i < m; i++) {
       const j = (i + 1) % m;
@@ -158,6 +162,10 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
     }
   }
 
+  const architecture=campusArchitecture(hf.height(-3755,-700)+.25);
+  for(const [target,name] of [[pos,'position'],[nrm,'normal'],[mat,'aMat'],[cell,'aCell']] as const)
+    for(const value of architecture.getAttribute(name).array)target.push(value);
+  architecture.dispose();
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
@@ -181,7 +189,7 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
         vCell = aCell;
         vec3 p = position;
         // the plaza sits on the ground: pull it toward the camera so the terrain never covers it
-        if (aMat > 5.5){ vec3 toCam = cameraPosition - p; float d = length(toCam); p += toCam / d * min(d * .003, 6.); }
+        if (abs(aMat-6.)<.1){ vec3 toCam = cameraPosition - p; float d = length(toCam); p += toCam / d * min(d * .003, 6.); }
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
       }
     `,
@@ -198,7 +206,7 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
         vec2 cellWidth = max(fwidth(vCell),vec2(.001));
         vec3 v = normalize(vWorld - cameraPosition);
         int m = int(vMat + .5);
-        vec3 albedo = vec3(.62, .63, .62);
+        vec3 albedo = vec3(.58, .52, .42);
         vec3 emit = vec3(0.);
         if (m == 1){
           // glass: mullions every 1.6 m, sky reflection by day, lit rooms at night
@@ -217,7 +225,7 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
         } else if (m == 2) albedo = vec3(.55, .56, .56);
         else if (m == 3) albedo = vec3(.13, .15, .16) * (.85 + .3 * vnoise(vCell * .3));
         else if (m == 4) albedo = vec3(.42, .43, .43);
-        else if (m == 5){ albedo = vec3(.5, .78, .8); emit += vec3(.39, .86, .9) * (.4 + 1.6 * uCity); }
+        else if (m == 5) albedo = vec3(.43,.46,.47);
         else if (m == 6){
           // paving: big light slabs with fine joints
           vec2 g = fract(vCell / 3.);
@@ -226,6 +234,22 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
           joint=mix(joint,.98,smoothstep(.08,.25,max(fw.x,fw.y)));
           albedo = vec3(.44, .43, .41) * (.85 + .15 * joint) * (.9 + .2 * vnoise(vCell * .2));
         }
+        else if (m == 7){
+          vec2 brick=vec2(vCell.x/.23+mod(floor(vCell.y/.075),2.)*.5,vCell.y/.075);
+          vec2 fw=fwidth(brick),g=fract(brick);
+          float joint=smoothstep(.04-fw.x,.04+fw.x,g.x)*smoothstep(.07-fw.y,.07+fw.y,g.y);
+          joint=mix(joint,.9,smoothstep(.2,.7,max(fw.x,fw.y)));
+          albedo=vec3(.61,.55,.44)*mix(.83,1.,joint);
+        }
+        else if (m == 8){
+          albedo=vec3(.38,.47,.47);
+          emit=skyColor(reflect(v,n))*.25;
+        }
+        else if (m == 9) albedo=vec3(.28,.16,.09);
+        else if (m == 10) albedo=vec3(.12,.19,.075);
+        else if (m == 11) albedo=vec3(.15,.18,.19);
+        else if (m == 12) albedo=vec3(.67,.68,.65);
+        else if (m == 13){albedo=vec3(.7,.66,.5);emit=vec3(1.,.77,.42)*uCity;}
         vec3 col = shade(albedo, n, vWorld, sh);
         gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), 1.);
       }
