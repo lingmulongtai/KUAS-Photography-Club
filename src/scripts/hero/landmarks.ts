@@ -109,8 +109,8 @@ const LANDMARKS: Record<string, Placed> = {
   togetsukyo: { parts: togetsukyo().map(part=>({...part,geo:part.geo.rotateY(-5.8*Math.PI/180).translate(0,2,0)})), lat: 35.01287125, lon: 135.67776225 },
 };
 
-export function buildLandmarks(env: Env, hf: Heightfield) {
-  const geos: THREE.BufferGeometry[] = [];
+export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
+  const geos: THREE.BufferGeometry[] = extraParts.map(paint);
   const positions: Record<string, THREE.Vector3> = {};
   const sites:Record<string,Placed>={...LANDMARKS,...imperialPalace(),...nijoCastle()};
   for (const [name, l] of Object.entries(sites)) {
