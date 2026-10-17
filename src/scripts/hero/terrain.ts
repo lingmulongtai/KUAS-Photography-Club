@@ -141,6 +141,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uRoads: { value: null as THREE.Texture | null },
     uRoadBox: { value: new THREE.Vector4(0, 0, 1, 1) },
     uRoadsOn: { value: 0 },
+    uRegionRoads:{value:tex.aerialWide},
+    uRegionRoadBox:{value:new THREE.Vector4(0,0,1,1)},
+    uRegionRoadsOn:{value:0},
   };
   // One set of uniforms per sharper photo: GLSL can't index an array of samplers in a loop.
   const photos = (tex.photos ?? []).map((box) => ({ box: { value: v4(box) }, map: { value: tex.aerialWide }, on: { value: 0 } }));
@@ -404,9 +407,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     position.needsUpdate = true;
   };
   /** Show the sharper photo for tex.photos[i]. */
-  const setPhoto = (i: number, photo: THREE.Texture) => {
-    photos[i].map.value = photo;
-    photos[i].on.value = 1;
+  const setPhoto = (i: number, photo: THREE.Texture|null,box?:Box) => {
+    photos[i].map.value = photo??tex.aerialWide;
+    photos[i].on.value = photo?1:0;
+    if(box)photos[i].box.value.set(...box);
   };
   const setChannel=(next:KamoChannel,mask:THREE.Texture)=>{
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;

@@ -40,6 +40,7 @@ import { buildOcclusion } from './building-occlusion';
 import { buildIslands } from './islands';
 import { islandMask } from './island-mask';
 import { LINE, loadLines } from './lines-data';
+import {createRegionalLoader,regionAt,type CityRegion} from './regional-loader';
 
 export interface HeroStatus {
   minutes: number;
@@ -117,12 +118,14 @@ export function createHero(
   let lastT = 0;
   const campus = new THREE.Vector3(CAMPUS_CENTER.x, 40, CAMPUS_CENTER.z);
   let view: HeroView = 'shogunzuka';
+  let mode: HeroMode = 'city';
   let VIEW: ViewDef = VIEWS.shogunzuka;
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   let groundAt: ((x: number, z: number) => number) | null = null;
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
+  let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let driveCars: ((dt: number) => void) | null = null;
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
@@ -153,7 +156,7 @@ export function createHero(
       normalNearBox: meta.near.box,
       regional: meta.arashiyama ? {box:meta.arashiyama.box,normal:normalTexture(hf,meta.arashiyama.elevation)} : undefined,
       outer: outer && meta.outer ? {box:meta.outer.box,normal:normalTexture(hf,meta.outer),photo:outer} : undefined,
-      photos: regions.map((r) => r.meta.box),
+      photos: [...regions.map((r) => r.meta.box),meta.far.box],
     }, opts.quality > 0.75 ? 640 : 400);
     const regionalPhotos: (Promise<unknown> | undefined)[] = [];
     const detailedPhotos: (THREE.Texture | undefined)[] = [];
@@ -218,6 +221,7 @@ export function createHero(
     env.uBuiltTexel.value = (BUILDINGS_BOX[2] - BUILDINGS_BOX[0]) / builtSize;
     env.uBuiltOn.value = 1;
     const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
+    let outerExcluded:(x:number,z:number)=>boolean=()=>false;
     const forestMaskBox=regions.reduce<Box>((a,{meta:{box:b}})=>[Math.min(a[0],b[0]),Math.min(a[1],b[1]),
       Math.max(a[2],b[2]),Math.max(a[3],b[3])],BUILDINGS_BOX);
     const roadsAndWater = infrastructureMask(lines, forestMaskBox);
@@ -226,7 +230,7 @@ export function createHero(
     const island = islandMask(lines.filter((f) => f.kind === LINE.waterHole).map((f) => f.pts));
     const garden=landmarks.positions.ryoanji;
     const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || rockGarden(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, campusTreeSpots(hf), { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
     const forestPhoto=(photo:THREE.Texture,i:number)=>{
       forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal);
       shadow.invalidate();
@@ -262,6 +266,68 @@ export function createHero(
     pointLayers.push(lamps.uniforms, cars.uniforms);
     scene.add(lamps.points, cars.group);
     updatePointScale();
+    // Neighbouring basins are intentionally absent from the initial transfer. At most
+    // one additional city is alive, and switching destinations never queues all four.
+    const coreBuilt=env.uBuilt.value;
+    let regionalDrive:((dt:number)=>void)|null=null;
+    driveCars=(dt)=>{cars.update(dt);regionalDrive?.(dt);};
+    const disposeGroup=(group:THREE.Object3D)=>{
+      const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
+      group.traverse(o=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;
+        geometries.add(mesh.geometry);
+        for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])materials.add(material);
+        if(mesh.userData.depthMaterial)materials.add(mesh.userData.depthMaterial);
+      });
+      geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+    };
+    const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
+      const results=await Promise.allSettled([loadBuildings(r.buildings.meta,r.buildings.file),
+        loadLines(undefined,r.lines.file,r.lines.box,r.lines.q),loadTexture(lite?r.photo.mobile.file:r.photo.file,aniso)] as const);
+      const [b,l,p]=results;
+      if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){
+        if(p.status==='fulfilled')p.value.dispose();
+        throw results.find(result=>result.status==='rejected')!.reason;
+      }
+      return {buildings:b.value,lines:l.value,photo:p.value,dispose:()=>p.value.dispose()};
+    },(r,data)=>{
+      const group=new THREE.Group();group.name=`region-${r.id}`;
+      const city=buildCity(env,hf,data.buildings,b=>!lite||b.w*b.d>65||b.h>10);
+      group.add(city.group,buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24),buildIslands(env,hf,data.lines));
+      const lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);
+      const traffic=buildCars(env,hf,data.lines,lite ? .25 : .45);
+      group.add(lamps.points,traffic.group);
+      const road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
+      terrain.uniforms.uRegionRoads.value=road.texture;
+      terrain.uniforms.uRegionRoadBox.value.set(...r.box);
+      terrain.uniforms.uRegionRoadsOn.value=1;
+      terrain.setPhoto(regions.length,data.photo,r.photo.box);
+      const built=buildOcclusion(data.buildings,r.box,builtSize);
+      env.uBuilt.value=built;env.uBuiltBox.value.set(...r.box);
+      env.uBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
+      const mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
+      const infrastructure=infrastructureMask(data.lines,r.box);
+      outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z);
+      forest.setOuterPhoto(data.photo.image as HTMLImageElement,r.photo.box);
+      regionalDrive=traffic.update;
+      pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
+      scene.add(group);casts(city.group);shadow.invalidate();
+      return ()=>{
+        regionalDrive=null;scene.remove(group);disposeGroup(group);
+        for(const layer of [lamps.uniforms,traffic.uniforms])pointLayers.splice(pointLayers.indexOf(layer),1);
+        terrain.uniforms.uRegionRoadsOn.value=0;
+        terrain.uniforms.uRegionRoads.value=wide;
+        terrain.setPhoto(regions.length,null);
+        env.uBuilt.value=coreBuilt;env.uBuiltBox.value.set(...BUILDINGS_BOX);
+        env.uBuiltTexel.value=(BUILDINGS_BOX[2]-BUILDINGS_BOX[0])/builtSize;
+        outerExcluded=()=>false;
+        forest.setOuterPhoto(null,r.photo.box);
+        road.dispose();built.dispose();data.dispose();shadow.invalidate();
+      };
+    },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
+    const regionManifest=await loadJSON<{regions:CityRegion[]}>('regions.json')
+      .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};});
+    ensureCityRegion=center=>{void regionLoader.request(regionAt(regionManifest.regions,center));};
+    ensureCityRegion(landscapeCenter(VIEW));
     opts.onReady?.();
   })().catch((err) => console.error('Kyoto data failed to load', err));
 
@@ -325,7 +391,6 @@ export function createHero(
     if (ray.ray.direction.y > .01) meteors.burst(1);
   },()=>!flight,()=>mode==='campus'||!!VIEW.orbit,(ratio)=>{ zoom.pinch(ratio); updateZoom(); });
 
-  let mode: HeroMode = 'city';
   let modeSince = 0;
   let flight: {
     to: HeroMode;
@@ -388,6 +453,7 @@ export function createHero(
     updateZoom();
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
+    ensureCityRegion?.(target==='campus'?CAMPUS_CENTER:landscapeCenter(VIEWS[nextView]));
     if (!flight && mode === to && (to === 'campus' || nextView === view)) {
       resetLook();
       opts.onMode?.(to,false);
