@@ -12,7 +12,8 @@ import { campusArchitecture, CampusBuilder, CAMPUS_TREES } from './campus-archit
 
 /** Campus buildings that get the detailed model (the plain block is hidden while it shows). */
 export function isDetailed(kind: number, h: number, x: number, z: number) {
-  return (kind & 3) === CLASS.sturdy && h >= 9 && inCampus(x, z) && x < -3680;
+  const futureCenter=h>=7 && x < -3838 && z < -759;
+  return (kind & 3) === CLASS.sturdy && inCampus(x, z) && ((h>=9 && x < -3680) || futureCenter);
 }
 
 export function buildCampus(env: Env, hf: Heightfield) {

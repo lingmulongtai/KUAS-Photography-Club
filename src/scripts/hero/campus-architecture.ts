@@ -434,6 +434,28 @@ export function addCourtyard(b:CampusBuilder) {
   });
 }
 
+/** The one-storey Future Center by the west gate, identified by the official map's d.
+ * Its irregular roof outline is PLATEAU 26100-bldg-194971; the common floor datum
+ * avoids interpreting the basement-inclusive 8.7 m LOD1 height as multiple storeys.
+ */
+export function addFutureCenter(b:CampusBuilder) {
+  b.part('future-center-west-gate',()=>{
+    const ring:[number,number][]=[[-86.31,-68.59],[-83.86,-71.87],[-86.41,-73.78],[-85.96,-74.39],
+      [-99.94,-84.85],[-106.42,-76.18],[-88.68,-62.91],[-85.11,-67.68]];
+    for(let i=0;i<ring.length;i++) {
+      const a=ring[i],c=ring[(i+1)%ring.length],len=Math.hypot(c[0]-a[0],c[1]-a[1]);
+      b.facade(a,c,0,5.35,len>5?[[.8,len-.8,.8,4.2]]:[],CM.wall);
+      b.beam([a[0],5.35,a[1]],[c[0],5.35,c[1]],.25,.2,CM.metal);
+    }
+    const outline=ring.map(([u,v])=>new THREE.Vector2(u,v));
+    for(const t of THREE.ShapeUtils.triangulateShape(outline,[])) {
+      const [a,c,d]=t.map(i=>[ring[i][0],5.45,ring[i][1]] as P);
+      const up=(c[2]-a[2])*(d[0]-a[0])-(c[0]-a[0])*(d[2]-a[2]);
+      if(up>0)b.quad(a,c,d,a,CM.roof);else b.quad(a,d,c,a,CM.roof);
+    }
+  });
+}
+
 export function campusArchitecture(ground:number) {
-  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);addSouth(b);addSouthStairs(b);addCourtyard(b);return b.geometry();
+  const b=new CampusBuilder(ground);addNorthEast(b);addBridges(b);addWest(b);addSouth(b);addSouthStairs(b);addCourtyard(b);addFutureCenter(b);return b.geometry();
 }
