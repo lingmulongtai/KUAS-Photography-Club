@@ -16,7 +16,7 @@ const Module=require('node:module');
     let internal=0,karasuma=0,marutamachi=0;
     const violations=[];
     function inside(x,z) {
-      if(x<0||x>730||z< -2830||z> -1540)return false;
+      if(x< -4||x>730||z< -2830||z> -1540)return false;
       let hit=false;
       for(let i=0,j=boundary.length-1;i<boundary.length;j=i++){
         const a=boundary[j],b=boundary[i];
