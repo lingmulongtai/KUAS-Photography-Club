@@ -66,7 +66,7 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
   const vehicleMaterial=new THREE.ShaderMaterial({uniforms:env,
     vertexShader:`attribute vec3 iPos;attribute vec3 iDirection;attribute vec3 iColor;varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;
       void main(){vec3 p=position*vec3(2.7,3.1,iDirection.z);vLocal=p;vColor=iColor;vVisible=step(.01,iDirection.z);vec2 d=iDirection.xy;
-        vWorld=iPos+vec3(-d.y*p.x+d.x*p.z,p.y,d.x*p.x+d.y*p.z);vNormal=vec3(-d.y*normal.x+d.x*normal.z,normal.y,d.x*normal.x+d.y*normal.z);
+        vWorld=iPos+vec3(d.y*p.x+d.x*p.z,p.y,-d.x*p.x+d.y*p.z);vNormal=vec3(d.y*normal.x+d.x*normal.z,normal.y,-d.x*normal.x+d.y*normal.z);
         gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`,
     fragmentShader:`${ENV_GLSL}${SHADOW_GLSL}
       varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;
