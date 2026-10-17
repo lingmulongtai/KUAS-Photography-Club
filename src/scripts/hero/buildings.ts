@@ -105,7 +105,7 @@ const INSTANCE_VS = /* glsl */ `
   varying vec3 vWorld;
   varying vec3 vNormal;
   varying vec2 vWall;
-  varying vec4 vInfo;
+  flat varying vec4 vInfo;
 
   void main(){
     vec3 p = position;
@@ -152,7 +152,7 @@ const POLY_VS = /* glsl */ `
   varying vec3 vWorld;
   varying vec3 vNormal;
   varying vec2 vWall;
-  varying vec4 vInfo;
+  flat varying vec4 vInfo;
   void main(){
     vWorld = position;
     vNormal = normal;
@@ -169,7 +169,7 @@ const BUILDING_FS = /* glsl */ `
   varying vec3 vWorld;
   varying vec3 vNormal;
   varying vec2 vWall;
-  varying vec4 vInfo;
+  flat varying vec4 vInfo;
 
   vec3 pick4(float r, vec3 a, vec3 b, vec3 c, vec3 d){ return r < .25 ? a : r < .5 ? b : r < .75 ? c : d; }
 
@@ -187,6 +187,8 @@ const BUILDING_FS = /* glsl */ `
     float kind = mod(code, 256.);
     float cls = mod(kind, 4.);
     float use = floor(kind / 4. + .01);
+    // Building identity is constant across the primitive. Perspective interpolation
+    // perturbs a seed by a few ULPs, enough for the window hash to flip on/off.
     float seed = vInfo.y;
     float H = vInfo.z;
     float role = floor(vInfo.w + .5);
@@ -255,12 +257,13 @@ const BUILDING_FS = /* glsl */ `
       lit = mix(lit, rate * .1, tiny);
       vec3 warm = vec3(1., .58, .26);
       vec3 cool = vec3(.95, .85, .7);
-      vec3 lampCol = mix(warm, cool, (use == 4. ? .8 : .15) * step(.4, hash12(id + seed)));
+      vec3 lampCol = mix(warm, cool, (use == 4. ? .8 : .15) * mix(step(.4, hash12(id + seed)), .6, tiny));
       // bright enough to glow through the haze from the hills, not so bright they burn out up close
       float strength = wooden ? .75 : 1.05;
       emit += lampCol * lit * pane * strength * uCity;
       // shopfronts glow along the street
-      if ((use == 3. || use == 5.) && id.y < .5) emit += warm * smoothstep(.1, .5, f.y) * valid * mix(1.2, .05, tiny) * uCity;
+      float groundFloor=1.-smoothstep(floorH-fwWall.y,floorH+fwWall.y,vWall.y-.5);
+      if (use == 3. || use == 5.) emit += warm * groundFloor * mix(smoothstep(.1,.5,f.y),.7,tiny) * valid * mix(1.2,.05,tiny) * uCity;
       emit *= cityLightShimmer(vWorld);
     }
 
@@ -281,7 +284,7 @@ const BUILDING_FS = /* glsl */ `
 const DEPTH_FS = /* glsl */ `
   #include <packing>
   uniform float uCampusDetail;
-  varying vec4 vInfo;
+  flat varying vec4 vInfo;
   void main(){
     if (vInfo.x > 767.5 && uCampusDetail > .5) discard;
     gl_FragColor = packDepthToRGBA(gl_FragCoord.z);
