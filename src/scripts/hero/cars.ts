@@ -4,7 +4,7 @@ import type { Heightfield } from './heightfield';
 import { LINE, type LineFeature } from './lines-data';
 import { ROAD_WIDTH } from './roads';
 import { rng } from './util';
-import { trafficSegments } from './traffic-access';
+import { trafficSegments, trafficLaneFraction } from './traffic-access';
 import { lightSpriteGeometry, LIGHT_SPRITE_VERTEX, LIGHT_SPRITE_FRAGMENT } from './light-sprites';
 
 /*
@@ -257,8 +257,10 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
       const ux = ((bx - ax) / len) * dir[i];
       const uz = ((bz - az) / len) * dir[i];
       // keep left: the left of a heading (ux, uz) is (uz, -ux) with x east and z south
-      const x = ax + (bx - ax) * t + uz * lane[i];
-      const z = az + (bz - az) * t - ux * lane[i];
+      const cx=ax+(bx-ax)*t,cz=az+(bz-az)*t;
+      const fraction=trafficLaneFraction(cx,cz,uz*lane[i],-ux*lane[i]);
+      const x = cx + uz * lane[i]*fraction;
+      const z = cz - ux * lane[i]*fraction;
       const y = hf.height(x, z) + 0.05;
       pos[i * 3] = x;
       pos[i * 3 + 1] = y;
