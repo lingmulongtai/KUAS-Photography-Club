@@ -397,8 +397,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   const position = geo.getAttribute('position') as THREE.BufferAttribute;
   const prepare = (c: { x: number; z: number }) => {
     const key = `${c.x},${c.z}`;
-    if (!cache.has(key)) cache.set(key, terrainPositions(hf, c, segments,channel));
-    return cache.get(key)!;
+    const prepared=cache.get(key)??terrainPositions(hf,c,segments,channel);
+    cache.delete(key);cache.set(key,prepared);
+    if(cache.size>4)cache.delete(cache.keys().next().value!);
+    return prepared;
   };
   const recenter = (c: { x: number; z: number }) => {
     activeCenter=c;
