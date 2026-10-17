@@ -21,13 +21,13 @@ test('Heian court and gate stay open between the actual halls',()=>{
   assert.ok(Math.hypot(center.x-HEIAN_CENTER.x,center.z-HEIAN_CENTER.z)<.1,'map pin and orbit frame the precinct');material.dispose();
 });
 
-test('replacement removes the fused shrine roof without removing nearby offices',async(t)=>{
+test('replacement removes the fused shrine and service roofs without clearing the neighbourhood',async(t)=>{
   const original=globalThis.fetch;globalThis.fetch=async(url)=>new Response(await readFile(new URL('../public'+url,import.meta.url)));
   t.after(()=>{globalThis.fetch=original;});
   const data=await loadBuildings();
   const removed=data.polys.filter(p=>replacesHeianFootprint(p.ring));
-  assert.ok(removed.length>=2&&removed.length<=3,'main fused roof and north sanctuary');
+  assert.ok(removed.length>=4&&removed.length<=5,'main sanctuary, Kaguraden and lower service roofs');
   assert.ok(removed.some(p=>p.ring.some((v,i)=>i%2===0&&Math.abs(v-2025.06)<2)));
   const nearby=data.polys.filter(p=>p.ring[0]>2000&&p.ring[0]<2210&&p.ring[1]>-1500&&p.ring[1]<-1200);
-  assert.ok(nearby.filter(p=>!replacesHeianFootprint(p.ring)).length>=5);
+  assert.ok(nearby.filter(p=>!replacesHeianFootprint(p.ring)).length>=3);
 });

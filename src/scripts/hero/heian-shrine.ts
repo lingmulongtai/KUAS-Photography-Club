@@ -4,12 +4,13 @@ import {roof} from './temple-models.ts';
 
 const red:Part['color']=[.47,.065,.025],white:Part['color']=[.58,.55,.45],green:Part['color']=[.055,.14,.085];
 export const HEIAN_CENTER={x:2095.4,z:-1380};
-/** Match the three measured roof outlines, rather than deleting neighbouring offices. */
+/** Match measured shrine/administration roofs, without clearing the neighbourhood. */
 export function replacesHeianFootprint(ring:Float32Array){
   const bounds=[Infinity,Infinity,-Infinity,-Infinity];
   for(let i=0;i<ring.length;i+=2){bounds[0]=Math.min(bounds[0],ring[i]);bounds[1]=Math.min(bounds[1],ring[i+1]);
     bounds[2]=Math.max(bounds[2],ring[i]);bounds[3]=Math.max(bounds[3],ring[i+1]);}
-  return [[2025.06,-1445.8,2163.91,-1338.19],[2063.32,-1485.94,2132.2,-1438.22],[2081.86,-1322.18,2109.37,-1305.96]]
+  return [[2025.06,-1445.8,2163.91,-1338.19],[2063.32,-1485.94,2132.2,-1438.22],[2081.86,-1322.18,2109.37,-1305.96],
+    [2109.19,-1380.08,2164.25,-1302.1],[2163.02,-1372.9,2198.9,-1289.59]]
     .some(b=>b.every((v,i)=>Math.abs(v-bounds[i])<2));
 }
 
@@ -48,7 +49,13 @@ export function heianShrine():Part[]{
     place(side*65,25,()=>corridor(6,90));
     place(side*42,66,()=>corridor(46,7));
     place(side*20,58,()=>corridor(6,16));
-    place(side*51,18,()=>hall(15,31,10.5));
+    place(side*51,26,()=>hall(15,31,10.5));
+  }
+  // The east-side fused source roof contains Kaguraden, walks and administration.
+  // Split its office-like extrusion into the hall above and lower service wings.
+  for(const [x,z,w,d,h] of [[81,28,26,42,9.6],[85.6,64,35.8,38,9.6],[93,82,17,17,6]]){
+    const start=parts.length;place(x,z,()=>hall(w,d,h));
+    for(const p of parts.slice(start))if(p.color===green)p.color=[.1,.115,.1];
   }
   // Inner sanctuary and its short enclosing walks, behind the outer prayer hall.
   place(0,-91,()=>hall(58,25,12.5));
