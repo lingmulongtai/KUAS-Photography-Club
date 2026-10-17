@@ -44,6 +44,7 @@ export interface TerrainTextures {
   normalNear: THREE.Texture;
   normalNearBox: Box;
   regional?: {normal:THREE.Texture;box:Box};
+  outer?: {normal:THREE.Texture;photo:THREE.Texture;box:Box};
   /** areas with a sharper photo (RegionalPhotoMeta in data.ts), each drawn once setPhoto() fills it */
   photos?: Box[];
 }
@@ -123,6 +124,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uRegionalBox: {value:v4(tex.regional?.box??tex.normalFarBox)},
     uRegionalNormal: {value:tex.regional?.normal??tex.normalFar},
     uRegionalOn: {value:tex.regional?1:0},
+    uOuterNormal: {value:tex.outer?.normal??tex.normalFar},
+    uOuterPhoto: {value:tex.outer?.photo??tex.aerialWide},
+    uOuterBox: {value:v4(tex.outer?.box??tex.normalFarBox)},
+    uOuterOn: {value:tex.outer?1:0},
     /** the mown strips of the 大 on Daimonji-yama */
     uStrokes: { value: STROKES.map((s) => new THREE.Vector4(...s)) },
     /** distance field of the streets and railways (see roads.ts) */
@@ -161,6 +166,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform vec4 uRegionalBox;
       uniform sampler2D uRegionalNormal;
       uniform float uRegionalOn;
+      uniform sampler2D uOuterNormal;
+      uniform sampler2D uOuterPhoto;
+      uniform vec4 uOuterBox;
+      uniform float uOuterOn;
       ${photos.map((_, i) => `uniform vec4 uPhotoBox${i}; uniform sampler2D uPhoto${i}; uniform float uPhotoOn${i};`).join('\n')}
       ${ROAD_GLSL}
       ${BUILT_GLSL}
@@ -187,6 +196,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         // slope from the elevation grids
         vec3 nf = texture2D(uNormalFar, boxUv(uNormalFarBox, p)).xyz * 2. - 1.;
         vec3 nn = texture2D(uNormalNear, boxUv(uNormalNearBox, p)).xyz * 2. - 1.;
+        vec3 no=texture2D(uOuterNormal,boxUv(uOuterBox,p)).xyz*2.-1.;
+        nf=mix(nf,mix(no,nf,inside(uNormalFarBox,p,300.)),uOuterOn);
         vec3 n = normalize(mix(nf, nn, inside(uNormalNearBox, p, 300.)));
         float regional = inside(uRegionalBox,p,120.)*uRegionalOn;
         vec3 nr=texture2D(uRegionalNormal,boxUv(uRegionalBox,p)).xyz*2.-1.;
@@ -195,9 +206,12 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         // aerial photo: the sharper city sheet where we have it
         vec2 uw = boxUv(uAerialWideBox, p);
         vec3 photo = texture2D(uAerialWide, vec2(uw.x, 1. - uw.y)).rgb;
+        vec2 uo=boxUv(uOuterBox,p);
+        vec3 outerPhoto=texture2D(uOuterPhoto,vec2(uo.x,1.-uo.y)).rgb;
+        photo=mix(photo,mix(outerPhoto,photo,inside(uAerialWideBox,p,300.)),uOuterOn);
         vec2 uc = boxUv(uAerialCityBox, p);
         vec3 city = texture2D(uAerialCity, vec2(uc.x, 1. - uc.y)).rgb;
-        float mappedForest = texture2D(uWoodland, uw).a * uWoodlandOn;
+        float mappedForest = texture2D(uWoodland, uw).a * uWoodlandOn * inside(uAerialWideBox,p,5.);
         photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
         // Sharper local photos. Only a uniform condition guards the samples, never a spatial
         // one, so automatic mip derivatives stay defined.

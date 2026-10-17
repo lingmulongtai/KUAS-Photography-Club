@@ -130,7 +130,9 @@ export function createHero(
   (async () => {
     const meta = await loadJSON<TerrainMeta>('terrain.json');
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
-    const [hf, wide] = await Promise.all([loadHeightfield(meta), loadTexture(wideFile, aniso)]);
+    const [hf, wide, outer] = await Promise.all([loadHeightfield(meta), loadTexture(wideFile, aniso),
+      meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
+        .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : null]);
     groundAt = (x, z) => hf.height(x, z);
     eye.copy(eyeOf(VIEW));
     campus.y = hf.height(campus.x, campus.z) + 14;
@@ -148,6 +150,7 @@ export function createHero(
       normalNear: normalTexture(hf, meta.near),
       normalNearBox: meta.near.box,
       regional: meta.arashiyama ? {box:meta.arashiyama.box,normal:normalTexture(hf,meta.arashiyama.elevation)} : undefined,
+      outer: outer && meta.outer ? {box:meta.outer.box,normal:normalTexture(hf,meta.outer),photo:outer} : undefined,
       photos: regions.map((r) => r.meta.box),
     }, opts.quality > 0.75 ? 640 : 400);
     const regionalPhotos: (Promise<unknown> | undefined)[] = [];

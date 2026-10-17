@@ -39,6 +39,9 @@ export interface RegionalPhotoMeta {
 }
 
 export interface TerrainMeta {
+  /** Coarser outer mountains; the original basin grids retain priority. */
+  outer?: GridMeta;
+  aerialOuter?: RegionalPhotoMeta;
   far: GridMeta;
   near: GridMeta;
   aerialWide: { box: Box; file: string; size: [number, number]; high?: { file: string; size: [number, number]; bytes: number; zoom: number } };
