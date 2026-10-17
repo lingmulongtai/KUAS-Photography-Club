@@ -66,6 +66,13 @@ test('South grand staircase rises through four flights with flat, traversable cr
 test('campus planting stays clear of the academic facades and stair flights',()=>{
   for(const [u,v] of CAMPUS_TREES)assert.equal(ray([u,2,v],[u,7,v]).length,0,`tree at ${u},${v} intersects the architecture`);
 });
+
+test('Future Center is a low irregular building at the west gate',()=>{
+  const roof=ray([-96,15,-74],[-96,0,-74])[0];
+  assert.ok(roof&&Math.abs(roof.point.y-32.5-5.45)<.001);
+  assert.equal(ray([-96,8,-74],[-96,6,-74]).length,0,'no invented upper storey');
+  assert.ok(geometry.userData.parts.some(p=>p.name==='future-center-west-gate'));
+});
 test('courtyard walls and stair risers face the viewer with normal back-face culling',()=>{
   const saved=mesh.material.side;mesh.material.side=THREE.FrontSide;
   assert.ok(ray([0,11,-35],[-25,11,-35]).length,'West glass faces the courtyard');
