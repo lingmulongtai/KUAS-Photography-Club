@@ -45,6 +45,7 @@ import {replacesHeianFootprint} from './heian-shrine';
 import {replacesNijoFootprint,replacesNijoBox} from './nijo-castle';
 import {replacesKyotoStation} from './kyoto-station';
 import {kawaramachiFacades} from './kawaramachi-facades';
+import {gionStreetscape} from './gion-streetscape';
 
 export interface HeroStatus {
   minutes: number;
@@ -207,7 +208,7 @@ export function createHero(
     terrain.uniforms.uCityOn.value = 1;
     const lite = opts.quality < 0.75;
     const eyes = Object.values(VIEWS).map((v) => v.eye);
-    const landmarks = buildLandmarks(env, hf,kawaramachiFacades(buildings,hf).parts);
+    const landmarks = buildLandmarks(env, hf,[...kawaramachiFacades(buildings,hf).parts,...gionStreetscape(buildings,hf).parts]);
     const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30},
       {p:landmarks.positions.tojiKondo,w:47,d:32},{p:landmarks.positions.tojiKodo,w:48,d:29},{p:landmarks.positions.tojiJikido,w:42,d:33},
       {p:{x:2095.62,z:-1314.07},w:28,d:17}];
