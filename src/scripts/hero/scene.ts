@@ -48,6 +48,8 @@ import {kawaramachiFacades} from './kawaramachi-facades';
 import {gionStreetscape} from './gion-streetscape';
 import {buildKameokaCampus,isKameokaBuilding,KAMEOKA_CENTER} from './kameoka-campus';
 import {kameokaClearing} from './kameoka-grounds';
+import {buildRailways} from './railways';
+import type {RailwayRoute} from './railway-path';
 
 export interface HeroStatus {
   minutes: number;
@@ -281,7 +283,12 @@ export function createHero(
     // one additional city is alive, and switching destinations never queues all four.
     const coreBuilt=env.uBuilt.value;
     let regionalDrive:((dt:number)=>void)|null=null;
-    driveCars=(dt)=>{cars.update(dt);regionalDrive?.(dt);};
+    let railDrive:((dt:number)=>void)|null=null;
+    void loadBinary('railways.json.gz').then(bytes=>{
+      const railways=buildRailways(env,(x,z)=>hf.height(x,z),(JSON.parse(new TextDecoder().decode(bytes)) as {routes:RailwayRoute[]}).routes);
+      scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
+    }).catch(error=>console.warn('Railway scenery unavailable',error));
+    driveCars=(dt)=>{cars.update(dt);regionalDrive?.(dt);railDrive?.(dt);};
     const disposeGroup=(group:THREE.Object3D)=>{
       const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
       group.traverse(o=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;

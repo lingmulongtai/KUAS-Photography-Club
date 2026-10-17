@@ -148,7 +148,7 @@ def export_lines(key,box):
                     state=p.get('railState')
                     if state not in (0,1):
                         continue
-                    attr=(1 if state==1 else 0)|(2 if (p.get('snglDbl') or 0)>=3 else 0)
+                    attr=(1 if state==1 else 0)|(2 if p.get('snglDbl')==2 else 0)
                 g=transform(project,make_valid(shape(ft['geometry'])).intersection(sbox(0,0,4096,4096))).intersection(clip)
                 if kind<2:
                     for part in line_parts(g):

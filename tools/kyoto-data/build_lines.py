@@ -53,9 +53,8 @@ def main():
     minx, minz, maxx, maxz = R.LINES
     feats = []
     clip = sbox(0, 0, EXTENT, EXTENT)
-    for path in sorted(glob.glob(os.path.join(CACHE, 'gsi', 'bvmap', '14', '*', '*.pbf'))):
-        x = int(path.split(os.sep)[-2])
-        y = int(os.path.basename(path).split('.')[0])
+    for _, x, y in R.tiles_for(R.LINES, 14):
+        path = os.path.join(CACHE, 'gsi', 'bvmap', '14', str(x), f'{y}.pbf')
         loc = to_local_fn(14, x, y)
         d = mvt.decode(open(path, 'rb').read(), default_options={'y_coord_down': True})
 
@@ -90,7 +89,7 @@ def main():
             state = p.get('railState')
             if state not in (0, 1):  # skip tunnels and underground lines
                 continue
-            attr = (1 if state == 1 else 0) | (2 if (p.get('snglDbl') or 0) >= 3 else 0)
+            attr = (1 if state == 1 else 0) | (2 if p.get('snglDbl') == 2 else 0)
             for g in parts(shape(ft['geometry']).intersection(clip)):
                 add(1, attr, list(g.simplify(1.2).coords))
         for ft in d.get('waterarea', {}).get('features', []):
