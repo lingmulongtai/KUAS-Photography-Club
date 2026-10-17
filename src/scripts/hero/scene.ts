@@ -325,7 +325,7 @@ export function createHero(
         let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !isKameokaBuilding(x/(p.ring.length/2),z/(p.ring.length/2));
       }):data.buildings.polys;
       const city=buildCity(env,hf,{...data.buildings,polys},b=>(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10));
-      group.add(city.group,buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24),buildIslands(env,hf,data.lines));
+      group.add(city.group,buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24,undefined,r.id==='yamashina'),buildIslands(env,hf,data.lines));
       let campusNormal:THREE.Texture|null=null;
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
       if(detailedCampus){

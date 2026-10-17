@@ -22,7 +22,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
   uRegionRoads:{value:THREE.Texture};
   uRegionRoadBox:{value:THREE.Vector4};
   uRegionRoadsOn:{value:number};
-}, regionalEdge=18,channel?:KamoChannel) {
+}, regionalEdge=18,channel?:KamoChannel,regionalSurface=false) {
   const pos: number[] = [];
   const stable:number[]=[];
   for (let i = 0; i < lines.length; i++) {
@@ -39,7 +39,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
     } catch {
       continue;
     }
-    if(f.attr===1||f.attr===2) {
+    if(regionalSurface||f.attr===1||f.attr===2) {
       // A bounded fallback retains the complete shoreline if a pathological polygon is huge.
       let refined;
       for(const edge of [regionalEdge,regionalEdge*2,regionalEdge*4]) {
@@ -64,9 +64,10 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
   geo.setAttribute('aStable',new THREE.Float32BufferAttribute(stable,1));
   geo.computeBoundingSphere();
   const material = new THREE.ShaderMaterial({
-    uniforms: { ...env, ...roads },
+    uniforms: { ...env, ...roads,uWaterBias:{value:regionalSurface?.35:30} },
     vertexShader: /* glsl */ `
       attribute float aStable;
+      uniform float uWaterBias;
       varying float vStable;
       varying vec3 vWorld;
       void main(){
@@ -75,7 +76,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
         vStable=aStable;
         vec3 toCam = cameraPosition - p;
         float dist = length(toCam);
-        p += toCam / max(dist,.01) * min(dist * .004, 30.) * (1.-aStable);
+        p += toCam / max(dist,.01) * min(dist * .004, uWaterBias) * (1.-aStable);
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
       }
     `,
