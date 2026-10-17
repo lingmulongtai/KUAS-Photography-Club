@@ -299,7 +299,7 @@ export function addWest(b:CampusBuilder) {
 
 /** South academic wings step back from the plaza. Only the narrow south-west residence
  * reaches eight storeys (KUAS Dormitory A: seven residential floors, all rooms south-facing).
- * The central 16 m slot is kept open for the grand staircase.
+ * The stair court is recessed into one connected building, with a four-storey central room.
  */
 export function addSouth(b:CampusBuilder) {
   b.part('south-stepped-academic-wings',()=>{
@@ -329,15 +329,25 @@ export function addSouth(b:CampusBuilder) {
       b.facade([u0,30],[u0,22],8.8,13.2,[[.2,7.8,9,13]]);
       b.box(u0,u1,22,30,13.05,13.3,CM.metal);
     }
-    // Narrow cross-corridors connect the academic wings at each stair landing.
-    for(let f=1;f<=4;f++) {
-      const y=f*4.4,v=22+f*11.7-2.2;
-      b.box(-9,7,v,v+2.2,y-.32,y,CM.concrete);
-      for(const edge of [v,v+2.2]) {
-        b.rail([-9,y,edge],[-4.4,y,edge]);b.rail([2.4,y,edge],[7,y,edge]);
+    // The lower floors continue below the staircase. The south elevation is one
+    // connected mass, rather than two towers with an empty slot between them.
+    b.part('south-connected-central-building',()=>{
+      b.box(-9,7,33.7,35.9,0,8.48,CM.brick);
+      b.box(-9,7,45.4,73,0,13.2,CM.brick);
+      for(let f=0;f<3;f++) {
+        const y=f*4.4;
+        b.facade([7,73.015],[-9,73.015],y,y+4.4,[[.8,15.2,y+.8,y+3.2]]);
       }
-    }
-    b.box(-9,7,68.8,73,17.6,17.65,CM.leaves);
+      // Four-floor room directly in front of the final stair landing; its roof
+      // is the fifth-floor artificial-turf court, below the academic wing roofs.
+      b.facade([-9,47.6],[7,47.6],13.2,17.6,[[.4,15.6,13.4,17.3]],CM.brick,[[6,10,13.2,16]]);
+      b.facade([7,73],[-9,73],13.2,17.6,[[.8,15.2,14,16.4]]);
+      for(const u of [-9,7])b.box(u-.08,u+.08,47.6,73,13.2,17.6,CM.brick);
+      b.box(-9,7,47.6,73,17.4,17.6,CM.concrete);
+      b.box(-8.8,6.8,47.8,72.8,17.6,17.65,CM.lawn);
+      for(const u of [-8.85,6.85])b.rail([u,17.65,47.8],[u,17.65,72.8]);
+      for(const v of [47.8,72.8])b.rail([-8.85,17.65,v],[6.85,17.65,v]);
+    });
     // The east wing's clock is individual ticks and hands on the brick, not a signboard.
     const u=10.6,v=29.94,y=19.7,r=1.0;
     for(let i=0;i<12;i++) {
@@ -369,18 +379,32 @@ export function addSouth(b:CampusBuilder) {
   });
 }
 
-/** Four straight outdoor flights lead from the plaza to the fifth-floor terrace. The
- * tread/riser sizes are photograph-based estimates, not claimed as surveyed dimensions.
+/** Preserve the plaza-to-2F flight. User-confirmed 2F-to-3F stairs turn north
+ * on both sides before returning south through the centre; the broad final
+ * flight reaches the 4F room, not the fifth-floor roof. Dimensions are estimates.
  */
 export function addSouthStairs(b:CampusBuilder) {
   b.part('south-grand-staircase',()=>{
-    for(let f=0;f<4;f++) {
-      const v=22+f*11.7,y=f*4.4;
-      b.stairs([-1,y,v],[-1,y+4.4,v+9.5],6.8,27);
-      b.box(-4.4,2.4,v+9.5,v+11.7,y+4.08,y+4.4,CM.concrete);
-      // The broad stair is split by a central metal handrail.
-      b.rail([-1,y,v],[-1,y+4.4,v+9.5],false);
-      for(const u of [-6.8,4.8])b.box(u-.2,u+.2,v+10.4,v+10.8,0,y+4.08,CM.concrete);
+    const broad=(v:number,y:number,rise:number,len:number,steps:number,solid:boolean)=>{
+      b.stairs([-1,y,v],[-1,y+rise,v+len],6.8,steps);
+      b.rail([-1,y,v],[-1,y+rise,v+len],false);
+      if(solid)for(let i=0;i<steps;i++)
+        b.box(y===0?-4.4:-9,y===0?2.4:7,v+i*len/steps,v+(i+1)*len/steps,-.1,y+(i+1)*rise/steps-.04,CM.brick);
+    };
+    // This first flight and landing retain the previously accepted coordinates.
+    broad(22,0,4.4,9.5,27,true);
+    b.box(-9,7,31.5,33.7,4.08,4.4,CM.concrete);
+    // Two narrow stairs leave the second-floor landing toward the north.
+    for(const u of [-6.5,4.5])b.stairs([u,4.4,33.7],[u,6.6,28.95],2.2,14);
+    b.box(-7.6,5.6,26.75,28.95,6.28,6.6,CM.concrete);
+    b.rail([-7.6,6.6,26.75],[5.6,6.6,26.75]);
+    broad(28.95,6.6,2.2,4.75,14,false);
+    b.box(-9,7,33.7,35.9,8.48,8.8,CM.concrete);
+    broad(35.9,8.8,4.4,9.5,27,true);
+    b.box(-9,7,45.4,47.6,12.88,13.2,CM.concrete);
+    // Rails stop at the central walking opening into each floor.
+    for(const [v,y] of [[33.7,4.4],[35.9,8.8],[47.6,13.2]]) {
+      b.rail([-9,y,v],[-4.4,y,v]);b.rail([2.4,y,v],[7,y,v]);
     }
     b.box(-4.4,2.4,16,22,-.12,0,CM.paving);
   });

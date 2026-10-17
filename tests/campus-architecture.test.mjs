@@ -38,31 +38,32 @@ test('both third-floor links have an open undercroft and a supported glazed deck
     assert.ok(ray([u-5,y+1.5,v],[u+5,y+1.5,v]).length,'glazed sides are present');
   }
 });
-test('South academic wings leave the central stair slot open and only the residence has eight storeys',()=>{
-  assert.equal(ray([4,2,24],[4,2,70]).length,0,'ground-floor passage beside the stairs stays open');
+test('South wings connect below the stairs and only the residence has eight storeys',()=>{
+  assert.ok(ray([4,2,80],[4,2,30]).length,'the south elevation closes the central gap');
   assert.equal(ray([30,26,45],[30,26,70]).length,0,'academic wing roof is below the residence');
   assert.ok(ray([-25,30,68],[-25,20,68]).length,'south-west residence rises above the academic roof');
   assert.ok(ray([30,4.3,21],[30,4.3,29]).length,'first stepped terrace is present');
 });
-test('South grand staircase rises through four flights with flat, traversable cross-landings',()=>{
-  const heights=[];
-  for(let f=0;f<4;f++) {
-    let previous=f*4.4;
-    for(let i=0;i<27;i++) {
-      const v=22+f*11.7+(i+.5)*9.5/27;
-      const hit=ray([0,30,v],[0,-1,v])[0];
-      assert.ok(hit,'every tread is modeled');
-      const height=hit.point.y-32.5;
-      assert.ok(Math.abs(height-(f*4.4+(i+1)*4.4/27))<.001);
-      assert.ok(height>previous);previous=height;
-    }
-    const v=22+f*11.7+10.5;
-    const level=ray([0,30,v],[0,-1,v])[0].point.y-32.5;
-    heights.push(level);
-    assert.equal(ray([-4,level+.6,v],[2,level+.6,v]).length,0,'no handrail or slab blocks the landing');
+test('South stairs retain 1F-to-2F, reverse at 2F-to-3F, and end at the 4F room',()=>{
+  const top=(u,v,from=32)=>ray([u,from,v],[u,-1,v])[0].point.y-32.5;
+  for(let i=0;i<27;i++) {
+    const v=22+(i+.5)*9.5/27;
+    // The upper return flight overlaps part of this flight in plan; cast below it.
+    assert.ok(Math.abs(top(0,v,6)-(i+1)*4.4/27)<.001,'preserve every accepted first-flight tread');
   }
-  assert.deepEqual(heights.map(y=>Math.round(y*10)/10),[4.4,8.8,13.2,17.6]);
+  for(const u of [-6.5,4.5]) {
+    const near=top(u,32.8,8),north=top(u,29.2,8);
+    assert.ok(north>near&&north>6,'the two side flights rise northward');
+  }
+  assert.ok(Math.abs(top(0,27.5)-6.6)<.001,'half-floor landing joins both sides');
+  assert.ok(top(0,33)>top(0,30),'central return rises southward');
+  assert.ok(Math.abs(top(0,34.8)-8.8)<.001,'third-floor landing');
+  assert.ok(Math.abs(top(0,46.5)-13.2)<.001,'fourth-floor landing');
+  assert.ok(ray([0,14.5,46],[0,14.5,50]).length===0,'central doorway opens into the fourth-floor room');
+  assert.ok(Math.abs(top(0,60)-17.65)<.001,'the room roof is a lower artificial-turf court');
+  assert.equal(ray([0,19,50],[0,19,70]).length,0,'no extra flight continues to the fifth floor');
 });
+
 test('campus planting stays clear of the academic facades and stair flights',()=>{
   for(const [u,v] of CAMPUS_TREES)assert.equal(ray([u,2,v],[u,7,v]).length,0,`tree at ${u},${v} intersects the architecture`);
 });
