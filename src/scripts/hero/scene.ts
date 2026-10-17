@@ -43,6 +43,7 @@ import { LINE, loadLines } from './lines-data';
 import {createRegionalLoader,regionAt,type CityRegion} from './regional-loader';
 import {replacesHeianFootprint} from './heian-shrine';
 import {replacesNinomaru} from './nijo-castle';
+import {replacesKyotoStation} from './kyoto-station';
 
 export interface HeroStatus {
   minutes: number;
@@ -212,7 +213,7 @@ export function createHero(
     const replaced = (x:number,z:number) => replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
     const hojo=landmarks.positions.ryoanji;
     const hojoBox:Box=[hojo.x-14.5,hojo.z-15.5,hojo.x+14.5,hojo.z+10.5];
-    const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>!replacesHeianFootprint(p.ring)&&!replacesNinomaru(p.ring)).flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
+    const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>!replacesHeianFootprint(p.ring)&&!replacesNinomaru(p.ring)&&!replacesKyotoStation(p.ring)).flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
       let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}
       return !replaced(x/(p.ring.length/2),z/(p.ring.length/2));
     })};

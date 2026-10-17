@@ -10,6 +10,7 @@ import {templeHall} from './compound-models';
 import {heianShrine,HEIAN_CENTER} from './heian-shrine';
 import {imperialPalace} from './imperial-palace';
 import {nijoCastle} from './nijo-castle';
+import {kyotoStation,STATION_CENTER} from './kyoto-station';
 
 /*
  * Landmarks the building data can't show properly, modelled at their real positions and sizes.
@@ -92,6 +93,7 @@ interface Placed {
 
 const LANDMARKS: Record<string, Placed> = {
   kyotoTower: { parts: kyotoTower(), lat: 34.9875524, lon: 135.7593295 },
+  kyotoStation:{parts:kyotoStation(),...STATION_CENTER},
   toji: { parts: pagoda(5, 9.5, 6.6, 54.8, 12, WOOD, ROOF), x: -984, z: 2632 },
   tojiKondo:{parts:templeHall(44.56,29.11,24.9,true),x:-1077.32,z:2578.44},
   tojiKodo:{parts:templeHall(45.72,26.12,17.7),x:-1076.97,z:2534.76},
