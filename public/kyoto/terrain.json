@@ -121,5 +121,41 @@
    ],
    "bytes": 240998
   }
+ },
+ "outer": {
+  "box": [
+   -35000,
+   -20000,
+   14000,
+   21000
+  ],
+  "step": 100,
+  "nx": 491,
+  "nz": 411,
+  "file": "terrain-outer.bin",
+  "bytes": 251104
+ },
+ "aerialOuter": {
+  "box": [
+   -35000,
+   -20000,
+   14000,
+   21000
+  ],
+  "file": "aerial-outer.webp",
+  "size": [
+   2048,
+   1714
+  ],
+  "bytes": 593324,
+  "zoom": 12,
+  "mobile": {
+   "file": "aerial-outer-mobile.webp",
+   "size": [
+    1024,
+    857
+   ],
+   "bytes": 215244
+  }
  }
 }
