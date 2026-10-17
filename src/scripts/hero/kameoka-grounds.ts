@@ -60,7 +60,7 @@ export function kameokaGrounds(hf:{height(x:number,z:number):number},center:{x:n
     else if(c[1]>a[1]+.15)b.stairs(a,c,10,Math.max(2,Math.ceil((c[1]-a[1])/.18)));
     else b.box(65,79,-80,-70,a[1]-.1,a[1],CM.paving);
   });
-  for(const [name,ring] of Object.entries(KAMEOKA_FIELDS))b.part(`sports-${name}`,()=>surface(ring,CM.paving));
+  for(const [name,ring] of Object.entries(KAMEOKA_FIELDS))b.part(`sports-${name}`,()=>surface(ring,CM.sportsGround));
   b.part('tennis-painted-area',()=>surface(KAMEOKA_TENNIS,CM.leaves));
   return b.geometry();
 }
