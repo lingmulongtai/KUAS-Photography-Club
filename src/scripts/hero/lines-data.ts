@@ -1,6 +1,6 @@
-import { loadBinary } from './data';
-import { BUILDINGS_BOX } from './geo';
-import {applyWaterDetail,waterChecksum,type WaterDetail} from './water-detail';
+import { loadBinary } from './data.ts';
+import { BUILDINGS_BOX, type Box } from './geo.ts';
+import {applyWaterDetail,waterChecksum,type WaterDetail} from './water-detail.ts';
 
 /** Kinds of features in lines.bin (see tools/kyoto-data/build_lines.py). */
 export const LINE = { road: 0, rail: 1, water: 2, waterHole: 3 } as const;
@@ -13,8 +13,8 @@ export interface LineFeature {
   pts: Float32Array;
 }
 
-export async function loadLines(waterFile?:string) {
-  const bytes = await loadBinary('lines.bin');
+export async function loadLines(waterFile?:string,file='lines.bin',box:Box=BUILDINGS_BOX,q=.5) {
+  const bytes = await loadBinary(file);
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = dv.getUint32(0, true);
   let o = 4;
@@ -30,7 +30,7 @@ export async function loadLines(waterFile?:string) {
   const read = (off: number, i: number) => ((bytes[off + i] | (bytes[off + total + i] << 8)) << 16) >> 16;
   const ox = o;
   const oz = o + total * 2;
-  const [minX, minZ] = BUILDINGS_BOX;
+  const [minX, minZ] = box;
   const out: LineFeature[] = new Array(count);
   let x = 0;
   let z = 0;
@@ -40,8 +40,8 @@ export async function loadLines(waterFile?:string) {
     for (let j = 0; j < ns[i]; j++, k++) {
       x += read(ox, k);
       z += read(oz, k);
-      pts[j * 2] = minX + x * 0.5;
-      pts[j * 2 + 1] = minZ + z * 0.5;
+      pts[j * 2] = minX + x * q;
+      pts[j * 2 + 1] = minZ + z * q;
     }
     out[i] = { kind: kinds[i], attr: attrs[i], pts };
   }

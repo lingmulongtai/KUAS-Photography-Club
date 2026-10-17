@@ -70,6 +70,8 @@ def heightfield():
             return (a + (b - a) * tx) * (1 - tz) + (c + (d - c) * tx) * tz
         return f
 
+    outer_meta=meta.get('outer')
+    outer=sampler(outer_meta,load(outer_meta)) if outer_meta else None
     far = sampler(meta['far'], load(meta['far']))
     near = sampler(meta['near'], load(meta['near']))
     regional_meta = meta.get('arashiyama', {}).get('elevation')
@@ -88,7 +90,8 @@ def heightfield():
         return base + (n - base) * w
 
     def height(x, z):
-        f = far(x, z) or 0.0
+        base=(outer(x,z) or 0.0) if outer else 0.0
+        f = blend(meta['far'],far,x,z,base,300) if outer else far(x,z) or 0.0
         n = blend(meta['near'], near, x, z, f, 300)
         return blend(regional_meta, regional, x, z, n, 120) if regional else n
     return height
@@ -156,10 +159,11 @@ def keep(b, area, cx, cz):
     return area >= 150 or b['height'] >= 14
 
 
-def main():
-    buildings = pickle.load(open(os.path.join(CACHE, 'buildings.pkl'), 'rb'))
-    ground_at = heightfield()
-    minx, minz = R.BUILDINGS[0], R.BUILDINGS[1]
+def export_buildings(buildings, *, box=R.BUILDINGS, stem='buildings', ground_at=None, keep_fn=keep, close_fn=None):
+    if max(box[2]-box[0],box[3]-box[1]) > 65535*Q:
+        raise ValueError('Building region exceeds uint16 coordinate range')
+    ground_at = ground_at or heightfield()
+    minx, minz = box[0], box[1]
     boxes, polys = [], []
     names = []
     dropped = 0
@@ -174,7 +178,7 @@ def main():
             poly = max(poly.geoms, key=lambda g: g.area)
         area = poly.area
         c = poly.centroid
-        if not keep(b, area, c.x, c.y):
+        if not keep_fn(b, area, c.x, c.y):
             dropped += 1
             continue
         h = max(2.5, min(b['height'], 127.5))
@@ -194,6 +198,8 @@ def main():
         kuas = R.to_local(*R.PLACES['kuas'])
         close = (math.hypot(c.x - cam[0], c.y - cam[1]) < 3000
                  or math.hypot(c.x - kuas[0], c.y - kuas[1]) < 900 or west_corridor(c.x, c.y))
+        if close_fn is not None:
+            close=close_fn(c.x,c.y)
         rect = poly.minimum_rotated_rectangle
         rc = np.array(rect.exterior.coords)[:4]
         e1 = rc[1] - rc[0]
@@ -255,11 +261,16 @@ def main():
     out += planes(dx) + planes(dz) + w.tobytes() + d.tobytes() + ang.tobytes() + hh.tobytes() + go.tobytes() + kd.tobytes()
     out += bytes(np.array(pn, np.uint8)) + bytes(np.array(ph, np.uint8)) + bytes(np.array(pk, np.uint8)) + np.array(pg, np.int8).tobytes()
     out += planes(pdx) + planes(pdz)
-    size = write_gz('buildings.bin', out)
-    json.dump({'box': R.BUILDINGS, 'q': Q, 'boxes': len(bq), 'polys': len(polys), 'points': int(len(pdx))},
-              open(os.path.join(OUT, 'buildings.json'), 'w'))
-    json.dump(names, open(os.path.join(CACHE, 'building-names.json'), 'w'), ensure_ascii=False, indent=0)
+    size = write_gz(stem+'.bin', out)
+    json.dump({'box': box, 'q': Q, 'boxes': len(bq), 'polys': len(polys), 'points': int(len(pdx))},
+              open(os.path.join(OUT, stem+'.json'), 'w'))
+    if stem=='buildings':
+        json.dump(names, open(os.path.join(CACHE, 'building-names.json'), 'w'), ensure_ascii=False, indent=0)
     print(f'{len(bq)} boxes, {len(polys)} polygons ({len(pdx)} points), {dropped} left out; raw {len(out)} gz {size}')
+
+
+def main():
+    export_buildings(pickle.load(open(os.path.join(CACHE,'buildings.pkl'),'rb')))
 
 
 if __name__ == '__main__':

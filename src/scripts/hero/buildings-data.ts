@@ -33,8 +33,8 @@ interface Meta {
   points: number;
 }
 
-export async function loadBuildings() {
-  const [meta, bytes] = await Promise.all([loadJSON<Meta>('buildings.json'), loadBinary('buildings.bin')]);
+export async function loadBuildings(metaFile='buildings.json',binFile='buildings.bin') {
+  const [meta, bytes] = await Promise.all([loadJSON<Meta>(metaFile), loadBinary(binFile)]);
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const nb = dv.getUint32(0, true);
   const np = dv.getUint32(4, true);
