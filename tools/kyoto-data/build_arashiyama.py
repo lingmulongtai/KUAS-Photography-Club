@@ -66,7 +66,7 @@ def elevation():
             'file': 'terrain-arashiyama.bin', 'bytes': size}
 
 
-def old_water():
+def old_water(bounds=B):
     path = os.path.join(OUT, 'lines.bin')
     raw = open(path, 'rb').read()
     data = gzip.decompress(raw)
@@ -87,7 +87,7 @@ def old_water():
         count = int(count)
         rings.append(pts[offset:offset+count]); offset += count
     selected, outside = [], []
-    region = box(*B)
+    region = box(*bounds)
     i = 0
     while i < n:
         if kinds[i] != 2:
@@ -109,30 +109,32 @@ def old_water():
     return selected, outside, hashlib.sha256(raw).hexdigest(), checksum
 
 
-def water():
-    selected, outside, source_hash, checksum = old_water()
+def water(bounds=B, filename='water-arashiyama.json.gz', attr=1):
+    selected, outside, source_hash, checksum = old_water(bounds)
     detailed = []
     tile_box = box(0, 0, 4096, 4096)
-    for z, x, y in R.tiles_for(B, 16):
+    for z, x, y in R.tiles_for(bounds, 16):
         path = os.path.join(CACHE, 'gsi', 'bvmap', str(z), str(x), f'{y}.pbf')
         data = mvt.decode(open(path, 'rb').read(), default_options={'y_coord_down': True})
         project = to_local_fn(z, x, y)
         for ft in data.get('waterarea', {}).get('features', []):
             geom = make_valid(shape(ft['geometry'])).intersection(tile_box)
             detailed.extend(polygons(transform(project, geom)))
-    local = unary_union(detailed).intersection(box(*B))
+    local = unary_union(detailed).intersection(box(*bounds))
     combined = unary_union([local, *outside])
     def ring(coords):
         return [round(float(v), 2) for p in list(coords)[:-1] for v in p]
     packed = [{'outer': ring(p.exterior.coords), 'holes': [ring(h.coords) for h in p.interiors]}
               for p in polygons(combined) if p.area > 1]
-    payload = {'box': B, 'source': 'GSI experimental_bvmap z16 waterarea',
+    payload = {'box': bounds, 'source': 'GSI experimental_bvmap z16 waterarea',
                'baseSha256': source_hash, 'baseChecksum': checksum, 'replace': selected, 'polygons': packed}
-    size = write_gz('water-arashiyama.json.gz', json.dumps(payload, separators=(',', ':')).encode())
+    if attr!=1:
+        payload['attr']=attr
+    size = write_gz(filename, json.dumps(payload, separators=(',', ':')).encode())
     if size > 256*1024:
         raise RuntimeError('Arashiyama water exceeds budget')
     print('water', len(selected), 'replaced rings', len(packed), 'polygons', size, 'bytes', flush=True)
-    return {'file': 'water-arashiyama.json.gz', 'bytes': size, 'baseSha256': source_hash}
+    return {'file': filename, 'bytes': size, 'baseSha256': source_hash}
 
 
 def main():
