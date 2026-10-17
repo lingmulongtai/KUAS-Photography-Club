@@ -53,7 +53,7 @@ export const VIEWS = {
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
   atago: { ja: '愛宕山', en: 'Mt. Atago', eye: ahead(ATAGO, 130, 60), ref: ATAGO, above: 75, bearing: 130, pitch: -7 },
   kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
-  station: spotOrbit('station',420,230,180,40),
+  station: spotOrbit('station',520,280,0,25),
   toji: spotOrbit('toji',300,180,180,22),
   yasaka: spotOrbit('yasaka',140,78,220,23),
   gion: spotOrbit('gion',360,220,210,8),
