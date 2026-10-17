@@ -19,6 +19,9 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
   uRoads: { value: THREE.Texture | null };
   uRoadBox: { value: THREE.Vector4 };
   uRoadsOn: { value: number };
+  uRegionRoads:{value:THREE.Texture};
+  uRegionRoadBox:{value:THREE.Vector4};
+  uRegionRoadsOn:{value:number};
 }, regionalEdge=18,channel?:KamoChannel) {
   const pos: number[] = [];
   const stable:number[]=[];

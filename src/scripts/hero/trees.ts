@@ -46,7 +46,7 @@ export function createForest(
   const citySample = sampler(photo, photoBox);
   const wideSample = fallback ? sampler(fallback.photo, fallback.box, quality > .75 ? 4096 : 2048) : null;
   /** sharper local photos (setRegionalPhoto), which take precedence over the city sheet */
-  const regions:{box:Box;sample:ReturnType<typeof sampler>;seasonal:boolean}[]=[];
+  const regions:{box:Box;sample:ReturnType<typeof sampler>;seasonal:boolean;temporary?:boolean}[]=[];
   const inBox=(b:Box,x:number,z:number)=>x>=b[0]&&x<b[2]&&z>=b[1]&&z<b[3];
   const regionAt=(x:number,z:number)=>regions.find(r=>inBox(r.box,x,z));
   const sample = (x: number, z: number) => regionAt(x,z)?.sample(x,z) ?? citySample(x, z) ?? wideSample?.(x, z) ?? null;
@@ -276,5 +276,14 @@ export function createForest(
     populations.clear();
     if(planted) plant(planted.eye,planted.bearing);
   };
-  return { group, plant, contains, setRegionalPhoto, get count() { return count; } };
+  /** Replace the one outer-city photo, releasing its CPU pixels and cached populations. */
+  const setOuterPhoto=(photo:HTMLImageElement|ImageBitmap|null,box:Box)=>{
+    const i=regions.findIndex(r=>r.temporary);
+    if(i>=0)regions.splice(i,1);
+    if(photo)regions.unshift({box,sample:sampler(photo,box),seasonal:false,temporary:true});
+    for(const population of populations.values())for(const mesh of population.meshes)mesh.geometry.dispose();
+    populations.clear();
+    if(planted)plant(planted.eye,planted.bearing);
+  };
+  return { group, plant, contains, setRegionalPhoto, setOuterPhoto, get count() { return count; } };
 }
