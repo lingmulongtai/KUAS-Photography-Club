@@ -54,6 +54,7 @@ import {moveExplorer} from './free-explore';
 import {seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
+import {buildKiyomizuBeam} from './kiyomizu-beam';
 
 export interface HeroStatus {
   minutes: number;
@@ -220,6 +221,7 @@ export function createHero(
     terrain.uniforms.uAerialCity.value = cityPhoto;
     terrain.uniforms.uCityOn.value = 1;
     const lite = opts.quality < 0.75;
+    scene.add(buildKiyomizuBeam(env,(x,z)=>hf.height(x,z)));
     const eyes = Object.values(VIEWS).map((v) => v.eye);
     const landmarks = buildLandmarks(env, hf,[...kawaramachiFacades(buildings,hf).parts,...gionStreetscape(buildings,hf).parts]);
     const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30},
