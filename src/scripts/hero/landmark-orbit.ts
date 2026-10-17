@@ -22,12 +22,20 @@ export function landmarkOrbit(
   const elevation = Math.max(5, Math.min(89, Math.atan2(dy, horizontal) / rad + pitch)) * rad;
   const radius = Math.cos(elevation) * distance;
   const pos = { x: target.x + Math.sin(azimuth) * radius, y: target.y + Math.sin(elevation) * distance, z: target.z - Math.cos(azimuth) * radius };
-  // Hills behind a temple must not swallow the camera or hide the target under the terrain.
-  // Eight heightfield samples are cheap and do not require raycasting the city mesh.
-  for (let i = 0; i < 8; i++) {
-    const t = i / 8;
+  // Sample more densely than the 10 m local elevation grid. A fixed eight-point
+  // test can miss the narrow ridge immediately behind a temple.
+  const samples = Math.max(16,Math.min(128,Math.ceil(radius/48)*8));
+  for (let i = 0; i < samples; i++) {
+    const t = i / samples;
     const h = obstruction(pos.x + (target.x - pos.x) * t, pos.z + (target.z - pos.z) * t);
     pos.y = Math.max(pos.y, (h - target.y * t) / (1 - t));
+  }
+  // Keep the near view clear on both sides as well as directly beneath the eye.
+  // This avoids a hillside occupying the whole screen while the centre ray is clear.
+  const clearance=Math.max(12,Math.min(80,distance*.12));
+  for(let i=0;i<8;i++) {
+    const a=i*Math.PI/4;
+    pos.y=Math.max(pos.y,obstruction(pos.x+Math.cos(a)*clearance,pos.z+Math.sin(a)*clearance)+8);
   }
   return { pos, target };
 }
