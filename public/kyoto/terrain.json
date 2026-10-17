@@ -157,5 +157,41 @@
    ],
    "bytes": 215244
   }
+ },
+ "kameokaCampus": {
+  "box": [
+   -19500,
+   300,
+   -18100,
+   1900
+  ],
+  "file": "aerial-kameoka-campus.webp",
+  "size": [
+   1792,
+   2048
+  ],
+  "bytes": 344734,
+  "zoom": 16,
+  "mobile": {
+   "file": "aerial-kameoka-campus-mobile.webp",
+   "size": [
+    896,
+    1024
+   ],
+   "bytes": 158002
+  },
+  "elevation": {
+   "box": [
+    -19500,
+    300,
+    -18100,
+    1900
+   ],
+   "step": 10,
+   "nx": 141,
+   "nz": 161,
+   "file": "terrain-kameoka-campus.bin",
+   "bytes": 19501
+  }
  }
 }
