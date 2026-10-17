@@ -46,6 +46,16 @@ export class CampusBuilder {
       this.cells.push(horizontal?p[0]:p[0]*along.x+p[2]*along.z,horizontal?p[2]:p[1]);
     }
   }
+  triangle(a:P,b:P,c:P,m:Material) {
+    const along=new THREE.Vector3(...b).sub(new THREE.Vector3(...a)).normalize();
+    const n=new THREE.Vector3(...b).sub(new THREE.Vector3(...a)).cross(new THREE.Vector3(...c).sub(new THREE.Vector3(...a))).normalize();
+    if(n.lengthSq()<.5)throw new Error('Degenerate campus surface');
+    const ca=Math.cos(this.yaw),sa=Math.sin(this.yaw);
+    for(const p of [a,b,c]){
+      this.positions.push(...this.point(p));this.normals.push(ca*n.x-sa*n.z,n.y,sa*n.x+ca*n.z);this.materials.push(m);
+      this.cells.push(Math.abs(n.y)>.8?p[0]:p[0]*along.x+p[2]*along.z,Math.abs(n.y)>.8?p[2]:p[1]);
+    }
+  }
   box(u0:number,u1:number,v0:number,v1:number,y0:number,y1:number,m:Material) {
     if(Math.min(u1-u0,v1-v0,y1-y0)<1e-6)return;
     this.quad([u0,y0,v0],[u0,y1,v0],[u1,y1,v0],[u1,y0,v0],m);

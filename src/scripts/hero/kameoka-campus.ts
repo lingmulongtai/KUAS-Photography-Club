@@ -4,6 +4,7 @@ import {CampusBuilder,CM} from './campus-architecture.ts';
 import {KAMEOKA_ROOFS} from './kameoka-campus-layout.ts';
 import {createCampusMesh} from './campus';
 import type {Env} from './env';
+import {kameokaGrounds} from './kameoka-grounds.ts';
 
 export const KAMEOKA_CENTER={x:-18824.8865,z:1105.346};
 type Ground={height(x:number,z:number):number};
@@ -161,5 +162,7 @@ export function kameokaArchitecture(hf:Ground){
 }
 
 export function buildKameokaCampus(env:Env,hf:Ground){
-  return createCampusMesh({...env,uHighlight:{value:1}},kameokaArchitecture(hf));
+  const parts=[kameokaArchitecture(hf),kameokaGrounds(hf,KAMEOKA_CENTER)];
+  const geo=mergeGeometries(parts)!;parts.forEach(g=>g.dispose());
+  return createCampusMesh({...env,uHighlight:{value:1}},geo);
 }
