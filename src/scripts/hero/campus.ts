@@ -44,9 +44,17 @@ export function buildCampus(env: Env, hf: Heightfield) {
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   geo.setAttribute('aMat', new THREE.Float32BufferAttribute(mat, 1));
   geo.setAttribute('aCell', new THREE.Float32BufferAttribute(cell, 2));
+  const mesh=createCampusMesh(env,geo);
+  mesh.visible=false;
+  return {mesh,count:4};
+}
+
+/** The same architectural material and transparent guardrails serve both campuses. */
+export function createCampusMesh(env:Env,geo:THREE.BufferGeometry){
   // Sort the draw ranges once, so glass guardrails use depth-tested transparency without
   // putting the opaque building into the transparent render queue. Two static draw calls.
   const opaque:number[]=[],glass:number[]=[];
+  const mat=geo.getAttribute('aMat').array;
   for(let i=0;i<mat.length;i++)(mat[i]===8?glass:opaque).push(i);
   const indices=new Uint32Array(opaque.length+glass.length);indices.set(opaque);indices.set(glass,opaque.length);
   geo.setIndex(new THREE.BufferAttribute(indices,1));
@@ -146,8 +154,7 @@ export function buildCampus(env: Env, hf: Heightfield) {
     vertexShader:`attribute float aMat;varying float vMat;void main(){vMat=aMat;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
     fragmentShader:`varying float vMat;void main(){if(abs(vMat-8.)<.1)discard;gl_FragColor=vec4(1.);}`,
   });
-  mesh.visible = false;
-  return { mesh, count: 4 };
+  return mesh;
 }
 
 /** Source-backed planting positions, clear of the architecture and the central stair axis. */
