@@ -43,6 +43,13 @@ export function buildCampus(env: Env, hf: Heightfield) {
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   geo.setAttribute('aMat', new THREE.Float32BufferAttribute(mat, 1));
   geo.setAttribute('aCell', new THREE.Float32BufferAttribute(cell, 2));
+  // Sort the draw ranges once, so glass guardrails use depth-tested transparency without
+  // putting the opaque building into the transparent render queue. Two static draw calls.
+  const opaque:number[]=[],glass:number[]=[];
+  for(let i=0;i<mat.length;i++)(mat[i]===8?glass:opaque).push(i);
+  const indices=new Uint32Array(opaque.length+glass.length);indices.set(opaque);indices.set(glass,opaque.length);
+  geo.setIndex(new THREE.BufferAttribute(indices,1));
+  geo.addGroup(0,opaque.length,0);geo.addGroup(opaque.length,glass.length,1);
   geo.computeBoundingSphere();
 
   const material = new THREE.ShaderMaterial({
@@ -85,7 +92,7 @@ export function buildCampus(env: Env, hf: Heightfield) {
           float mull = smoothstep(.04-fw,.04+fw,fract(u)) * (1.-smoothstep(.96-fw,.96+fw,fract(u)));
           float tiny=smoothstep(.12,.35,fw);
           mull=mix(mull,.92,tiny);
-          vec2 id = vec2(floor(u), floor(vCell.y));
+          vec2 id = vec2(floor(u), floor(vCell.y/4.));
           float fres = .06 + .7 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);
           vec3 refl = skyColor(reflect(v, n));
           albedo = mix(vec3(.32,.34,.34), vec3(.025, .045, .055), mull);
@@ -93,7 +100,12 @@ export function buildCampus(env: Env, hf: Heightfield) {
           float lit = mix(step(hash12(id + 3.1), .5),.25,tiny);
           emit += vec3(1., .9, .76) * lit * mull * .9 * uCity;
         } else if (m == 2) albedo = vec3(.55, .56, .56);
-        else if (m == 3) albedo = vec3(.13, .15, .16) * (.85 + .3 * vnoise(vCell * .3));
+        else if (m == 3){
+          float seam=abs(fract(vCell.x/.45)-.5),fw=fwidth(vCell.x/.45);
+          float line=1.-smoothstep(.015-fw,.015+fw,seam);
+          line=mix(line,.03,smoothstep(.1,.4,fw));
+          albedo = vec3(.13, .15, .16) * (.95 + .1 * vnoise(vCell * .3))*(1.-line*.2);
+        }
         else if (m == 4) albedo = vec3(.42, .43, .43);
         else if (m == 5) albedo = vec3(.43,.46,.47);
         else if (m == 6){
@@ -112,8 +124,8 @@ export function buildCampus(env: Env, hf: Heightfield) {
           albedo=vec3(.61,.55,.44)*mix(.83,1.,joint);
         }
         else if (m == 8){
-          albedo=vec3(.38,.47,.47);
-          emit=skyColor(reflect(v,n))*.25;
+          albedo=vec3(.22,.32,.33);
+          emit=skyColor(reflect(v,n))*.35;
         }
         else if (m == 9) albedo=vec3(.28,.16,.09);
         else if (m == 10) albedo=vec3(.12,.19,.075);
@@ -122,11 +134,17 @@ export function buildCampus(env: Env, hf: Heightfield) {
         else if (m == 13){albedo=vec3(.7,.66,.5);emit=vec3(1.,.77,.42)*uCity;}
         else if (m == 14) albedo=vec3(.18,.29,.1)*(.92+.16*vnoise(vCell*1.5));
         vec3 col = shade(albedo, n, vWorld, sh);
-        gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), 1.);
+        gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), m==8?.22:1.);
       }
     `,
   });
-  const mesh = new THREE.Mesh(geo, material);
+  const guardrail=material.clone();guardrail.uniforms=env;
+  guardrail.transparent=true;guardrail.depthWrite=false;guardrail.side=THREE.DoubleSide;guardrail.forceSinglePass=true;
+  const mesh = new THREE.Mesh(geo, [material,guardrail]);
+  mesh.userData.depthMaterial=new THREE.ShaderMaterial({
+    vertexShader:`attribute float aMat;varying float vMat;void main(){vMat=aMat;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`varying float vMat;void main(){if(abs(vMat-8.)<.1)discard;gl_FragColor=vec4(1.);}`,
+  });
   mesh.visible = false;
   return { mesh, count: 4 };
 }
