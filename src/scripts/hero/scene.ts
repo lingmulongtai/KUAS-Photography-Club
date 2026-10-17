@@ -24,7 +24,7 @@ import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds, coverForDay } from './clouds';
-import { createLookRotation, mountLookControls } from './look-controls';
+import { createLookRotation, createViewZoom, mountLookControls } from './look-controls';
 import { createBuildingMask } from './vegetation-mask';
 import type { Woodland } from './woodland';
 import { buildWoodlandTexture } from './woodland-texture';
@@ -302,13 +302,16 @@ export function createHero(
   /* ---------- camera: the view from Shogunzuka, and a flight to the campus ---------- */
 
   const rotation = createLookRotation();
+  const zoom = createViewZoom();
+  let baseFov = camera.fov;
+  const updateZoom = () => { camera.fov = zoom.fov(baseFov); camera.updateProjectionMatrix(); updatePointScale(); };
   const lookDrag = rotation.state;
   const ray = new THREE.Raycaster();
   const resetLook = mountLookControls(el, rotation, (e) => {
     const r = el.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, 1 - (e.clientY - r.top) / r.height * 2), camera);
     if (ray.ray.direction.y > .01) meteors.burst(1);
-  },()=>!flight,()=>mode==='campus'||!!VIEW.orbit);
+  },()=>!flight,()=>mode==='campus'||!!VIEW.orbit,(ratio)=>{ zoom.pinch(ratio); updateZoom(); });
 
   let mode: HeroMode = 'city';
   let modeSince = 0;
@@ -369,6 +372,8 @@ export function createHero(
 
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
+    zoom.reset();
+    updateZoom();
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
     if (!flight && mode === to && (to === 'campus' || nextView === view)) {
@@ -518,8 +523,8 @@ export function createHero(
       height = h;
       camera.aspect = w / h;
       // about 68° across on a wide screen: Kyoto Tower and Toji on the left to Nijo Castle and Atago on the right
-      camera.fov = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(34 * RAD) / camera.aspect)) / RAD, 36, 66);
-      camera.updateProjectionMatrix();
+      baseFov = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(34 * RAD) / camera.aspect)) / RAD, 36, 66);
+      updateZoom();
       setResolution(Math.min(d, pixelRatio < maxDpr && pixelRatio > 0 && lowered ? pixelRatio : d));
     },
     render(t) {
