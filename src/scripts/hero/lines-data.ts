@@ -1,6 +1,6 @@
 import { loadBinary } from './data.ts';
 import { BUILDINGS_BOX, type Box } from './geo.ts';
-import {applyWaterDetail,waterChecksum,type WaterDetail} from './water-detail.ts';
+import {applyWaterDetails,waterChecksum,type WaterDetail} from './water-detail.ts';
 
 /** Kinds of features in lines.bin (see tools/kyoto-data/build_lines.py). */
 export const LINE = { road: 0, rail: 1, water: 2, waterHole: 3 } as const;
@@ -13,7 +13,7 @@ export interface LineFeature {
   pts: Float32Array;
 }
 
-export async function loadLines(waterFile?:string,file='lines.bin',box:Box=BUILDINGS_BOX,q=.5) {
+export async function loadLines(waterFile?:string|string[],file='lines.bin',box:Box=BUILDINGS_BOX,q=.5) {
   const bytes = await loadBinary(file);
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = dv.getUint32(0, true);
@@ -47,8 +47,9 @@ export async function loadLines(waterFile?:string,file='lines.bin',box:Box=BUILD
   }
   if(!waterFile) return out;
   try {
-    const detail=JSON.parse(new TextDecoder().decode(await loadBinary(waterFile))) as WaterDetail;
-    return applyWaterDetail(out,detail,waterChecksum(bytes));
+    const details=await Promise.all((Array.isArray(waterFile)?waterFile:[waterFile]).map(async file=>
+      JSON.parse(new TextDecoder().decode(await loadBinary(file))) as WaterDetail));
+    return applyWaterDetails(out,details,waterChecksum(bytes));
   } catch(error) {
     console.warn('Regional water unavailable; retaining base water',error);
     return out;
