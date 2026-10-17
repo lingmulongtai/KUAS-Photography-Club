@@ -13,6 +13,9 @@ test('Ninomaru halls step northwest while leaving the west garden outside the ro
     assert.ok(sites[`ninomaru-${names[i]}`].z<sites[`ninomaru-${names[i-1]}`].z);
   }
   for(const site of Object.values(sites))for(const {geo} of site.parts){
+    const ray=new THREE.Raycaster(new THREE.Vector3(-1076-site.x,100,-1177-site.z),new THREE.Vector3(0,-1,0));
+    const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+    assert.equal(ray.intersectObject(new THREE.Mesh(geo,material)).length,0,'Honmaru court stays open to the sky');material.dispose();
     geo.computeBoundingBox();assert.ok(geo.boundingBox.max.y<20);assert.ok([...geo.getAttribute('position').array].every(Number.isFinite));
     triangles+=(geo.index?.count??geo.getAttribute('position').count)/3;geo.dispose();
   }
