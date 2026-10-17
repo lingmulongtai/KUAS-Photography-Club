@@ -280,7 +280,12 @@ const BUILDING_FS = /* glsl */ `
 
 const DEPTH_FS = /* glsl */ `
   #include <packing>
-  void main(){ gl_FragColor = packDepthToRGBA(gl_FragCoord.z); }
+  uniform float uCampusDetail;
+  varying vec4 vInfo;
+  void main(){
+    if (vInfo.x > 767.5 && uCampusDetail > .5) discard;
+    gl_FragColor = packDepthToRGBA(gl_FragCoord.z);
+  }
 `;
 
 /* ---------- building the meshes ---------- */
@@ -405,8 +410,8 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
   const group = new THREE.Group();
   const instMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: INSTANCE_VS, fragmentShader: BUILDING_FS });
   const polyMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: POLY_VS, fragmentShader: BUILDING_FS });
-  const instDepth = new THREE.ShaderMaterial({ vertexShader: INSTANCE_VS, fragmentShader: DEPTH_FS });
-  const polyDepth = new THREE.ShaderMaterial({ vertexShader: POLY_VS, fragmentShader: DEPTH_FS });
+  const instDepth = new THREE.ShaderMaterial({ uniforms:env, vertexShader: INSTANCE_VS, fragmentShader: DEPTH_FS });
+  const polyDepth = new THREE.ShaderMaterial({ uniforms:env, vertexShader: POLY_VS, fragmentShader: DEPTH_FS });
   const flat = flatShape();
   const pitched = pitchedShape();
 
