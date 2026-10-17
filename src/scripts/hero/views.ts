@@ -56,7 +56,7 @@ export const VIEWS = {
   station: spotOrbit('station',520,280,0,25),
   toji: spotOrbit('toji',300,180,180,22),
   yasaka: spotOrbit('yasaka',140,78,220,23),
-  gion: spotOrbit('gion',360,220,210,8),
+  gion: spotOrbit('gion',260,150,210,6),
   kawaramachi: spotOrbit('kawaramachi',400,230,200,25),
   sanjo: spotOrbit('sanjo',180,120,180,8),
   gojo: spotOrbit('gojo',180,120,180,8),

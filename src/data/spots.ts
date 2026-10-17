@@ -5,7 +5,7 @@ export const SPOTS = [
   { id: 'toji', rank: 2, ja: '東寺', en: 'Toji', lat: 34.98016, lon: 135.74757, above: 64 },
   { id: 'yasaka', rank: 3, ja: '八坂の塔', en: 'Yasaka Pagoda', lat: 34.99823, lon: 135.77905, above: 52 },
   { id: 'kiyomizu', rank: 3, ja: '清水寺', en: 'Kiyomizu-dera', lat: 34.9950586, lon: 135.7838348, above: 40 },
-  { id: 'gion', rank: 2, ja: '祇園', en: 'Gion', lat: 35.0036027, lon: 135.7782611, above: 28 },
+  { id: 'gion', rank: 2, ja: '祇園', en: 'Gion', lat: 35.0024476, lon: 135.7748211, above: 18 },
   { id: 'kawaramachi', rank: 1, ja: '四条河原町', en: 'Shijo-Kawaramachi', lat: 35.0037796, lon: 135.76932, above: 46 },
   { id: 'sanjo', rank: 2, ja: '三条大橋', en: 'Sanjo Bridge', lat: 35.0090445, lon: 135.7717206, above: 26 },
   { id: 'gojo', rank: 2, ja: '五条大橋', en: 'Gojo Bridge', lat: 34.9956954, lon: 135.767913, above: 26 },
