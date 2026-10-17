@@ -54,7 +54,7 @@ export const VIEWS = {
   atago: { ja: '愛宕山', en: 'Mt. Atago', eye: ahead(ATAGO, 130, 60), ref: ATAGO, above: 75, bearing: 130, pitch: -7 },
   kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
   station: spotOrbit('station',420,230,180,40),
-  toji: spotOrbit('toji',190,86,180,28),
+  toji: spotOrbit('toji',300,180,180,22),
   yasaka: spotOrbit('yasaka',140,78,220,23),
   gion: spotOrbit('gion',360,220,210,8),
   kawaramachi: spotOrbit('kawaramachi',400,230,200,25),

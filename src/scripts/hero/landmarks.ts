@@ -6,6 +6,7 @@ import { toLocal } from './geo';
 import { kyotoTower } from './kyoto-tower';
 import { goldenPavilion, kiyomizuHall, pagoda, ryoanji, shishinden, togetsukyo } from './temple-models';
 import { SPOTS } from '../../data/spots';
+import {templeHall} from './compound-models';
 
 /*
  * Landmarks the building data can't show properly, modelled at their real positions and sizes.
@@ -89,6 +90,9 @@ interface Placed {
 const LANDMARKS: Record<string, Placed> = {
   kyotoTower: { parts: kyotoTower(), lat: 34.9875524, lon: 135.7593295 },
   toji: { parts: pagoda(5, 9.5, 6.6, 54.8, 12, WOOD, ROOF), x: -984, z: 2632 },
+  tojiKondo:{parts:templeHall(44.56,29.11,24.9,true),x:-1077.32,z:2578.44},
+  tojiKodo:{parts:templeHall(45.72,26.12,17.7),x:-1076.97,z:2534.76},
+  tojiJikido:{parts:templeHall(39.75,30.42,18.2),x:-1077.93,z:2443.75},
   yasaka: { parts: pagoda(5, 6.4, 4.6, 46, 9.5, WOOD, ROOF), x: 1802, z: 560 },
   kiyomizu: { parts: pagoda(3, 6.2, 4.8, 31, 8, VERMILION, [0.05, 0.032, 0.022]), lat: 34.9950586, lon: 135.7838348 },
   heianTorii: { parts: torii(), lat: 35.0125663, lon: 135.7826821 },
