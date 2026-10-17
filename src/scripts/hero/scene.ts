@@ -521,25 +521,26 @@ export function createHero(
 
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
+    const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
     if(exploring){exploring=false;keys.clear();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
     zoom.reset();
     updateZoom();
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
     ensureCityRegion?.(target==='campus'?CAMPUS_CENTER:landscapeCenter(VIEWS[nextView]));
-    if (!flight && mode === to && (to === 'campus' || nextView === view)) {
+    if (!fromExplorer && !flight && mode === to && (to === 'campus' || nextView === view)) {
       resetLook();
       opts.onMode?.(to,false);
       opts.onMode?.(to,true);
       return;
     }
     const blank = () => ({ pos: new THREE.Vector3(), target: new THREE.Vector3() });
-    const from = flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, blank()) : campusPose(t, blank());
+    const from = fromExplorer ?? (flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, blank()) : campusPose(t, blank()));
     resetLook();
     const seconds = opts.flightSeconds ?? 5;
     modeSince = t + seconds;
     const viewChanged = nextView !== view;
-    const locationChanged = viewChanged || mode !== to || !!flight;
+    const locationChanged = viewChanged || mode !== to || !!flight || !!fromExplorer;
     if (viewChanged) {
       view = nextView;
       VIEW = VIEWS[view];
