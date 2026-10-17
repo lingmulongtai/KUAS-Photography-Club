@@ -9,6 +9,7 @@ import { SPOTS } from '../../data/spots';
 import {templeHall} from './compound-models';
 import {heianShrine,HEIAN_CENTER} from './heian-shrine';
 import {imperialPalace} from './imperial-palace';
+import {nijoCastle} from './nijo-castle';
 
 /*
  * Landmarks the building data can't show properly, modelled at their real positions and sizes.
@@ -109,7 +110,7 @@ const LANDMARKS: Record<string, Placed> = {
 export function buildLandmarks(env: Env, hf: Heightfield) {
   const geos: THREE.BufferGeometry[] = [];
   const positions: Record<string, THREE.Vector3> = {};
-  const sites:Record<string,Placed>={...LANDMARKS,...imperialPalace()};
+  const sites:Record<string,Placed>={...LANDMARKS,...imperialPalace(),...nijoCastle()};
   for (const [name, l] of Object.entries(sites)) {
     const p = l.lat !== undefined ? toLocal(l.lat, l.lon!) : { x: l.x!, z: l.z! };
     const y = hf.height(p.x, p.z);
