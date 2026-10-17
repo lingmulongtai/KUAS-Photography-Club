@@ -63,7 +63,7 @@ export const VIEWS = {
   kamo: spotOrbit('kamo',380,230,180,4),
   nijo: spotOrbit('nijo',600,350,180,15),
   // OSM way/554905814: 紫宸殿; way/374564926: 龍安寺方丈.
-  gosho: spotOrbit('gosho',180,90,180,10),
+  gosho: spotOrbit('gosho',450,270,180,8),
   heian: spotOrbit('heian',300,195,180,8),
   ryoanji: spotOrbit('ryoanji',110,65,180,7),
   togetsukyo: spotOrbit('arashiyama',330,160,180,8),
