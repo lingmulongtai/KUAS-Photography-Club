@@ -161,8 +161,8 @@ export function createForest(
         }
         n.xz = mat2(cos(a), sin(a), -sin(a), cos(a)) * n.xz;
         vNormal = normalize(normalize(n) + vec3(0., .15, 0.));
-        float patch=fract(sin(dot(iPos.xz,vec2(.13,.17)))*347.7);
-        vec3 leaves=mix(iTint,mix(vec3(.5,.12,.035),vec3(.66,.4,.065),patch),uAutumn*iSeason.x*(.45+.55*patch));
+        float leafPhase=fract(sin(dot(iPos.xz,vec2(.13,.17)))*347.7);
+        vec3 leaves=mix(iTint,mix(vec3(.5,.12,.035),vec3(.66,.4,.065),leafPhase),uAutumn*iSeason.x*(.45+.55*leafPhase));
         leaves=mix(leaves,vec3(.85,.62,.69),uSpring*iSeason.y);
         vTint = mix(leaves,vec3(.22,.15,.09),aBark);
         vUp = position.y;
