@@ -67,6 +67,7 @@ export const VIEWS = {
   heian: spotOrbit('heian',300,195,180,8),
   ryoanji: spotOrbit('ryoanji',110,65,180,7),
   togetsukyo: spotOrbit('arashiyama',330,160,180,8),
+  kameoka:spotOrbit('kameoka',820,540,240,15),
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
