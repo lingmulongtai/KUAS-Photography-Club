@@ -20,6 +20,9 @@ export const SPOTS = [
   { id: 'daimonji', rank: 2, ja: '大文字', en: 'Daimonji Firebed', lat: 35.0230738, lon: 135.804312, above: 35 },
   { id: 'kuas', rank: 0, ja: '太秦キャンパス', en: 'KUAS Uzumasa Campus', lat: 35.0099245, lon: 135.7184382, above: 48, action: true },
   { id: 'kameoka', rank: 0, ja: '亀岡キャンパス', en: 'KUAS Kameoka Campus', lat: 34.9936366, lon: 135.5532771, above: 40 },
+  { id: 'sonobe', rank: 4, ja: '園部駅周辺', en: 'Sonobe Station area', lat: 35.1023071, lon: 135.4833287, above: 30 },
+  { id: 'yamashina', rank: 4, ja: '山科駅周辺', en: 'Yamashina Station area', lat: 34.9925975, lon: 135.8166736, above: 30 },
+  { id: 'takeda', rank: 4, ja: '竹田・京都南部', en: 'Takeda / southern Kyoto', lat: 34.9561575, lon: 135.7561415, above: 30 },
 ] as const;
 
 export type SpotId = (typeof SPOTS)[number]['id'];
