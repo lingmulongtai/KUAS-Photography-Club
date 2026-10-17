@@ -20,11 +20,13 @@ export class CampusBuilder {
   cells:number[]=[];
   parts:CampusPart[]=[];
   readonly ground:number;
-  constructor(ground:number) { this.ground=ground; }
+  readonly center:{x:number;z:number};
+  readonly yaw:number;
+  constructor(ground:number,center=CAMPUS_CENTER,yaw=CAMPUS_YAW) { this.ground=ground;this.center=center;this.yaw=yaw; }
 
   point([u,y,v]:P):P {
-    const c=Math.cos(CAMPUS_YAW),s=Math.sin(CAMPUS_YAW);
-    return [CAMPUS_CENTER.x+c*u-s*v,this.ground+y,CAMPUS_CENTER.z+s*u+c*v];
+    const c=Math.cos(this.yaw),s=Math.sin(this.yaw);
+    return [this.center.x+c*u-s*v,this.ground+y,this.center.z+s*u+c*v];
   }
   part(name:string,build:()=>void) {
     const start=this.materials.length;build();
@@ -34,7 +36,7 @@ export class CampusBuilder {
     const edge=new THREE.Vector3(...b).sub(new THREE.Vector3(...a));
     const n=edge.cross(new THREE.Vector3(...c).sub(new THREE.Vector3(...a))).normalize();
     if(n.lengthSq()<.5)throw new Error('Degenerate campus surface');
-    const ca=Math.cos(CAMPUS_YAW),sa=Math.sin(CAMPUS_YAW);
+    const ca=Math.cos(this.yaw),sa=Math.sin(this.yaw);
     const normal=[ca*n.x-sa*n.z,n.y,sa*n.x+ca*n.z];
     // Physical face coordinates keep bricks and glazing stable on vertical and inclined faces.
     const horizontal=Math.abs(n.y)>.8;
