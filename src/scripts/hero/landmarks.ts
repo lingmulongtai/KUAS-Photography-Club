@@ -153,7 +153,7 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
       void main(){
         vec3 n = normalize(vNormal);
         float sh = sunShadow(vWorld, n);
-        vec3 col = shade(vColor, n, vWorld, sh);
+        vec3 col = shade(seasonalSurface(vColor,n,vWorld), n, vWorld, sh);
         // Cool panes reflect the sky; the smooth tower shell catches a restrained highlight.
         vec3 view = normalize(cameraPosition - vWorld);
         float spec = pow(clamp(dot(n, normalize(uSunDir + view)), 0., 1.), 36.);

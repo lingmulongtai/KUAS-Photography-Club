@@ -71,6 +71,7 @@ export const VIEWS = {
   sonobe:spotOrbit('sonobe',1100,650,180,8),
   yamashina:spotOrbit('yamashina',1000,650,180,8),
   takeda:spotOrbit('takeda',1100,650,180,8),
+  philosopher:spotOrbit('philosopher',280,185,240,4),
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;

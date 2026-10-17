@@ -276,7 +276,7 @@ const BUILDING_FS = /* glsl */ `
       emit += teal * .25 * campus * (roof ? .4 : 1.) * (.4 + uCity);
     }
 
-    vec3 col = shade(albedo, n, vWorld, sh);
+    vec3 col = shade(seasonalSurface(albedo,n,vWorld), n, vWorld, sh);
     gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
   }
 `;

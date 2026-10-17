@@ -23,6 +23,7 @@ export const SPOTS = [
   { id: 'sonobe', rank: 4, ja: '園部駅周辺', en: 'Sonobe Station area', lat: 35.1023071, lon: 135.4833287, above: 30 },
   { id: 'yamashina', rank: 4, ja: '山科駅周辺', en: 'Yamashina Station area', lat: 34.9925975, lon: 135.8166736, above: 30 },
   { id: 'takeda', rank: 4, ja: '竹田・京都南部', en: 'Takeda / southern Kyoto', lat: 34.9561575, lon: 135.7561415, above: 30 },
+  { id: 'philosopher', rank: 4, ja: '哲学の道・南側', en: 'Philosopher’s Path, south', lat: 35.0168503, lon: 135.7959795, above: 25 },
 ] as const;
 
 export type SpotId = (typeof SPOTS)[number]['id'];

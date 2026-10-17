@@ -21,7 +21,7 @@ export function createForest(
   photoBox: Box,
   quality: number,
   /** extra broadleaf trees, e.g. along the campus edge */
-  extra: { x: number; y: number; z: number }[] = [],
+  extra: { x: number; y: number; z: number;cherry?:boolean }[] = [],
   fallback?: { photo: HTMLImageElement | ImageBitmap; box: Box },
   excluded: (x: number, z: number) => boolean = () => false,
   forestArea: (x: number, z: number) => boolean = () => false,
@@ -66,6 +66,7 @@ export function createForest(
     const kind: number[] = [];
     const lods: number[] = [];
     const shapes: number[] = [];
+    const season:number[]=[];
     const detailed=regions.some(r=>inBox(r.box,eye.x,eye.z));
     for (const { x, z, lod, seed } of forestCells(eye, quality,detailed)) {
         const c = sample(x, z);
@@ -79,6 +80,7 @@ export function createForest(
         size.push((cedar ? 2.6 : 4.2) * profile.width * cluster, (cedar ? 15 : 10.5) * profile.height);
         tint.push(...profile.tint.map((v,i)=>v*.8+Math.min(c[i],.45)*.2));
         kind.push(cedar ? 1 : 0);
+        season.push(cedar?0:1,0);
         lods.push(lod);
         shapes.push(profile.aspect,profile.lean,profile.crown);
     }
@@ -88,11 +90,12 @@ export function createForest(
       size.push(3.4 * s, 9 * s);
       tint.push(0.2, 0.3, 0.15);
       kind.push(0);
+      season.push(1,t.cherry?1:0);
       lods.push(0);
       const profile=treeProfile(t.x,t.z);
       shapes.push(profile.aspect,profile.lean,profile.crown);
     }
-    return { pos, size, tint, kind, lods, shapes };
+    return { pos, size, tint, kind, lods, shapes,season };
   }
 
   // broadleaf crown: two flattened blobs; cedar: a narrow cone. Both unit-sized, base at y = 0.
@@ -127,8 +130,11 @@ export function createForest(
       attribute vec2 iSize;
       attribute vec3 iTint;
       attribute vec3 iShape;
+      attribute vec2 iSeason;
       attribute float aBark;
       uniform float uTime;
+      uniform float uSpring;
+      uniform float uAutumn;
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying vec3 vTint;
@@ -155,7 +161,10 @@ export function createForest(
         }
         n.xz = mat2(cos(a), sin(a), -sin(a), cos(a)) * n.xz;
         vNormal = normalize(normalize(n) + vec3(0., .15, 0.));
-        vTint = mix(iTint,vec3(.22,.15,.09),aBark);
+        float patch=fract(sin(dot(iPos.xz,vec2(.13,.17)))*347.7);
+        vec3 leaves=mix(iTint,mix(vec3(.5,.12,.035),vec3(.66,.4,.065),patch),uAutumn*iSeason.x*(.45+.55*patch));
+        leaves=mix(leaves,vec3(.85,.62,.69),uSpring*iSeason.y);
+        vTint = mix(leaves,vec3(.22,.15,.09),aBark);
         vUp = position.y;
         gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.);
       }
@@ -189,7 +198,7 @@ export function createForest(
         vec3 alb = pow(vTint, vec3(2.2)) * 1.05;
         float occ = mix(.42, 1., smoothstep(.15, 1., vUp)) * mix(1., .62 + .6 * c1, k);
         alb *= mix(occ, .8, vBark);
-        vec3 col = shade(alb, n, vWorld, sh);
+        vec3 col = shade(seasonalSurface(alb,n,vWorld), n, vWorld, sh);
         // sunlight through the leaves when the tree stands against the sun
         vec3 v = normalize(vWorld - cameraPosition);
         float back = pow(max(dot(v, uSunDir), 0.), 5.) * (1. - vBark);
@@ -225,7 +234,7 @@ export function createForest(
       populations.delete(key);populations.set(key,cached);
       group.add(...cached.meshes);count=cached.count;return;
     }
-    const { pos, size, tint, kind, lods, shapes } = trees(eye);
+    const { pos, size, tint, kind, lods, shapes,season } = trees(eye);
     count = kind.length;
     const chunks = new Map<string, number[]>();
     kind.forEach((k, i) => {
@@ -244,6 +253,7 @@ export function createForest(
       geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => size.slice(i * 2, i * 2 + 2))), 2));
       geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => tint.slice(i * 3, i * 3 + 3))), 3));
       geo.setAttribute('iShape', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => shapes.slice(i * 3, i * 3 + 3))), 3));
+      geo.setAttribute('iSeason',new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap(i=>season.slice(i*2,i*2+2))),2));
       geo.instanceCount = idx.length;
       const bounds = new THREE.Box3();
       for (const i of idx) {

@@ -7,6 +7,7 @@ import * as THREE from 'three';
 export function createEnv() {
   return {
     uTime: { value: 0 },
+    uSpring:{value:0},uAutumn:{value:0},uSnow:{value:0},
     uSunDir: { value: new THREE.Vector3(0, 1, 0) },
     uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
     uZenith: { value: new THREE.Color() },
@@ -75,6 +76,9 @@ float fbm(vec2 p){
 /** GLSL declarations for the shared uniforms plus sky, haze, shadow and lighting helpers. */
 export const ENV_GLSL = /* glsl */ `
 uniform float uTime;
+uniform float uSpring;
+uniform float uAutumn;
+uniform float uSnow;
 uniform vec3 uSunDir;
 uniform vec3 uMoonDir;
 uniform vec3 uZenith;
@@ -178,6 +182,12 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wp, float sh){
   float moon = max(dot(n, uMoonDir), 0.);
   vec3 bounce = (uSunLight * max(uSunDir.y, 0.) * .06 + uHorizon * .04) * (.5 - .5 * n.y);
   return albedo * (uSunLight * sun + uMoonLight * moon + skyLight(n) + bounce);
+}
+
+/* A light dusting on upward-facing surfaces, strongest in the higher hills. */
+vec3 seasonalSurface(vec3 albedo,vec3 n,vec3 wp){
+  float cover=uSnow*smoothstep(.4,.85,n.y)*(.3+.7*smoothstep(100.,550.,wp.y));
+  return mix(albedo,vec3(.67,.72,.76),cover*(.75+.25*vnoise(wp.xz*.025)));
 }
 `;
 

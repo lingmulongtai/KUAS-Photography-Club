@@ -71,7 +71,14 @@ const pinTrips = completeSpotPreviews((await getTrips())
         <button type="button" data-time="sunset" aria-pressed="false">{en ? 'Sunset' : '夕焼け'}</button>
         <button type="button" data-time="night" aria-pressed="false">{en ? 'Night' : '夜'}</button>
       </div>
-      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. The night-time bonfires are illustrative.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。夜景の送り火はイメージです。'}</span></p>
+      <label class="season-picker">{en?'Seasonal scenery':'季節の演出'}
+        <select data-season aria-label={en?'Choose seasonal scenery':'季節の演出を選ぶ'}>
+          <option value="auto">{en?'Current month':'いまの季節'}</option>
+          <option value="spring">{en?'Spring':'春'}</option><option value="summer">{en?'Summer':'夏'}</option>
+          <option value="autumn">{en?'Autumn':'秋'}</option><option value="winter">{en?'Winter':'冬'}</option>
+        </select>
+      </label>
+      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Seasonal snow, bonfires and the blue night beam are illustrative, rather than live weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。季節の雪や夜景の送り火・青い光は演出で、当日の天気や催事を示すものではありません。'}</span></p>
     </aside>
   </div>
 
@@ -101,6 +108,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { jstDateAt, jstMinutes, sunPosition, sunTimes } from '../scripts/hero/astro';
   import { SPOTS, type SpotId } from '../data/spots';
   import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
+  import type {Season} from '../scripts/hero/seasons';
 
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
   const hero = stage?.closest<HTMLElement>('.hero');
@@ -243,6 +251,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     );
 
     const returnToPanorama=()=>demo?.flyTo(panorama);
+    hero.querySelector<HTMLSelectElement>('[data-season]')!.addEventListener('change',e=>demo?.setSeason((e.target as HTMLSelectElement).value as Season));
     exploreToggle.addEventListener('click',()=>demo?.setExploring(!demo.exploring));
     back.addEventListener('click', returnToPanorama);
     spotReturn.addEventListener('click', returnToPanorama);
@@ -374,6 +383,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .is-ready .spot-nav { opacity: 1; }
   .area-status { position: absolute; top: calc(100% + 8px); left: 0; white-space: nowrap; padding: 7px 12px; border-radius: 16px; background: rgba(11,20,36,.8); color: var(--on-dark); font-size: 11px; }
   .explore-toggle { border: 0; background: transparent; color: var(--on-dark); font: inherit; font-size: 11px; padding: 8px; opacity: .7; }
+  .season-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--on-dark); }
+  .season-picker select { min-height: 32px; max-width: 145px; padding: 3px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: #15202d; color: var(--on-dark); font: inherit; }
   .explore-toggle:hover,.explore-toggle:focus-visible { opacity: 1; }
   .is-exploring .copy,.is-exploring .scrim,.is-exploring .scroll-cue { opacity: 0; visibility: hidden; pointer-events: none; }
   .is-exploring .hint span { display: none; }
