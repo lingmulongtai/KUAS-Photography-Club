@@ -5,6 +5,7 @@ import { LINE, type LineFeature } from './lines-data';
 import { ROAD_GLSL } from './roads';
 import {refineWaterSurface} from './water-surface';
 import {toLocal} from './geo';
+import type {KamoChannel} from './kamo-channel';
 
 const senkoji=toLocal(35.0157751,135.6655983);
 
@@ -18,8 +19,9 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
   uRoads: { value: THREE.Texture | null };
   uRoadBox: { value: THREE.Vector4 };
   uRoadsOn: { value: number };
-}, regionalEdge=18) {
+}, regionalEdge=18,channel?:KamoChannel) {
   const pos: number[] = [];
+  const stable:number[]=[];
   for (let i = 0; i < lines.length; i++) {
     const f = lines[i];
     if (f.kind !== LINE.water) continue;
@@ -34,11 +36,11 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
     } catch {
       continue;
     }
-    if(f.attr===1) {
+    if(f.attr===1||f.attr===2) {
       // A bounded fallback retains the complete shoreline if a pathological polygon is huge.
       let refined;
       for(const edge of [regionalEdge,regionalEdge*2,regionalEdge*4]) {
-        try {refined=refineWaterSurface(all,tris,edge,40000,{x:senkoji.x,y:senkoji.z});break;} catch { /* retry coarser, never drop water */ }
+        try {refined=refineWaterSurface(all,tris,edge,40000,f.attr===1?{x:senkoji.x,y:senkoji.z}:undefined);break;} catch { /* retry coarser, never drop water */ }
       }
       if(refined) {all=refined.points;tris=refined.triangles;}
     }
@@ -48,23 +50,29 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
       const up = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) < 0;
       for (const k of up ? t : [t[0], t[2], t[1]]) {
         const p = all[k];
-        pos.push(p.x, hf.height(p.x, p.y) + 0.4, p.y);
+        const ground=hf.height(p.x,p.y),fixed=channel&&channel.owns(f.pts);
+        pos.push(p.x,fixed?channel.surface(p.x,p.y,ground):ground+.4,p.y);
+        stable.push(fixed?channel.stability(p.x,p.y):0);
       }
     }
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('aStable',new THREE.Float32BufferAttribute(stable,1));
   geo.computeBoundingSphere();
   const material = new THREE.ShaderMaterial({
     uniforms: { ...env, ...roads },
     vertexShader: /* glsl */ `
+      attribute float aStable;
+      varying float vStable;
       varying vec3 vWorld;
       void main(){
         vec3 p = position;
         vWorld = p;
+        vStable=aStable;
         vec3 toCam = cameraPosition - p;
         float dist = length(toCam);
-        p += toCam / dist * min(dist * .004, 30.);
+        p += toCam / max(dist,.01) * min(dist * .004, 30.) * (1.-aStable);
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
       }
     `,
@@ -72,6 +80,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
       ${ENV_GLSL}
       ${ROAD_GLSL}
       varying vec3 vWorld;
+      varying float vStable;
       void main(){
         vec2 q = vWorld.xz;
         float footprint=max(length(dFdx(q)),length(dFdy(q)));
@@ -80,7 +89,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
         // Sample before discarding so the road texture's mip level remains well defined.
         // The road painted on the terrain and its cars must remain visible across rivers.
         Road road = roadAt(q);
-        if (road.edge <= 0.) discard;
+        if (road.edge <= 0. && vStable<.001) discard;
         float t = uTime;
         vec2 w = vec2(vnoise(q * .35 + vec2(t * .3, 0.)) - .5, vnoise(q * .35 + vec2(0., t * .25) + 9.) - .5);
         w *= broad;

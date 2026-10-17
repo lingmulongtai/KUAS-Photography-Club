@@ -7,6 +7,7 @@ import type { Box } from './geo';
 import { toLocal } from './geo';
 import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
+import type {KamoChannel} from './kamo-channel';
 
 /**
  * A normal map baked from an elevation grid, so slopes are lit per pixel no matter how coarse
@@ -52,7 +53,7 @@ export interface TerrainTextures {
 const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
 
 /** Vertex positions of the warped grid centred on `center` (see buildTerrain). */
-function terrainPositions(hf: Heightfield, center: { x: number; z: number }, segments: number) {
+function terrainPositions(hf: Heightfield, center: { x: number; z: number }, segments: number,channel?:KamoChannel) {
   const [minX, minZ, maxX, maxZ] = hf.bounds;
   const n = segments + 1;
   const p = 2.1;
@@ -75,7 +76,8 @@ function terrainPositions(hf: Heightfield, center: { x: number; z: number }, seg
       const cx = Math.min(Math.max(x, minX), maxX);
       const cz = Math.min(Math.max(z, minZ), maxZ);
       pos[k] = x;
-      pos[k + 1] = hf.height(cx, cz) - (cx !== x || cz !== z ? 60 : 0);
+      const ground=hf.height(cx,cz);
+      pos[k + 1] = (channel?channel.bed(cx,cz,ground):ground) - (cx !== x || cz !== z ? 60 : 0);
       pos[k + 2] = z;
     }
   }
@@ -88,6 +90,8 @@ function terrainPositions(hf: Heightfield, center: { x: number; z: number }, seg
  * so the edge never shows against the sky. recenter() moves the dense part to a new viewpoint.
  */
 export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: number }, tex: TerrainTextures, segments = 640) {
+  let channel:KamoChannel|undefined;
+  let activeCenter=center;
   const kinkaku = toLocal(35.0395092, 135.7284548), kiyomizu = toLocal(34.9946668, 135.7849382);
   const n = segments + 1;
   const pos = terrainPositions(hf, center, segments);
@@ -128,6 +132,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uOuterPhoto: {value:tex.outer?.photo??tex.aerialWide},
     uOuterBox: {value:v4(tex.outer?.box??tex.normalFarBox)},
     uOuterOn: {value:tex.outer?1:0},
+    uKamoMask:{value:tex.aerialWide},
+    uKamoBox:{value:new THREE.Vector4(0,0,1,1)},
+    uKamoOn:{value:0},
     /** the mown strips of the 大 on Daimonji-yama */
     uStrokes: { value: STROKES.map((s) => new THREE.Vector4(...s)) },
     /** distance field of the streets and railways (see roads.ts) */
@@ -170,6 +177,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform sampler2D uOuterPhoto;
       uniform vec4 uOuterBox;
       uniform float uOuterOn;
+      uniform sampler2D uKamoMask;
+      uniform vec4 uKamoBox;
+      uniform float uKamoOn;
       ${photos.map((_, i) => `uniform vec4 uPhotoBox${i}; uniform sampler2D uPhoto${i}; uniform float uPhotoOn${i};`).join('\n')}
       ${ROAD_GLSL}
       ${BUILT_GLSL}
@@ -192,6 +202,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         float dist = length(vWorld - cameraPosition);
         // ground covered by one pixel, in metres (the longer side of its footprint)
         float fp = max(length(dFdx(p)), length(dFdy(p)));
+        vec2 riverUv=boxUv(uKamoBox,p);
+        vec2 river=texture2D(uKamoMask,riverUv).rg*inside(uKamoBox,p,1.)*uKamoOn;
 
         // slope from the elevation grids
         vec3 nf = texture2D(uNormalFar, boxUv(uNormalFarBox, p)).xyz * 2. - 1.;
@@ -247,6 +259,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         // photos carry their own midday light: bring them down to something like albedo
         vec3 albedo = photo * .68 * mix(vec3(1.), vec3(1.07, 1., .9), green);
         albedo = mix(vec3(dot(albedo, vec3(.3, .55, .15))), albedo, .9);
+        // A quiet gravel fringe joins the mapped water to the existing floodplain.
+        // Keep islands and the delta: only the actual water mask is cut away.
+        float bank=clamp((river.g-river.r)*2.2,0.,.9);
+        albedo=mix(albedo,vec3(.24,.22,.17),bank);
 
         // Aerial roofs and paving contain baked highlights. Compress pale neutral ground
         // locally instead of changing the sky/exposure or decoding sRGB for a second time.
@@ -364,6 +380,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float ring = exp(-r0 * r0) + .5 * exp(-r1 * r1) * (1. - wave / 160.);
           emit += vec3(.39, .86, .9) * ring * uHighlight * 2.5;
         }
+        // Discard after screen derivatives and shadows, so shoreline pixels keep
+        // valid derivatives. Physical bridge decks cover the river independently.
+        if(river.r>.5)discard;
         gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
       }
     `,
@@ -375,10 +394,11 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   const position = geo.getAttribute('position') as THREE.BufferAttribute;
   const prepare = (c: { x: number; z: number }) => {
     const key = `${c.x},${c.z}`;
-    if (!cache.has(key)) cache.set(key, terrainPositions(hf, c, segments));
+    if (!cache.has(key)) cache.set(key, terrainPositions(hf, c, segments,channel));
     return cache.get(key)!;
   };
   const recenter = (c: { x: number; z: number }) => {
+    activeCenter=c;
     // Keep one GPU attribute while switching equal-sized terrain grids.
     position.array = prepare(c);
     position.needsUpdate = true;
@@ -388,5 +408,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     photos[i].map.value = photo;
     photos[i].on.value = 1;
   };
-  return { mesh, uniforms, recenter, prepare, setPhoto };
+  const setChannel=(next:KamoChannel,mask:THREE.Texture)=>{
+    channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
+    cache.clear();recenter(activeCenter);
+  };
+  return { mesh, uniforms, recenter, prepare, setPhoto, setChannel };
 }
