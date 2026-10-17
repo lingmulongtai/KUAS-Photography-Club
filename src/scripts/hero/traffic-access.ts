@@ -2,6 +2,28 @@ import { GYOEN_OUTLINE } from '../../data/kyotogyoen.ts';
 
 type Point={x:number;z:number};
 const cross=(x:number,z:number,u:number,v:number)=>x*v-z*u;
+function inside(x:number,z:number,boundary:readonly Point[]) {
+  let hit=false;
+  for(let i=0,j=boundary.length-1;i<boundary.length;j=i++){
+    const a=boundary[j],b=boundary[i],dx=b.x-a.x,dz=b.z-a.z;
+    if(Math.abs(cross(x-a.x,z-a.z,dx,dz))<1e-5 && (x-a.x)*(x-b.x)+(z-a.z)*(z-b.z)<=1e-5)return false;
+    if((a.z>z)!==(b.z>z)&&x<(b.x-a.x)*(z-a.z)/(b.z-a.z)+a.x)hit=!hit;
+  }
+  return hit;
+}
+const xs=GYOEN_OUTLINE.map(p=>p.x),zs=GYOEN_OUTLINE.map(p=>p.z);
+const parkBounds=[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)];
+/** Limit lane offsets at the park's street corners, smoothly retaining the available lane width. */
+export function trafficLaneFraction(x:number,z:number,dx:number,dz:number) {
+  const tx=x+dx,tz=z+dz;
+  if(tx<parkBounds[0]||tx>parkBounds[2]||tz<parkBounds[1]||tz>parkBounds[3]||!inside(tx,tz,GYOEN_OUTLINE))return 1;
+  let lo=0,hi=1;
+  for(let i=0;i<10;i++) {
+    const mid=(lo+hi)/2;
+    if(inside(x+dx*mid,z+dz*mid,GYOEN_OUTLINE))hi=mid;else lo=mid;
+  }
+  return lo;
+}
 
 /** Split a road at a restricted park boundary; never join exterior fragments across its interior. */
 export function trafficSegments(pts:Float32Array, boundary:readonly Point[]=GYOEN_OUTLINE):Float32Array[] {
@@ -10,15 +32,6 @@ export function trafficSegments(pts:Float32Array, boundary:readonly Point[]=GYOE
   let minX=Infinity,minZ=Infinity,maxX=-Infinity,maxZ=-Infinity;
   for(let i=0;i<pts.length;i+=2){minX=Math.min(minX,pts[i]);maxX=Math.max(maxX,pts[i]);minZ=Math.min(minZ,pts[i+1]);maxZ=Math.max(maxZ,pts[i+1]);}
   if(maxX<bounds[0]||minX>bounds[2]||maxZ<bounds[1]||minZ>bounds[3])return [pts];
-  const inside=(x:number,z:number)=>{
-    let hit=false;
-    for(let i=0,j=boundary.length-1;i<boundary.length;j=i++){
-      const a=boundary[j],b=boundary[i],dx=b.x-a.x,dz=b.z-a.z;
-      if(Math.abs(cross(x-a.x,z-a.z,dx,dz))<1e-5 && (x-a.x)*(x-b.x)+(z-a.z)*(z-b.z)<=1e-5)return false;
-      if((a.z>z)!==(b.z>z)&&x<(b.x-a.x)*(z-a.z)/(b.z-a.z)+a.x)hit=!hit;
-    }
-    return hit;
-  };
   const parts:Float32Array[]=[];
   let current:number[]=[],cut=false;
   const flush=()=>{if(current.length>=4)parts.push(new Float32Array(current));current=[];};
@@ -39,7 +52,7 @@ export function trafficSegments(pts:Float32Array, boundary:readonly Point[]=GYOE
     cuts.sort((a,b)=>a-b);
     for(let j=0;j<cuts.length-1;j++){
       const a=cuts[j],b=cuts[j+1];if(b-a<1e-8)continue;
-      if(inside(ax+dx*(a+b)/2,az+dz*(a+b)/2)){cut=true;flush();continue;}
+      if(inside(ax+dx*(a+b)/2,az+dz*(a+b)/2,boundary)){cut=true;flush();continue;}
       const x=ax+dx*a,z=az+dz*a;
       if(current.length&&Math.hypot(current.at(-2)!-x,current.at(-1)!-z)>1e-4)flush();
       if(!current.length)current.push(x,z);

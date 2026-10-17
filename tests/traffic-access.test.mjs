@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {trafficSegments} from '../src/scripts/hero/traffic-access.ts';
+import {trafficSegments,trafficLaneFraction} from '../src/scripts/hero/traffic-access.ts';
 
 const square=[{x:0,z:0},{x:10,z:0},{x:10,z:10},{x:0,z:10}];
 const split=(p,b=square)=>trafficSegments(new Float32Array(p),b).map(p=>Array.from(p));
@@ -10,6 +10,12 @@ test('through roads are split into exterior pieces without bridging the forbidde
   assert.deepEqual(split([2,2,8,8]),[]);
   assert.deepEqual(split([-2,-2,0,0,12,-2]),[[-2,-2,0,0,12,-2]]);
   assert.deepEqual(split([-2,0,12,0]),[[-2,0,12,0]],'preserve tangent boundary roads');
+});
+test('lane offsets at the south-west corner do not drift into the park',()=>{
+  const fraction=trafficLaneFraction(-5,-1554,6,0);
+  assert.ok(fraction>0&&fraction<1);
+  assert.equal(trafficLaneFraction(-16,-2100,8,0),1,'normal Karasuma lanes are preserved');
+  assert.equal(trafficLaneFraction(-4000,-700,6,0),1);
 });
 test('real Gyoen paths disappear while Karasuma and Marutamachi roads remain intact',()=>{
   assert.deepEqual(trafficSegments(new Float32Array([120,-2082.5,411.5,-2083])),[]);
