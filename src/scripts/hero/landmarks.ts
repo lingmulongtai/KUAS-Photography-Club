@@ -7,6 +7,7 @@ import { kyotoTower } from './kyoto-tower';
 import { goldenPavilion, kiyomizuHall, pagoda, ryoanji, shishinden, togetsukyo } from './temple-models';
 import { SPOTS } from '../../data/spots';
 import {templeHall} from './compound-models';
+import {heianShrine,HEIAN_CENTER} from './heian-shrine';
 
 /*
  * Landmarks the building data can't show properly, modelled at their real positions and sizes.
@@ -96,6 +97,7 @@ const LANDMARKS: Record<string, Placed> = {
   yasaka: { parts: pagoda(5, 6.4, 4.6, 46, 9.5, WOOD, ROOF), x: 1802, z: 560 },
   kiyomizu: { parts: pagoda(3, 6.2, 4.8, 31, 8, VERMILION, [0.05, 0.032, 0.022]), lat: 34.9950586, lon: 135.7838348 },
   heianTorii: { parts: torii(), lat: 35.0125663, lon: 135.7826821 },
+  heianShrine:{parts:heianShrine(),...HEIAN_CENTER},
   goldenPavilion: { parts: goldenPavilion(), lat: 35.0395092, lon: 135.7284548 },
   shishinden: { parts: shishinden(), lat: SPOTS.find(s=>s.id==='gosho')!.lat, lon: SPOTS.find(s=>s.id==='gosho')!.lon },
   ryoanji: { parts: ryoanji(), lat: SPOTS.find(s=>s.id==='ryoanji')!.lat, lon: SPOTS.find(s=>s.id==='ryoanji')!.lon },
