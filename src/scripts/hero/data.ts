@@ -52,6 +52,7 @@ export interface TerrainMeta {
   };
   /** the slopes below Shogunzuka and Kiyomizu-dera (build_higashiyama.py) */
   higashiyama?: RegionalPhotoMeta;
+  kameokaCampus?:RegionalPhotoMeta & {elevation:GridMeta};
 }
 
 /** An elevation grid in metres, decoded from decimetre deltas (see encode_heights in common.py). */
