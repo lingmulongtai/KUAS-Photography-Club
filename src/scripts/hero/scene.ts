@@ -325,7 +325,7 @@ export function createHero(
     regrow: boolean;
   } | null = null;
   env.uCampus.value.set(CAMPUS_CENTER.x, CAMPUS_CENTER.z);
-  const ORBIT = { radius: 640, height: 150, start: 112 * RAD, speed: 0.03 };
+  const ORBIT = { radius: 230, height: 165, start: 25 * RAD, speed: 0.03 };
   const pose = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
@@ -348,12 +348,17 @@ export function createHero(
 
   function campusPose(t: number, out = pose) {
     const a = ORBIT.start - (opts.reducedMotion ? 0 : (t - modeSince) * ORBIT.speed) + lookDrag.yaw * RAD;
-    out.target.copy(campus).setY(campus.y + 45);
+    out.target.copy(campus).setY(campus.y);
     // A spherical orbit reaches an overhead view without passing through the ground.
-    const elevation = THREE.MathUtils.clamp(Math.atan2(ORBIT.height - 45, ORBIT.radius) / RAD + lookDrag.pitch, 5, 89) * RAD;
-    const distance = Math.hypot(ORBIT.radius, ORBIT.height - 45);
+    const elevation = THREE.MathUtils.clamp(Math.atan2(ORBIT.height, ORBIT.radius) / RAD + lookDrag.pitch, 5, 89) * RAD;
+    // Portrait framing keeps all four wings in view. On wide screens the campus sits
+    // to the left of its information card rather than disappearing underneath it.
+    const framing=Math.max(1,1/Math.max(.45,camera.aspect));
+    const distance = Math.hypot(ORBIT.radius, ORBIT.height)*framing;
     const radius = Math.cos(elevation) * distance;
     out.pos.set(campus.x + Math.sin(a) * radius, out.target.y + Math.sin(elevation) * distance, campus.z - Math.cos(a) * radius);
+    const offset=THREE.MathUtils.smoothstep(camera.aspect,1.3,1.7)*40;
+    out.target.x-=Math.cos(a)*offset;out.target.z-=Math.sin(a)*offset;
     return out;
   }
 
@@ -387,7 +392,7 @@ export function createHero(
     }
     const region =
       to === 'campus'
-        ? new THREE.Box3(new THREE.Vector3(campus.x - 2600, 0, campus.z - 2600), new THREE.Vector3(campus.x + 2600, 450, campus.z + 2600))
+        ? new THREE.Box3(new THREE.Vector3(campus.x - 700, 0, campus.z - 700), new THREE.Vector3(campus.x + 700, 200, campus.z + 700))
         : shadowRegion(VIEW, eye);
     shadow.setRegion(region);
     labels?.filter(to === 'campus' ? ['kuas', 'arashiyama', 'atago', 'nijo', 'tower', 'kinkaku'] : null);
