@@ -2,148 +2,24 @@ import * as THREE from 'three';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CAMPUS_OUTLINE, inCampus } from './geo';
-import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
-import { rng } from './util';
+import { CLASS } from './buildings-data';
+import { campusArchitecture, CampusBuilder, CAMPUS_TREES } from './campus-architecture';
 
 /*
- * The Uzumasa campus up close. PLATEAU only has plain blocks for these buildings, so they are
- * rebuilt from their real footprints and heights with architectural detail: white spandrels and
- * recessed glass bands floor by floor, parapets with a teal coping, rooftop plant, a paved plaza
- * and trees along the edge. Shown only when the camera is at the campus.
+ * Source-backed architecture replaces the campus's coarse PLATEAU LOD1 blocks up close.
+ * Geometry is built in a common floor datum, independent of basement-inclusive LOD1 heights.
  */
 
 /** Campus buildings that get the detailed model (the plain block is hidden while it shows). */
 export function isDetailed(kind: number, h: number, x: number, z: number) {
-  return (kind & 3) === CLASS.sturdy && h >= 9 && inCampus(x, z);
+  return (kind & 3) === CLASS.sturdy && h >= 9 && inCampus(x, z) && x < -3680;
 }
 
-const MAT = { spandrel: 0, glass: 1, reveal: 2, roof: 3, plant: 4, coping: 5, paving: 6 };
-
-function ringOfBox(b: BoxBuilding) {
-  const c = Math.cos(b.angle);
-  const s = Math.sin(b.angle);
-  const hw = b.w / 2;
-  const hd = b.d / 2;
-  const pts: [number, number][] = [
-    [b.x - c * hw + s * hd, b.z - s * hw - c * hd],
-    [b.x + c * hw + s * hd, b.z + s * hw - c * hd],
-    [b.x + c * hw - s * hd, b.z + s * hw + c * hd],
-    [b.x - c * hw - s * hd, b.z - s * hw + c * hd],
-  ];
-  return pts;
-}
-
-export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }) {
+export function buildCampus(env: Env, hf: Heightfield) {
   const pos: number[] = [];
   const nrm: number[] = [];
   const mat: number[] = [];
   const cell: number[] = [];
-  const quad = (a: number[], b: number[], c: number[], d: number[], n: number[], m: number, u0 = 0, u1 = 0, v0 = 0, v1 = 0) => {
-    // a b c d counter-clockwise seen from outside; uv cells for the window grid
-    const verts = [a, b, c, a, c, d];
-    const uvs = [[u0, v0], [u1, v0], [u1, v1], [u0, v0], [u1, v1], [u0, v1]];
-    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const flip = (ab[1] * ac[2] - ab[2] * ac[1]) * n[0] + (ab[2] * ac[0] - ab[0] * ac[2]) * n[1] + (ab[0] * ac[1] - ab[1] * ac[0]) * n[2] < 0;
-    const order = flip ? [0, 2, 1, 3, 5, 4] : [0, 1, 2, 3, 4, 5];
-    for (const k of order) {
-      pos.push(...verts[k]);
-      nrm.push(...n);
-      mat.push(m);
-      cell.push(...uvs[k]);
-    }
-  };
-
-  const r = rng(306);
-  const footprints: { ring: [number, number][]; h: number; y: number }[] = [];
-  for (const b of data.boxes) if (isDetailed(b.kind, b.h, b.x, b.z)) footprints.push({ ring: ringOfBox(b), h: b.h, y: hf.height(b.x, b.z) + b.ground });
-  for (const p of data.polys) {
-    const ring: [number, number][] = [];
-    for (let i = 0; i < p.ring.length; i += 2) ring.push([p.ring[i], p.ring[i + 1]]);
-    const cx = ring.reduce((s, q) => s + q[0], 0) / ring.length;
-    const cz = ring.reduce((s, q) => s + q[1], 0) / ring.length;
-    if (isDetailed(p.kind, p.h, cx, cz)) footprints.push({ ring, h: p.h, y: hf.height(cx, cz) + p.ground });
-  }
-
-  for (const f of footprints) {
-    const ring = f.ring;
-    const m = ring.length;
-    let area = 0;
-    for (let i = 0; i < m; i++) {
-      const j = (i + 1) % m;
-      area += ring[i][0] * ring[j][1] - ring[j][0] * ring[i][1];
-    }
-    const out = area >= 0 ? 1 : -1;
-    const top = f.y + f.h;
-    const floors = Math.max(2, Math.round((f.h - 1.2) / 3.9));
-    const fh = (f.h - 1.2) / floors;
-    const inset = 0.32;
-    let along = 0;
-    for (let i = 0; i < m; i++) {
-      const [ax, az] = ring[i];
-      const [bx, bz] = ring[(i + 1) % m];
-      const len = Math.hypot(bx - ax, bz - az);
-      if (len < 0.5) continue;
-      const nx = (out * (bz - az)) / len;
-      const nz = (-out * (bx - ax)) / len;
-      const n = [nx, 0, nz];
-      const ix = -nx * inset;
-      const iz = -nz * inset;
-      const u0 = along;
-      const u1 = along + len;
-      // base below ground
-      quad([ax, f.y - 4, az], [bx, f.y - 4, bz], [bx, f.y, bz], [ax, f.y, az], n, MAT.spandrel);
-      for (let k = 0; k < floors; k++) {
-        const y0 = f.y + k * fh;
-        const spandrelTop = y0 + (k === 0 ? 0.35 : fh * 0.36);
-        const glassTop = y0 + fh;
-        quad([ax, y0, az], [bx, y0, bz], [bx, spandrelTop, bz], [ax, spandrelTop, az], n, MAT.spandrel);
-        // recessed glass with its sill and head
-        quad([ax + ix, spandrelTop, az + iz], [bx + ix, spandrelTop, bz + iz], [bx + ix, glassTop, bz + iz], [ax + ix, glassTop, az + iz], n, MAT.glass, u0, u1, k, k + 1);
-        quad([ax, spandrelTop, az], [bx, spandrelTop, bz], [bx + ix, spandrelTop, bz + iz], [ax + ix, spandrelTop, az + iz], [0, 1, 0], MAT.reveal);
-        quad([ax + ix, glassTop, az + iz], [bx + ix, glassTop, bz + iz], [bx, glassTop, bz], [ax, glassTop, az], [0, -1, 0], MAT.reveal);
-      }
-      // parapet with a teal coping
-      const py = f.y + floors * fh;
-      quad([ax, py, az], [bx, py, bz], [bx, top, bz], [ax, top, az], n, MAT.spandrel);
-      quad([ax, top, az], [bx, top, bz], [bx + ix * 1.5, top, bz + iz * 1.5], [ax + ix * 1.5, top, az + iz * 1.5], [0, 1, 0], MAT.coping);
-      along = u1;
-    }
-    // roof slab, just below the parapet top
-    const contour = ring.map(([x, z]) => new THREE.Vector2(x, z));
-    for (const t of THREE.ShapeUtils.triangulateShape(contour, [])) {
-      const [a, b, c] = t.map((k) => contour[k]);
-      const y = top - 1;
-      const tri = [[a.x, y, a.y], [b.x, y, b.y], [c.x, y, c.y]];
-      const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-      for (const v of cross < 0 ? tri : [tri[0], tri[2], tri[1]]) {
-        pos.push(...v);
-        nrm.push(0, 1, 0);
-        mat.push(MAT.roof);
-        cell.push(v[0], v[2]);
-      }
-    }
-    // rooftop plant: a few boxes near the middle
-    const cx = ring.reduce((s, q) => s + q[0], 0) / m;
-    const cz = ring.reduce((s, q) => s + q[1], 0) / m;
-    for (let k = 0; k < 3; k++) {
-      const w = 3 + r() * 5;
-      const d = 2.5 + r() * 4;
-      const h = 1.6 + r() * 2;
-      const x = cx + (r() - 0.5) * 10;
-      const z = cz + (r() - 0.5) * 10;
-      const y = top - 1;
-      const c = [[x - w / 2, z - d / 2], [x + w / 2, z - d / 2], [x + w / 2, z + d / 2], [x - w / 2, z + d / 2]];
-      for (let e = 0; e < 4; e++) {
-        const [p0, p1] = [c[e], c[(e + 1) % 4]];
-        const ex = p1[0] - p0[0], ez = p1[1] - p0[1];
-        const l = Math.hypot(ex, ez);
-        quad([p0[0], y, p0[1]], [p1[0], y, p1[1]], [p1[0], y + h, p1[1]], [p0[0], y + h, p0[1]], [ez / l, 0, -ex / l], MAT.plant);
-      }
-      quad([c[0][0], y + h, c[0][1]], [c[3][0], y + h, c[3][1]], [c[2][0], y + h, c[2][1]], [c[1][0], y + h, c[1][1]], [0, 1, 0], MAT.plant);
-    }
-  }
-
   // the plaza: the campus outline, paved
   const plaza = CAMPUS_OUTLINE.map(([x, z]) => new THREE.Vector2(x, z));
   for (const t of THREE.ShapeUtils.triangulateShape(plaza, [])) {
@@ -153,16 +29,27 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
     for (const v of cross < 0 ? tri : [tri[0], tri[2], tri[1]]) {
       pos.push(...v);
       nrm.push(0, 1, 0);
-      mat.push(MAT.paving);
+      mat.push(6);
       cell.push(v[0], v[2]);
     }
   }
 
+  const architecture=campusArchitecture(hf.height(-3755,-700)+.25);
+  for(const [target,name] of [[pos,'position'],[nrm,'normal'],[mat,'aMat'],[cell,'aCell']] as const)
+    for(const value of architecture.getAttribute(name).array)target.push(value);
+  architecture.dispose();
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   geo.setAttribute('aMat', new THREE.Float32BufferAttribute(mat, 1));
   geo.setAttribute('aCell', new THREE.Float32BufferAttribute(cell, 2));
+  // Sort the draw ranges once, so glass guardrails use depth-tested transparency without
+  // putting the opaque building into the transparent render queue. Two static draw calls.
+  const opaque:number[]=[],glass:number[]=[];
+  for(let i=0;i<mat.length;i++)(mat[i]===8?glass:opaque).push(i);
+  const indices=new Uint32Array(opaque.length+glass.length);indices.set(opaque);indices.set(glass,opaque.length);
+  geo.setIndex(new THREE.BufferAttribute(indices,1));
+  geo.addGroup(0,opaque.length,0);geo.addGroup(opaque.length,glass.length,1);
   geo.computeBoundingSphere();
 
   const material = new THREE.ShaderMaterial({
@@ -180,8 +67,6 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
         vMat = aMat;
         vCell = aCell;
         vec3 p = position;
-        // the plaza sits on the ground: pull it toward the camera so the terrain never covers it
-        if (aMat > 5.5){ vec3 toCam = cameraPosition - p; float d = length(toCam); p += toCam / d * min(d * .003, 6.); }
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
       }
     `,
@@ -198,7 +83,7 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
         vec2 cellWidth = max(fwidth(vCell),vec2(.001));
         vec3 v = normalize(vWorld - cameraPosition);
         int m = int(vMat + .5);
-        vec3 albedo = vec3(.62, .63, .62);
+        vec3 albedo = vec3(.58, .52, .42);
         vec3 emit = vec3(0.);
         if (m == 1){
           // glass: mullions every 1.6 m, sky reflection by day, lit rooms at night
@@ -207,7 +92,7 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
           float mull = smoothstep(.04-fw,.04+fw,fract(u)) * (1.-smoothstep(.96-fw,.96+fw,fract(u)));
           float tiny=smoothstep(.12,.35,fw);
           mull=mix(mull,.92,tiny);
-          vec2 id = vec2(floor(u), floor(vCell.y));
+          vec2 id = vec2(floor(u), floor(vCell.y/4.));
           float fres = .06 + .7 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);
           vec3 refl = skyColor(reflect(v, n));
           albedo = mix(vec3(.32,.34,.34), vec3(.025, .045, .055), mull);
@@ -215,9 +100,14 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
           float lit = mix(step(hash12(id + 3.1), .5),.25,tiny);
           emit += vec3(1., .9, .76) * lit * mull * .9 * uCity;
         } else if (m == 2) albedo = vec3(.55, .56, .56);
-        else if (m == 3) albedo = vec3(.13, .15, .16) * (.85 + .3 * vnoise(vCell * .3));
+        else if (m == 3){
+          float seam=abs(fract(vCell.x/.45)-.5),fw=fwidth(vCell.x/.45);
+          float line=1.-smoothstep(.015-fw,.015+fw,seam);
+          line=mix(line,.03,smoothstep(.1,.4,fw));
+          albedo = vec3(.13, .15, .16) * (.95 + .1 * vnoise(vCell * .3))*(1.-line*.2);
+        }
         else if (m == 4) albedo = vec3(.42, .43, .43);
-        else if (m == 5){ albedo = vec3(.5, .78, .8); emit += vec3(.39, .86, .9) * (.4 + 1.6 * uCity); }
+        else if (m == 5) albedo = vec3(.43,.46,.47);
         else if (m == 6){
           // paving: big light slabs with fine joints
           vec2 g = fract(vCell / 3.);
@@ -226,32 +116,44 @@ export function buildCampus(env: Env, hf: Heightfield, data: { boxes: BoxBuildin
           joint=mix(joint,.98,smoothstep(.08,.25,max(fw.x,fw.y)));
           albedo = vec3(.44, .43, .41) * (.85 + .15 * joint) * (.9 + .2 * vnoise(vCell * .2));
         }
+        else if (m == 7){
+          vec2 brick=vec2(vCell.x/.23+mod(floor(vCell.y/.075),2.)*.5,vCell.y/.075);
+          vec2 fw=fwidth(brick),g=fract(brick);
+          float joint=smoothstep(.04-fw.x,.04+fw.x,g.x)*smoothstep(.07-fw.y,.07+fw.y,g.y);
+          joint=mix(joint,.9,smoothstep(.2,.7,max(fw.x,fw.y)));
+          albedo=vec3(.61,.55,.44)*mix(.83,1.,joint);
+        }
+        else if (m == 8){
+          albedo=vec3(.22,.32,.33);
+          emit=skyColor(reflect(v,n))*.35;
+        }
+        else if (m == 9) albedo=vec3(.28,.16,.09);
+        else if (m == 10) albedo=vec3(.12,.19,.075);
+        else if (m == 11) albedo=vec3(.15,.18,.19);
+        else if (m == 12) albedo=vec3(.67,.68,.65);
+        else if (m == 13){albedo=vec3(.7,.66,.5);emit=vec3(1.,.77,.42)*uCity;}
+        else if (m == 14) albedo=vec3(.18,.29,.1)*(.92+.16*vnoise(vCell*1.5));
         vec3 col = shade(albedo, n, vWorld, sh);
-        gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), 1.);
+        gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), m==8?.22:1.);
       }
     `,
   });
-  const mesh = new THREE.Mesh(geo, material);
+  const guardrail=material.clone();guardrail.uniforms=env;
+  guardrail.transparent=true;guardrail.depthWrite=false;guardrail.side=THREE.DoubleSide;guardrail.forceSinglePass=true;
+  const mesh = new THREE.Mesh(geo, [material,guardrail]);
+  mesh.userData.depthMaterial=new THREE.ShaderMaterial({
+    vertexShader:`attribute float aMat;varying float vMat;void main(){vMat=aMat;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`varying float vMat;void main(){if(abs(vMat-8.)<.1)discard;gl_FragColor=vec4(1.);}`,
+  });
   mesh.visible = false;
-  return { mesh, count: footprints.length };
+  return { mesh, count: 4 };
 }
 
-/** Trees along the inside of the campus edge, as tree positions for the forest layer. */
+/** Source-backed planting positions, clear of the architecture and the central stair axis. */
 export function campusTreeSpots(hf: Heightfield) {
-  const spots: { x: number; y: number; z: number }[] = [];
-  const p = CAMPUS_OUTLINE;
-  for (let i = 0; i < p.length; i++) {
-    const [ax, az] = p[i];
-    const [bx, bz] = p[(i + 1) % p.length];
-    const len = Math.hypot(bx - ax, bz - az);
-    for (let t = 4; t < len - 4; t += 9) {
-      const x = ax + ((bx - ax) * t) / len;
-      const z = az + ((bz - az) * t) / len;
-      // step a few metres inward toward the middle
-      const ix = x + (-3755 - x) * 0.04;
-      const iz = z + (-700 - z) * 0.04;
-      spots.push({ x: ix, y: hf.height(ix, iz), z: iz });
-    }
-  }
-  return spots;
+  const frame=new CampusBuilder(0);
+  return CAMPUS_TREES.map(([u,v])=>{
+    const [x,,z]=frame.point([u,0,v]);
+    return {x,y:hf.height(x,z),z};
+  });
 }

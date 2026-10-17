@@ -342,7 +342,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           emit *= uCity * cityLightShimmer(vWorld);
         }
         // a teal ring that pulses around the campus when it is in focus
-        if (uHighlight > 0.){
+        if (uHighlight > 0. && uCampusDetail < .5){
           float d = length(p - uCampus);
           float wave = mod(uTime * 40., 160.);
           float r0 = (d - 175.) / 3.5;

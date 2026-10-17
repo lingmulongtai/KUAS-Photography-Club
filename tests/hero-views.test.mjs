@@ -49,3 +49,12 @@ test('every map spot has a camera destination and landmarks stay centred', () =>
   assert.equal(spotDestination('arashiyama'),'togetsukyo');
   assert.equal(VIEWS.arashiyama.orbit,undefined);
 });
+
+test('Daimonji panorama looks out over Kyoto and its map spot looks back at the firebed',()=>{
+  const panorama=VIEWS.daimonji, spot=VIEWS[spotDestination('daimonji')];
+  assert.equal(panorama.orbit,undefined);
+  assert.ok(panorama.bearing>210&&panorama.bearing<280,'face west/southwest toward Kyoto');
+  assert.ok(Math.hypot(panorama.eye.x-panorama.ref.x,panorama.eye.z-panorama.ref.z)<30,'stand at the firebed viewpoint');
+  assert.deepEqual(spot.orbit.center,toLocal(35.0230738,135.804312));
+  assert.ok(spot.eye.x<spot.orbit.center.x-300,'view the west-facing 大 from downslope');
+});

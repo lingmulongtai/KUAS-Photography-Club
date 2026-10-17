@@ -17,6 +17,8 @@ jobs:
       - run: npm ci
       - name: Interaction regression tests
         run: npm test
+      - name: Verify Kyoto Gyoen traffic with shipped road data
+        run: node tools/verify-gyoen-traffic.cjs
       - name: Type check
         run: npm run check
       - name: Build
