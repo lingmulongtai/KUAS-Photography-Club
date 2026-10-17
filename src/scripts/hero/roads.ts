@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDINGS_BOX } from './geo';
+import { BUILDINGS_BOX, type Box } from './geo';
 import { LINE, type LineFeature } from './lines-data';
 
 /** Road widths in metres for each GSI width rank (0 under 3 m … 4 over 19.5 m). */
@@ -21,8 +21,8 @@ const CENTRE_SPAN = 32;
  *   b  distance to the centre line of the nearest avenue
  *   a  signed distance to the edge of the nearest railway
  */
-export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature[], size: number) {
-  const [minX, minZ, maxX, maxZ] = BUILDINGS_BOX;
+export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature[], size: number, box:Box=BUILDINGS_BOX) {
+  const [minX, minZ, maxX, maxZ] = box;
   const segs: number[] = [];
   for (const f of lines) {
     let half: number;
