@@ -7,7 +7,7 @@ import { CAMPUS_CENTER } from './geo.ts';
  */
 export const CAMPUS_YAW = -1.58 * Math.PI / 180;
 export const CM = { wall:0, glass:1, concrete:2, roof:3, plant:4, metal:5, paving:6,
-  brick:7, railing:8, timber:9, leaves:10, steel:11, white:12, lamp:13, lawn:14, terracotta:15 } as const;
+  brick:7, railing:8, timber:9, leaves:10, steel:11, white:12, lamp:13, lawn:14, terracotta:15, sportsGround:16 } as const;
 type P = [number,number,number];
 type Material = typeof CM[keyof typeof CM];
 export type CampusPart = { name:string; start:number; count:number };
