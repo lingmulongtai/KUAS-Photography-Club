@@ -19,6 +19,7 @@ export const SPOTS = [
   { id: 'atago', rank: 3, ja: '愛宕山', en: 'Mt. Atago', lat: 35.0600453, lon: 135.6342851, above: 60 },
   { id: 'daimonji', rank: 2, ja: '大文字', en: 'Daimonji Firebed', lat: 35.0230738, lon: 135.804312, above: 35 },
   { id: 'kuas', rank: 0, ja: '太秦キャンパス', en: 'KUAS Uzumasa Campus', lat: 35.0099245, lon: 135.7184382, above: 48, action: true },
+  { id: 'kameoka', rank: 0, ja: '亀岡キャンパス', en: 'KUAS Kameoka Campus', lat: 34.9936366, lon: 135.5532771, above: 40 },
 ] as const;
 
 export type SpotId = (typeof SPOTS)[number]['id'];

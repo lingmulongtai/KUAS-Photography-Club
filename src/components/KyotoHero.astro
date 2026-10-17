@@ -35,6 +35,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <button type="button" class="spot-return" hidden>{en ? 'Back to view' : '展望へ戻る'}</button>
       <a class="spot-records" hidden>{en ? 'Outing records' : '活動記録'}</a>
       <span class="visually-hidden" role="status" data-place-status></span>
+      <span class="area-status" role="status" data-area-status hidden>{en ? 'Loading the surrounding area…' : '周辺の景色を読み込んでいます…'}</span>
     </div>
     <div class="loading" aria-hidden="true">
       <span class="spin"></span>
@@ -118,6 +119,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const spotReturn=hero.querySelector<HTMLButtonElement>('.spot-return')!;
     const spotRecords=hero.querySelector<HTMLAnchorElement>('.spot-records')!;
     const placeStatus=hero.querySelector('[data-place-status]')!;
+    const areaStatus=hero.querySelector<HTMLElement>('[data-area-status]')!;
     const viewButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('button[data-view]'));
     let panorama: HeroView='shogunzuka';
 
@@ -215,6 +217,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           drift: !coarse,
           onStatus,
           onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false; viewButtons.forEach(b=>b.disabled=false); },
+          onAreaLoading: loading=>{areaStatus.hidden=!loading;},
           onAction: (id) => demo?.flyTo(spotDestination(id)),
           onMode: setView,
           avoid: () => {
@@ -359,6 +362,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .is-ready .spot-nav { opacity: 1; }
+  .area-status { position: absolute; top: calc(100% + 8px); left: 0; white-space: nowrap; padding: 7px 12px; border-radius: 16px; background: rgba(11,20,36,.8); color: var(--on-dark); font-size: 11px; }
   .no-3d .views, .no-3d .spot-nav { display: none; }
   .spot-select, .spot-return, .spot-records {
     min-height: 36px;

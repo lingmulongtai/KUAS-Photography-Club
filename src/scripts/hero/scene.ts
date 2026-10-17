@@ -46,6 +46,8 @@ import {replacesNijoFootprint,replacesNijoBox} from './nijo-castle';
 import {replacesKyotoStation} from './kyoto-station';
 import {kawaramachiFacades} from './kawaramachi-facades';
 import {gionStreetscape} from './gion-streetscape';
+import {buildKameokaCampus,isKameokaBuilding,KAMEOKA_CENTER} from './kameoka-campus';
+import {kameokaClearing} from './kameoka-grounds';
 
 export interface HeroStatus {
   minutes: number;
@@ -63,6 +65,8 @@ export interface HeroOptions {
   trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
   onReady?: () => void;
+  /** A neighbouring area is loading; all navigation remains available. */
+  onAreaLoading?:(loading:boolean)=>void;
   /** A map destination was selected. */
   onAction?: (id: SpotId) => void;
   /** The camera started moving to (or arrived at) a view. */
@@ -298,8 +302,19 @@ export function createHero(
       return {buildings:b.value,lines:l.value,photo:p.value,dispose:()=>p.value.dispose()};
     },(r,data)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
-      const city=buildCity(env,hf,data.buildings,b=>!lite||b.w*b.d>65||b.h>10);
+      const detailedCampus=r.id==='kameoka-campus';
+      const polys=detailedCampus?data.buildings.polys.filter(p=>{
+        let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !isKameokaBuilding(x/(p.ring.length/2),z/(p.ring.length/2));
+      }):data.buildings.polys;
+      const city=buildCity(env,hf,{...data.buildings,polys},b=>(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10));
       group.add(city.group,buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24),buildIslands(env,hf,data.lines));
+      let campusNormal:THREE.Texture|null=null;
+      const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
+      if(detailedCampus){
+        const campus=buildKameokaCampus(env,hf);group.add(campus);casts(campus);
+        if(meta.kameokaCampus){campusNormal=normalTexture(hf,meta.kameokaCampus.elevation);
+          terrain.uniforms.uRegionalNormal.value=campusNormal;terrain.uniforms.uRegionalBox.value.set(...meta.kameokaCampus.box);terrain.uniforms.uRegionalOn.value=1;}
+      }
       const lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);
       const traffic=buildCars(env,hf,data.lines,lite ? .25 : .45);
       group.add(lamps.points,traffic.group);
@@ -313,7 +328,7 @@ export function createHero(
       env.uBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
       const mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
       const infrastructure=infrastructureMask(data.lines,r.box);
-      outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z);
+      outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
       forest.setOuterPhoto(data.photo.image as HTMLImageElement,r.photo.box);
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
@@ -329,11 +344,21 @@ export function createHero(
         outerExcluded=()=>false;
         forest.setOuterPhoto(null,r.photo.box);
         road.dispose();built.dispose();data.dispose();shadow.invalidate();
+        if(campusNormal){terrain.uniforms.uRegionalNormal.value=oldNormal;terrain.uniforms.uRegionalBox.value.copy(oldNormalBox);
+          terrain.uniforms.uRegionalOn.value=oldNormalOn;campusNormal.dispose();}
       };
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
     const regionManifest=await loadJSON<{regions:CityRegion[]}>('regions.json')
       .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};});
-    ensureCityRegion=center=>{void regionLoader.request(regionAt(regionManifest.regions,center));};
+    let areaRequest=0;
+    ensureCityRegion=center=>{
+      let region=regionAt(regionManifest.regions,center);
+      if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
+        region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
+      const request=++areaRequest;
+      opts.onAreaLoading?.(!!region&&region.id!==regionLoader.id);
+      void regionLoader.request(region).finally(()=>{if(request===areaRequest)opts.onAreaLoading?.(false);});
+    };
     ensureCityRegion(landscapeCenter(VIEW));
     opts.onReady?.();
   })().catch((err) => console.error('Kyoto data failed to load', err));
