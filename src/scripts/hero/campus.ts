@@ -125,12 +125,12 @@ export function createCampusMesh(env:Env,geo:THREE.BufferGeometry){
           joint=mix(joint,.98,smoothstep(.08,.25,max(fw.x,fw.y)));
           albedo = vec3(.44, .43, .41) * (.85 + .15 * joint) * (.9 + .2 * vnoise(vCell * .2));
         }
-        else if (m == 7){
+        else if (m == 7 || m == 15){
           vec2 brick=vec2(vCell.x/.23+mod(floor(vCell.y/.075),2.)*.5,vCell.y/.075);
           vec2 fw=fwidth(brick),g=fract(brick);
           float joint=smoothstep(.04-fw.x,.04+fw.x,g.x)*smoothstep(.07-fw.y,.07+fw.y,g.y);
           joint=mix(joint,.9,smoothstep(.2,.7,max(fw.x,fw.y)));
-          albedo=vec3(.61,.55,.44)*mix(.83,1.,joint);
+          albedo=(m==7?vec3(.61,.55,.44):vec3(.34,.15,.09))*mix(.83,1.,joint);
         }
         else if (m == 8){
           albedo=vec3(.22,.32,.33);
