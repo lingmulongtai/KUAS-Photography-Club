@@ -43,7 +43,7 @@
 
 ## 実装コミット
 
-以下は実装順。各件名が独立した変更の目的を示す。履歴のamend・squash・rebase・force-pushは行わず、通常のマージで保持する。
+以下は文書作成時点の実装順。追加の境界修正を含む全コミットは[PRのコミット一覧](https://github.com/lingmulongtai/KUAS-Photography-Club/pull/8/commits)に記録する。京都南部の訪問先は、追加データの範囲内にある伏見駅とし、全4地域の地点と読み込み範囲の対応もテストする。各件名が独立した変更の目的を示す。履歴のamend・squash・rebase・force-pushは行わず、通常のマージで保持する。
 
 <!-- implementation-commits -->
 
