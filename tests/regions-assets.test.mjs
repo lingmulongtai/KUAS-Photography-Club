@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import {readFile,stat} from 'node:fs/promises';
 import {loadBuildings} from '../src/scripts/hero/buildings-data.ts';
 import {loadLines} from '../src/scripts/hero/lines-data.ts';
+import {SPOTS} from '../src/data/spots.ts';
+import {toLocal} from '../src/scripts/hero/geo.ts';
+import {regionAt} from '../src/scripts/hero/regional-loader.ts';
 
 test('each shipped region decodes within its bounds and bounded download budget',async(t)=>{
   const root=new URL('../public/kyoto/',import.meta.url),original=globalThis.fetch;
@@ -10,6 +13,10 @@ test('each shipped region decodes within its bounds and bounded download budget'
   t.after(()=>{globalThis.fetch=original;});
   const {regions}=JSON.parse(await readFile(new URL('regions.json',root),'utf8'));
   assert.deepEqual(regions.map(r=>r.id).sort(),['kameoka','sonobe','south','yamashina']);
+  for(const [id,expected] of [['kameoka','kameoka'],['sonobe','sonobe'],['yamashina','yamashina'],['fushimi','south']]){
+    const spot=SPOTS.find(s=>s.id===id);assert.ok(spot);
+    assert.equal(regionAt(regions,toLocal(spot.lat,spot.lon))?.id,expected,`${id} actually enters its additional region`);
+  }
   for(const region of regions) {
     const [x0,z0,x1,z1]=region.box;
     const valid=(x,z)=>Number.isFinite(x)&&Number.isFinite(z)&&x>=x0-.5&&x<=x1+.5&&z>=z0-.5&&z<=z1+.5;
