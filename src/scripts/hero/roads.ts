@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDINGS_BOX } from './geo';
+import { BUILDINGS_BOX, type Box } from './geo';
 import { LINE, type LineFeature } from './lines-data';
 
 /** Road widths in metres for each GSI width rank (0 under 3 m … 4 over 19.5 m). */
@@ -21,8 +21,8 @@ const CENTRE_SPAN = 32;
  *   b  distance to the centre line of the nearest avenue
  *   a  signed distance to the edge of the nearest railway
  */
-export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature[], size: number) {
-  const [minX, minZ, maxX, maxZ] = BUILDINGS_BOX;
+export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature[], size: number, box:Box=BUILDINGS_BOX) {
+  const [minX, minZ, maxX, maxZ] = box;
   const segs: number[] = [];
   for (const f of lines) {
     let half: number;
@@ -136,7 +136,7 @@ export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature
   renderer.toneMapping = prevTone;
   geo.dispose();
   material.dispose();
-  return { texture: target.texture, segments: count };
+  return { texture: target.texture, segments: count, dispose:()=>target.dispose() };
 }
 
 /** GLSL to read the field: declares uRoads / uRoadBox and roadAt(). */
@@ -144,6 +144,9 @@ export const ROAD_GLSL = /* glsl */ `
 uniform sampler2D uRoads;
 uniform vec4 uRoadBox;
 uniform float uRoadsOn;
+uniform sampler2D uRegionRoads;
+uniform vec4 uRegionRoadBox;
+uniform float uRegionRoadsOn;
 
 struct Road { float edge; float avenue; float centre; float rail; };
 
@@ -152,6 +155,9 @@ Road roadAt(vec2 p){
   // sample first, then decide: a texture read inside a branch would have no well-defined mip level
   vec4 f = texture2D(uRoads, vec2(uv.x, 1. - uv.y));
   if (uRoadsOn < .5 || uv.x <= 0. || uv.x >= 1. || uv.y <= 0. || uv.y >= 1.) f = vec4(1.);
+  vec2 ru=(p-uRegionRoadBox.xy)/(uRegionRoadBox.zw-uRegionRoadBox.xy);
+  vec4 rf=texture2D(uRegionRoads,vec2(ru.x,1.-ru.y));
+  if(uRegionRoadsOn>.5&&ru.x>0.&&ru.x<1.&&ru.y>0.&&ru.y<1.)f=min(f,rf);
   Road r;
   r.edge = f.r * ${SPAN}. - ${NEAR}.;
   r.avenue = f.g * ${SPAN}. - ${NEAR}.;

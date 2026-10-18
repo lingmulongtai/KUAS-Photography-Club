@@ -13,10 +13,10 @@ function setup(t, enabled=()=>true, orbiting=()=>false) {
     setPointerCapture(id){ captured.add(id); }, hasPointerCapture(id){return captured.has(id);}, releasePointerCapture(id){captured.delete(id);},
     classList:{add(){},remove(){}}, getBoundingClientRect(){return {left:0,top:0,width:600,height:400};},
   };
-  const look = createLookRotation(); let taps=0;
-  mountLookControls(el,look,()=>taps++,enabled,orbiting);
+  const look = createLookRotation(); let taps=0; const zooms=[];
+  const reset=mountLookControls(el,look,()=>taps++,enabled,orbiting,ratio=>zooms.push(ratio));
   const send=(type,x,y,extra={})=>listeners.get(type)({type,isPrimary:true,button:0,pointerType:'mouse',pointerId:1,clientX:x,clientY:y,timeStamp:10,target:{closest(){return null;}},...extra});
-  return {el,send,look,captured,taps:()=>taps};
+  return {el,send,look,captured,taps:()=>taps,zooms,reset};
 }
 test('small mouse release outside is captured, cancelled and never becomes a later hover drag', (t) => {
   const h=setup(t); h.send('pointerdown',599,100);
@@ -24,6 +24,44 @@ test('small mouse release outside is captured, cancelled and never becomes a lat
   h.send('pointerup',602,100);
   h.send('pointermove',300,100);
   assert.equal(h.look.state.yaw,0); assert.equal(h.taps(),0);
+});
+
+test('two fingers zoom in either direction without rotating or activating a pin', (t)=>{
+  const h=setup(t), touch={pointerType:'touch',target:{closest:()=>({})}};
+  h.send('pointerdown',100,100,touch);
+  h.send('pointerdown',200,100,{...touch,pointerId:2,isPrimary:false});
+  h.send('pointermove',300,100,{...touch,pointerId:2,isPrimary:false});
+  h.send('pointermove',250,100,{...touch,pointerId:2,isPrimary:false});
+  assert.deepEqual(h.zooms,[2,.75]);
+  assert.equal(h.look.state.yaw,0);
+  h.send('pointerup',250,100,{...touch,pointerId:2,isPrimary:false});
+  h.send('pointermove',180,100,touch);
+  h.send('pointerup',180,100,touch);
+  assert.equal(h.look.state.yaw,0);
+  assert.equal(h.taps(),0);
+  assert.equal(h.captured.size,0);
+  let blocked=false;
+  h.send('click',180,100,{preventDefault(){blocked=true;},stopPropagation(){}});
+  assert.equal(blocked,true);
+  h.send('pointerdown',100,100,{pointerType:'touch'});
+  h.send('pointermove',160,100,{pointerType:'touch',timeStamp:30});
+  assert.equal(h.look.state.yaw,-18);
+});
+
+test('cancel and reset clear every finger and allow a fresh gesture', (t)=>{
+  const h=setup(t), touch={pointerType:'touch'};
+  for(const end of ['pointercancel','reset']) {
+    h.send('pointerdown',100,100,touch);
+    h.send('pointerdown',200,100,{...touch,pointerId:2,isPrimary:false});
+    if(end==='reset') h.reset(); else h.send(end,100,100,{...touch,target:h.el});
+    h.send('pointermove',300,100,{...touch,pointerId:2,isPrimary:false});
+    assert.equal(h.zooms.length,0);
+    assert.equal(h.captured.size,0);
+  }
+  h.send('pointerdown',100,100,touch);
+  h.send('pointerdown',200,100,{...touch,pointerId:2,isPrimary:false});
+  h.send('pointermove',300,100,{...touch,pointerId:2,isPrimary:false});
+  assert.deepEqual(h.zooms,[2]);
 });
 test('touch capture transferred from a child canvas keeps every swipe movement', (t) => {
   const h=setup(t);

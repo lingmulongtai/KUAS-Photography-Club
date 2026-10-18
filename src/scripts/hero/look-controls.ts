@@ -33,20 +33,55 @@ export function createLookRotation() {
 }
 
 /** Keep vertical touch scrolling native and leave controls and short taps alone. */
-export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true, orbiting:()=>boolean=()=>false) {
+export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true, orbiting:()=>boolean=()=>false, onPinch:(ratio:number)=>void=()=>{}) {
   let drag: { id: number; x: number; y: number; lastX: number; lastY: number; time: number; touch: boolean; pin: boolean; moved: boolean } | null = null;
   let suppressClick = false;
+  const touches = new Map<number, {x:number;y:number}>();
+  let pinching = false;
+  const distance = () => {
+    const [a,b] = [...touches.values()];
+    return a && b ? Math.hypot(a.x-b.x,a.y-b.y) : 0;
+  };
+  const clear = () => {
+    const ids = new Set([...touches.keys(), ...(drag ? [drag.id] : [])]);
+    drag = null;
+    touches.clear();
+    pinching = false;
+    rotation.stop();
+    el.classList.remove('is-dragging');
+    for (const id of ids) if (el.hasPointerCapture(id)) el.releasePointerCapture(id);
+  };
   const interactive = (e: PointerEvent) => (e.target as Element).closest('button, a, input, select, textarea, [role="slider"]');
   el.addEventListener('pointerdown', (e) => {
-    suppressClick = false;
     const pin=!!(e.target as Element).closest('.pin-trigger');
-    if (!enabled() || !e.isPrimary || e.button !== 0 || (!pin && interactive(e))) return;
+    if (!enabled() || e.button !== 0 || (!pin && interactive(e))) return;
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if (touches.size > 1) {
+        pinching = suppressClick = true;
+        drag = null;
+        rotation.stop();
+        el.classList.remove('is-dragging');
+        for (const id of touches.keys()) el.setPointerCapture(id);
+        return;
+      }
+    } else if (!e.isPrimary) return;
+    suppressClick = false;
     rotation.stop();
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, time: e.timeStamp, touch: e.pointerType !== 'mouse', pin, moved: false };
     // Leave short pin taps with their button; a swipe takes capture after the threshold.
     if (!drag.touch && !pin) el.setPointerCapture(e.pointerId);
   });
   el.addEventListener('pointermove', (e) => {
+    if (touches.has(e.pointerId)) {
+      const before = distance();
+      touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if (pinching) {
+        const after = distance();
+        if (before > 4 && after > 4) onPinch(after/before);
+        return;
+      }
+    }
     if (!drag || drag.id !== e.pointerId) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
@@ -71,6 +106,17 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     // Touch starts with implicit capture on the canvas. Transferring capture to
     // the stage bubbles the canvas's loss here without ending the stage's drag.
     if (e.type === 'lostpointercapture' && e.target !== el) return;
+    if (touches.has(e.pointerId)) {
+      if (e.type !== 'pointerup') { clear(); return; }
+      touches.delete(e.pointerId);
+      if (pinching) {
+        // Ignore the remaining finger until it lifts; a pinch must never turn
+        // into a pin click, a shooting star, or a sudden camera rotation.
+        if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+        if (!touches.size) pinching = false;
+        return;
+      }
+    }
     if (!drag || drag.id !== e.pointerId) return;
     const previous = drag;
     drag = null;
@@ -89,13 +135,20 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
   el.addEventListener('click', (e) => {
     if (suppressClick) { e.preventDefault(); e.stopPropagation(); suppressClick = false; }
   }, true);
-  window.addEventListener('blur', () => { drag = null; rotation.stop(); el.classList.remove('is-dragging'); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { drag = null; rotation.stop(); el.classList.remove('is-dragging'); } });
+  window.addEventListener('blur', clear);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) clear(); });
   return () => {
-    const id = drag?.id;
-    drag = null;
-    if (id !== undefined && el.hasPointerCapture(id)) el.releasePointerCapture(id);
+    clear();
     rotation.reset();
-    el.classList.remove('is-dragging');
+  };
+}
+
+/** Optical zoom keeps every viewpoint's terrain clearance unchanged. */
+export function createViewZoom() {
+  let scale = 1;
+  return {
+    pinch(ratio:number) { if (Number.isFinite(ratio) && ratio > 0) scale = Math.max(.7,Math.min(3,scale*ratio)); },
+    reset() { scale = 1; },
+    fov(base:number) { return 2*Math.atan(Math.tan(base*Math.PI/360)/scale)*180/Math.PI; },
   };
 }

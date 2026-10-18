@@ -35,6 +35,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <button type="button" class="spot-return" hidden>{en ? 'Back to view' : '展望へ戻る'}</button>
       <a class="spot-records" hidden>{en ? 'Outing records' : '活動記録'}</a>
       <span class="visually-hidden" role="status" data-place-status></span>
+      <span class="area-status" role="status" data-area-status hidden>{en ? 'Loading the surrounding area…' : '周辺の景色を読み込んでいます…'}</span>
+      <button type="button" class="explore-toggle" aria-pressed="false" disabled>{en ? 'Free explore' : '自由に散策'}</button>
     </div>
     <div class="loading" aria-hidden="true">
       <span class="spin"></span>
@@ -69,7 +71,14 @@ const pinTrips = completeSpotPreviews((await getTrips())
         <button type="button" data-time="sunset" aria-pressed="false">{en ? 'Sunset' : '夕焼け'}</button>
         <button type="button" data-time="night" aria-pressed="false">{en ? 'Night' : '夜'}</button>
       </div>
-      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. The night-time bonfires are illustrative.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。夜景の送り火はイメージです。'}</span></p>
+      <label class="season-picker">{en?'Seasonal scenery':'季節の演出'}
+        <select data-season aria-label={en?'Choose seasonal scenery':'季節の演出を選ぶ'}>
+          <option value="auto">{en?'Current month':'いまの季節'}</option>
+          <option value="spring">{en?'Spring':'春'}</option><option value="summer">{en?'Summer':'夏'}</option>
+          <option value="autumn">{en?'Autumn':'秋'}</option><option value="winter">{en?'Winter':'冬'}</option>
+        </select>
+      </label>
+      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Seasonal snow, bonfires and the blue night beam are illustrative, rather than live weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。季節の雪や夜景の送り火・青い光は演出で、当日の天気や催事を示すものではありません。'}</span></p>
     </aside>
   </div>
 
@@ -99,6 +108,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { jstDateAt, jstMinutes, sunPosition, sunTimes } from '../scripts/hero/astro';
   import { SPOTS, type SpotId } from '../data/spots';
   import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
+  import type {Season} from '../scripts/hero/seasons';
 
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
   const hero = stage?.closest<HTMLElement>('.hero');
@@ -118,6 +128,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const spotReturn=hero.querySelector<HTMLButtonElement>('.spot-return')!;
     const spotRecords=hero.querySelector<HTMLAnchorElement>('.spot-records')!;
     const placeStatus=hero.querySelector('[data-place-status]')!;
+    const areaStatus=hero.querySelector<HTMLElement>('[data-area-status]')!;
+    const exploreToggle=hero.querySelector<HTMLButtonElement>('.explore-toggle')!;
     const viewButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('button[data-view]'));
     let panorama: HeroView='shogunzuka';
 
@@ -214,7 +226,14 @@ const pinTrips = completeSpotPreviews((await getTrips())
           get reducedMotion() { return motion.matches; },
           drift: !coarse,
           onStatus,
-          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false; viewButtons.forEach(b=>b.disabled=false); },
+          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false; viewButtons.forEach(b=>b.disabled=false); },
+          onAreaLoading: loading=>{areaStatus.hidden=!loading;},
+          onExplore: enabled=>{
+            hero.classList.toggle('is-exploring',enabled);exploreToggle.setAttribute('aria-pressed',String(enabled));
+            exploreToggle.textContent=enabled?(en?'Exit exploration':'散策を終了'):(en?'Free explore':'自由に散策');
+            card.hidden=enabled||demo?.mode!=='campus';
+            cameraHint.textContent=enabled?(en?'Drag to look · W/A/S/D to move · Q/E down/up · Shift faster · wheel to approach · Esc to exit.':'ドラッグで見回す・W/A/S/Dで移動・Q/Eで下降/上昇・Shiftで加速・ホイールで接近・Escで終了。'):'';
+          },
           onAction: (id) => demo?.flyTo(spotDestination(id)),
           onMode: setView,
           avoid: () => {
@@ -232,13 +251,16 @@ const pinTrips = completeSpotPreviews((await getTrips())
     );
 
     const returnToPanorama=()=>demo?.flyTo(panorama);
+    hero.querySelector<HTMLSelectElement>('[data-season]')!.addEventListener('change',e=>demo?.setSeason((e.target as HTMLSelectElement).value as Season));
+    exploreToggle.addEventListener('click',()=>demo?.setExploring(!demo.exploring));
     back.addEventListener('click', returnToPanorama);
     spotReturn.addEventListener('click', returnToPanorama);
     spotSelect.addEventListener('change',()=>{
       if (SPOTS.some(spot=>spot.id===spotSelect.value)) demo?.flyTo(spotDestination(spotSelect.value as SpotId));
     });
     hero.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && (demo?.mode === 'campus'||demo?.orbiting)) returnToPanorama();
+      if(e.key==='Escape'&&demo?.exploring){demo.setExploring(false);exploreToggle.focus({preventScroll:true});}
+      else if (e.key === 'Escape' && (demo?.mode === 'campus'||demo?.orbiting)) returnToPanorama();
     });
 
     viewButtons.forEach((b) =>
@@ -359,6 +381,14 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .is-ready .spot-nav { opacity: 1; }
+  .area-status { position: absolute; top: calc(100% + 8px); left: 0; white-space: nowrap; padding: 7px 12px; border-radius: 16px; background: rgba(11,20,36,.8); color: var(--on-dark); font-size: 11px; }
+  .explore-toggle { border: 0; background: transparent; color: var(--on-dark); font: inherit; font-size: 11px; padding: 8px; opacity: .7; }
+  .season-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--on-dark); }
+  .season-picker select { min-height: 32px; max-width: 145px; padding: 3px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: #15202d; color: var(--on-dark); font: inherit; }
+  .explore-toggle:hover,.explore-toggle:focus-visible { opacity: 1; }
+  .is-exploring .copy,.is-exploring .scrim,.is-exploring .scroll-cue { opacity: 0; visibility: hidden; pointer-events: none; }
+  .is-exploring .hint span { display: none; }
+  @media (pointer: coarse), (max-width: 760px) { .explore-toggle { display: none; } }
   .no-3d .views, .no-3d .spot-nav { display: none; }
   .spot-select, .spot-return, .spot-records {
     min-height: 36px;

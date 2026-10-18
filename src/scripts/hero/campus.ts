@@ -12,7 +12,8 @@ import { campusArchitecture, CampusBuilder, CAMPUS_TREES } from './campus-archit
 
 /** Campus buildings that get the detailed model (the plain block is hidden while it shows). */
 export function isDetailed(kind: number, h: number, x: number, z: number) {
-  return (kind & 3) === CLASS.sturdy && h >= 9 && inCampus(x, z) && x < -3680;
+  const futureCenter=h>=7 && x < -3838 && z < -759;
+  return inCampus(x,z) && (futureCenter || ((kind & 3)===CLASS.sturdy && h>=9 && x < -3680));
 }
 
 export function buildCampus(env: Env, hf: Heightfield) {
@@ -43,9 +44,17 @@ export function buildCampus(env: Env, hf: Heightfield) {
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   geo.setAttribute('aMat', new THREE.Float32BufferAttribute(mat, 1));
   geo.setAttribute('aCell', new THREE.Float32BufferAttribute(cell, 2));
+  const mesh=createCampusMesh(env,geo);
+  mesh.visible=false;
+  return {mesh,count:4};
+}
+
+/** The same architectural material and transparent guardrails serve both campuses. */
+export function createCampusMesh(env:Env,geo:THREE.BufferGeometry){
   // Sort the draw ranges once, so glass guardrails use depth-tested transparency without
   // putting the opaque building into the transparent render queue. Two static draw calls.
   const opaque:number[]=[],glass:number[]=[];
+  const mat=geo.getAttribute('aMat').array;
   for(let i=0;i<mat.length;i++)(mat[i]===8?glass:opaque).push(i);
   const indices=new Uint32Array(opaque.length+glass.length);indices.set(opaque);indices.set(glass,opaque.length);
   geo.setIndex(new THREE.BufferAttribute(indices,1));
@@ -116,12 +125,12 @@ export function buildCampus(env: Env, hf: Heightfield) {
           joint=mix(joint,.98,smoothstep(.08,.25,max(fw.x,fw.y)));
           albedo = vec3(.44, .43, .41) * (.85 + .15 * joint) * (.9 + .2 * vnoise(vCell * .2));
         }
-        else if (m == 7){
+        else if (m == 7 || m == 15){
           vec2 brick=vec2(vCell.x/.23+mod(floor(vCell.y/.075),2.)*.5,vCell.y/.075);
           vec2 fw=fwidth(brick),g=fract(brick);
           float joint=smoothstep(.04-fw.x,.04+fw.x,g.x)*smoothstep(.07-fw.y,.07+fw.y,g.y);
           joint=mix(joint,.9,smoothstep(.2,.7,max(fw.x,fw.y)));
-          albedo=vec3(.61,.55,.44)*mix(.83,1.,joint);
+          albedo=(m==7?vec3(.61,.55,.44):vec3(.34,.15,.09))*mix(.83,1.,joint);
         }
         else if (m == 8){
           albedo=vec3(.22,.32,.33);
@@ -133,7 +142,8 @@ export function buildCampus(env: Env, hf: Heightfield) {
         else if (m == 12) albedo=vec3(.67,.68,.65);
         else if (m == 13){albedo=vec3(.7,.66,.5);emit=vec3(1.,.77,.42)*uCity;}
         else if (m == 14) albedo=vec3(.18,.29,.1)*(.92+.16*vnoise(vCell*1.5));
-        vec3 col = shade(albedo, n, vWorld, sh);
+        else if (m == 16) albedo=vec3(.24,.19,.12)*(.94+.12*vnoise(vCell*.12));
+        vec3 col = shade(seasonalSurface(albedo,n,vWorld), n, vWorld, sh);
         gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), m==8?.22:1.);
       }
     `,
@@ -145,8 +155,7 @@ export function buildCampus(env: Env, hf: Heightfield) {
     vertexShader:`attribute float aMat;varying float vMat;void main(){vMat=aMat;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
     fragmentShader:`varying float vMat;void main(){if(abs(vMat-8.)<.1)discard;gl_FragColor=vec4(1.);}`,
   });
-  mesh.visible = false;
-  return { mesh, count: 4 };
+  return mesh;
 }
 
 /** Source-backed planting positions, clear of the architecture and the central stair axis. */

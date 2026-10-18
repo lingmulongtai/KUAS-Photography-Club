@@ -38,3 +38,13 @@ test('canopy clearance lifts the camera but does not add tree height to the targ
   assert.ok(p.pos.y>60);
   assert.deepEqual(p.target,{x:12,y:16,z:-30});
 });
+
+test('a narrow ridge and off-axis hillside cannot surround the camera',()=>{
+  const narrow=(x)=>x>103.5&&x<108.5?62:0;
+  const ridge=landmarkOrbit(site,eye,0,0,narrow);
+  assert.ok(ridge.pos.y>65,'sample a ridge that the old eight samples missed');
+  const side=(x,z)=>x>100&&z>-20?80:0;
+  const hillside=landmarkOrbit(site,eye,0,0,side);
+  assert.ok(hillside.pos.y>=92,'clear the terrain beside the near view');
+  assert.deepEqual(hillside.target,{x:12,y:16,z:-30});
+});
