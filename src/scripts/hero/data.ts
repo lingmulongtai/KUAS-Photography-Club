@@ -39,6 +39,9 @@ export interface RegionalPhotoMeta {
 }
 
 export interface TerrainMeta {
+  /** Coarser outer mountains; the original basin grids retain priority. */
+  outer?: GridMeta;
+  aerialOuter?: RegionalPhotoMeta;
   far: GridMeta;
   near: GridMeta;
   aerialWide: { box: Box; file: string; size: [number, number]; high?: { file: string; size: [number, number]; bytes: number; zoom: number } };
@@ -49,6 +52,7 @@ export interface TerrainMeta {
   };
   /** the slopes below Shogunzuka and Kiyomizu-dera (build_higashiyama.py) */
   higashiyama?: RegionalPhotoMeta;
+  kameokaCampus?:RegionalPhotoMeta & {elevation:GridMeta};
 }
 
 /** An elevation grid in metres, decoded from decimetre deltas (see encode_heights in common.py). */

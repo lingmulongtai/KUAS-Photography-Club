@@ -90,14 +90,14 @@ def leaves(tile, out):
         leaves(k, out)
 
 
-def fetch_plateau():
+def fetch_plateau(wards=WARDS, box=R.BUILDINGS):
     import remotezip as rz
     dir_path = os.path.join(CACHE, 'plateau', 'directory.json')
     if not os.path.exists(dir_path):
         os.makedirs(os.path.dirname(dir_path), exist_ok=True)
         json.dump(rz.directory(PLATEAU_ZIP), open(dir_path, 'w'))
     entries = {e['name']: e for e in json.load(open(dir_path))}
-    for ward in WARDS:
+    for ward in wards:
         base = f'{PLATEAU_PREFIX}{ward}_lod1/'
         out_dir = os.path.join(CACHE, 'plateau', ward)
         os.makedirs(out_dir, exist_ok=True)
@@ -107,7 +107,7 @@ def fetch_plateau():
         tileset = json.load(open(ts_path))
         tiles = []
         leaves(tileset['root'], tiles)
-        wanted = [t for t in tiles if intersects(t['boundingVolume']['region'], R.BUILDINGS)]
+        wanted = [t for t in tiles if intersects(t['boundingVolume']['region'], box)]
 
         def one(t):
             uri = t['content']['uri']

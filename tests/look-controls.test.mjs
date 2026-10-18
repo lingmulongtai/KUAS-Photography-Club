@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLookRotation } from '../src/scripts/hero/look-controls.ts';
+import { createLookRotation, createViewZoom } from '../src/scripts/hero/look-controls.ts';
 
 test('look can complete multiple turns while pitch avoids the poles', () => {
   const look = createLookRotation();
@@ -14,6 +14,24 @@ test('look can complete multiple turns while pitch avoids the poles', () => {
   const before = look.state.yaw;
   look.move(3200, 0, 800, 600, .016);
   assert.ok(look.state.yaw < before - 700);
+});
+
+test('optical pinch zoom has bounded magnification and retains it on resize',()=>{
+  const zoom=createViewZoom();
+  zoom.pinch(2);
+  assert.ok(zoom.fov(60)<60 && zoom.fov(36)<36);
+  zoom.pinch(100);
+  const max=zoom.fov(60);
+  zoom.pinch(2);
+  assert.equal(zoom.fov(60),max);
+  zoom.pinch(.0001);
+  const min=zoom.fov(60);
+  zoom.pinch(.1);
+  assert.equal(zoom.fov(60),min);
+  for(const invalid of [0,-1,NaN,Infinity]) zoom.pinch(invalid);
+  assert.equal(zoom.fov(60),min);
+  zoom.reset();
+  assert.ok(Math.abs(zoom.fov(60)-60)<1e-10);
 });
 
 test('inertia is independent of frame rate and disabled for reduced motion', () => {

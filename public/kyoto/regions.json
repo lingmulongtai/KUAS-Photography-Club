@@ -1,0 +1,212 @@
+{
+ "regions": [
+  {
+   "id": "kameoka",
+   "ja": "亀岡・保津峡",
+   "en": "Kameoka / Hozukyo",
+   "box": [
+    -24000,
+    -8000,
+    -9000,
+    4000
+   ],
+   "heightSource": "GSI outlines; illustrative heights (6 m / 10 m)",
+   "buildings": {
+    "meta": "buildings-kameoka.json",
+    "file": "buildings-kameoka.bin",
+    "bytes": 420225
+   },
+   "lines": {
+    "file": "lines-kameoka.bin",
+    "box": [
+     -24000,
+     -8000,
+     -9000,
+     4000
+    ],
+    "q": 0.5,
+    "bytes": 158792,
+    "features": 14613
+   },
+   "photo": {
+    "box": [
+     -24000,
+     -8000,
+     -9000,
+     4000
+    ],
+    "file": "aerial-kameoka.webp",
+    "size": [
+     2048,
+     1638
+    ],
+    "bytes": 302934,
+    "zoom": 13,
+    "mobile": {
+     "file": "aerial-kameoka-mobile.webp",
+     "size": [
+      1024,
+      819
+     ],
+     "bytes": 132696
+    }
+   }
+  },
+  {
+   "id": "sonobe",
+   "ja": "園部・八木",
+   "en": "Sonobe / Yagi",
+   "box": [
+    -33000,
+    -18000,
+    -21000,
+    -8000
+   ],
+   "heightSource": "GSI outlines; illustrative heights (6 m / 10 m)",
+   "buildings": {
+    "meta": "buildings-sonobe.json",
+    "file": "buildings-sonobe.bin",
+    "bytes": 153699
+   },
+   "lines": {
+    "file": "lines-sonobe.bin",
+    "box": [
+     -33000,
+     -18000,
+     -21000,
+     -8000
+    ],
+    "q": 0.5,
+    "bytes": 78995,
+    "features": 6182
+   },
+   "photo": {
+    "box": [
+     -33000,
+     -18000,
+     -21000,
+     -8000
+    ],
+    "file": "aerial-sonobe.webp",
+    "size": [
+     2048,
+     1707
+    ],
+    "bytes": 274760,
+    "zoom": 13,
+    "mobile": {
+     "file": "aerial-sonobe-mobile.webp",
+     "size": [
+      1024,
+      854
+     ],
+     "bytes": 126958
+    }
+   }
+  },
+  {
+   "id": "yamashina",
+   "ja": "山科",
+   "en": "Yamashina",
+   "box": [
+    4600,
+    -2500,
+    12500,
+    8500
+   ],
+   "heightSource": "PLATEAU measured",
+   "buildings": {
+    "meta": "buildings-yamashina.json",
+    "file": "buildings-yamashina.bin",
+    "bytes": 214599
+   },
+   "lines": {
+    "file": "lines-yamashina.bin",
+    "box": [
+     4600,
+     -2500,
+     12500,
+     8500
+    ],
+    "q": 0.5,
+    "bytes": 122575,
+    "features": 14667
+   },
+   "photo": {
+    "box": [
+     4600,
+     -2500,
+     12500,
+     8500
+    ],
+    "file": "aerial-yamashina.webp",
+    "size": [
+     1471,
+     2048
+    ],
+    "bytes": 202198,
+    "zoom": 13,
+    "mobile": {
+     "file": "aerial-yamashina-mobile.webp",
+     "size": [
+      736,
+      1024
+     ],
+     "bytes": 92316
+    }
+   }
+  },
+  {
+   "id": "south",
+   "ja": "京都南部",
+   "en": "Southern Kyoto",
+   "box": [
+    -9000,
+    6200,
+    4600,
+    19000
+   ],
+   "heightSource": "PLATEAU measured",
+   "buildings": {
+    "meta": "buildings-south.json",
+    "file": "buildings-south.bin",
+    "bytes": 469781
+   },
+   "lines": {
+    "file": "lines-south.bin",
+    "box": [
+     -9000,
+     6200,
+     4600,
+     19000
+    ],
+    "q": 0.5,
+    "bytes": 411233,
+    "features": 55524
+   },
+   "photo": {
+    "box": [
+     -9000,
+     6200,
+     4600,
+     19000
+    ],
+    "file": "aerial-south.webp",
+    "size": [
+     2048,
+     1928
+    ],
+    "bytes": 514816,
+    "zoom": 13,
+    "mobile": {
+     "file": "aerial-south-mobile.webp",
+     "size": [
+      1024,
+      964
+     ],
+     "bytes": 206890
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createRegionalLoader,regionAt} from '../src/scripts/hero/regional-loader.ts';
+
+const region=(id,box=[0,0,10,10])=>({id,box});
+const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
+
+test('rapid travel serializes downloads and discards stale data before GPU activation',async()=>{
+  const pending=[],activated=[],released=[],errors=[];
+  const loader=createRegionalLoader(r=>{const d=deferred();pending.push({id:r.id,...d});return d.promise;},
+    (r,data)=>{activated.push(r.id);return ()=>{released.push(`city-${r.id}`);data.dispose();};},e=>errors.push(e));
+  const a=region('a'),b=region('b'),c=region('c');
+  const done=loader.request(a);loader.request(b);loader.request(c);
+  assert.deepEqual(pending.map(p=>p.id),['a']);
+  pending[0].resolve({dispose:()=>released.push('data-a')});
+  await Promise.resolve();await Promise.resolve();
+  assert.deepEqual(pending.map(p=>p.id),['a','c']);
+  pending[1].resolve({dispose:()=>released.push('data-c')});await done;
+  assert.deepEqual(activated,['c']);assert.deepEqual(released,['data-a']);
+  assert.equal(loader.id,'c');
+  await loader.request(null);
+  assert.deepEqual(released,['data-a','city-c','data-c']);assert.equal(loader.id,null);
+  assert.deepEqual(errors,[]);
+});
+
+test('leaving during a download never activates it; a failed region can be retried',async()=>{
+  const d=deferred();let disposed=0,activated=0,attempts=0;const errors=[];
+  const loader=createRegionalLoader(async()=>{attempts++;if(attempts===1)return d.promise;
+    if(attempts===2)throw Error('offline');return {dispose(){disposed++;}};},
+    (_r,data)=>{activated++;return data.dispose;},e=>errors.push(e.message));
+  const a=region('a');const done=loader.request(a);loader.request(null);
+  d.resolve({dispose(){disposed++;}});await done;
+  assert.equal(activated,0);assert.equal(disposed,1);
+  await loader.request(a);assert.equal(loader.id,null);assert.deepEqual(errors,['offline']);
+  await loader.request(a);assert.equal(loader.id,'a');assert.equal(activated,1);
+  await loader.request(a);assert.equal(attempts,3);
+  await loader.request(null);assert.equal(disposed,2);
+});
+
+test('regional boundaries do not double-select adjoining datasets',()=>{
+  const a=region('a'),b=region('b',[10,0,20,10]);
+  assert.equal(regionAt([a,b],{x:10,z:5}),b);
+  assert.equal(regionAt([a,b],{x:20,z:5}),null);
+});

@@ -1,11 +1,10 @@
 import type { Box } from './geo';
-import { loadGrid, type GridMeta, type TerrainMeta } from './data';
+import { loadGrid, type GridMeta, type TerrainMeta } from './data.ts';
 
 class Grid {
-  constructor(
-    readonly meta: GridMeta,
-    readonly h: Float32Array,
-  ) {}
+  readonly meta:GridMeta;
+  readonly h:Float32Array;
+  constructor(meta:GridMeta,h:Float32Array) {this.meta=meta;this.h=h;}
 
   /** Bilinear height at (x, z), or NaN outside the grid. */
   sample(x: number, z: number) {
@@ -36,21 +35,27 @@ const smooth = (e0: number, e1: number, v: number) => {
  * 30 m grid of the whole basin over a 300 m band at the edge of the detailed area.
  */
 export class Heightfield {
-  constructor(
-    private far: Grid,
-    private near: Grid,
-    private regional?: Grid,
-  ) {}
+  private far:Grid;
+  private near:Grid;
+  private regional?:Grid;
+  private outer?:Grid;
+  private campus?:Grid;
+  constructor(far:Grid,near:Grid,regional?:Grid,outer?:Grid,campus?:Grid) {
+    this.far=far;this.near=near;this.regional=regional;this.outer=outer;this.campus=campus;
+  }
 
   get bounds(): Box {
-    return this.far.meta.box;
+    return (this.outer ?? this.far).meta.box;
   }
 
   height(x: number, z: number) {
+    const outer=this.outer?.sample(x,z) ?? NaN;
+    const base=Number.isNaN(outer)?0:outer;
     const f = this.far.sample(x, z);
-    const far = Number.isNaN(f) ? 0 : f;
+    const far = this.outer ? this.blend(this.far,x,z,base,300) : Number.isNaN(f) ? 0 : f;
     const near = this.blend(this.near,x,z,far,300);
-    return this.regional ? this.blend(this.regional,x,z,near,120) : near;
+    const regional=this.regional ? this.blend(this.regional,x,z,near,120) : near;
+    return this.campus?this.blend(this.campus,x,z,regional,80):regional;
   }
 
   private blend(grid:Grid,x:number,z:number,base:number,margin:number) {
@@ -78,11 +83,17 @@ export class Heightfield {
 }
 
 export async function loadHeightfield(meta: TerrainMeta) {
-  const [far, near, regional] = await Promise.all([loadGrid(meta.far), loadGrid(meta.near),
+  const [far, near, regional, outer, campus] = await Promise.all([loadGrid(meta.far), loadGrid(meta.near),
     meta.arashiyama ? loadGrid(meta.arashiyama.elevation).catch(error=>{
       console.warn('Arashiyama elevation unavailable; using basin terrain',error);
       return null;
-    }) : null]);
+    }) : null, meta.outer ? loadGrid(meta.outer).catch(error=>{
+      console.warn('Outer elevation unavailable; retaining Kyoto basin',error);return null;
+    }) : null,meta.kameokaCampus?loadGrid(meta.kameokaCampus.elevation).catch(error=>{
+      console.warn('Kameoka campus elevation unavailable; retaining outer terrain',error);return null;
+    }):null]);
   return new Heightfield(new Grid(meta.far, far), new Grid(meta.near, near),
-    regional && meta.arashiyama ? new Grid(meta.arashiyama.elevation,regional) : undefined);
+    regional && meta.arashiyama ? new Grid(meta.arashiyama.elevation,regional) : undefined,
+    outer && meta.outer ? new Grid(meta.outer,outer) : undefined,
+    campus&&meta.kameokaCampus?new Grid(meta.kameokaCampus.elevation,campus):undefined);
 }
