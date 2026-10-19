@@ -23,7 +23,8 @@ import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
-import { buildClouds, coverForDay } from './clouds';
+import { buildClouds } from './clouds';
+import {createCloudClock} from './cloud-weather';
 import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio } from './look-controls';
 import {createKamoChannel,kamoMask} from './kamo-channel';
 import {buildBridges} from './bridges';
@@ -68,6 +69,8 @@ export interface HeroOptions {
   lang?: 'ja' | 'en';
   /** Date to render for this frame. */
   now: () => Date;
+  /** Displayed minutes, continuous while a time preset is fast-forwarding. */
+  cloudMinutes?:()=>number;
   quality: number;
   trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
@@ -113,6 +116,7 @@ export function createHero(
   const celestial = buildCelestial(env, opts.quality);
   const meteors = buildMeteors(opts.quality);
   const clouds = buildClouds(env);
+  const cloudClock=createCloudClock();
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, 2);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
@@ -416,7 +420,6 @@ export function createHero(
     env.uStars.value = dark * (1 - 0.35 * moon.illumination * moonUp);
     celestial.setSidereal(localSiderealAngle(date, KYOTO.lon));
     const ymd = jstParts(date);
-    clouds.uniforms.uCover.value = coverForDay(ymd.year, ymd.month, ymd.day);
 
     renderer.toneMappingExposure = look.exposure;
     post.bloom.strength = look.bloom * (1 + .12 * look.city);
@@ -654,7 +657,6 @@ export function createHero(
     celestial.group.position.copy(camera.position);
     clouds.mesh.position.x = camera.position.x;
     clouds.mesh.position.z = camera.position.z;
-    clouds.uniforms.uWind.value.set(t * 0.0009, t * 0.0003);
   }
 
   const forward = new THREE.Vector3();
@@ -709,7 +711,10 @@ export function createHero(
       const dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
       clock = t;
-      applyTime(opts.now(), t);
+      const date=opts.now();
+      applyTime(date, t);
+      const cloudSeconds=cloudClock.step(opts.cloudMinutes?.()??jstMinutes(date),dt,opts.reducedMotion);
+      clouds.uniforms.uWind.value.set(cloudSeconds*clouds.weather.wind[0],cloudSeconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
       if (dt > 0) driveCars?.(dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);

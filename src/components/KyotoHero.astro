@@ -220,6 +220,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       (renderer, el) =>
         (demo = createHero(renderer, el, {
           now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
+          cloudMinutes: shown,
           quality,
           lang: en?'en':'ja',
           trips: JSON.parse(stage.dataset.trips ?? '[]'),
