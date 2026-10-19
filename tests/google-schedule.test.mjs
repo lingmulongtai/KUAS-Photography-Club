@@ -38,3 +38,8 @@ test('upstream failure and oversized feeds fail closed',async()=>{
   await assert.rejects(fetchGoogleSchedule(now,async()=>new Response('',{status:403})));
   await assert.rejects(fetchGoogleSchedule(now,async()=>new Response('x'.repeat(1024*1024+1))));
 });
+test('overnight entries retain explicit start and end dates on each occupied day',async()=>{
+  const s=await parseGoogleSchedule(calendar(['UID:overnight','DTSTAMP:20261001T000000Z','SUMMARY:Night','DTSTART:20261106T140000Z','DTEND:20261106T160000Z']),now);
+  assert.deepEqual(s.events.map(e=>e.date),['2026-11-06','2026-11-07']);
+  assert.ok(s.events.every(e=>e.time==='2026-11-06 23:00 – 2026-11-07 01:00'));
+});
