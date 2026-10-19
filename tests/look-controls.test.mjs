@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLookRotation, createViewZoom } from '../src/scripts/hero/look-controls.ts';
+import { createLookRotation, createViewZoom, wheelZoomRatio } from '../src/scripts/hero/look-controls.ts';
+
+test('wheel optical zoom normalizes devices, reverses cleanly and bounds large deltas',()=>{
+  assert.equal(wheelZoomRatio(16,0,800),wheelZoomRatio(1,1,800));
+  assert.equal(wheelZoomRatio(800,0,800),wheelZoomRatio(1,2,800));
+  const zoom=createViewZoom(),initial=zoom.fov(40);
+  zoom.pinch(wheelZoomRatio(-100,0,800));assert.ok(zoom.fov(40)<initial);
+  zoom.pinch(wheelZoomRatio(100,0,800));assert.ok(Math.abs(zoom.fov(40)-initial)<1e-10);
+  assert.ok(Number.isFinite(wheelZoomRatio(1e20,0,800)));
+});
 
 test('look can complete multiple turns while pitch avoids the poles', () => {
   const look = createLookRotation();
