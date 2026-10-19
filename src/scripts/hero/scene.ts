@@ -57,6 +57,7 @@ import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
 import {buildKiyomizuBeam} from './kiyomizu-beam';
 import {replacesInari,inariClearing} from './fushimi-inari';
+import {replacesByodoin} from './byodoin';
 
 export interface HeroStatus {
   minutes: number;
@@ -259,7 +260,7 @@ export function createHero(
     const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, [...campusTreeSpots(hf),...cherries], { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, [...campusTreeSpots(hf),...cherries], { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) || replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
     const forestPhoto=(photo:THREE.Texture,i:number)=>{
       forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal);
       shadow.invalidate();
@@ -329,7 +330,8 @@ export function createHero(
       const polys=detailedCampus?data.buildings.polys.filter(p=>{
         let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !isKameokaBuilding(x/(p.ring.length/2),z/(p.ring.length/2));
       }):data.buildings.polys;
-      const city=buildCity(env,hf,{...data.buildings,polys},b=>(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10));
+      const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
+      const city=buildCity(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10));
       group.add(city.group,buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24,undefined,r.id==='yamashina'),buildIslands(env,hf,data.lines));
       let campusNormal:THREE.Texture|null=null;
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
