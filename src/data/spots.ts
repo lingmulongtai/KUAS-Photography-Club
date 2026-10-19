@@ -23,6 +23,8 @@ export const SPOTS = [
   { id: 'sonobe', rank: 4, ja: '園部駅周辺', en: 'Sonobe Station area', lat: 35.1023071, lon: 135.4833287, above: 30 },
   { id: 'yamashina', rank: 4, ja: '山科駅周辺', en: 'Yamashina Station area', lat: 34.9925975, lon: 135.8166736, above: 30 },
   { id: 'fushimi', rank: 4, ja: '伏見駅周辺・京都南部', en: 'Fushimi Station / southern Kyoto', lat: 34.9459699, lon: 135.7615435, above: 30 },
+  { id: 'inari', rank: 2, ja: '伏見稲荷大社', en: 'Fushimi Inari Taisha', lat: 34.967174, lon: 135.773355, above: 28 },
+  { id: 'byodoin', rank: 1, ja: '宇治・平等院鳳凰堂', en: 'Uji / Byodoin Phoenix Hall', lat: 34.88928359, lon: 135.80767787, above: 24 },
   { id: 'philosopher', rank: 4, ja: '哲学の道・南側', en: 'Philosopher’s Path, south', lat: 35.0168503, lon: 135.7959795, above: 25 },
 ] as const;
 

@@ -152,3 +152,9 @@ export function createViewZoom() {
     fov(base:number) { return 2*Math.atan(Math.tan(base*Math.PI/360)/scale)*180/Math.PI; },
   };
 }
+
+/** Wheel pixels, lines and pages have the same optical direction and bounded speed. */
+export function wheelZoomRatio(deltaY:number, deltaMode:number, pageHeight:number) {
+  const pixels=deltaY*(deltaMode===1?16:deltaMode===2?pageHeight:1);
+  return Math.exp(-Math.max(-240,Math.min(240,pixels))*.003);
+}

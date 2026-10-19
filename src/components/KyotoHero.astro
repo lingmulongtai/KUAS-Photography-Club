@@ -139,6 +139,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     };
     /* the sky follows the real time unless someone picks another time of today */
     const sky = { live: true, from: 0, delta: 0, start: 0, dur: 0 };
+    const cloudTravel={from:0,delta:0};
     const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
     const shown = () => {
       const real = jstMinutes(new Date());
@@ -152,6 +153,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       }
       return m;
     };
+    const cloudShown=()=>cloudTravel.from+cloudTravel.delta*(sky.dur?ease(Math.min(1,(performance.now()-sky.start)/sky.dur)):1);
     const presets = (key: string) => {
       const { sunrise, sunset } = sunTimes(new Date());
       return { morning: sunrise - 6, noon: 12 * 60 + 30, sunset: sunset - 14, night: sunset + 100 }[key] ?? jstMinutes(new Date());
@@ -160,10 +162,12 @@ const pinTrips = completeSpotPreviews((await getTrips())
     timeButtons.forEach((b) =>
       b.addEventListener('click', () => {
         const key = b.dataset.time!;
+        const cloudFrom=cloudShown();
         const from = shown();
         const to = key === 'now' ? jstMinutes(new Date()) : presets(key);
         // take the short way round the clock
         const delta = ((((to - from) % 1440) + 2160) % 1440) - 720;
+        cloudTravel.from=cloudFrom;cloudTravel.delta=delta;
         sky.live = key === 'now';
         sky.from = from;
         sky.delta = delta;
@@ -220,6 +224,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       (renderer, el) =>
         (demo = createHero(renderer, el, {
           now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
+          cloudTravelMinutes: cloudShown,
           quality,
           lang: en?'en':'ja',
           trips: JSON.parse(stage.dataset.trips ?? '[]'),
@@ -232,7 +237,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
             hero.classList.toggle('is-exploring',enabled);exploreToggle.setAttribute('aria-pressed',String(enabled));
             exploreToggle.textContent=enabled?(en?'Exit exploration':'散策を終了'):(en?'Free explore':'自由に散策');
             card.hidden=enabled||demo?.mode!=='campus';
-            cameraHint.textContent=enabled?(en?'Drag to look · W/A/S/D to move · Q/E down/up · Shift faster · wheel to approach · Esc to exit.':'ドラッグで見回す・W/A/S/Dで移動・Q/Eで下降/上昇・Shiftで加速・ホイールで接近・Escで終了。'):'';
+            cameraHint.textContent=enabled?(en?'Drag to look · W/A/S/D move · Q/E down/up · Shift faster · wheel approach · Ctrl/⌘ + wheel zoom · Esc exit.':'ドラッグで見回す・W/A/S/Dで移動・Q/Eで下降/上昇・Shiftで加速・ホイールで接近・Ctrl/⌘＋ホイールで画角・Escで終了。'):'';
           },
           onAction: (id) => demo?.flyTo(spotDestination(id)),
           onMode: setView,
@@ -512,7 +517,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .btn--glass:hover {
     background: var(--on-dark);
     border-color: var(--on-dark);
-    color: var(--ink);
+    color: var(--brand-ink);
   }
 
   .sky-chip {
@@ -600,7 +605,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     gap: 10px;
     padding: 22px;
     border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--header-bg);
     color: var(--ink);
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
     animation: card-in 0.7s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -662,7 +667,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
   .campus-card .back:hover {
     background: var(--ink);
-    color: var(--on-dark);
+    color: var(--on-ink);
   }
 
   .hero[data-view='campus'] .hero-inner {

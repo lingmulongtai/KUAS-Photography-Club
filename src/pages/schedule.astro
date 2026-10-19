@@ -1,4 +1,5 @@
 ---
+import CalendarFeed from '../components/CalendarFeed.astro';
 import Base from '../layouts/Base.astro';
 import PageHero from '../components/PageHero.astro';
 import ScheduleMonth from '../components/ScheduleMonth.astro';
@@ -12,15 +13,15 @@ const kinds = Object.keys(kindLabel) as EventKind[];
   <PageHero
     edge="SCHEDULE ▸ MONTHLY"
     title="スケジュール"
-    lead={`定例ミーティングは${club.meetings.day} ${club.meetings.times.join(' / ')}、${club.campus} ${club.meetings.room} 教室です。休会や教室変更があるため、参加前に運営へ最新案内をご確認ください。確定した予定とお知らせを掲載します。`}
+    lead={`定例ミーティングは${club.meetings.day} ${club.meetings.times.join(' / ')}、${club.campus} ${club.meetings.room} 教室です。休会や教室変更があるため、参加前に運営へ最新案内をご確認ください。共有Googleカレンダーの予定とお知らせを自動で表示します。`}
   />
 
   <div class="wrap">
-    <p><a href="/contact/">運営へ最新の開催・教室を確認する</a>。今後の予定は、決まり次第お知らせします。</p>
+    <p><a href="/contact/">運営へ最新の開催・教室を確認する</a>。予定は部のGoogleカレンダーから自動更新されます。</p>
     <ul class="legend" aria-label="予定の種類">
       {kinds.map((k) => <li class={`k-${k}`}><i></i>{kindLabel[k]}</li>)}
     </ul>
-    {months.map((m) => <ScheduleMonth month={m} />)}
+    <CalendarFeed>{months.map((m) => <ScheduleMonth month={m} />)}</CalendarFeed>
     {months.length === 0 && <p class="muted">まだ予定はありません。</p>}
   </div>
 </Base>
@@ -70,7 +71,7 @@ const kinds = Object.keys(kindLabel) as EventKind[];
   }
 
   .k-trip {
-    --c: #1b363d;
+    --c: var(--meeting);
   }
 
   .k-event {
@@ -78,7 +79,7 @@ const kinds = Object.keys(kindLabel) as EventKind[];
   }
 
   .k-deadline {
-    --c: #c2412d;
+    --c: var(--error);
   }
 
   .k-other {

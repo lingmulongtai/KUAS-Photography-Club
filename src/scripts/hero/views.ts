@@ -30,6 +30,8 @@ const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
 const ATAGO = toLocal(35.0600453, 135.6342851); // 愛宕山（地図の地点と共通）
 const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
+const KIRI_TERRACE=toLocal(34.9926914,135.5615125); // OSM viewpoint node/6855829264
+const SAKURA_DEAI=toLocal(34.8905798,135.7014513); // OSM viewpoint node/10300134954
 
 /** Frame the named structure or area using the same centre as its map pin. */
 function spotOrbit(id: SpotId, distance: number, above: number, bearing: number, targetHeight: number): ViewDef {
@@ -68,15 +70,19 @@ export const VIEWS = {
   ryoanji: spotOrbit('ryoanji',110,65,180,7),
   togetsukyo: spotOrbit('arashiyama',330,160,180,8),
   kameoka:spotOrbit('kameoka',820,540,240,15),
+  kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:KIRI_TERRACE,ref:KIRI_TERRACE,above:35,bearing:278,pitch:-9},
+  sewaritei:{ja:'背割堤・三川合流',en:'Sewaritei / three rivers',eye:SAKURA_DEAI,ref:SAKURA_DEAI,above:28,bearing:250,pitch:-7},
   sonobe:spotOrbit('sonobe',1100,650,180,8),
   yamashina:spotOrbit('yamashina',1000,650,180,8),
   fushimi:spotOrbit('fushimi',1100,650,180,8),
+  inari:spotOrbit('inari',330,170,240,10),
+  byodoin:spotOrbit('byodoin',200,95,95,7),
   philosopher:spotOrbit('philosopher',280,185,240,4),
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
 export type HeroDestination = 'campus' | HeroView;
-export const PANORAMA_VIEWS = ['shogunzuka','daimonji','arashiyama','atago'] as const satisfies readonly HeroView[];
+export const PANORAMA_VIEWS = ['shogunzuka','daimonji','arashiyama','atago','kameokaTerrace','sewaritei'] as const satisfies readonly HeroView[];
 
 export function spotDestination(id: SpotId): HeroDestination {
   if (id==='kuas') return 'campus';

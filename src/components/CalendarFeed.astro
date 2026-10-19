@@ -1,0 +1,41 @@
+---
+import {PUBLIC_CALENDAR_URL} from '../data/public-calendar';
+interface Props { lang?:'ja'|'en'; compact?:boolean; count?:number; }
+const {lang='ja',compact=false,count=4}=Astro.props;
+const en=lang==='en';
+---
+<div class="calendar-feed" data-calendar-root data-lang={lang} data-compact={String(compact)} data-count={count}>
+  <p class="calendar-source small"><span data-calendar-status role="status">{en?'Loading the club calendar…':'部のカレンダーを読み込んでいます…'}</span> · <a href={PUBLIC_CALENDAR_URL} target="_blank" rel="noopener">{en?'Open Google Calendar':'Googleカレンダーを見る'} ↗</a></p>
+  <div data-calendar-content><slot /></div>
+  <noscript><p class="muted small">{en?'Open Google Calendar above for the latest dates.':'最新の予定は上のGoogleカレンダーからご確認ください。'}</p></noscript>
+</div>
+<script>import '../scripts/schedule';</script>
+<style is:global>
+  .calendar-feed { padding-bottom: 24px; }
+  .calendar-feed .calendar-source { color: var(--muted); margin-bottom: 18px; }
+  .calendar-feed .calendar-source a { color: var(--accent); }
+  .calendar-feed .calendar-month { border-top: 1px solid var(--line); padding-block: 32px; display: grid; gap: 20px; scroll-margin-top: calc(var(--header-h) + 16px); }
+  .calendar-feed h2 { font-size: var(--step-3); }
+  .calendar-feed .calendar-layout { display: grid; grid-template-columns: minmax(250px,1fr) minmax(0,1.4fr); gap: 28px; align-items: start; }
+  .calendar-feed .calendar-grid { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+  .calendar-feed .calendar-grid th { font-weight: 500; color: var(--muted); padding-bottom: 8px; }
+  .calendar-feed .calendar-grid td { background: var(--raise-2); border: 3px solid var(--base); text-align: center; height: 44px; vertical-align: top; padding: 4px; font-variant-numeric: tabular-nums; }
+  .calendar-feed .calendar-grid td:empty { background: transparent; }
+  .calendar-feed .calendar-grid .sat { color: var(--saturday); }
+  .calendar-feed .calendar-grid .sun { color: var(--sunday); }
+  .calendar-feed .calendar-grid .today { background: var(--brand); color: var(--on-accent); font-weight: 700; }
+  .calendar-feed .calendar-dots { display: flex; justify-content: center; gap: 3px; flex-wrap: wrap; margin-top: 3px; }
+  .calendar-feed .calendar-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .calendar-feed .calendar-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .calendar-feed[data-compact="true"] .calendar-list { grid-template-columns: repeat(auto-fit,minmax(min(240px,100%),1fr)); gap: 12px; }
+  .calendar-feed .calendar-event { padding: 18px; background: var(--raise); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: var(--radius); display: grid; gap: 5px; }
+  .calendar-feed .calendar-event.k-trip { border-top-color: var(--meeting); }
+  .calendar-feed .calendar-event.k-event { border-top-color: #e0a23b; }
+  .calendar-feed .calendar-event.k-other { border-top-color: var(--muted); }
+  .calendar-feed .calendar-event.k-deadline { border-top-color: var(--error); }
+  .calendar-feed .calendar-event .calendar-date { font: 700 15px/1.4 var(--latin); color: var(--accent); }
+  .calendar-feed .calendar-event .calendar-kind,.calendar-feed .calendar-event .calendar-meta { font-size: 13px; color: var(--muted); }
+  .calendar-feed .calendar-event b { overflow-wrap: anywhere; }
+  .calendar-feed .calendar-event.past { opacity: .65; }
+  @media(max-width:700px) { .calendar-feed .calendar-layout { grid-template-columns: 1fr; gap: 18px; } }
+</style>

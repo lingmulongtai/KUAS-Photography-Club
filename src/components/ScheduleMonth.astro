@@ -140,16 +140,21 @@ const heads = en ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['月', '
 
   .sat .n,
   .wd.sat {
-    color: #2f6fa8;
+    color: var(--saturday);
   }
 
   .sun .n,
   .wd.sun {
-    color: #b8483a;
+    color: var(--sunday);
   }
 
   :global(.day.today) {
     background: var(--brand);
+    color: var(--on-accent);
+  }
+
+  :global(.day.today) .n {
+    color: var(--on-accent);
   }
 
   :global(.day.past) {
@@ -175,7 +180,7 @@ const heads = en ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['月', '
   }
 
   .k-trip {
-    --c: #1b363d;
+    --c: var(--meeting);
   }
 
   .k-event {
@@ -183,7 +188,7 @@ const heads = en ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['月', '
   }
 
   .k-deadline {
-    --c: #c2412d;
+    --c: var(--error);
   }
 
   .k-other {
