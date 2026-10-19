@@ -232,7 +232,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
             hero.classList.toggle('is-exploring',enabled);exploreToggle.setAttribute('aria-pressed',String(enabled));
             exploreToggle.textContent=enabled?(en?'Exit exploration':'散策を終了'):(en?'Free explore':'自由に散策');
             card.hidden=enabled||demo?.mode!=='campus';
-            cameraHint.textContent=enabled?(en?'Drag to look · W/A/S/D to move · Q/E down/up · Shift faster · wheel to approach · Esc to exit.':'ドラッグで見回す・W/A/S/Dで移動・Q/Eで下降/上昇・Shiftで加速・ホイールで接近・Escで終了。'):'';
+            cameraHint.textContent=enabled?(en?'Drag to look · W/A/S/D move · Q/E down/up · Shift faster · wheel approach · Ctrl/⌘ + wheel zoom · Esc exit.':'ドラッグで見回す・W/A/S/Dで移動・Q/Eで下降/上昇・Shiftで加速・ホイールで接近・Ctrl/⌘＋ホイールで画角・Escで終了。'):'';
           },
           onAction: (id) => demo?.flyTo(spotDestination(id)),
           onMode: setView,

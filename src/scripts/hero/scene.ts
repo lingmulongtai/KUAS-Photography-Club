@@ -24,7 +24,7 @@ import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds, coverForDay } from './clouds';
-import { createLookRotation, createViewZoom, mountLookControls } from './look-controls';
+import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio } from './look-controls';
 import {createKamoChannel,kamoMask} from './kamo-channel';
 import {buildBridges} from './bridges';
 import { createBuildingMask } from './vegetation-mask';
@@ -452,7 +452,12 @@ export function createHero(
   });
   window.addEventListener('keyup',e=>keys.delete(e.code));
   el.addEventListener('wheel',e=>{
-    if(!exploring||(e.target as Element).closest('button,a,input,select,textarea'))return;
+    if(!exploring)return;
+    if(e.ctrlKey||e.metaKey) {
+      e.preventDefault();
+      zoom.pinch(wheelZoomRatio(e.deltaY,e.deltaMode,height));updateZoom();return;
+    }
+    if((e.target as Element).closest('button,a,input,select,textarea'))return;
     e.preventDefault();const amount=Math.max(-1,Math.min(1,-e.deltaY/160));
     moveExplorer(freePosition,freeBearing+lookDrag.yaw,amount,0,amount*.35,.1,true,groundAt??(()=>40));
   },{passive:false});
