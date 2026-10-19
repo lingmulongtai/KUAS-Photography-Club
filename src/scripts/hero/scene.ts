@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Demo } from '../gl/stage';
 import { createEnv } from './env';
-import { KYOTO, directionFrom, jstMinutes, jstParts, localSiderealAngle, moonPosition, sunPosition } from './astro';
+import { KYOTO, directionFrom, jstMinutes, localSiderealAngle, moonPosition, sunPosition } from './astro';
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import type { Box } from './geo';
 import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
@@ -71,8 +71,8 @@ export interface HeroOptions {
   lang?: 'ja' | 'en';
   /** Date to render for this frame. */
   now: () => Date;
-  /** Displayed minutes, continuous while a time preset is fast-forwarding. */
-  cloudMinutes?:()=>number;
+  /** Cumulative minutes explicitly travelled by a time preset, excluding the live clock. */
+  cloudTravelMinutes?:()=>number;
   quality: number;
   trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
@@ -422,7 +422,6 @@ export function createHero(
     env.uMoonLight.value.setRGB(0.5, 0.58, 0.78).multiplyScalar(0.07 * moon.illumination * moonUp * dark);
     env.uStars.value = dark * (1 - 0.35 * moon.illumination * moonUp);
     celestial.setSidereal(localSiderealAngle(date, KYOTO.lon));
-    const ymd = jstParts(date);
 
     renderer.toneMappingExposure = look.exposure;
     post.bloom.strength = look.bloom * (1 + .12 * look.city);
@@ -716,7 +715,7 @@ export function createHero(
       clock = t;
       const date=opts.now();
       applyTime(date, t);
-      const cloudSeconds=cloudClock.step(opts.cloudMinutes?.()??jstMinutes(date),dt,opts.reducedMotion);
+      const cloudSeconds=cloudClock.step(opts.cloudTravelMinutes?.()??0,dt,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudSeconds*clouds.weather.wind[0],cloudSeconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
       if (dt > 0) driveCars?.(dt);
