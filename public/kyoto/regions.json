@@ -1,6 +1,58 @@
 {
  "regions": [
   {
+   "id": "uji",
+   "ja": "宇治・平等院",
+   "en": "Uji / Byodoin",
+   "box": [
+    0,
+    10000,
+    11000,
+    19000
+   ],
+   "heightSource": "GSI outlines; illustrative heights (6 m / 10 m)",
+   "buildings": {
+    "meta": "buildings-uji.json",
+    "file": "buildings-uji.bin",
+    "bytes": 722531
+   },
+   "lines": {
+    "file": "lines-uji.bin",
+    "box": [
+     0,
+     10000,
+     11000,
+     19000
+    ],
+    "q": 0.5,
+    "bytes": 162996,
+    "features": 19214
+   },
+   "photo": {
+    "box": [
+     0,
+     10000,
+     11000,
+     19000
+    ],
+    "file": "aerial-uji.webp",
+    "size": [
+     2048,
+     1676
+    ],
+    "bytes": 299852,
+    "zoom": 13,
+    "mobile": {
+     "file": "aerial-uji-mobile.webp",
+     "size": [
+      1024,
+      838
+     ],
+     "bytes": 142356
+    }
+   }
+  },
+  {
    "id": "kameoka",
    "ja": "亀岡・保津峡",
    "en": "Kameoka / Hozukyo",

@@ -1,5 +1,6 @@
 ---
 /** The next few events from the schedule. Past ones are hidden in the browser, so the list stays current between deploys. */
+import CalendarFeed from './CalendarFeed.astro';
 import { formatDay, getSchedule, kindLabel, kindLabelEn } from '../lib/schedule';
 
 interface Props {
@@ -10,6 +11,7 @@ const { count = 4, lang = 'ja' } = Astro.props;
 const en = lang === 'en';
 const events = (await getSchedule()).flatMap((m) => m.events);
 ---
+<CalendarFeed lang={lang} compact count={count}>
 <div class="upcoming" data-count={count}>
   <ol class="events">
     {events.map((e) => (
@@ -25,6 +27,8 @@ const events = (await getSchedule()).flatMap((m) => m.events);
   </ol>
   <p class="empty muted" hidden>{en ? 'Future plans will be announced once confirmed.' : '今後の予定は、決まり次第お知らせします。'}</p>
 </div>
+
+</CalendarFeed>
 
 <script>
   document.querySelectorAll<HTMLElement>('.upcoming').forEach((root) => {
@@ -87,7 +91,7 @@ const events = (await getSchedule()).flatMap((m) => m.events);
   }
 
   .k-trip {
-    --c: #1b363d;
+    --c: var(--meeting);
   }
 
   .k-event {
@@ -95,7 +99,7 @@ const events = (await getSchedule()).flatMap((m) => m.events);
   }
 
   .k-deadline {
-    --c: #c2412d;
+    --c: var(--error);
   }
 
   .k-other {

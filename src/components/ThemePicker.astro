@@ -1,0 +1,56 @@
+---
+const en = Astro.props.lang === 'en';
+const choices = [
+  ['light', en ? 'Light' : 'ライト'],
+  ['dark', en ? 'Dark navy' : 'ダーク（紺）'],
+  ['black', en ? 'OLED black' : 'ブラック（OLED）'],
+];
+---
+<details class="theme-picker">
+  <summary title={en ? 'Colour theme' : '表示テーマ'}>
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor"/></svg>
+    <span class="visually-hidden">{en ? 'Colour theme' : '表示テーマ'}</span>
+  </summary>
+  <div class="theme-options" role="group" aria-label={en ? 'Colour theme' : '表示テーマ'}>
+    {choices.map(([value, label]) => <button type="button" data-theme-choice={value} aria-pressed={value === 'light' ? 'true' : 'false'}><span class:list={['swatch', value]} aria-hidden="true"></span>{label}</button>)}
+  </div>
+</details>
+
+<script>
+  import { THEME_KEY, THEME_COLORS, preferredTheme } from '../lib/theme';
+  const picker = document.querySelector<HTMLDetailsElement>('.theme-picker');
+  const buttons = picker?.querySelectorAll<HTMLButtonElement>('[data-theme-choice]');
+  function apply(saved: unknown) {
+    const theme = preferredTheme(saved);
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[theme]);
+    buttons?.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeChoice === theme)));
+  }
+  apply(document.documentElement.dataset.theme);
+  buttons?.forEach(button => button.addEventListener('click', () => {
+    const theme = preferredTheme(button.dataset.themeChoice);
+    apply(theme);
+    try { localStorage.setItem(THEME_KEY, theme); } catch { /* The choice still works for this page. */ }
+    if (picker) { picker.open = false; picker.querySelector('summary')?.focus(); }
+  }));
+  document.addEventListener('click', event => {
+    if (picker && event.target instanceof Node && !picker.contains(event.target)) picker.open = false;
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && picker?.open) { picker.open = false; picker.querySelector('summary')?.focus(); }
+  });
+  window.addEventListener('storage', event => { if (event.key === THEME_KEY || event.key === null) apply(event.newValue); });
+</script>
+
+<style>
+  .theme-picker { position: relative; flex: none; }
+  summary { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid currentColor; border-radius: 50%; cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+  .theme-options { position: absolute; right: 0; top: calc(100% + 12px); width: max-content; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow); background: var(--raise); color: var(--ink); display: grid; gap: 4px; }
+  button { display: flex; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 10px 12px; background: transparent; text-align: left; cursor: pointer; font-size: 13px; min-height: 44px; }
+  button:hover { background: var(--raise-2); }
+  button[aria-pressed="true"] { border-color: var(--accent); background: var(--brand-pale); }
+  .swatch { width: 16px; height: 16px; border: 1px solid var(--muted); border-radius: 50%; }
+  .light { background: #f7fbfb; } .dark { background: #101b2b; } .black { background: #000; }
+</style>

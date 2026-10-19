@@ -23,8 +23,9 @@ import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
-import { buildClouds, coverForDay } from './clouds';
-import { createLookRotation, createViewZoom, mountLookControls } from './look-controls';
+import { buildClouds } from './clouds';
+import {createCloudClock} from './cloud-weather';
+import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio } from './look-controls';
 import {createKamoChannel,kamoMask} from './kamo-channel';
 import {buildBridges} from './bridges';
 import { createBuildingMask } from './vegetation-mask';
@@ -55,6 +56,8 @@ import {seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
 import {buildKiyomizuBeam} from './kiyomizu-beam';
+import {replacesInari,inariClearing} from './fushimi-inari';
+import {replacesByodoin,BYODOIN_CENTER} from './byodoin';
 
 export interface HeroStatus {
   minutes: number;
@@ -68,6 +71,8 @@ export interface HeroOptions {
   lang?: 'ja' | 'en';
   /** Date to render for this frame. */
   now: () => Date;
+  /** Cumulative minutes explicitly travelled by a time preset, excluding the live clock. */
+  cloudTravelMinutes?:()=>number;
   quality: number;
   trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
@@ -113,6 +118,7 @@ export function createHero(
   const celestial = buildCelestial(env, opts.quality);
   const meteors = buildMeteors(opts.quality);
   const clouds = buildClouds(env);
+  const cloudClock=createCloudClock();
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, 2);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
@@ -227,7 +233,7 @@ export function createHero(
     const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30},
       {p:landmarks.positions.tojiKondo,w:47,d:32},{p:landmarks.positions.tojiKodo,w:48,d:29},{p:landmarks.positions.tojiJikido,w:42,d:33},
       {p:{x:2095.62,z:-1314.07},w:28,d:17}];
-    const replaced = (x:number,z:number) => replacesNijoBox(x,z)||replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
+    const replaced = (x:number,z:number) => replacesInari(x,z)||replacesNijoBox(x,z)||replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
     const hojo=landmarks.positions.ryoanji;
     const hojoBox:Box=[hojo.x-14.5,hojo.z-15.5,hojo.x+14.5,hojo.z+10.5];
     const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>!replacesHeianFootprint(p.ring)&&!replacesNijoFootprint(p.ring)&&!replacesKyotoStation(p.ring)).flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
@@ -254,7 +260,7 @@ export function createHero(
     const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, [...campusTreeSpots(hf),...cherries], { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, [...campusTreeSpots(hf),...cherries], { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) || replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
     const forestPhoto=(photo:THREE.Texture,i:number)=>{
       forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal);
       shadow.invalidate();
@@ -324,7 +330,8 @@ export function createHero(
       const polys=detailedCampus?data.buildings.polys.filter(p=>{
         let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !isKameokaBuilding(x/(p.ring.length/2),z/(p.ring.length/2));
       }):data.buildings.polys;
-      const city=buildCity(env,hf,{...data.buildings,polys},b=>(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10));
+      const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
+      const city=buildCity(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10));
       group.add(city.group,buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24,undefined,r.id==='yamashina'),buildIslands(env,hf,data.lines));
       let campusNormal:THREE.Texture|null=null;
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
@@ -373,6 +380,8 @@ export function createHero(
       let region=regionAt(regionManifest.regions,center);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
+      if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)
+        region={...region,id:'uji-detail',photo:meta.byodoin};
       const request=++areaRequest;
       opts.onAreaLoading?.(!!region&&region.id!==regionLoader.id);
       void regionLoader.request(region).finally(()=>{if(request===areaRequest)opts.onAreaLoading?.(false);});
@@ -415,8 +424,6 @@ export function createHero(
     env.uMoonLight.value.setRGB(0.5, 0.58, 0.78).multiplyScalar(0.07 * moon.illumination * moonUp * dark);
     env.uStars.value = dark * (1 - 0.35 * moon.illumination * moonUp);
     celestial.setSidereal(localSiderealAngle(date, KYOTO.lon));
-    const ymd = jstParts(date);
-    clouds.uniforms.uCover.value = coverForDay(ymd.year, ymd.month, ymd.day);
 
     renderer.toneMappingExposure = look.exposure;
     post.bloom.strength = look.bloom * (1 + .12 * look.city);
@@ -452,7 +459,12 @@ export function createHero(
   });
   window.addEventListener('keyup',e=>keys.delete(e.code));
   el.addEventListener('wheel',e=>{
-    if(!exploring||(e.target as Element).closest('button,a,input,select,textarea'))return;
+    if(!exploring)return;
+    if(e.ctrlKey||e.metaKey) {
+      e.preventDefault();
+      zoom.pinch(wheelZoomRatio(e.deltaY,e.deltaMode,height));updateZoom();return;
+    }
+    if((e.target as Element).closest('button,a,input,select,textarea'))return;
     e.preventDefault();const amount=Math.max(-1,Math.min(1,-e.deltaY/160));
     moveExplorer(freePosition,freeBearing+lookDrag.yaw,amount,0,amount*.35,.1,true,groundAt??(()=>40));
   },{passive:false});
@@ -649,7 +661,6 @@ export function createHero(
     celestial.group.position.copy(camera.position);
     clouds.mesh.position.x = camera.position.x;
     clouds.mesh.position.z = camera.position.z;
-    clouds.uniforms.uWind.value.set(t * 0.0009, t * 0.0003);
   }
 
   const forward = new THREE.Vector3();
@@ -704,7 +715,10 @@ export function createHero(
       const dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
       clock = t;
-      applyTime(opts.now(), t);
+      const date=opts.now();
+      applyTime(date, t);
+      const cloudSeconds=cloudClock.step(opts.cloudTravelMinutes?.()??0,dt,opts.reducedMotion);
+      clouds.uniforms.uWind.value.set(cloudSeconds*clouds.weather.wind[0],cloudSeconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
       if (dt > 0) driveCars?.(dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);

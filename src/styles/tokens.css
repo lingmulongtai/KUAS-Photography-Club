@@ -29,6 +29,14 @@
   --safe: #ff3a24;
   --ok: #2f8f5b;
   --error: #c2412d;
+  --on-ink: #ffffff;
+  --header-bg: rgba(255, 255, 255, 0.9);
+  --band: var(--brand);
+  --saturday: #2f6fa8;
+  --sunday: #b8483a;
+  --meeting: #1b363d;
+  --warning-bg: #fff4dc;
+  --warning-line: #f0d49b;
 
   /* text over WebGL stages and photos */
   --hud: #fff6e6;
@@ -61,4 +69,40 @@
   --shadow: 0 1px 2px rgba(27, 54, 61, 0.06), 0 8px 24px rgba(27, 54, 61, 0.08);
 
   color-scheme: light;
+}
+
+/* Dark themes are explicit choices. Keep the teal identity against a navy base. */
+:root[data-theme="dark"],
+:root[data-theme="black"] {
+  --base: #101b2b;
+  --raise: #17263a;
+  --raise-2: #1d3044;
+  --brand-pale: #193b48;
+  --line: #30465a;
+  --line-strong: #527186;
+  --ink: #e8f3f5;
+  --muted: #afc5cf;
+  --accent: #83d5dc;
+  --mark: #83d5dc;
+  --on-ink: #101b2b;
+  --header-bg: rgba(16, 27, 43, 0.94);
+  --band: #152c3d;
+  --saturday: #99caff;
+  --sunday: #ffa397;
+  --meeting: #a9dce0;
+  --ok: #8bd9ac;
+  --error: #ffa397;
+  --warning-bg: #3b301d;
+  --warning-line: #8c7546;
+  --shadow: 0 2px 4px #0003, 0 12px 32px #0005;
+  color-scheme: dark;
+}
+
+:root[data-theme="black"] {
+  --base: #000000;
+  --raise: #0b1016;
+  --raise-2: #121d26;
+  --band: #090f15;
+  --header-bg: rgba(0, 0, 0, 0.96);
+  --on-ink: #000000;
 }

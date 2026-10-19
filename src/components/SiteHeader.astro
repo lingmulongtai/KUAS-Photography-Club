@@ -1,6 +1,7 @@
 ---
 import { nav } from '../data/club';
 import { languagePath } from '../lib/i18n';
+import ThemePicker from './ThemePicker.astro';
 
 interface Props {
   /** Float over a full-bleed hero instead of sitting on the page background. */
@@ -25,7 +26,9 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
 
     <a class="language-switch" href={languagePath(Astro.url.pathname, en ? 'ja' : 'en')} data-language={en ? 'ja' : 'en'} lang={en ? 'ja' : 'en'} aria-label={en ? '日本語に切り替える' : 'Switch to English'}>{en ? '日本語' : 'English'}</a>
 
-    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">
+    <ThemePicker lang={lang} />
+
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" aria-label={en ? 'Main menu' : 'メインメニュー'}>
       <span class="menu-icon" aria-hidden="true"><i></i><i></i></span>
       <span class="menu-label">MENU</span>
     </button>
@@ -65,6 +68,8 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     document.documentElement.classList.toggle('menu-open', open);
   };
   btn?.addEventListener('click', () => setOpen(!header?.classList.contains('open')));
+  const theme=header?.querySelector<HTMLDetailsElement>('.theme-picker');
+  theme?.addEventListener('toggle',()=>{if(theme.open)setOpen(false);});
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && header?.classList.contains('open')) {
       setOpen(false);
@@ -109,7 +114,7 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     position: sticky;
     top: 0;
     z-index: 50;
-    background: rgba(255, 255, 255, 0.88);
+    background: var(--header-bg);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line);
@@ -130,7 +135,7 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
 
   .site-header.overlay.scrolled {
     color: var(--ink);
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--header-bg);
     border-bottom-color: var(--line);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
@@ -299,7 +304,7 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
       left: 0;
       right: 0;
       height: calc(100dvh - var(--header-h));
-      background: var(--brand);
+      background: var(--band);
       color: var(--ink);
       padding: 24px var(--gutter) 40px;
       overflow-y: auto;
@@ -363,12 +368,12 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
       font-size: 16px;
       background: var(--ink);
       border-color: var(--ink);
-      color: var(--on-dark);
+      color: var(--on-ink);
     }
 
     .open.site-header,
     .open.site-header.overlay {
-      background: var(--brand);
+      background: var(--band);
       color: var(--ink);
       border-bottom-color: transparent;
       -webkit-backdrop-filter: none;
@@ -380,6 +385,13 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     .brand-en {
       display: none;
     }
+    .bar { gap: 8px; }
+    .brand { gap: 8px; }
+    .brand-ja { font-size: 17px; letter-spacing: .16em; white-space: nowrap; }
+    .mark { width: 36px; height: 36px; }
+    .language-switch { padding: 9px; font-size: 12px; }
+    .menu-label { display: none; }
+    .menu-btn { padding: 11px; }
   }
 
   :global(html.menu-open) {
