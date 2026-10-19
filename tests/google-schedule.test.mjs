@@ -43,3 +43,10 @@ test('overnight entries retain explicit start and end dates on each occupied day
   assert.deepEqual(s.events.map(e=>e.date),['2026-11-06','2026-11-07']);
   assert.ok(s.events.every(e=>e.time==='2026-11-06 23:00 – 2026-11-07 01:00'));
 });
+test('old ongoing all-day events are clipped to the current viewing window',async()=>{
+  const s=await parseGoogleSchedule(calendar(['UID:long','DTSTAMP:20250101T000000Z','SUMMARY:Long event','DTSTART;VALUE=DATE:20250101','DTEND;VALUE=DATE:20270101']),now);
+  assert.equal(s.events.length,61);assert.equal(s.events[0].date,'2026-11-01');assert.equal(s.events.at(-1).date,'2026-12-31');
+});
+test('minute-frequency recurrences are rejected before allocating their instances',async()=>{
+  await assert.rejects(parseGoogleSchedule(calendar(['UID:dense','DTSTAMP:20261001T000000Z','SUMMARY:Dense','DTSTART:20261106T090000Z','DTEND:20261106T090100Z','RRULE:FREQ=MINUTELY;COUNT=3000']),now),/frequency/);
+});
