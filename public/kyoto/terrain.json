@@ -193,5 +193,28 @@
    "file": "terrain-kameoka-campus.bin",
    "bytes": 19501
   }
+ },
+ "byodoin": {
+  "box": [
+   3700,
+   12000,
+   5100,
+   13400
+  ],
+  "file": "aerial-byodoin.webp",
+  "size": [
+   1536,
+   1536
+  ],
+  "bytes": 387150,
+  "zoom": 17,
+  "mobile": {
+   "file": "aerial-byodoin-mobile.webp",
+   "size": [
+    768,
+    768
+   ],
+   "bytes": 145044
+  }
  }
 }

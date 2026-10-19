@@ -57,7 +57,7 @@ import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
 import {buildKiyomizuBeam} from './kiyomizu-beam';
 import {replacesInari,inariClearing} from './fushimi-inari';
-import {replacesByodoin} from './byodoin';
+import {replacesByodoin,BYODOIN_CENTER} from './byodoin';
 
 export interface HeroStatus {
   minutes: number;
@@ -380,6 +380,8 @@ export function createHero(
       let region=regionAt(regionManifest.regions,center);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
+      if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)
+        region={...region,id:'uji-detail',photo:meta.byodoin};
       const request=++areaRequest;
       opts.onAreaLoading?.(!!region&&region.id!==regionLoader.id);
       void regionLoader.request(region).finally(()=>{if(request===areaRequest)opts.onAreaLoading?.(false);});

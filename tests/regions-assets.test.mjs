@@ -36,3 +36,13 @@ test('each shipped region decodes within its bounds and bounded download budget'
     assert.match(region.heightSource,/illustrative|measured/);
   }
 });
+
+test('close Uji imagery covers Phoenix Hall without enlarging other regional transfers',async()=>{
+  const root=new URL('../public/kyoto/',import.meta.url);
+  const {byodoin}=JSON.parse(await readFile(new URL('terrain.json',root),'utf8'));
+  const p=toLocal(34.88928359,135.80767787),b=byodoin.box;
+  assert.ok(p.x>b[0]+300&&p.x<b[2]-300&&p.z>b[1]+300&&p.z<b[3]-300);
+  assert.ok((await stat(new URL(byodoin.file,root))).size<=600000);
+  assert.ok((await stat(new URL(byodoin.mobile.file,root))).size<=200000);
+  assert.ok(byodoin.mobile.size[0]<byodoin.size[0]);
+});
