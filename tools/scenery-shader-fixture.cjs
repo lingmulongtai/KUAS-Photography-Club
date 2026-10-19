@@ -13,6 +13,7 @@ import {createForest} from './src/scripts/hero/trees.ts';
 import {buildSnow} from './src/scripts/hero/season-effects.ts';
 import {buildKiyomizuBeam} from './src/scripts/hero/kiyomizu-beam.ts';
 import {buildRailways} from './src/scripts/hero/railways.ts';
+import {buildClouds} from './src/scripts/hero/clouds.ts';
 const renderer=new THREE.WebGLRenderer({antialias:false});renderer.setSize(320,240);document.body.append(renderer.domElement);
 renderer.debug.onShaderError=(gl,program,vs,fs)=>{throw Error(gl.getProgramInfoLog(program)+' '+gl.getShaderInfoLog(vs)+' '+gl.getShaderInfoLog(fs));};
 const env=createEnv();env.uSnow.value=1;env.uSpring.value=1;env.uAutumn.value=1;env.uSunDir.value.set(.3,.8,.3).normalize();env.uSunLight.value.setRGB(1,1,1);
@@ -30,6 +31,14 @@ window.runSceneryChecks=()=>{
   const error=renderer.getContext().getError();if(error)throw Error(name+' GPU error '+error);
   const info={name,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,points:renderer.info.render.points};
   if(info.calls<1)throw Error(name+' was not drawn');stats.push(info);scene.remove(object);
+ }
+ for(const seed of [0,9817,19634,29451,39268,49085]){
+  const clouds=buildClouds(env,seed),scene=new THREE.Scene();scene.add(clouds.mesh);
+  camera.lookAt(0,1800,0);renderer.info.reset();renderer.render(scene,camera);
+  const error=renderer.getContext().getError();if(error)throw Error('Cloud GPU error '+error);
+  if(renderer.info.render.calls<1)throw Error('Cloud layer was not drawn');
+  stats.push({name:'cloud-'+clouds.weather.style,calls:renderer.info.render.calls});
+  clouds.mesh.geometry.dispose();clouds.mesh.material.dispose();
  }
  const result={passed:true,stats};document.querySelector('pre').textContent=JSON.stringify(result,null,2);return result;
 };
