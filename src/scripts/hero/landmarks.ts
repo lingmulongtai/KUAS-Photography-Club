@@ -12,6 +12,7 @@ import {imperialPalace} from './imperial-palace';
 import {nijoCastle} from './nijo-castle';
 import {kyotoStation,STATION_CENTER} from './kyoto-station';
 import {fushimiInari} from './fushimi-inari';
+import {byodoinParts} from './byodoin';
 
 /*
  * Landmarks the building data can't show properly, modelled at their real positions and sizes.
@@ -111,7 +112,7 @@ const LANDMARKS: Record<string, Placed> = {
 };
 
 export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
-  const geos: THREE.BufferGeometry[] = [...extraParts,...fushimiInari((x,z)=>hf.height(x,z))].map(paint);
+  const geos: THREE.BufferGeometry[] = [...extraParts,...fushimiInari((x,z)=>hf.height(x,z)),...byodoinParts((x,z)=>hf.height(x,z))].map(paint);
   const positions: Record<string, THREE.Vector3> = {};
   const sites:Record<string,Placed>={...LANDMARKS,...imperialPalace(),...nijoCastle()};
   for (const [name, l] of Object.entries(sites)) {

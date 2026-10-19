@@ -74,6 +74,7 @@ export const VIEWS = {
   yamashina:spotOrbit('yamashina',1000,650,180,8),
   fushimi:spotOrbit('fushimi',1100,650,180,8),
   inari:spotOrbit('inari',330,170,240,10),
+  byodoin:spotOrbit('byodoin',200,95,95,7),
   philosopher:spotOrbit('philosopher',280,185,240,4),
 } satisfies Record<string, ViewDef>;
 
