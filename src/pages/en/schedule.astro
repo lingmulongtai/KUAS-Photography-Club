@@ -1,4 +1,5 @@
 ---
+import CalendarFeed from '../../components/CalendarFeed.astro';
 import Base from '../../layouts/Base.astro';
 import PageHero from '../../components/PageHero.astro';
 import ScheduleMonth from '../../components/ScheduleMonth.astro';
@@ -6,6 +7,6 @@ import { getSchedule } from '../../lib/schedule';
 const months = await getSchedule();
 ---
 <Base lang="en" title="Schedule" description="Confirmed KUAS Photography Club dates and meeting cancellation notices.">
-  <PageHero edge="SCHEDULE ▸ CONFIRMED DATES" title="Schedule" lead="Regular meetings are on Fridays from 18:00, usually in S306 at Uzumasa Campus. Meetings may be cancelled or moved. Only individually confirmed dates and notices are listed here." />
-  <div class="wrap"><p>Before visiting, <a href="/en/contact/">confirm the latest arrangements with the organizers</a>. Future plans will be announced once confirmed.</p>{months.map(month => <ScheduleMonth month={month} lang="en" />)}</div>
+  <PageHero edge="SCHEDULE ▸ CONFIRMED DATES" title="Schedule" lead="Regular meetings are on Fridays from 18:00, usually in S306 at Uzumasa Campus. Meetings may be cancelled or moved. Dates and notices update automatically from the club’s shared Google Calendar." />
+  <div class="wrap"><p>Before visiting, <a href="/en/contact/">confirm the latest arrangements with the organizers</a>. Future plans will be announced once confirmed.</p><CalendarFeed lang="en">{months.map(month => <ScheduleMonth month={month} lang="en" />)}</CalendarFeed></div>
 </Base>
