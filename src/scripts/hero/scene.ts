@@ -56,6 +56,7 @@ import {seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
 import {buildKiyomizuBeam} from './kiyomizu-beam';
+import {replacesInari,inariClearing} from './fushimi-inari';
 
 export interface HeroStatus {
   minutes: number;
@@ -231,7 +232,7 @@ export function createHero(
     const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30},
       {p:landmarks.positions.tojiKondo,w:47,d:32},{p:landmarks.positions.tojiKodo,w:48,d:29},{p:landmarks.positions.tojiJikido,w:42,d:33},
       {p:{x:2095.62,z:-1314.07},w:28,d:17}];
-    const replaced = (x:number,z:number) => replacesNijoBox(x,z)||replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
+    const replaced = (x:number,z:number) => replacesInari(x,z)||replacesNijoBox(x,z)||replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
     const hojo=landmarks.positions.ryoanji;
     const hojoBox:Box=[hojo.x-14.5,hojo.z-15.5,hojo.x+14.5,hojo.z+10.5];
     const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>!replacesHeianFootprint(p.ring)&&!replacesNijoFootprint(p.ring)&&!replacesKyotoStation(p.ring)).flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
@@ -258,7 +259,7 @@ export function createHero(
     const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, [...campusTreeSpots(hf),...cherries], { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
+    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, [...campusTreeSpots(hf),...cherries], { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
     const forestPhoto=(photo:THREE.Texture,i:number)=>{
       forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal);
       shadow.invalidate();
