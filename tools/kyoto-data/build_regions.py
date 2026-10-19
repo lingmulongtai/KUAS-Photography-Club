@@ -27,6 +27,8 @@ from build_arashiyama import polygons
 from extract_buildings import decode_tile
 
 REGIONS = {
+    # Uji precedes overlapping ward data: Kyoto PLATEAU does not cover Uji City.
+    'uji': {'box': (0,10000,11000,19000), 'ja':'宇治・平等院', 'en':'Uji / Byodoin'},
     'kameoka': {'box': (-24000,-8000,-9000,4000), 'ja':'亀岡・保津峡', 'en':'Kameoka / Hozukyo'},
     'sonobe': {'box': (-33000,-18000,-21000,-8000), 'ja':'園部・八木', 'en':'Sonobe / Yagi'},
     'yamashina': {'box': (4600,-2500,12500,8500), 'ja':'山科', 'en':'Yamashina', 'wards':['26110_yamashina-ku']},
@@ -209,6 +211,7 @@ def main():
     for key in selected:
         entry=build(key,REGIONS[key])
         existing['regions']=[r for r in existing['regions'] if r['id']!=key]+[entry]
+        existing['regions'].sort(key=lambda r:list(REGIONS).index(r['id']))
         with open(path,'w',encoding='utf-8') as f:
             json.dump(existing,f,ensure_ascii=False,indent=1);f.write('\n')
         print('finished',key,flush=True)
