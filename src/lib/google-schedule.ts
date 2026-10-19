@@ -29,11 +29,15 @@ export async function parseGoogleSchedule(text:string,now=new Date()):Promise<Li
       const first=instance.isFullDay?floatingDate(instance.start):jstDate(instance.start);
       // End is exclusive for all-day events. Show ongoing multi-day events on each day.
       const last=instance.isFullDay?floatingDate(new Date(+instance.end-1)):jstDate(new Date(Math.max(+instance.start,+instance.end-1)));
+      const endDate=jstDate(instance.end);
+      const time=first===endDate
+        ? jstTime(instance.start)+(+instance.end>+instance.start?'–'+jstTime(instance.end):'')
+        : first+' '+jstTime(instance.start)+' – '+endDate+' '+jstTime(instance.end);
       const kind=/休会|中止|cancel/i.test(title)?'other':/ミーティング|定例|meeting/i.test(title)?'meeting':/撮影会|photo outing|photowalk/i.test(title)?'trip':/締切|deadline/i.test(title)?'deadline':'event';
       for(let day=new Date(first+'T00:00:00Z'),i=0;i<370&&day.toISOString().slice(0,10)<=last;i++,day=new Date(+day+86400000)) {
         const date=day.toISOString().slice(0,10);
         if(date<jstDate(from)||date>=jstDate(to))continue;
-        events.push({date,title,kind,...(!instance.isFullDay?{time:jstTime(instance.start)+(first===last&&+instance.end>+instance.start?'–'+jstTime(instance.end):'')}:{}),...(plain(event.location)?{place:plain(event.location)}:{})});
+        events.push({date,title,kind,...(!instance.isFullDay?{time}:{}),...(plain(event.location)?{place:plain(event.location)}:{})});
         if(events.length>2000)throw new Error('Calendar event limit exceeded');
       }
     }
