@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Demo } from '../gl/stage';
 import { createEnv } from './env';
-import { KYOTO, directionFrom, jstMinutes, localSiderealAngle, moonPosition, sunPosition } from './astro';
+import { KYOTO, directionFrom, jstMinutes, jstParts, localSiderealAngle, moonPosition, sunPosition } from './astro';
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import type { Box } from './geo';
 import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
