@@ -150,8 +150,8 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
   .mode {
     padding: 10px 14px;
     border-radius: var(--radius);
-    background: #fff4dc;
-    border: 1px solid #f0d49b;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-line);
     font-size: 14px;
   }
 
@@ -198,7 +198,7 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
     padding: 10px 12px;
     border: 1.5px solid var(--line-strong);
     border-radius: var(--radius-sm);
-    background: #fff;
+    background: var(--raise);
     color: var(--ink);
     font: 400 15px/1.5 var(--body);
   }
@@ -385,7 +385,7 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
   .admin :global(.event-row button) {
     appearance: none;
     border: 1px solid var(--line-strong);
-    background: #fff;
+    background: var(--raise);
     border-radius: 6px;
     padding: 4px 8px;
     cursor: pointer;

@@ -46,6 +46,16 @@ const hasLanguagePair = languagePath(englishPath, 'ja') === japanesePath;
     <link rel="icon" href="/brand/favicon-48.png" sizes="48x48" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#64bec6" />
+    <script is:inline>
+      // Run before paint; choosing a dark OS theme does not opt the visitor in.
+      try {
+        const theme = localStorage.getItem('kuas-theme');
+        if (theme === 'dark' || theme === 'black') {
+          document.documentElement.dataset.theme = theme;
+          document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#101b2b' : '#000000';
+        }
+      } catch { /* Light remains available when storage is blocked. */ }
+    </script>
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={club.name} />

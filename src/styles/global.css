@@ -286,7 +286,7 @@ table.data th.num {
 .btn:hover {
   background: var(--ink);
   border-color: var(--ink);
-  color: var(--on-dark);
+  color: var(--on-ink);
 }
 
 .btn--primary {

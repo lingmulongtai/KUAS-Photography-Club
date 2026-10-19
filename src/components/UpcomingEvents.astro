@@ -87,7 +87,7 @@ const events = (await getSchedule()).flatMap((m) => m.events);
   }
 
   .k-trip {
-    --c: #1b363d;
+    --c: var(--meeting);
   }
 
   .k-event {
@@ -95,7 +95,7 @@ const events = (await getSchedule()).flatMap((m) => m.events);
   }
 
   .k-deadline {
-    --c: #c2412d;
+    --c: var(--error);
   }
 
   .k-other {
