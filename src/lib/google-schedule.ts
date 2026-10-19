@@ -21,6 +21,8 @@ export async function parseGoogleSchedule(text:string,now=new Date()):Promise<Li
   const data=await ical.async.parseICS(text),events:ScheduleEvent[]=[];
   for(const component of Object.values(data)) {
     if(component?.type!=='VEVENT'||component.recurrenceid||component.status==='CANCELLED'||component.class==='PRIVATE'||component.class==='CONFIDENTIAL')continue;
+    // A club schedule never needs hundreds of thousands of minute/second instances.
+    if(component.rrule&&/FREQ=(SECONDLY|MINUTELY|HOURLY)/.test(component.rrule.toString()))throw new Error('Calendar recurrence frequency exceeds budget');
     for(const instance of ical.expandRecurringEvent(component,{from,to,includeOverrides:true,excludeExdates:true,expandOngoing:true})) {
       const event=instance.event;
       if(event.status==='CANCELLED'||event.class==='PRIVATE'||event.class==='CONFIDENTIAL')continue;
@@ -34,7 +36,8 @@ export async function parseGoogleSchedule(text:string,now=new Date()):Promise<Li
         ? jstTime(instance.start)+(+instance.end>+instance.start?'–'+jstTime(instance.end):'')
         : first+' '+jstTime(instance.start)+' – '+endDate+' '+jstTime(instance.end);
       const kind=/休会|中止|cancel/i.test(title)?'other':/ミーティング|定例|meeting/i.test(title)?'meeting':/撮影会|photo outing|photowalk/i.test(title)?'trip':/締切|deadline/i.test(title)?'deadline':'event';
-      for(let day=new Date(first+'T00:00:00Z'),i=0;i<370&&day.toISOString().slice(0,10)<=last;i++,day=new Date(+day+86400000)) {
+      const visibleFirst=first<jstDate(from)?jstDate(from):first;
+      for(let day=new Date(visibleFirst+'T00:00:00Z'),i=0;i<370&&day.toISOString().slice(0,10)<=last&&day.toISOString().slice(0,10)<jstDate(to);i++,day=new Date(+day+86400000)) {
         const date=day.toISOString().slice(0,10);
         if(date<jstDate(from)||date>=jstDate(to))continue;
         events.push({date,title,kind,...(!instance.isFullDay?{time}:{}),...(plain(event.location)?{place:plain(event.location)}:{})});
