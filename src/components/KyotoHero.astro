@@ -139,6 +139,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     };
     /* the sky follows the real time unless someone picks another time of today */
     const sky = { live: true, from: 0, delta: 0, start: 0, dur: 0 };
+    const cloudTravel={from:0,delta:0};
     const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
     const shown = () => {
       const real = jstMinutes(new Date());
@@ -152,6 +153,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       }
       return m;
     };
+    const cloudShown=()=>cloudTravel.from+cloudTravel.delta*(sky.dur?ease(Math.min(1,(performance.now()-sky.start)/sky.dur)):1);
     const presets = (key: string) => {
       const { sunrise, sunset } = sunTimes(new Date());
       return { morning: sunrise - 6, noon: 12 * 60 + 30, sunset: sunset - 14, night: sunset + 100 }[key] ?? jstMinutes(new Date());
@@ -160,10 +162,12 @@ const pinTrips = completeSpotPreviews((await getTrips())
     timeButtons.forEach((b) =>
       b.addEventListener('click', () => {
         const key = b.dataset.time!;
+        const cloudFrom=cloudShown();
         const from = shown();
         const to = key === 'now' ? jstMinutes(new Date()) : presets(key);
         // take the short way round the clock
         const delta = ((((to - from) % 1440) + 2160) % 1440) - 720;
+        cloudTravel.from=cloudFrom;cloudTravel.delta=delta;
         sky.live = key === 'now';
         sky.from = from;
         sky.delta = delta;
@@ -220,7 +224,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       (renderer, el) =>
         (demo = createHero(renderer, el, {
           now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
-          cloudMinutes: shown,
+          cloudTravelMinutes: cloudShown,
           quality,
           lang: en?'en':'ja',
           trips: JSON.parse(stage.dataset.trips ?? '[]'),

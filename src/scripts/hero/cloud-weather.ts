@@ -8,15 +8,13 @@ export function cloudWeather(seed:number) {
     wind:[.0005+random()*.0005,(random()-.5)*.0008] as const};
 }
 
-/** Continuous drift plus the displayed time's travel, including midnight crossings. */
+/** Continuous drift plus cumulative user-requested time travel, never the live clock. */
 export function createCloudClock() {
-  let previous:number|null=null,seconds=0;
+  let previous=0,seconds=0;
   return {
-    step(minutes:number,dt:number,reducedMotion=false) {
-      const delta=previous===null?0:((minutes-previous+720)%1440+1440)%1440-720;
-      previous=minutes;
-      if(!reducedMotion)seconds+=Math.max(0,Math.min(.2,dt))+delta*60;
-      else if(Math.abs(delta)>.5)seconds+=delta*60;
+    step(travelMinutes:number,dt:number,reducedMotion=false) {
+      const delta=travelMinutes-previous;previous=travelMinutes;
+      seconds+=delta*60+(reducedMotion?0:Math.max(0,Math.min(.2,dt)));
       return seconds;
     },
   };
