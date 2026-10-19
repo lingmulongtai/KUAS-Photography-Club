@@ -8,6 +8,7 @@ import { getCollection } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import { SPOTS } from '../../data/spots';
 import { isPublicContent } from '../../lib/public-content';
+import {PUBLIC_CALENDAR_URL} from '../../data/public-calendar';
 
 const trips = (await getCollection('trips', isPublicContent))
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
@@ -29,6 +30,12 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
     </header>
 
     <!-- sign in -->
+    <section class="card">
+      <h2>予定はGoogleカレンダーで管理</h2>
+      <p>部の共有カレンダーに予定を追加・変更・削除すると、トップとスケジュールに自動で反映されます。予定の更新には、この管理画面へのログインやサイトの再公開は必要ありません。</p>
+      <a class="btn btn--primary" href={PUBLIC_CALENDAR_URL} target="_blank" rel="noopener">部のGoogleカレンダーを開く ↗</a>
+      <p class="small muted">公開用の予定だけを登録してください。写真・活動記録は、下の管理画面から更新できます。</p>
+    </section>
     <section class="card login" data-view="login" hidden>
       <h2>ログイン</h2>
       <form data-login>
@@ -44,7 +51,7 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
       <nav class="tabs" role="tablist">
         <button role="tab" type="button" data-tab="new" aria-selected="true">撮影会を追加</button>
         <button role="tab" type="button" data-tab="add" aria-selected="false">写真を追加</button>
-        <button role="tab" type="button" data-tab="schedule" aria-selected="false">スケジュール</button>
+        <button role="tab" type="button" data-tab="schedule" aria-selected="false">補助の予定案内</button>
         <button type="button" class="logout" data-logout>ログアウト</button>
       </nav>
 
@@ -93,7 +100,8 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
 
       <!-- schedule -->
       <form class="card panel" data-panel="schedule" hidden>
-        <h2>月のスケジュール</h2>
+        <h2>カレンダーを取得できない場合の補助案内</h2>
+        <p class="small muted">通常の予定はGoogleカレンダーで更新してください。ここから保存した案内は、カレンダー読み込み前や取得できない場合の補助表示に使われます。</p>
         <div class="grid2">
           <label>月<input name="month" type="month" required /></label>
           <p class="small muted">定例ミーティングも、開催が確認できた日を予定として個別に入力してください。毎週の自動生成は行いません。</p>
