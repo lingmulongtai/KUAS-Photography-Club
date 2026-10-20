@@ -3,6 +3,7 @@ import { APERTURES, FOCUS_STOPS } from '../../data/camera-settings';
 import { nearestStop, syncCameraDial } from '../controls/camera-dial';
 import { press, setText, type Demo } from '../gl/stage';
 import { VS_MESH } from '../gl/shaders';
+import { pageLanguage } from '../../lib/i18n';
 
 /** Seeded random numbers so the street looks the same on every visit. */
 function rng(seed: number) {
@@ -20,6 +21,7 @@ const SENSOR_H = 0.024;
  * blurs with the same optics through its mipmaps.
  */
 export function createBokeh(renderer: THREE.WebGLRenderer, el: HTMLElement, printSrc: string): Demo {
+  const focusWord = pageLanguage() === 'en' ? 'focus' : 'ピント';
   const scene = new THREE.Scene();
   scene.background = new THREE.Color().setRGB(0.02, 0.024, 0.043, THREE.LinearSRGBColorSpace);
   const cam = new THREE.PerspectiveCamera(16, 1, 0.05, 400);
@@ -249,7 +251,7 @@ export function createBokeh(renderer: THREE.WebGLRenderer, el: HTMLElement, prin
       if (slider && autoFocus) slider.value = String(nearestStop(FOCUS_STOPS, target));
       syncCameraDial(slider);
       setText(out, fmt(focus));
-      setText(readout, `85mm · f/${aper} · ピント ${fmt(focus)}`);
+      setText(readout, `85mm · f/${aper} · ${focusWord} ${fmt(focus)}`);
     },
   };
 }
