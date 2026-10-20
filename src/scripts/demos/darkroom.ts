@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { setText, type Demo } from '../gl/stage';
 import { HASH, VS_QUAD, fullscreenQuad, quadCamera } from '../gl/shaders';
+import { pageLanguage } from '../../lib/i18n';
 
 const FS = /* glsl */ `
   ${HASH}
@@ -71,6 +72,7 @@ const FS = /* glsl */ `
  * Each sheet goes developer → stop → fix; touching the tray stirs the liquid.
  */
 export function createDarkroom(renderer: THREE.WebGLRenderer, el: HTMLElement, sources: string[]): Demo {
+  const steps = pageLanguage() === 'en' ? ['DEVELOP', 'STOP', 'FIX'] : ['現像 DEV', '停止 STOP', '定着 FIX'];
   const loader = new THREE.TextureLoader();
   const textures = sources.map((src) => loader.load(src));
   const rip = [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, -100, 0));
@@ -137,13 +139,13 @@ export function createDarkroom(renderer: THREE.WebGLRenderer, el: HTMLElement, s
       let step: string;
       let secs: number;
       if (lt < 8.5) {
-        step = '現像 DEV';
+        step = steps[0];
         secs = (Math.max(0, lt - 1.2) / 7.3) * 90;
       } else if (lt < 9.6) {
-        step = '停止 STOP';
+        step = steps[1];
         secs = ((lt - 8.5) / 1.1) * 30;
       } else {
-        step = '定着 FIX';
+        step = steps[2];
         secs = ((lt - 9.6) / 2.4) * 300;
       }
       setText(stepEl, step);

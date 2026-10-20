@@ -3,15 +3,21 @@
 const lengths = [16, 24, 35, 50, 85, 135, 200];
 import CameraDial from './CameraDial.astro';
 import { FOCAL_STOPS } from '../../data/camera-settings';
+import type { SiteLanguage } from '../../lib/i18n';
+interface Props {
+  lang?: SiteLanguage;
+}
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
 ---
 <figure class="demo">
   <div class="grid">
     <div class="stage" data-demo="focal" data-slider="focal-mm" style="--fb: linear-gradient(#2a241e, #15120f)">
-      <canvas aria-label="同じ大きさに写る距離で、撮影する人と石膏像の遠近感を比べる3Dデモ"></canvas>
+      <canvas aria-label={en ? 'A 3D demo comparing perspective on a photographer and a plaster bust, framed the same size at each focal length' : '同じ大きさに写る距離で、撮影する人と石膏像の遠近感を比べる3Dデモ'}></canvas>
       <div class="hud">
-        <div class="row"><span class="tag" data-readout>50mm · 画角 47° · 距離 1.0m</span></div>
+        <div class="row"><span class="tag" data-readout>{en ? '50mm · view 47° · distance 1.0m' : '50mm · 画角 47° · 距離 1.0m'}</span></div>
         <div class="row">
-          <div class="chips" role="group" aria-label="焦点距離">
+          <div class="chips" role="group" aria-label={en ? 'Focal length' : '焦点距離'}>
             {lengths.map((mm) => <button class="chip" type="button" data-mm={mm} aria-pressed={mm === 50 ? 'true' : 'false'}>{mm}mm</button>)}
           </div>
         </div>
@@ -19,7 +25,7 @@ import { FOCAL_STOPS } from '../../data/camera-settings';
     </div>
 
     <div class="diagram" aria-hidden="true">
-      <p class="edge">TOP VIEW · 真上から見た撮影位置</p>
+      <p class="edge">{en ? 'TOP VIEW · WHERE THE CAMERA STANDS' : 'TOP VIEW · 真上から見た撮影位置'}</p>
       <svg viewBox="0 0 400 150" role="img">
         <line x1="20" y1="75" x2="380" y2="75" class="axis" />
         <path class="wedge" d="M0 0" />
@@ -31,23 +37,27 @@ import { FOCAL_STOPS } from '../../data/camera-settings';
         <text class="dist" x="200" y="140" text-anchor="middle">1.0 m</text>
       </svg>
       <dl class="figures">
-        <div><dt>焦点距離</dt><dd data-fig="mm">50mm</dd></div>
-        <div><dt>画角（対角）</dt><dd data-fig="angle">47°</dd></div>
-        <div><dt>被写体までの距離</dt><dd data-fig="dist">1.0m</dd></div>
+        <div><dt>{en ? 'Focal length' : '焦点距離'}</dt><dd data-fig="mm">50mm</dd></div>
+        <div><dt>{en ? 'Angle of view (diagonal)' : '画角（対角）'}</dt><dd data-fig="angle">47°</dd></div>
+        <div><dt>{en ? 'Distance to subject' : '被写体までの距離'}</dt><dd data-fig="dist">1.0m</dd></div>
       </dl>
     </div>
   </div>
   <div class="camera-controls">
-    <CameraDial id="focal-mm" label="焦点距離" values={FOCAL_STOPS.map((mm) => `${mm}mm`)} value={6} />
+    <CameraDial id="focal-mm" label={en ? 'Focal length' : '焦点距離'} values={FOCAL_STOPS.map((mm) => `${mm}mm`)} value={6} lang={lang} />
   </div>
   <div class="choices">
-    <label>被写体<select data-focal-subject><option value="photographer">撮影する人（写真部ロゴより）</option><option value="plaster">石膏像</option></select></label>
-    <label>背景<select data-focal-background><option value="shoji">障子</option><option value="forest">奥行きのある森</option><option value="night">夜の街・玉ボケ</option></select></label>
+    <label>{en ? 'Subject' : '被写体'}<select data-focal-subject><option value="photographer">{en ? 'Photographer (from the club logo)' : '撮影する人（写真部ロゴより）'}</option><option value="plaster">{en ? 'Plaster bust' : '石膏像'}</option></select></label>
+    <label>{en ? 'Background' : '背景'}<select data-focal-background><option value="shoji">{en ? 'Shoji screen' : '障子'}</option><option value="forest">{en ? 'Deep forest' : '奥行きのある森'}</option><option value="night">{en ? 'City lights at night' : '夜の街・玉ボケ'}</option></select></label>
   </div>
   <p class="hint" data-subject-status role="status"></p>
   <figcaption class="hint">
-    どの焦点距離でも、頭と肩の上あたりまでが画面の高さに収まる距離から撮っています。被写体と背景を切り替え、背景の大きさや奥行きの見え方を比べられます。カーソルを動かすと少し回り込めます。
-    <span class="credit" data-head-credit hidden>頭部モデル：<a href="https://www.ir-ltd.net/" target="_blank" rel="noopener">Infinite-Realities</a>「Lee Perry-Smith 3D Head Scan」（<a href="https://creativecommons.org/licenses/by/3.0/deed.ja" target="_blank" rel="noopener">CC BY 3.0</a>）を石膏像として表示</span>
+    {en
+      ? 'At every focal length the camera stands where the head and the top of the shoulders fill the frame. Switch subject and background to compare how large and how deep the background looks. Move the cursor to look around a little.'
+      : 'どの焦点距離でも、頭と肩の上あたりまでが画面の高さに収まる距離から撮っています。被写体と背景を切り替え、背景の大きさや奥行きの見え方を比べられます。カーソルを動かすと少し回り込めます。'}
+    {en
+      ? <span class="credit" data-head-credit hidden>Head model: <a href="https://www.ir-ltd.net/" target="_blank" rel="noopener">Infinite-Realities</a> “Lee Perry-Smith 3D Head Scan” (<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>), shown as a plaster bust</span>
+      : <span class="credit" data-head-credit hidden>頭部モデル：<a href="https://www.ir-ltd.net/" target="_blank" rel="noopener">Infinite-Realities</a>「Lee Perry-Smith 3D Head Scan」（<a href="https://creativecommons.org/licenses/by/3.0/deed.ja" target="_blank" rel="noopener">CC BY 3.0</a>）を石膏像として表示</span>}
   </figcaption>
 </figure>
 

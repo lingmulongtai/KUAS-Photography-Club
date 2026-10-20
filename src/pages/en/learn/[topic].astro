@@ -1,19 +1,33 @@
 ---
-import Base from '../../../layouts/Base.astro';
-import PageHero from '../../../components/PageHero.astro';
+import LearnPage from '../../../layouts/LearnPage.astro';
+import DemoExposure from '../../../components/learn/DemoExposure.astro';
+import DemoBokeh from '../../../components/learn/DemoBokeh.astro';
+import DemoFocal from '../../../components/learn/DemoFocal.astro';
+import DemoDarkroom from '../../../components/learn/DemoDarkroom.astro';
 import { learnTopics } from '../../../data/learn';
 export function getStaticPaths() { return learnTopics.map(topic => ({ params: { topic: topic.slug }, props: { topic } })); }
 const { topic } = Astro.props;
+const leads: Record<string, string> = {
+  'shutter-speed': 'The time the shutter stays open becomes the length of time in the photo. Faster makes motion easier to freeze; slower lets light and movement flow into lines.',
+  aperture: 'The size of the opening in the lens changes both brightness and how much of the scene is in focus. Open up and the background melts into bokeh; stop down and more stays sharp.',
+  'focal-length': 'Changing focal length changes how much fits in the frame. Moving back with a longer lens to keep the subject the same size also changes how the background looks.',
+  darkroom: 'In the darkroom an image appears on film and paper through chemistry; on a computer, RAW processing adjusts captured data. Two different ways to finish a photograph.',
+};
 ---
-<Base lang="en" title={topic.en} description={`An English introduction to ${topic.en.toLowerCase()}.`}>
-  <PageHero edge={`LEARN ▸ ${topic.no}`} title={topic.en} lead="An introduction to the ideas behind the image. Results depend on your equipment, subject and shooting conditions." />
-  <section class="wrap section prose">
-    {topic.slug === 'shutter-speed' && <><h2>Time and motion</h2><p>Shutter speed is the time the sensor or film receives light. Doubling the time adds one stop of exposure for a steady scene. Faster speeds help reduce motion blur, but no single speed guarantees a sharp image: subject motion, distance, focal length and camera movement matter.</p><h2>Fireworks</h2><p>Aperture and ISO mainly control the brightness of the light trails. Shutter time changes their length and how many bursts overlap, and also affects background brightness. Overlapping trails can clip. Try a stable support, low ISO and a suitable aperture; check results. Follow your equipment instructions for stabilization on a tripod.</p><p><a href="https://www.sony.com/electronics/support/articles/00223375">Sony: photographing fireworks</a></p></>}
-    {topic.slug === 'aperture' && <><h2>Aperture and depth of field</h2><p>The f-number is focal length divided by effective aperture diameter. A smaller f-number means a larger opening. Depth of field also depends on focus distance, focal length and viewing conditions. Aperture alone cannot guarantee an unblurred background.</p><h2>Diffraction and sharpness</h2><p>Stopping down can reduce aberrations, while diffraction may reduce detail. There is no universal f/16 boundary; equipment and output size matter. Two stops from f/1.4 is f/2.8, while two stops from f/2.8 is f/5.6.</p><h2>Smartphone blur</h2><p>Smartphones can produce natural optical blur. Portrait features may also add simulated blur through image processing. Check the result around hair and glasses.</p><p><a href="https://download.nikonimglib.com/archive3/3MTAX009BPUv03iOpyF65nWOL127/D800_TG_%28En%2901.pdf">Nikon: diffraction example (p.26)</a></p></>}
-    {topic.slug === 'focal-length' && <><h2>Field of view and perspective</h2><p>A shorter focal length gives a wider field of view on the same sensor; a longer one gives a narrower view. Perspective depends on the camera’s position. Moving back and using a longer lens to keep the subject the same size changes the relative appearance of the background.</p><p>Try comparing camera positions as well as focal lengths. Sensor size changes field of view, so equivalent focal lengths can help compare cameras.</p></>}
-    {topic.slug === 'darkroom' && <><h2>Film, paper and RAW</h2><p>Monochrome film development forms a negative, which can be printed onto compatible monochrome photographic paper. RAW processing instead adjusts digital capture data. These are different processes; this introduction is not a chemical processing manual or a record of club workshops.</p><h2>Safelights and chemicals</h2><p>Use the paper manufacturer’s specified safelight, installation and exposure conditions, and test before use. A red lamp is not automatically safe. Film and colour paper do not share the same requirements. Follow product instructions, safety data sheets and facility guidance. Put used chemicals in the designated separate collection containers; do not mix them or pour them down a drain. Confirm local disposal arrangements.</p><p><a href="https://www.ilfordphoto.com/testing-your-safelights/">ILFORD: testing safelights</a> · <a href="https://www.ilfordphoto.com/health-and-safety/">ILFORD: health and safety</a></p></>}
-    <p><a href={`/learn/${topic.slug}/`} lang="ja" data-language="ja">Read the detailed article and try the demo (Japanese) →</a></p>
-    <p class="small muted">Demonstrations are simplified illustrations. Actual results vary with equipment, distance and subject movement. Program-drawn learning images are not member photographs or activity records.</p>
-    <p><a href="/en/learn/">← All learning topics</a></p>
-  </section>
-</Base>
+<LearnPage lang="en" slug={topic.slug} lead={leads[topic.slug]} description={`${topic.name}: an English introduction with a demo you can try, from the KUAS Photography Club.`}>
+  {topic.slug === 'shutter-speed' && <DemoExposure slot="demo" lang="en" />}
+  {topic.slug === 'aperture' && <DemoBokeh slot="demo" lang="en" />}
+  {topic.slug === 'focal-length' && <DemoFocal slot="demo" lang="en" />}
+  {topic.slug === 'darkroom' && <DemoDarkroom slot="demo" lang="en" />}
+
+  {topic.slug === 'shutter-speed' && <><h2>Time and motion</h2><p>Shutter speed is the time the sensor or film receives light. Doubling the time adds one stop of exposure for a steady scene. Faster speeds help reduce motion blur, but no single speed guarantees a sharp image: subject motion, distance, focal length and camera movement matter.</p><h2>Fireworks</h2><p>Aperture and ISO mainly control the brightness of the light trails. Shutter time changes their length and how many bursts overlap, and also affects background brightness. Overlapping trails can clip. Try a stable support, low ISO and a suitable aperture; check results. Follow your equipment instructions for stabilization on a tripod.</p><p><a href="https://www.sony.com/electronics/support/articles/00223375">Sony: photographing fireworks</a></p></>}
+  {topic.slug === 'aperture' && <><h2>Aperture and depth of field</h2><p>The f-number is focal length divided by effective aperture diameter. A smaller f-number means a larger opening. Depth of field also depends on focus distance, focal length and viewing conditions. Aperture alone cannot guarantee an unblurred background.</p><h2>Diffraction and sharpness</h2><p>Stopping down can reduce aberrations, while diffraction may reduce detail. There is no universal f/16 boundary; equipment and output size matter. Two stops from f/1.4 is f/2.8, while two stops from f/2.8 is f/5.6.</p><h2>Smartphone blur</h2><p>Smartphones can produce natural optical blur. Portrait features may also add simulated blur through image processing. Check the result around hair and glasses.</p><p><a href="https://download.nikonimglib.com/archive3/3MTAX009BPUv03iOpyF65nWOL127/D800_TG_%28En%2901.pdf">Nikon: diffraction example (p.26)</a></p></>}
+  {topic.slug === 'focal-length' && <><h2>Field of view and perspective</h2><p>A shorter focal length gives a wider field of view on the same sensor; a longer one gives a narrower view. Perspective depends on the camera’s position. Moving back and using a longer lens to keep the subject the same size changes the relative appearance of the background.</p><p>Try comparing camera positions as well as focal lengths. Sensor size changes field of view, so equivalent focal lengths can help compare cameras.</p></>}
+  {topic.slug === 'darkroom' && <><h2>Film, paper and RAW</h2><p>Monochrome film development forms a negative, which can be printed onto compatible monochrome photographic paper. RAW processing instead adjusts digital capture data. These are different processes; this introduction is not a chemical processing manual or a record of club workshops.</p><h2>Safelights and chemicals</h2><p>Use the paper manufacturer’s specified safelight, installation and exposure conditions, and test before use. A red lamp is not automatically safe. Film and colour paper do not share the same requirements. Follow product instructions, safety data sheets and facility guidance. Put used chemicals in the designated separate collection containers; do not mix them or pour them down a drain. Confirm local disposal arrangements.</p><p><a href="https://www.ilfordphoto.com/testing-your-safelights/">ILFORD: testing safelights</a> · <a href="https://www.ilfordphoto.com/health-and-safety/">ILFORD: health and safety</a></p></>}
+
+  <div slot="aside" class="point">
+    <h2>In Japanese</h2>
+    <p class="small">The Japanese article goes into more detail, with tables and step-by-step guides.</p>
+    <p class="small"><a href={`/learn/${topic.slug}/`} lang="ja" data-language="ja">Read the detailed article (Japanese) →</a></p>
+  </div>
+</LearnPage>

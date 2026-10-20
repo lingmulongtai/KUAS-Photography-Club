@@ -6,25 +6,81 @@
  */
 import CameraDial from './CameraDial.astro';
 import { SHUTTERS, APERTURES, ISO_STOPS, shutterLabel } from '../../data/camera-settings';
+import type { SiteLanguage } from '../../lib/i18n';
+
+interface Props {
+  lang?: SiteLanguage;
+}
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
 const scenes = [
-  { id: 'sun', label: '晴れた屋外', ev: 15, img: '/photos/samples/arashiyama-randen/01.jpg' },
-  { id: 'cloud', label: 'くもり・木陰', ev: 12, img: '/photos/samples/fushimi-inari/05.jpg' },
-  { id: 'dusk', label: '夕暮れ', ev: 9, img: '/photos/samples/summer-fireworks/01.jpg' },
-  { id: 'indoor', label: '明るい室内', ev: 7, img: '/photos/samples/kyoto-aquarium/01.jpg' },
-  { id: 'night', label: '夜の街', ev: 4, img: '/photos/samples/kawaramachi-night/01.jpg' },
+  { id: 'sun', label: en ? 'Sunny outdoors' : '晴れた屋外', ev: 15, img: '/photos/samples/arashiyama-randen/01.jpg' },
+  { id: 'cloud', label: en ? 'Cloud or shade' : 'くもり・木陰', ev: 12, img: '/photos/samples/fushimi-inari/05.jpg' },
+  { id: 'dusk', label: en ? 'Dusk' : '夕暮れ', ev: 9, img: '/photos/samples/summer-fireworks/01.jpg' },
+  { id: 'indoor', label: en ? 'Bright room' : '明るい室内', ev: 7, img: '/photos/samples/kyoto-aquarium/01.jpg' },
+  { id: 'night', label: en ? 'City at night' : '夜の街', ev: 4, img: '/photos/samples/kawaramachi-night/01.jpg' },
 ];
+const t = en
+  ? {
+      note: 'A simplified illustration of how it works. Real results vary with equipment, distance and subject movement. The pictures are learning illustrations, not member photographs or activity records.',
+      alt: 'How bright the picture comes out with the chosen settings',
+      scene: 'SCENE',
+      shutter: 'Shutter',
+      aperture: 'Aperture',
+      iso: 'ISO',
+      turn: 'Turn the dials by dragging, scrolling or with the arrow keys.',
+      meter: 'EXPOSURE METER',
+      blur: 'Blur',
+      bokeh: 'Background blur',
+      noise: 'Noise',
+      byIso: 'Match with ISO',
+      bySs: 'Match with shutter speed',
+    }
+  : {
+      note: '仕組みを理解するための簡易表現です。実際の写りは機材・撮影距離・被写体の動きなどで異なります。画像はプログラムで描いた学習用図解で、部員の撮影写真や活動記録ではありません。',
+      alt: '選んだ設定で撮ったときの明るさのイメージ',
+      scene: 'SCENE · 撮る場所',
+      shutter: 'シャッター',
+      aperture: '絞り',
+      iso: 'ISO 感度',
+      turn: 'ダイヤルをドラッグ・ホイール・矢印キーで回せます。',
+      meter: 'EXPOSURE · 露出計',
+      blur: 'ブレ',
+      bokeh: '背景のボケ',
+      noise: 'ノイズ',
+      byIso: 'ISO で合わせる',
+      bySs: 'シャッタースピードで合わせる',
+    };
+/** Words the script writes as the settings change. */
+const live = en
+  ? {
+      ok: 'Correct exposure',
+      over: '{n} stops too bright',
+      under: '{n} stops too dark',
+      blur: ['Consider a support', 'Watch for camera shake', 'Shake is easier to avoid', 'Try it on fast motion'],
+      bokeh: ['Tends to be large', 'A little smaller', 'Tends to be small', 'Smaller still'],
+      noise: ['Low', 'Some', 'Noticeable', 'Very noticeable'],
+    }
+  : {
+      ok: '適正露出',
+      over: '{n}段 明るすぎ',
+      under: '{n}段 暗すぎ',
+      blur: ['固定して撮影を検討', '手ブレに注意', 'ブレを抑えやすい', '速い動きにも試す'],
+      bokeh: ['大きくなりやすい', 'やや小さく', '小さくなりやすい', 'さらに小さくなる傾向'],
+      noise: ['少ない', 'ややある', '目立つ', 'かなり目立つ'],
+    };
 ---
-<p class="small muted">仕組みを理解するための簡易表現です。実際の写りは機材・撮影距離・被写体の動きなどで異なります。画像はプログラムで描いた学習用図解で、部員の撮影写真や活動記録ではありません。</p>
-<div class="sim" data-sim data-scenes={JSON.stringify(scenes)}>
+<p class="small muted">{t.note}</p>
+<div class="sim" data-sim data-scenes={JSON.stringify(scenes)} data-strings={JSON.stringify(live)}>
   <div class="preview">
-    <img src={scenes[0].img} alt="選んだ設定で撮ったときの明るさのイメージ" width="1400" height="933" />
+    <img src={scenes[0].img} alt={t.alt} width="1400" height="933" />
     <canvas class="grain" aria-hidden="true"></canvas>
-    <p class="verdict tag" aria-live="polite" data-verdict>適正露出</p>
+    <p class="verdict tag" aria-live="polite" data-verdict>{live.ok}</p>
   </div>
 
   <div class="panel">
     <fieldset class="scenes">
-      <legend class="edge">SCENE · 撮る場所</legend>
+      <legend class="edge">{t.scene}</legend>
       <div class="chips">
         {scenes.map((s, i) => (
           <button class="chip" type="button" data-scene={s.id} aria-pressed={i === 0 ? 'true' : 'false'}>{s.label}<span class="ev">EV{s.ev}</span></button>
@@ -33,14 +89,14 @@ const scenes = [
     </fieldset>
 
     <div class="camera-dials">
-      <CameraDial id="sim-ss" label="シャッター" values={SHUTTERS.map(shutterLabel)} value={5} outputKey="ss" />
-      <CameraDial id="sim-f" label="絞り" values={APERTURES.map((n) => `f/${n}`)} value={7} outputKey="f" />
-      <CameraDial id="sim-iso" label="ISO 感度" values={ISO_STOPS} value={0} outputKey="iso" />
+      <CameraDial id="sim-ss" label={t.shutter} values={SHUTTERS.map(shutterLabel)} value={5} outputKey="ss" lang={lang} />
+      <CameraDial id="sim-f" label={t.aperture} values={APERTURES.map((n) => `f/${n}`)} value={7} outputKey="f" lang={lang} />
+      <CameraDial id="sim-iso" label={t.iso} values={ISO_STOPS} value={0} outputKey="iso" lang={lang} />
     </div>
-    <p class="small muted">ダイヤルをドラッグ・ホイール・矢印キーで回せます。</p>
+    <p class="small muted">{t.turn}</p>
 
     <div class="meter" aria-hidden="true">
-      <span class="meter-label">EXPOSURE · 露出計</span>
+      <span class="meter-label">{t.meter}</span>
       <div class="scale">
         {[-3, -2, -1, 0, 1, 2, 3].map((n) => <span>{n > 0 ? `+${n}` : n}</span>)}
       </div>
@@ -48,14 +104,14 @@ const scenes = [
     </div>
 
     <ul class="effects">
-      <li><span>ブレ</span><b data-eff="blur">ブレを抑えやすい</b></li>
-      <li><span>背景のボケ</span><b data-eff="bokeh">小さい</b></li>
-      <li><span>ノイズ</span><b data-eff="noise">少ない</b></li>
+      <li><span>{t.blur}</span><b data-eff="blur">{live.blur[2]}</b></li>
+      <li><span>{t.bokeh}</span><b data-eff="bokeh">{live.bokeh[3]}</b></li>
+      <li><span>{t.noise}</span><b data-eff="noise">{live.noise[0]}</b></li>
     </ul>
 
     <div class="actions">
-      <button class="btn" type="button" data-auto="iso">ISO で合わせる</button>
-      <button class="btn" type="button" data-auto="ss">シャッタースピードで合わせる</button>
+      <button class="btn" type="button" data-auto="iso">{t.byIso}</button>
+      <button class="btn" type="button" data-auto="ss">{t.bySs}</button>
     </div>
   </div>
 </div>
@@ -72,6 +128,7 @@ const scenes = [
 
   document.querySelectorAll<HTMLElement>('[data-sim]').forEach((root) => {
     const scenes = JSON.parse(root.dataset.scenes ?? '[]') as Scene[];
+    const words = JSON.parse(root.dataset.strings ?? '{}') as { ok: string; over: string; under: string; blur: string[]; bokeh: string[]; noise: string[] };
     let scene = scenes[0];
     const img = root.querySelector('img')!;
     const grain = root.querySelector<HTMLCanvasElement>('.grain')!;
@@ -117,10 +174,10 @@ const scenes = [
       img.style.filter = `brightness(${Math.pow(2, clamped * 0.85).toFixed(3)}) saturate(${(1 - Math.min(0.5, Math.abs(clamped) * 0.12)).toFixed(2)})`;
       grain.style.opacity = String(Math.min(0.55, Math.max(0, (Math.log2(s / 100) - 2) * 0.09)));
       const r = Math.round(d * 3) / 3;
-      verdict.textContent = Math.abs(d) < 0.34 ? '適正露出' : d > 0 ? `${r.toFixed(1)}段 明るすぎ` : `${Math.abs(r).toFixed(1)}段 暗すぎ`;
-      eff('blur').textContent = t >= 1 / 15 ? '固定して撮影を検討' : t >= 1 / 60 ? '手ブレに注意' : t >= 1 / 250 ? 'ブレを抑えやすい' : '速い動きにも試す';
-      eff('bokeh').textContent = n <= 2 ? '大きくなりやすい' : n <= 4 ? 'やや小さく' : n <= 8 ? '小さくなりやすい' : 'さらに小さくなる傾向';
-      eff('noise').textContent = s <= 400 ? '少ない' : s <= 1600 ? 'ややある' : s <= 6400 ? '目立つ' : 'かなり目立つ';
+      verdict.textContent = Math.abs(d) < 0.34 ? words.ok : (d > 0 ? words.over : words.under).replace('{n}', Math.abs(r).toFixed(1));
+      eff('blur').textContent = words.blur[t >= 1 / 15 ? 0 : t >= 1 / 60 ? 1 : t >= 1 / 250 ? 2 : 3];
+      eff('bokeh').textContent = words.bokeh[n <= 2 ? 0 : n <= 4 ? 1 : n <= 8 ? 2 : 3];
+      eff('noise').textContent = words.noise[s <= 400 ? 0 : s <= 1600 ? 1 : s <= 6400 ? 2 : 3];
       [ss, f, iso].forEach(syncCameraDial);
     };
 

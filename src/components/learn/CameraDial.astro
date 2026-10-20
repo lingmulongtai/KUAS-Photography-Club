@@ -1,6 +1,8 @@
 ---
-interface Props { id: string; label: string; values: readonly (string | number)[]; value: number; outputKey?: string }
-const { id, label, values, value, outputKey } = Astro.props;
+import type { SiteLanguage } from '../../lib/i18n';
+interface Props { id: string; label: string; values: readonly (string | number)[]; value: number; outputKey?: string; lang?: SiteLanguage }
+const { id, label, values, value, outputKey, lang = 'ja' } = Astro.props;
+const hint = lang === 'en' ? 'Drag, scroll or use the arrow keys to adjust. Home and End jump to either end.' : 'ドラッグ、ホイール、矢印キーで調整できます。Home と End で両端に移動します。';
 ---
 <div class="camera-dial" data-camera-dial data-dial-levels={JSON.stringify(values.map(String))} style={`--dial-angle: ${-140 + value / Math.max(1, values.length - 1) * 280}deg`}>
   <span class="label" id={`${id}-label`}>{label}</span>
@@ -9,7 +11,7 @@ const { id, label, values, value, outputKey } = Astro.props;
   </div>
   <input type="range" id={id} min="0" max={values.length - 1} step="1" value={value} hidden aria-hidden="true" tabindex="-1" />
   <output class="lcd" for={id} data-dial-value data-out={outputKey} aria-hidden="true">{values[value]}</output>
-  <span class="sr-only" id={`${id}-hint`}>ドラッグ、ホイール、矢印キーで調整できます。Home と End で両端に移動します。</span>
+  <span class="sr-only" id={`${id}-hint`}>{hint}</span>
 </div>
 <script>
   import { mountCameraDials } from '../../scripts/controls/camera-dial';

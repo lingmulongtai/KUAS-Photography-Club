@@ -25,3 +25,8 @@ export function supportsLanguagePreference(path: string): boolean {
   const clean = path.replace(/^\/+|\/+$/g, '');
   return ENGLISH_PAGES.some(page => page === clean) || clean === 'guidelines';
 }
+
+/** The language of the page a browser script is running on (from <html lang>). */
+export function pageLanguage(): SiteLanguage {
+  return typeof document !== 'undefined' && document.documentElement.lang === 'en' ? 'en' : 'ja';
+}
