@@ -128,14 +128,14 @@ export function createHero(
   let width = 1;
   let height = 1;
   let pixelRatio = 1;
-  const pointLayers: { uScale: { value: number } }[] = [];
+  const pointLayers: { uScale: { value: number }; uDpr: { value: number } }[] = [];
   const snow=buildSnow(env,opts.quality);scene.add(snow.points);
   let labels: ReturnType<typeof createLabels> | null = null;
   let campusModel: THREE.Mesh | null = null;
   /** Pixels per metre at 1 m distance, so point lights can size themselves. */
   const updatePointScale = () => {
     const k = (height * pixelRatio) / (2 * Math.tan((camera.fov * RAD) / 2));
-    for (const u of pointLayers) u.uScale.value = k;
+    for (const u of pointLayers) { u.uScale.value = k; u.uDpr.value = pixelRatio; }
     pxPerM = k;
     snow.uniforms.uSnowScale.value=k;
   };
@@ -426,8 +426,12 @@ export function createHero(
     celestial.setSidereal(localSiderealAngle(date, KYOTO.lon));
 
     renderer.toneMappingExposure = look.exposure;
-    post.bloom.strength = look.bloom * (1 + .12 * look.city);
+    // after dusk the threshold drops below the lamps and windows, so every light (the far towns
+    // included) glows by its own brightness; by day and at sunset only the brightest highlights pass
+    const night = THREE.MathUtils.smoothstep(look.city, .55, 1);
+    post.bloom.strength = look.bloom * (1 + .12 * look.city + .7 * night);
     post.bloom.radius = .5 + .18 * look.city;
+    post.bloom.threshold = THREE.MathUtils.lerp(.85, .12, night);
     post.grade.value = THREE.MathUtils.smoothstep(alt, -6, 8);
 
     const status: HeroStatus = { minutes, altitude: alt, phase: phaseName(alt, minutes), kelvin: kelvin(alt), moonAge: moon.age };
