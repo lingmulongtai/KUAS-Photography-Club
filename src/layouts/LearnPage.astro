@@ -3,22 +3,41 @@ import Base from './Base.astro';
 import PageHero from '../components/PageHero.astro';
 import LearnCards from '../components/learn/LearnCards.astro';
 import { learnTopics } from '../data/learn';
+import type { SiteLanguage } from '../lib/i18n';
 
 interface Props {
   slug: (typeof learnTopics)[number]['slug'];
   lead: string;
   description: string;
+  lang?: SiteLanguage;
 }
-const { slug, lead, description } = Astro.props;
+const { slug, lead, description, lang = 'ja' } = Astro.props;
 const topic = learnTopics.find((t) => t.slug === slug)!;
+const en = lang === 'en';
+const name = en ? topic.name : topic.title;
+const t = en
+  ? {
+      learn: 'Learn photography',
+      home: '/en/learn/',
+      demo: 'Hands-on demo',
+      note: 'A simplified illustration of how it works. Real results vary with equipment, distance and subject movement. Pictures in the diagrams and demos are drawn by the program for learning; they are not member photographs or activity records.',
+      others: 'More topics',
+    }
+  : {
+      learn: '写真を学ぶ',
+      home: '/learn/',
+      demo: '触って試せるデモ',
+      note: '仕組みを理解するための簡易表現です。実際の写りは機材・撮影距離・被写体の動きなどで異なります。図解・デモ内の画像はプログラムで描いた学習用の表現で、部員が撮影した写真や活動記録ではありません。',
+      others: 'ほかのテーマ',
+    };
 ---
-<Base title={`${topic.title} | 写真を学ぶ`} description={description}>
-  <PageHero edge={`LEARN ▸ ${topic.no} ▸ ${topic.en}`} title={topic.title} lead={lead}>
-    <p class="crumb small"><a href="/learn/">写真を学ぶ</a> / {topic.title}</p>
+<Base lang={lang} title={`${name} | ${t.learn}`} description={description}>
+  <PageHero edge={`LEARN ▸ ${topic.no} ▸ ${topic.en}`} title={name} lead={lead}>
+    <p class="crumb small"><a href={t.home}>{t.learn}</a> / {name}</p>
   </PageHero>
 
-  <section class="wrap demo-wrap" aria-label="触って試せるデモ">
-    <p class="small muted">仕組みを理解するための簡易表現です。実際の写りは機材・撮影距離・被写体の動きなどで異なります。図解・デモ内の画像はプログラムで描いた学習用の表現で、部員が撮影した写真や活動記録ではありません。</p>
+  <section class="wrap demo-wrap" aria-label={t.demo}>
+    <p class="small muted">{t.note}</p>
     <slot name="demo" />
   </section>
 
@@ -35,7 +54,7 @@ const topic = learnTopics.find((t) => t.slug === slug)!;
 
   <section class="section">
     <div class="wrap">
-      <LearnCards exclude={slug} heading="ほかのテーマ" />
+      <LearnCards exclude={slug} heading={t.others} lang={lang} />
     </div>
   </section>
 </Base>
