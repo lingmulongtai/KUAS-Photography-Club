@@ -1,4 +1,5 @@
 import { TAU, cardPose, easeOutQuart, layoutFor, photoFor, ringPose, type ReelLayout } from './pose';
+import type { ReelCard } from '../../data/reel-placeholders';
 
 /*
  * The photo reel at the top of the trips page. On arrival the cards are dealt round a small
@@ -14,13 +15,6 @@ import { TAU, cardPose, easeOutQuart, layoutFor, photoFor, ringPose, type ReelLa
  * shorter stage, and data-seen-key keeps its play-once-per-session flag apart from the hero's.
  */
 
-export interface ReelPhoto {
-  src: string;
-  alt: string;
-  title: string;
-  meta: string;
-  href?: string;
-}
 
 const DEAL_MS = 1500;
 const REVEAL_MS = 1700;
@@ -32,7 +26,7 @@ const SEEN_KEY = 'kuas-reel-seen';
 const VIEW_SHARE = 0.45;
 
 export function mountReel(root: HTMLElement) {
-  const photos = JSON.parse(root.dataset.photos ?? '[]') as ReelPhoto[];
+  const photos = JSON.parse(root.dataset.photos ?? '[]') as ReelCard[];
   const stage = root.querySelector<HTMLElement>('[data-reel-stage]')!;
   const ring = root.querySelector<HTMLElement>('[data-reel-ring]')!;
   const slots = Array.from(ring.querySelectorAll<HTMLAnchorElement>('[data-slot]'));
@@ -74,8 +68,21 @@ export function mountReel(root: HTMLElement) {
     const p = photos[index];
     const el = slots[slot];
     const img = el.querySelector('img')!;
-    img.src = p.src;
-    img.alt = p.alt;
+    const art = el.querySelector<HTMLElement>('[data-art]')!;
+    el.classList.toggle('is-art', !p.src);
+    if (p.src) {
+      img.hidden = false;
+      img.src = p.src;
+      img.alt = p.alt;
+      art.hidden = true;
+    } else {
+      img.hidden = true;
+      img.removeAttribute('src');
+      img.alt = '';
+      art.hidden = false;
+      art.style.setProperty('--art', p.art ?? '');
+      art.querySelector('[data-art-name]')!.textContent = p.title;
+    }
     el.querySelector('[data-title]')!.textContent = p.title;
     el.querySelector('[data-meta]')!.textContent = p.meta;
     if (p.href) el.href = p.href;
@@ -103,7 +110,8 @@ export function mountReel(root: HTMLElement) {
       loaded++;
       progress();
     };
-    if (img.complete && img.naturalWidth) done();
+    // drawn cards have nothing to load
+    if (!photos[photoFor(i, 0, layout.count, photos.length)].src || (img.complete && img.naturalWidth)) done();
     else {
       img.addEventListener('load', done, { once: true });
       img.addEventListener('error', done, { once: true });

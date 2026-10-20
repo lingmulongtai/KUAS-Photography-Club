@@ -4,22 +4,22 @@
  * opens around the viewer and keeps turning slowly; drag, swipe, the arrow keys or the buttons
  * turn it. The ring echoes the open circle of the club logo. Motion lives in scripts/reel/.
  *
- * Until trips are published the cards show the design sample photos, marked as such and not
- * linked as records.
+ * Until trips are published the cards are drawn cards for the places the club photographs,
+ * linking to their spot pages: no photographs and no invented records.
  *
  * variant="section" is the same reel as a band further down a page (the home page's latest
  * trips): an h2, smaller cards, a link onward, and the deal waits until it scrolls into view.
  */
-import type { ReelPhoto } from '../scripts/reel/reel';
+import type { ReelCard } from '../data/reel-placeholders';
 import type { SiteLanguage } from '../lib/i18n';
 
 interface Props {
-  photos: ReelPhoto[];
+  photos: ReelCard[];
   edge: string;
   title: string;
   lead?: string;
-  /** the photos are design samples, not records */
-  sample?: boolean;
+  /** the cards are places, not photos from outings yet */
+  placeholder?: boolean;
   lang?: SiteLanguage;
   variant?: 'hero' | 'section';
   /** id of the heading, for a page that links to it */
@@ -27,7 +27,7 @@ interface Props {
   /** a link onward under the title, e.g. to all trips */
   link?: { href: string; label: string };
 }
-const { photos, edge, title, lead, sample = false, lang = 'ja', variant = 'hero', headingId = 'reel-title', link } = Astro.props;
+const { photos, edge, title, lead, placeholder = false, lang = 'ja', variant = 'hero', headingId = 'reel-title', link } = Astro.props;
 const en = lang === 'en';
 const section = variant === 'section';
 const Heading = section ? 'h2' : 'h1';
@@ -40,7 +40,7 @@ const t = en
       hint: 'Drag or swipe to turn',
       prev: 'Turn back',
       next: 'Turn forward',
-      sample: 'These are design sample photos, not activity records. They will be replaced by photos from our outings as records are published.',
+      placeholder: 'Photos from our outings will fill this ring once records are published. For now it shows places we photograph.',
     }
   : {
       ring: '撮影会の写真',
@@ -49,7 +49,7 @@ const t = en
       hint: 'ドラッグ・スワイプで回せます',
       prev: '前の写真へ回す',
       next: '次の写真へ回す',
-      sample: '表示している写真はデザイン用のサンプルで、活動記録ではありません。撮影会の記録を公開すると、その写真に入れ替わります。',
+      placeholder: '撮影会の記録を公開すると、ここに写真が並びます。いまは撮影に出かける場所を表示しています。',
     };
 ---
 <section
@@ -68,8 +68,9 @@ const t = en
         <a class="reel-card" data-slot={i} tabindex="-1" draggable="false">
           <span class="face front">
             <img alt="" decoding="async" loading={section ? 'lazy' : undefined} draggable="false" />
+            <span class="art" data-art hidden aria-hidden="true"><span class="art-name" data-art-name></span></span>
             <span class="cap">
-              {sample && <span class="badge">SAMPLE</span>}
+              {placeholder && <span class="badge">PHOTO SPOT</span>}
               <b data-title></b>
               <small data-meta></small>
             </span>
@@ -91,7 +92,7 @@ const t = en
       <p class="edge">{edge}</p>
       <Heading id={headingId} set:html={title} />
       {lead && <p class="lead">{lead}</p>}
-      {sample && <p class="sample-note small">{t.sample}</p>}
+      {placeholder && <p class="sample-note small">{t.placeholder}</p>}
       {link && <a class="link-arrow onward" href={link.href}>{link.label}</a>}
     </div>
   </div>
@@ -217,6 +218,50 @@ const t = en
     height: 100%;
     object-fit: cover;
     transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* a drawn card: a colour wash, the logo's open circle and the place name set vertically */
+  .art {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: start center;
+    padding-top: 22%;
+    background:
+      radial-gradient(circle at 50% 30%, transparent 0 27%, rgba(255, 255, 255, 0.5) 27.5% 28.6%, transparent 29%),
+      radial-gradient(circle at 70% 18%, rgba(255, 255, 255, 0.85) 0 2.2%, transparent 2.6%),
+      var(--art, var(--rebate));
+  }
+
+  .art[hidden] {
+    display: none;
+  }
+
+  /* the drawn card already shows the name large */
+  .is-art .cap b {
+    display: none;
+  }
+
+  .art-name {
+    writing-mode: vertical-rl;
+    font: 700 clamp(26px, 3vw, 40px) / 1.1 var(--display);
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.95);
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.25);
+  }
+
+  /* English names run across the middle of the circle */
+  :global(html[lang='en']) .art {
+    padding-top: 0;
+  }
+
+  :global(html[lang='en']) .art-name {
+    writing-mode: horizontal-tb;
+    max-width: 50%;
+    margin-top: calc(var(--card-w) * 16 / 9 * 0.3 - 0.6em);
+    text-align: center;
+    font-size: clamp(16px, 1.8vw, 24px);
+    letter-spacing: 0.02em;
   }
 
   .reel-card[href]:hover .front img,
