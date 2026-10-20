@@ -39,7 +39,7 @@ for (const [path, source] of html) {
   assert.ok(!/名前を入れてください|ここは仮の文章です|実際の手続きに合わせて|55名|55人|月に2回|月2回/.test(source), `Unverified copy: ${path}`);
   for (const slug of sampleSlugs) assert.ok(!source.includes(`/trips/${slug}/`), `Sample link or payload in ${path}: ${slug}`);
   const labelledErrorDemo = path === '404.html' && source.includes('学習用図解');
-  if (!path.startsWith('learn/') && !labelledErrorDemo) assert.ok(!source.includes('/photos/samples/'), `Learning-only illustration exposed as public photography: ${path}`);
+  if (!/^(en\/)?learn\//.test(path) && !labelledErrorDemo) assert.ok(!source.includes('/photos/samples/'), `Learning-only illustration exposed as public photography: ${path}`);
   // Verify every local HTML navigation target, including language switches.
   for (const match of source.matchAll(/\shref="(\/[^"?#]*)[^"\s]*"/g)) {
     const href = decodeURIComponent(match[1]);
