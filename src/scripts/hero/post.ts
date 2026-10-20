@@ -72,6 +72,48 @@ const SanitizeShader = {
 };
 
 /**
+ * Bright-pass for the bloom. Each bloom texel averages the whole patch of screen pixels it covers
+ * (four bilinear taps, up to 4×4 pixels), so a light one pixel across is never skipped between
+ * taps and does not blink as it moves. A soft knee replaces the hard cut-off: a light just above
+ * the threshold glows a little instead of popping on and off, and the glow grows with its energy.
+ */
+const BrightPassShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    luminosityThreshold: { value: 1 },
+    /** one screen pixel, in uv */
+    uTexel: { value: new THREE.Vector2(1, 1) },
+    /** screen pixels across one bloom texel */
+    uSpan: { value: 2 },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float luminosityThreshold;
+    uniform vec2 uTexel;
+    uniform float uSpan;
+    varying vec2 vUv;
+    vec3 bright(vec2 uv){
+      vec3 c = textureLod(tDiffuse, uv, 0.).rgb;
+      float l = dot(c, vec3(.2126, .7152, .0722));
+      float t = luminosityThreshold, k = t * .6 + 1e-4;
+      float soft = clamp(l - t + k, 0., 2. * k);
+      soft = soft * soft / (4. * k);
+      return c * max(soft, l - t) / max(l, 1e-4);
+    }
+    void main(){
+      vec2 o = uTexel * uSpan * .25;
+      vec3 c = bright(vUv + vec2(-o.x, -o.y)) + bright(vUv + vec2(o.x, -o.y))
+             + bright(vUv + vec2(-o.x, o.y)) + bright(vUv + vec2(o.x, o.y));
+      gl_FragColor = vec4(c * .25, 1.);
+    }
+  `,
+};
+
+/**
  * HDR pipeline: the scene renders into a multisampled half-float target (4× MSAA, so building
  * edges and power lines of light stay clean), then bloom, ACES tone mapping and the finish.
  */
@@ -82,6 +124,21 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   composer.addPass(new RenderPass(scene, camera));
   composer.addPass(new ShaderPass(SanitizeShader));
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.7, 0.5, 0.85);
+  const bright = new THREE.ShaderMaterial(BrightPassShader);
+  bloom.materialHighPassFilter.dispose();
+  bloom.materialHighPassFilter = bright;
+  bloom.highPassUniforms = bright.uniforms;
+  // The glow is sized in CSS pixels, not device pixels: on a phone or a Retina screen the blur
+  // would otherwise cover half or a third of the area and the lights barely glow, and it would
+  // shrink again whenever the frame rate guard lowers the resolution.
+  let cssWidth = 1;
+  let cssHeight = 1;
+  const sizeBloom = bloom.setSize.bind(bloom);
+  bloom.setSize = (w: number, h: number) => {
+    sizeBloom(cssWidth, cssHeight);
+    bright.uniforms.uTexel.value.set(1 / w, 1 / h);
+    bright.uniforms.uSpan.value = w / Math.max(1, Math.round(cssWidth / 2));
+  };
   // Bloom targets have no mipmaps. Explicit level-zero sampling keeps ANGLE from
   // estimating undefined gradients inside the separable blur's filter loop.
   for (const material of bloom.separableBlurMaterials) {
@@ -100,9 +157,10 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
     bloom,
     grade: finish.uniforms.uGrade,
     setSize(w: number, h: number, dpr: number) {
+      cssWidth = w;
+      cssHeight = h;
       composer.setPixelRatio(dpr);
       composer.setSize(w, h);
-      bloom.resolution.set(w * dpr * 0.5, h * dpr * 0.5);
       finish.uniforms.uRes.value.set(w * dpr, h * dpr);
     },
     render(time: number) {
