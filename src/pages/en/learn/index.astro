@@ -1,10 +1,82 @@
 ---
 import Base from '../../../layouts/Base.astro';
 import PageHero from '../../../components/PageHero.astro';
-import { learnTopics } from '../../../data/learn';
+import ExposureSim from '../../../components/learn/ExposureSim.astro';
+import LearnCards from '../../../components/learn/LearnCards.astro';
 ---
-<Base lang="en" title="Learn photography" description="English introductions to shutter speed, aperture, focal length and developing.">
-  <PageHero edge="LEARN ▸ PHOTOGRAPHY" title="Learn photography" lead="Explore the ideas behind camera settings. These introductions explain the basics; the detailed Japanese articles also include interactive demonstrations." />
-  <section class="wrap section"><div class="cards">{learnTopics.map(topic => <article><p class="edge">{topic.no}</p><h2><a href={`/en/learn/${topic.slug}/`}>{topic.en}</a></h2></article>)}</div></section>
+<Base lang="en" title="Learn photography" description="Shutter speed, aperture, ISO, focal length and developing: the basics of photography, with demos you can try in your browser. Put together by the KUAS Photography Club for beginners.">
+  <PageHero
+    edge="LEARN ▸ 4 TOPICS ▸ FOR BEGINNERS"
+    title="Photography, hands-on."
+    lead="Camera settings make more sense when you move them than when you read about them. These are the basics we share with new members, made into demos you can try in your browser. No camera needed: they help with smartphone photos too."
+  />
+
+  <section class="wrap topics">
+    <LearnCards lang="en" />
+  </section>
+
+  <section class="section" aria-labelledby="triangle">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="edge">EXPOSURE TRIANGLE</p>
+        <h2 id="triangle">The exposure triangle</h2>
+        <p class="lead">
+          Shutter speed, aperture and ISO together decide how bright a photo is. Make one of them a stop brighter and another a stop darker, and the brightness stays the same while the look of the picture changes.
+        </p>
+      </div>
+      <ExposureSim lang="en" />
+      <div class="notes">
+        <div>
+          <h3>Shutter speed</h3>
+          <p>Longer is brighter, but camera shake and subject blur become more likely. <a href="/en/learn/shutter-speed/">More →</a></p>
+        </div>
+        <div>
+          <h3>Aperture (f-number)</h3>
+          <p>A smaller number is brighter, but less of the picture is in focus and the background blurs. <a href="/en/learn/aperture/">More →</a></p>
+        </div>
+        <div>
+          <h3>ISO</h3>
+          <p>A larger number is brighter, but grainy noise increases. Use it last, to make up the difference.</p>
+        </div>
+        <div>
+          <h3>Sunny days: “f/16 · 1/ISO”</h3>
+          <p>Outdoors in sunshine, about f/16, ISO 100 and 1/125 s gives a good exposure (the sunny 16 rule). It is where the simulator starts.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 </Base>
-<style>.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; } article { padding: 24px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--radius); } h2 { font-size: var(--step-2); }</style>
+
+<style>
+  .topics {
+    padding-bottom: clamp(56px, 8vw, 96px);
+  }
+
+  .notes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px 32px;
+    margin-top: 12px;
+  }
+
+  .notes > div {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .notes h3 {
+    font-size: var(--step-1);
+  }
+
+  .notes p {
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .notes a {
+    color: var(--accent);
+  }
+</style>
