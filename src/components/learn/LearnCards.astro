@@ -1,12 +1,15 @@
 ---
 import { learnTopics } from '../../data/learn';
+import type { SiteLanguage } from '../../lib/i18n';
 
 interface Props {
   /** Leave out the page you are on. */
   exclude?: string;
   heading?: string;
+  lang?: SiteLanguage;
 }
-const { exclude, heading } = Astro.props;
+const { exclude, heading, lang = 'ja' } = Astro.props;
+const en = lang === 'en';
 const topics = learnTopics.filter((t) => t.slug !== exclude);
 ---
 <div class="cards-wrap">
@@ -14,10 +17,10 @@ const topics = learnTopics.filter((t) => t.slug !== exclude);
   <ul class="cards">
     {topics.map((t) => (
       <li>
-        <a class="card" href={`/learn/${t.slug}/`} style={`--fb: ${t.fb}`}>
+        <a class="card" href={`${en ? '/en' : ''}/learn/${t.slug}/`} style={`--fb: ${t.fb}`}>
           <span class="no">{t.no} ▸ {t.en}</span>
-          <span class="title">{t.title}</span>
-          <span class="summary">{t.summary}</span>
+          <span class="title">{en ? t.name : t.title}</span>
+          <span class="summary">{en ? t.enSummary : t.summary}</span>
         </a>
       </li>
     ))}
