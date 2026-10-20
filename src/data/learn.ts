@@ -6,6 +6,8 @@ export const learnTopics = [
     en: 'SHUTTER SPEED',
     title: 'シャッタースピード',
     summary: '動きを止めるか、流すか。花火・光跡・手ブレまで、時間の写し方。',
+    name: 'Shutter speed',
+    enSummary: 'Freeze motion or let it flow: fireworks, light trails and camera shake.',
     fb: 'radial-gradient(circle at 40% 35%, rgba(255,176,96,.45), transparent 28%), radial-gradient(circle at 70% 25%, rgba(140,200,255,.35), transparent 22%), linear-gradient(#0c1129, #03050d)',
   },
   {
@@ -14,6 +16,8 @@ export const learnTopics = [
     en: 'APERTURE & BOKEH',
     title: '絞りとボケ',
     summary: 'f値・被写界深度・玉ボケ。背景をぼかす仕組みと、くっきり写す仕組み。',
+    name: 'Aperture & bokeh',
+    enSummary: 'f-numbers, depth of field and bokeh: how backgrounds blur, and how to keep things sharp.',
     fb: 'radial-gradient(circle at 28% 38%, rgba(255,184,106,.5), transparent 13%), radial-gradient(circle at 62% 30%, rgba(116,179,255,.4), transparent 11%), radial-gradient(circle at 80% 62%, rgba(255,115,179,.4), transparent 12%), #05060b',
   },
   {
@@ -22,6 +26,8 @@ export const learnTopics = [
     en: 'FOCAL LENGTH',
     title: '焦点距離と遠近感',
     summary: '24mm と 85mm で顔の写り方が変わるのはなぜ？ 画角・距離・圧縮効果。',
+    name: 'Focal length & perspective',
+    enSummary: 'Why does a face look different at 24 mm and 85 mm? Field of view, distance and compression.',
     fb: 'linear-gradient(135deg, #3a3129, #15120f 70%)',
   },
   {
@@ -30,6 +36,8 @@ export const learnTopics = [
     en: 'DEVELOPING',
     title: '現像',
     summary: '暗室でのフィルム現像とプリント、そしてデジタルの RAW 現像。',
+    name: 'Developing',
+    enSummary: 'Developing film and making prints in the darkroom, and RAW processing on a computer.',
     fb: 'radial-gradient(circle at 25% 0%, rgba(255,46,31,.6), transparent 65%), #140505',
   },
 ] as const;
