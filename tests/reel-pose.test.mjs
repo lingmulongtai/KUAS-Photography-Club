@@ -70,3 +70,11 @@ test('poses stay finite for any spin', () => {
     }
   }
 });
+
+test('a smaller scale shrinks the cards but keeps the ring closed up', () => {
+  const small = layoutFor(1280, 0.75);
+  assert.equal(small.count, desktop.count);
+  assert.ok(small.width < desktop.width);
+  const gap = (TAU * small.radius) / small.count - small.width;
+  assert.ok(gap > 0 && gap < small.width * 0.1, `gap ${gap}`);
+});

@@ -63,11 +63,11 @@ export const wrapAngle = (a: number) => {
   return w === -Math.PI ? Math.PI : w;
 };
 
-/** Card size, count and the open ring for a stage of this width. */
-export function layoutFor(stageWidth: number): ReelLayout {
+/** Card size, count and the open ring for a stage of this width; `scale` shrinks the cards for a shorter stage. */
+export function layoutFor(stageWidth: number, scale = 1): ReelLayout {
   const narrow = stageWidth < 700;
   const count = narrow ? 12 : 16;
-  const width = Math.round(Math.min(340, Math.max(150, stageWidth * (narrow ? 0.5 : 0.26))));
+  const width = Math.round(Math.min(340, Math.max(150, stageWidth * (narrow ? 0.5 : 0.26))) * scale);
   // cards almost touch round the open ring
   const radius = (count * width * 1.06) / TAU;
   return { count, width, radius, perspective: radius * (narrow ? 1.4 : 0.9) };
