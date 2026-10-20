@@ -1,7 +1,9 @@
 ---
 /** A print developing in the tray under a red safelight. */
+import type { SiteLanguage } from '../../lib/i18n';
 interface Props {
   photos?: string[];
+  lang?: SiteLanguage;
 }
 const {
   photos = [
@@ -11,20 +13,24 @@ const {
     '/photos/samples/summer-fireworks/01.jpg',
     '/photos/samples/arashiyama-randen/01.jpg',
   ],
+  lang = 'ja',
 } = Astro.props;
+const en = lang === 'en';
 ---
 <figure class="demo">
   <div class="stage" data-demo="darkroom" data-photos={JSON.stringify(photos)} style="--fb: radial-gradient(circle at 25% 0%, rgba(255,46,31,.45), transparent 60%), #120404">
-    <canvas aria-label="暗室のバットの中で印画紙に写真が浮かび上がるデモ"></canvas>
+    <canvas aria-label={en ? 'A photograph appearing on paper in a darkroom tray' : '暗室のバットの中で印画紙に写真が浮かび上がるデモ'}></canvas>
     <div class="hud">
       <div class="row">
-        <span class="tag"><i class="lamp" aria-hidden="true"></i><span data-step>現像 DEV</span>&nbsp;&nbsp;<span data-timer>0:00</span></span>
-        <span class="tag">RC 印画紙 · 号数 2</span>
+        <span class="tag"><i class="lamp" aria-hidden="true"></i><span data-step>{en ? 'DEVELOP' : '現像 DEV'}</span>&nbsp;&nbsp;<span data-timer>0:00</span></span>
+        <span class="tag">{en ? 'RC paper · grade 2' : 'RC 印画紙 · 号数 2'}</span>
       </div>
       <div class="row"><span class="tag" data-count>1 / {photos.length}</span></div>
     </div>
   </div>
-  <figcaption class="hint">プログラムで描いた学習用図解です。部員が撮影した写真や活動記録ではありません。バットをなぞったりタップしたりすると、液面が揺れます。1枚ずつ「現像 → 停止 → 定着」と進みます。表示時間と照明色は演出で、実際の処理時間・使用条件を示しません。製品指定の条件と事前テストを確認してください。</figcaption>
+  <figcaption class="hint">{en
+    ? 'A program-drawn learning illustration, not a member photograph or activity record. Stroke or tap the tray to ripple the liquid. Each print goes through develop → stop → fix. The times and the lamp colour are for show and are not real processing times or conditions; follow the product’s specified conditions and test first.'
+    : 'プログラムで描いた学習用図解です。部員が撮影した写真や活動記録ではありません。バットをなぞったりタップしたりすると、液面が揺れます。1枚ずつ「現像 → 停止 → 定着」と進みます。表示時間と照明色は演出で、実際の処理時間・使用条件を示しません。製品指定の条件と事前テストを確認してください。'}</figcaption>
 </figure>
 
 <script>

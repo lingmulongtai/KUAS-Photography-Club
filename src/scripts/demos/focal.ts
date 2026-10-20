@@ -5,6 +5,7 @@ import { buildPhotographer } from './focal-subjects';
 import { buildFocalBackgrounds } from './focal-backgrounds';
 import { FOCAL_STOPS } from '../../data/camera-settings';
 import { nearestStop, syncCameraDial } from '../controls/camera-dial';
+import { pageLanguage } from '../../lib/i18n';
 
 const FRAME_H = 0.36; // keep the head and the top of the shoulders (36 cm) filling the frame height
 const SENSOR_H = 0.024; // full-frame sensor height in metres
@@ -111,6 +112,10 @@ export interface FocalState {
  * disappear; far away with a telephoto the face flattens and the background looms.
  */
 export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onChange?: (s: FocalState) => void): Demo {
+  const en = pageLanguage() === 'en';
+  const words = en
+    ? { view: 'view', distance: 'distance', loading: 'Loading the plaster bust…', failed: 'The plaster bust could not be loaded, so the photographer is back.' }
+    : { view: '画角', distance: '距離', loading: '石膏像を読み込んでいます…', failed: '石膏像を読み込めませんでした。撮影する人に戻しました。' };
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;
   const scene = new THREE.Scene();
@@ -171,7 +176,7 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
       setText(subjectStatus, '');
       return;
     }
-    setText(subjectStatus, bust ? '' : '石膏像を読み込んでいます…');
+    setText(subjectStatus, bust ? '' : words.loading);
     try {
       bustLoading ??= loadBust(aniso);
       const loaded = await bustLoading;
@@ -184,7 +189,7 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
       subjectSelect.value = 'photographer';
       photographer.visible = true;
       if (headCredit) headCredit.hidden = true;
-      setText(subjectStatus, '石膏像を読み込めませんでした。撮影する人に戻しました。');
+      setText(subjectStatus, words.failed);
     }
   });
 
@@ -264,7 +269,7 @@ export function createFocal(renderer: THREE.WebGLRenderer, el: HTMLElement, onCh
       if (slider) slider.value = String(toSlider(target));
       syncCameraDial(slider);
       const diag = (diagonalFov(mm) * 180) / Math.PI;
-      const label = `${Math.round(mm)}mm · 画角 ${diag.toFixed(diag < 20 ? 1 : 0)}° · 距離 ${d < 1 ? d.toFixed(2) : d.toFixed(1)}m`;
+      const label = `${Math.round(mm)}mm · ${words.view} ${diag.toFixed(diag < 20 ? 1 : 0)}° · ${words.distance} ${d < 1 ? d.toFixed(2) : d.toFixed(1)}m`;
       if (label !== last) {
         last = label;
         setText(readout, label);
