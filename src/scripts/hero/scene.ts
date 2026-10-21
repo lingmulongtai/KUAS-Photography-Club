@@ -117,10 +117,12 @@ export function createHero(
   const sky = buildSkyDome(env);
   const celestial = buildCelestial(env, opts.quality);
   const meteors = buildMeteors(opts.quality);
-  const clouds = buildClouds(env);
+  // ?clouds=<seed> pins the visit's weather so a sky can be reproduced in QA
+  const cloudSeed=Number(new URLSearchParams(location.search).get('clouds'));
+  const clouds = buildClouds(env, Number.isInteger(cloudSeed)&&cloudSeed>0?cloudSeed:undefined, opts.quality);
   const cloudClock=createCloudClock();
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
-  const post = createPost(renderer, scene, camera, 2);
+  const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
   const casts = (o: THREE.Object3D) => o.traverse((c) => (c as THREE.Mesh).isMesh && c.layers.enable(SHADOW_LAYER));
   const look = createLook();
@@ -153,6 +155,8 @@ export function createHero(
   let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let driveCars: ((dt: number) => void) | null = null;
+  /** Cities whose roofs switch to stepped blocks near the camera. */
+  const cityLods = new Set<ReturnType<typeof buildCity>>();
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -280,6 +284,7 @@ export function createHero(
     casts(campusModel);
     scene.add(city.group, landmarks.mesh);
     casts(city.group);
+    cityLods.add(city);
     casts(landmarks.mesh);
     shadow.invalidate();
     const tops = [landmarks.positions.kyotoTower.clone().setY(landmarks.positions.kyotoTower.y + 131.5)];
@@ -357,8 +362,9 @@ export function createHero(
       forest.setOuterPhoto(data.photo.image as HTMLImageElement,r.photo.box);
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
-      scene.add(group);casts(city.group);shadow.invalidate();
+      scene.add(group);casts(city.group);cityLods.add(city);shadow.invalidate();
       return ()=>{
+        cityLods.delete(city);
         regionalDrive=null;scene.remove(group);disposeGroup(group);
         for(const layer of [lamps.uniforms,traffic.uniforms])pointLayers.splice(pointLayers.indexOf(layer),1);
         terrain.uniforms.uRegionRoadsOn.value=0;
@@ -665,6 +671,9 @@ export function createHero(
     celestial.group.position.copy(camera.position);
     clouds.mesh.position.x = camera.position.x;
     clouds.mesh.position.z = camera.position.z;
+    let roofsChanged = false;
+    for (const c of cityLods) roofsChanged = c.updateLod(camera.position) || roofsChanged;
+    if (roofsChanged) shadow.invalidate();
   }
 
   const forward = new THREE.Vector3();
