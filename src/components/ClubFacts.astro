@@ -6,12 +6,15 @@ const en = lang === 'en';
 ---
 <div class="facts">
   <article><p class="edge">MEMBERS</p><h2>{en ? `${club.members} members` : `${club.members}名`}</h2><p>{en ? 'As of October 2026' : `${club.membersAsOf}現在`}</p></article>
-  <article><p class="edge">MEETING</p><h2>{en ? 'Fridays from 18:00' : `${club.meetings.day}18:00から`}</h2><p>{en ? `Usually ${club.meetings.room}, Uzumasa Campus` : `通常は${club.campus}${club.meetings.room}`}</p><a href={en ? '/en/schedule/' : '/schedule/'}>{en ? 'Check cancellations and room changes before visiting' : '参加前に休会・教室変更を確認'}</a></article>
+  <article class="meeting"><p class="edge">MEETING</p><h2><strong>{en ? 'Fridays from 18:00' : `${club.meetings.day}18:00から`}</strong></h2><p>{en ? 'Usually' : '通常は'} <strong class="where">{en ? `${club.meetings.room}, Uzumasa Campus` : `${club.campus} ${club.meetings.room} 教室`}</strong></p><a href={en ? '/en/schedule/' : '/schedule/'}>{en ? 'Check cancellations and room changes before visiting' : '参加前に休会・教室変更を確認'}</a></article>
   <article><p class="edge">DUES</p><h2>{en ? `JPY ${club.feePerSemester.toLocaleString('en-US')} / semester` : `半期${club.feePerSemester.toLocaleString('ja-JP')}円`}</h2><p>{en ? 'Transport, admission and other outing expenses are paid separately by each participant.' : '撮影会の交通費・入場料等は別途各自負担です。'}</p></article>
 </div>
 <style>
   .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
   article { display: grid; gap: 10px; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raise); }
   h2 { font-size: var(--step-2); }
+  .meeting { border-top: 3px solid var(--accent); }
+  .meeting h2 { color: var(--accent); }
+  .where { display: block; margin-top: 4px; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 5px; }
   @media (max-width: 860px) { .facts { grid-template-columns: 1fr; } }
 </style>

@@ -27,8 +27,8 @@ const latest = trips.slice(0, 3);
       <aside class="meeting" aria-label="ミーティングの案内">
         <p class="edge">MEETING ▸ EVERY WEEK</p>
         <p class="when">{club.meetings.day}</p>
-        <p class="times num">{club.meetings.times.join(' / ')}</p>
-        <p class="where">通常は {club.campus} {club.meetings.room} 教室</p>
+        <p class="times num"><strong>{club.meetings.times.join(' / ')}</strong></p>
+        <p class="where">通常は <strong>{club.campus}<br /><span class="room">{club.meetings.room} 教室</span></strong></p>
         <a class="small" href="/schedule/">休会・教室変更などの最新案内を確認</a>
         <a class="btn btn--primary" href="/join/">見学を申し込む <span class="arrow" aria-hidden="true">→</span></a>
       </aside>
@@ -84,7 +84,7 @@ const latest = trips.slice(0, 3);
     <div class="wrap cta-inner">
       <p class="edge">JOIN US</p>
       <h2>まずは、金曜の<br />ミーティングをのぞいてみませんか。</h2>
-      <p class="lead">経験もカメラもいりません。通常は{club.meetings.day} {club.meetings.times.join(' / ')}、{club.campus} {club.meetings.room} 教室です。参加前にスケジュールと運営への確認をお願いします。</p>
+      <p class="lead">経験もカメラもいりません。通常は<strong>{club.meetings.day} {club.meetings.times.join(' / ')}</strong>、<strong>{club.campus} {club.meetings.room} 教室</strong>です。参加前にスケジュールと運営への確認をお願いします。</p>
       <div class="ctas">
         <a class="btn btn--primary" href="/join/">見学・入部について <span class="arrow" aria-hidden="true">→</span></a>
         <a class="btn" href="/guidelines/">ガイドラインを読む</a>
@@ -119,6 +119,7 @@ const latest = trips.slice(0, 3);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     background: var(--raise);
+    border-top: 3px solid var(--accent);
   }
 
   .when {
@@ -130,11 +131,38 @@ const latest = trips.slice(0, 3);
     font-size: 30px;
     color: var(--accent);
     line-height: 1.2;
+    margin-bottom: 10px;
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 7px;
   }
 
   .where {
     color: var(--muted);
     margin-bottom: 14px;
+  }
+
+  .where strong {
+    display: block;
+    margin-top: 4px;
+    color: var(--ink);
+    line-height: 1.65;
+  }
+
+  .room {
+    font-size: var(--step-2);
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 5px;
+  }
+
+  .cta .lead strong {
+    font-weight: 800;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 4px;
   }
 
   .soft {
