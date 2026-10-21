@@ -106,7 +106,10 @@ export function createForest(
   for(const geo of [crown,trunk]) geo.deleteAttribute('uv');
   crown.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(crown.getAttribute('position').count),1));
   trunk.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(trunk.getAttribute('position').count).fill(1),1));
-  const closeCrown = mergeGeometries([crown, trunk]);
+  // Up close, crowns are built from blocks, voxel-game style (see voxelCrown); the smooth
+  // shapes above stay for the middle distance, where blocks would only shimmer.
+  const closeCrown = voxelCrown();
+  void crown;
   const farCrown = new THREE.IcosahedronGeometry(.5, 0).scale(1, .65, 1).translate(0, .65, 0);
   // The 20-face crown has flat normals and glinted like a cut gem from the hills: shade it as
   // the ellipsoid it stands for.
@@ -123,7 +126,8 @@ export function createForest(
     geo.deleteAttribute('uv');
     geo.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(geo.getAttribute('position').count),1));
   }
-  const closeCedar=mergeGeometries([cone,trunk]);
+  for (const geo of [farCrown, cone]) geo.setAttribute('aVox',new THREE.Float32BufferAttribute(new Float32Array(geo.getAttribute('position').count),1));
+  const closeCedar=voxelCedar();
 
   const vertexShader = /* glsl */ `
       attribute vec3 iPos;
@@ -132,6 +136,7 @@ export function createForest(
       attribute vec3 iShape;
       attribute vec2 iSeason;
       attribute float aBark;
+      attribute float aVox;
       uniform float uTime;
       uniform float uSpring;
       uniform float uAutumn;
@@ -140,9 +145,11 @@ export function createForest(
       varying vec3 vTint;
       varying float vUp;
       varying float vBark;
+      varying float vVox;
       void main(){
         float foliage=1.-aBark;
         vBark=aBark;
+        vVox=aVox;
         vec3 scale=vec3(iSize.x*2.*iShape.x,iSize.y,iSize.x*2./iShape.x);
         vec3 p = position * scale;
         float upper=max(position.y-.4,0.);
@@ -180,12 +187,14 @@ export function createForest(
       varying vec3 vTint;
       varying float vUp;
       varying float vBark;
+      varying float vVox;
       void main(){
         vec3 n = normalize(vNormal);
         float fp = max(length(dFdx(vWorld)), length(dFdy(vWorld)));
         // clumps of leaves: world-space noise tilts the normal and opens darker gaps, so a crown
         // reads as foliage rather than a smooth ball. Clumps under a couple of pixels fade out.
-        float k = (1. - smoothstep(.25, .6, fp * 1.1)) * (1. - vBark);
+        // Block crowns keep their flat faces and get a shade per block instead.
+        float k = (1. - smoothstep(.25, .6, fp * 1.1)) * (1. - vBark) * step(vVox, 0.);
         float c1 = .5;
         if (k > 0.) {
           // only near crowns pay for the clumps; nothing below takes derivatives
@@ -198,6 +207,7 @@ export function createForest(
         vec3 alb = pow(vTint, vec3(2.2)) * 1.05;
         float occ = mix(.42, 1., smoothstep(.15, 1., vUp)) * mix(1., .62 + .6 * c1, k);
         alb *= mix(occ, .8, vBark);
+        if (vVox > 0.) alb *= .8 + .4 * vVox;
         vec3 col = shade(seasonalSurface(alb,n,vWorld), n, vWorld, sh);
         // sunlight through the leaves when the tree stands against the sun
         vec3 v = normalize(vWorld - cameraPosition);
@@ -249,6 +259,7 @@ export function createForest(
       geo.setAttribute('position', shape.getAttribute('position'));
       geo.setAttribute('normal', shape.getAttribute('normal'));
       geo.setAttribute('aBark', shape.getAttribute('aBark'));
+      geo.setAttribute('aVox', shape.getAttribute('aVox'));
       geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => pos.slice(i * 3, i * 3 + 3))), 3));
       geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => size.slice(i * 2, i * 2 + 2))), 2));
       geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => tint.slice(i * 3, i * 3 + 3))), 3));
@@ -296,4 +307,83 @@ export function createForest(
     if(planted)plant(planted.eye,planted.bearing);
   };
   return { group, plant, contains, setRegionalPhoto, setOuterPhoto, get count() { return count; } };
+}
+
+/** An axis-aligned block: centre, size, and a shade (0..1, 0 for none) shared by its faces. */
+type Block = { c: [number, number, number]; s: [number, number, number]; shade: number; bark: number };
+
+const FACES: { n: [number, number, number]; corners: [number, number, number][] }[] = [
+  { n: [1, 0, 0], corners: [[1, -1, -1], [1, 1, -1], [1, 1, 1], [1, -1, 1]] },
+  { n: [-1, 0, 0], corners: [[-1, -1, 1], [-1, 1, 1], [-1, 1, -1], [-1, -1, -1]] },
+  { n: [0, 1, 0], corners: [[-1, 1, -1], [-1, 1, 1], [1, 1, 1], [1, 1, -1]] },
+  { n: [0, -1, 0], corners: [[-1, -1, 1], [-1, -1, -1], [1, -1, -1], [1, -1, 1]] },
+  { n: [0, 0, 1], corners: [[1, -1, 1], [1, 1, 1], [-1, 1, 1], [-1, -1, 1]] },
+  { n: [0, 0, -1], corners: [[-1, -1, -1], [-1, 1, -1], [1, 1, -1], [1, -1, -1]] },
+];
+
+/** Blocks as one non-indexed geometry; `hidden(block, face)` drops faces buried against a neighbour. */
+function blocksGeometry(blocks: Block[], hidden: (b: Block, n: [number, number, number]) => boolean = () => false) {
+  const pos: number[] = [], nrm: number[] = [], vox: number[] = [], bark: number[] = [];
+  for (const b of blocks) {
+    for (const f of FACES) {
+      if (hidden(b, f.n)) continue;
+      const q = f.corners.map(([x, y, z]) => [b.c[0] + x * b.s[0] / 2, b.c[1] + y * b.s[1] / 2, b.c[2] + z * b.s[2] / 2]);
+      for (const i of [0, 1, 2, 0, 2, 3]) {
+        pos.push(...q[i]);
+        nrm.push(...f.n);
+        vox.push(b.shade);
+        bark.push(b.bark);
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('aVox', new THREE.Float32BufferAttribute(vox, 1));
+  g.setAttribute('aBark', new THREE.Float32BufferAttribute(bark, 1));
+  return g;
+}
+
+/**
+ * A broadleaf crown of blocks filling the same two flattened blobs as the smooth crown, with a few
+ * blocks knocked off the surface so the outline is ragged, and a square trunk.
+ */
+function voxelCrown() {
+  const r = rng(77);
+  const S = 0.16;
+  const inside = (x: number, y: number, z: number) => {
+    const a = (x / 0.5) ** 2 + ((y - 0.62) / 0.35) ** 2 + (z / 0.5) ** 2;
+    const b = ((x - 0.18) / 0.36) ** 2 + ((y - 0.86) / 0.27) ** 2 + ((z - 0.1) / 0.36) ** 2;
+    return Math.min(a, b);
+  };
+  const cells = new Set<string>();
+  const blocks: Block[] = [];
+  for (let i = -4; i <= 4; i++) for (let j = 0; j <= 8; j++) for (let k = -4; k <= 4; k++) {
+    const x = i * S, y = 0.26 + j * S, z = k * S;
+    const d = inside(x, y, z);
+    // the outermost shell is thinned at random
+    if (d > 1.05 || (d > 0.7 && r() < 0.3)) continue;
+    cells.add(`${i},${j},${k}`);
+    blocks.push({ c: [x, y, z], s: [S, S, S], shade: 0.05 + r() * 0.95, bark: 0 });
+  }
+  const key = (b: Block) => [Math.round(b.c[0] / S), Math.round((b.c[1] - 0.26) / S), Math.round(b.c[2] / S)];
+  const crown = blocksGeometry(blocks, (b, n) => {
+    const [i, j, k] = key(b);
+    return cells.has(`${i + n[0]},${j + n[1]},${k + n[2]}`);
+  });
+  const trunk = blocksGeometry([{ c: [0, 0.2, 0], s: [0.08, 0.4, 0.08], shade: 0.5, bark: 1 }]);
+  return mergeGeometries([crown, trunk]);
+}
+
+/** A cedar as a stack of shrinking square tiers. */
+function voxelCedar() {
+  const blocks: Block[] = [];
+  const tiers = 5;
+  for (let t = 0; t < tiers; t++) {
+    const w = 0.95 * (1 - t / tiers) + 0.06;
+    const h = 0.75 / tiers;
+    blocks.push({ c: [0, 0.25 + h * (t + 0.5), 0], s: [w, h, w], shade: 0.25 + 0.6 * ((t * 0.37) % 1), bark: 0 });
+  }
+  blocks.push({ c: [0, 0.14, 0], s: [0.07, 0.28, 0.07], shade: 0.5, bark: 1 });
+  return blocksGeometry(blocks);
 }

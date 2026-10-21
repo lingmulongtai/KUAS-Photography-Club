@@ -15,6 +15,8 @@ const FinishShader = {
     uGrain: { value: 0.018 },
     /** 0..1: how much of the daylight print look to apply (none at night) */
     uGrade: { value: 0 },
+    /** unsharp mask: crisper block edges and window grids, the clean look of a voxel game */
+    uSharp: { value: 0.3 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -27,9 +29,15 @@ const FinishShader = {
     uniform vec2 uRes;
     uniform float uGrain;
     uniform float uGrade;
+    uniform float uSharp;
     varying vec2 vUv;
     void main(){
       vec3 c = texture2D(tDiffuse, vUv).rgb;
+      vec2 px = 1. / uRes;
+      vec3 around = texture2D(tDiffuse, vUv + vec2(px.x, 0.)).rgb + texture2D(tDiffuse, vUv - vec2(px.x, 0.)).rgb
+                  + texture2D(tDiffuse, vUv + vec2(0., px.y)).rgb + texture2D(tDiffuse, vUv - vec2(0., px.y)).rgb;
+      // limited, so a lone bright light does not get a dark ring
+      c = clamp(c + clamp(c - around * .25, -.08, .08) * uSharp * 4., 0., 1.);
       float l = dot(c, vec3(.299, .587, .114));
       // daylight print look: a touch more contrast and colour, cool shade, warm highlights,
       // so the grey city under a flat sky reads like a photograph rather than a model
