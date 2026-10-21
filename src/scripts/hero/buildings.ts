@@ -16,6 +16,10 @@ import { BUILT_GLSL } from './building-occlusion';
  */
 
 const CHUNK = 1500;
+/** Edge of one block of the voxel finish, metres. */
+const VOXEL = 0.75;
+/** Within this distance of the camera (metres to a chunk's centre), pitched roofs are built as stairs. */
+const STEPPED_NEAR = 2200;
 /** Walls run this far below the ground so buildings on slopes never float. */
 const FOOTING = 6;
 
@@ -33,6 +37,8 @@ interface Face {
   pts: number[][];
   n: number[];
   role: number;
+  /** stepped roofs: half the width of the block this face belongs to, in coded units */
+  level?: number;
 }
 
 /**
@@ -44,7 +50,8 @@ function unitShape(faces: Face[]) {
   const pos: number[] = [];
   const nrm: number[] = [];
   const role: number[] = [];
-  const tri = (a: number[], b: number[], c: number[], n: number[], r: number) => {
+  const level: number[] = [];
+  const tri = (a: number[], b: number[], c: number[], n: number[], r: number, l: number) => {
     // wind counter-clockwise around the outward normal
     const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
     const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
@@ -56,19 +63,22 @@ function unitShape(faces: Face[]) {
       pos.push(...p);
       nrm.push(...n);
       role.push(r);
+      level.push(l);
     }
   };
   for (const f of faces) {
-    if (f.pts.length === 3) tri(f.pts[0], f.pts[1], f.pts[2], f.n, f.role);
+    const l = f.level ?? 0.5;
+    if (f.pts.length === 3) tri(f.pts[0], f.pts[1], f.pts[2], f.n, f.role, l);
     else {
-      tri(f.pts[0], f.pts[1], f.pts[2], f.n, f.role);
-      tri(f.pts[0], f.pts[2], f.pts[3], f.n, f.role);
+      tri(f.pts[0], f.pts[1], f.pts[2], f.n, f.role, l);
+      tri(f.pts[0], f.pts[2], f.pts[3], f.n, f.role, l);
     }
   }
   const g = new THREE.InstancedBufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   g.setAttribute('aRole', new THREE.Float32BufferAttribute(role, 1));
+  g.setAttribute('aLevel', new THREE.Float32BufferAttribute(level, 1));
   return g;
 }
 
@@ -93,11 +103,51 @@ function pitchedShape() {
   ]);
 }
 
+/** Steps in a stepped roof. */
+const ROOF_STEPS = 3;
+
+/**
+ * The pitched roof built from blocks, the way a voxel game builds one: each course is a slab a
+ * little narrower than the one below, so gables and hips become stairs. Codes as above, except
+ * that y runs 1..2 continuously over the roof and `level` carries each course's half-width
+ * (the vertex shader pulls hips in from the ends by the same amount).
+ */
+function steppedShape() {
+  const faces: Face[] = [...walls(1)];
+  const N = ROOF_STEPS;
+  for (let k = 0; k < N; k++) {
+    const w = 0.5 * (1 - k / N);
+    const inner = k < N - 1 ? 0.5 * (1 - (k + 1) / N) : 0;
+    const y0 = 1 + k / N, y1 = 1 + (k + 1) / N;
+    const level = w;
+    // the treads left uncovered by the next course up, on both long sides
+    faces.push({ pts: [[-0.5, y1, inner], [0.5, y1, inner], [0.5, y1, w], [-0.5, y1, w]], n: [0, 1, 0], role: 1, level });
+    if (inner > 0) faces.push({ pts: [[-0.5, y1, -w], [0.5, y1, -w], [0.5, y1, -inner], [-0.5, y1, -inner]], n: [0, 1, 0], role: 1, level });
+    else faces.push({ pts: [[-0.5, y1, -w], [0.5, y1, -w], [0.5, y1, 0], [-0.5, y1, 0]], n: [0, 1, 0], role: 1, level });
+    // treads at the ends, which only show on a hip (there the next course is shorter as well);
+    // x = ±0.25 marks the next course's end
+    if (inner > 0) {
+      faces.push({ pts: [[0.5, y1, -inner], [0.5, y1, inner], [0.25, y1, inner], [0.25, y1, -inner]], n: [0, 1, 0], role: 1, level });
+      faces.push({ pts: [[-0.25, y1, -inner], [-0.25, y1, inner], [-0.5, y1, inner], [-0.5, y1, -inner]], n: [0, 1, 0], role: 1, level });
+    }
+    // risers on the long sides
+    faces.push({ pts: [[-0.5, y0, w], [0.5, y0, w], [0.5, y1, w], [-0.5, y1, w]], n: [0, 0, 1], role: 1, level });
+    faces.push({ pts: [[0.5, y0, -w], [-0.5, y0, -w], [-0.5, y1, -w], [0.5, y1, -w]], n: [0, 0, -1], role: 1, level });
+    // ends: a stepped gable wall, or the stairs of a hip
+    faces.push({ pts: [[0.5, y0, w], [0.5, y0, -w], [0.5, y1, -w], [0.5, y1, w]], n: [1, 0, 0], role: 2, level });
+    faces.push({ pts: [[-0.5, y0, -w], [-0.5, y0, w], [-0.5, y1, w], [-0.5, y1, -w]], n: [-1, 0, 0], role: 2, level });
+  }
+  // the underside of the eaves course, which overhangs the walls
+  faces.push({ pts: [[-0.5, 1, -0.5], [0.5, 1, -0.5], [0.5, 1, 0.5], [-0.5, 1, 0.5]], n: [0, -1, 0], role: 1, level: 0.5 });
+  return unitShape(faces);
+}
+
 /* ---------- shaders ---------- */
 
 /** Instanced placement: decode the unit shape into metres and turn it to the building's angle. */
 const INSTANCE_VS = /* glsl */ `
   attribute float aRole;
+  attribute float aLevel;
   attribute vec3 iPos;    // x, ground, z
   attribute vec3 iSize;   // long side, height, short side
   attribute float iRot;
@@ -114,6 +164,21 @@ const INSTANCE_VS = /* glsl */ `
     float rh = iMeta.w;
     float hip = step(1.5, roof);
     float eave = roof > .5 ? h - rh * .5 : h;
+    vec3 n = normal;
+  #ifdef STEPPED
+    float y = p.y < .5 ? -${FOOTING.toFixed(1)} : eave + max(p.y - 1., 0.) * rh;
+    vec2 xz = p.xz * vec2(w, d);
+    if (aRole > .5){
+      // each course's ends: the full length on a gable, pulled in like the sides on a hip
+      float lv = aLevel - (abs(p.x) < .4 ? .5 / float(${ROOF_STEPS}) : 0.);
+      float halfLen = max(w * .5 - hip * (.5 - lv) * d, min(w * .5, lv * d));
+      xz.x = sign(p.x) * halfLen;
+      // the eaves course overhangs the walls a little
+      float oh = min(.55, d * .07) * step(.49, aLevel);
+      xz.x += sign(p.x) * oh;
+      xz.y += sign(p.z) * step(.49, abs(p.z)) * oh;
+    }
+  #else
     float y = p.y < .5 ? -${FOOTING.toFixed(1)} : (p.y < 1.5 ? eave : eave + rh);
     vec2 xz = p.xz * vec2(w, d);
     if (p.y > 1.5){
@@ -127,9 +192,9 @@ const INSTANCE_VS = /* glsl */ `
     }
     if (aRole == 2. && hip > .5 && p.y < 1.5){ xz += sign(p.xz) * oh; y -= oh * rh / max(d * .5, 1.); }
 
-    vec3 n = normal;
     if (aRole == 1.) n = normalize(vec3(0., d * .5, sign(p.z) * rh));
     if (aRole == 2. && hip > .5) n = normalize(vec3(sign(p.x) * rh, d * .5, 0.));
+  #endif
 
     float c = cos(iRot), s = sin(iRot);
     mat2 R = mat2(c, s, -s, c);
@@ -139,8 +204,14 @@ const INSTANCE_VS = /* glsl */ `
     vWorld = world;
     vNormal = normalize(vec3(wn.x, n.y, wn.y));
     float along = abs(normal.x) > .5 ? p.z * d + 31. * sign(normal.x) : p.x * w + 17. * sign(normal.z);
-    vWall = vec2(along, y);
-    vInfo = vec4(iMeta.x, iMeta.y, h, aRole);
+    // level faces are laid out across their plane, so the blocks of a roof run both ways
+    vWall = abs(normal.y) > .5 ? xz : vec2(along, y);
+    float role = aRole;
+  #ifdef STEPPED
+    // the stairs at the ends of a hip are roof, not wall
+    if (aRole == 2. && hip > .5) role = 1.;
+  #endif
+    vInfo = vec4(iMeta.x, iMeta.y, h, role);
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.);
   }
 `;
@@ -196,7 +267,20 @@ const BUILDING_FS = /* glsl */ `
     float r1 = fract(seed * 13.17);
     float r2 = fract(seed * 71.31);
     bool wooden = cls < .5;
-    bool roof = role > 2.5 || (role > .5 && n.y > .2);
+    bool roof = role > 2.5 || (role > .5 && role < 1.5) || (role > .5 && n.y > .2);
+
+    // Close up, every surface is built of blocks, like a voxel game: each block has its own
+    // shade and a slightly darker edge, and windows snap to whole blocks. Blocks smaller than a
+    // few pixels would shimmer, so they fade to the plain surface with distance.
+    vec2 vq = vWall / ${VOXEL.toFixed(2)};
+    vec2 vcell = floor(vq);
+    vec2 ve = min(fract(vq), 1. - fract(vq));
+    vec2 vfw = fwWall / ${VOXEL.toFixed(2)};
+    float vox = 1. - smoothstep(.1, .34, max(vfw.x, vfw.y));
+    float vjit = hash12(vcell + vec2(seed * 57.3 + n.x * 7.1, n.y * 19.3 + n.z * 3.7)) - .5;
+    float vedge = smoothstep(0., .08 + max(vfw.x, vfw.y), min(ve.x, ve.y));
+    float voxShade = 1. + vox * (vjit * .18 - (1. - vedge) * .1);
+    vec2 wallAt = mix(vWall, (vcell + .5) * ${VOXEL.toFixed(2)}, vox);
 
     vec3 albedo;
     vec3 emit = vec3(0.);
@@ -229,7 +313,7 @@ const BUILDING_FS = /* glsl */ `
       // windows on a floor grid
       float floorH = wooden ? 2.9 : (use == 4. ? 3.7 : 3.1);
       float cellW = wooden ? 2.4 : (use == 2. ? 3.4 : 2.9);
-      vec2 g = vec2(vWall.x / cellW, (vWall.y - .5) / floorH);
+      vec2 g = vec2(wallAt.x / cellW, (wallAt.y - .5) / floorH);
       vec2 id = floor(g);
       vec2 f = fract(g);
       vec2 fw = fwWall / vec2(cellW, floorH);
@@ -266,6 +350,8 @@ const BUILDING_FS = /* glsl */ `
       if (use == 3. || use == 5.) emit += warm * groundFloor * mix(smoothstep(.1,.5,f.y),.7,tiny) * valid * mix(1.2,.05,tiny) * uCity;
       emit *= cityLightShimmer(vWorld);
     }
+
+    albedo *= voxShade;
 
     // the campus, when it is in focus: clean white facades, a teal line along the roofs, teal windows at night
     if (campus > 0.){
@@ -415,8 +501,13 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
   const polyMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: POLY_VS, fragmentShader: BUILDING_FS });
   const instDepth = new THREE.ShaderMaterial({ uniforms:env, vertexShader: INSTANCE_VS, fragmentShader: DEPTH_FS });
   const polyDepth = new THREE.ShaderMaterial({ uniforms:env, vertexShader: POLY_VS, fragmentShader: DEPTH_FS });
+  const stepMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: INSTANCE_VS, fragmentShader: BUILDING_FS, defines: { STEPPED: 1 } });
+  const stepDepth = new THREE.ShaderMaterial({ uniforms:env, vertexShader: INSTANCE_VS, fragmentShader: DEPTH_FS, defines: { STEPPED: 1 } });
   const flat = flatShape();
   const pitched = pitchedShape();
+  const stepped = steppedShape();
+  /** Pairs of the same houses: stepped roofs for chunks near the camera, plain slopes beyond. */
+  const roofLods: { near: THREE.Mesh; far: THREE.Mesh; x: number; z: number }[] = [];
 
   type Chunk = { flat: { b: BoxBuilding; y: number; seed: number }[]; pitched: { b: BoxBuilding; y: number; seed: number }[]; polys: { p: PolyBuilding; y: number; seed: number }[] };
   const chunks = new Map<string, Chunk>();
@@ -444,13 +535,42 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
   for (const c of chunks.values()) {
     const meshes: [THREE.BufferGeometry, THREE.ShaderMaterial, THREE.ShaderMaterial][] = [];
     if (c.flat.length) meshes.push([instanced(flat, c.flat, false), instMat, instDepth]);
-    if (c.pitched.length) meshes.push([instanced(pitched, c.pitched, true), instMat, instDepth]);
     if (c.polys.length) meshes.push([extruded(c.polys), polyMat, polyDepth]);
-    for (const [geo, mat, depth] of meshes) {
+    const add = ([geo, mat, depth]: (typeof meshes)[number]) => {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.userData.depthMaterial = depth;
       group.add(mesh);
+      return mesh;
+    };
+    meshes.forEach(add);
+    if (c.pitched.length) {
+      const far = instanced(pitched, c.pitched, true);
+      // the stepped houses share the far set's per-house data
+      const near = new THREE.InstancedBufferGeometry();
+      for (const name of ['position', 'normal', 'aRole', 'aLevel']) near.setAttribute(name, stepped.getAttribute(name));
+      for (const name of ['iPos', 'iSize', 'iRot', 'iMeta']) near.setAttribute(name, far.getAttribute(name));
+      near.instanceCount = far.instanceCount;
+      near.boundingBox = far.boundingBox;
+      near.boundingSphere = far.boundingSphere;
+      const center = far.boundingSphere!.center;
+      const pair = { far: add([far, instMat, instDepth]), near: add([near, stepMat, stepDepth]), x: center.x, z: center.z };
+      pair.near.visible = false;
+      roofLods.push(pair);
     }
   }
-  return { group };
+  return {
+    group,
+    /** Swap stepped and plain roofs by distance from the camera; call once a frame. True when any changed. */
+    updateLod(eye: { x: number; z: number }) {
+      let changed = false;
+      for (const l of roofLods) {
+        const near = Math.hypot(l.x - eye.x, l.z - eye.z) < STEPPED_NEAR;
+        if (l.near.visible === near) continue;
+        l.near.visible = near;
+        l.far.visible = !near;
+        changed = true;
+      }
+      return changed;
+    },
+  };
 }
