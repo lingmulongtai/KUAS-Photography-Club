@@ -442,6 +442,9 @@ export function createHero(
     post.bloom.strength = look.bloom * (1 + .12 * look.city + .7 * night);
     post.bloom.radius = .5 + .18 * look.city;
     post.bloom.threshold = THREE.MathUtils.lerp(.85, .12, night);
+    // by day and at sunset the sun and the sky round it glow with all their light, so the setting
+    // sun spreads into a big soft glow; at night only the light above the low threshold glows
+    post.bloomWhole.value = 1 - night;
     post.grade.value = THREE.MathUtils.smoothstep(alt, -6, 8);
 
     const status: HeroStatus = { minutes, altitude: alt, phase: phaseName(alt, minutes), kelvin: kelvin(alt), moonAge: moon.age };

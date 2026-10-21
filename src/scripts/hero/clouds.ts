@@ -8,6 +8,8 @@ const CIRRUS_Y = 8200;
 const ALTO_Y = 4600;
 /** Clouds fade out into the haze before this distance. */
 const FAR = 44000;
+/** Radius of the drum the clouds are drawn on: beyond FAR, inside the camera's far plane. */
+const DRUM = 52000;
 
 /**
  * Clouds with volume. The low layer (cumulus heads, a stratocumulus deck or towering congestus,
@@ -244,18 +246,40 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           float span = t1 - t0;
           // a per-pixel offset trades the banding of the steps for a fine grain; kept to half a
           // step, the grain stays below the film grain of the finish
-          float jitter = .25 + .5 * hash12(gl_FragCoord.xy);
+          // (interleaved gradient noise: neighbouring pixels take evenly spread offsets, which reads
+          // as a finer, calmer grain than independent random ones)
+          float jitter = .25 + .5 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))));
           // tall slabs (towering clouds) need more steps to stay solid
           float steps = min(float(STEPS) * (1. + (uTop - uBase) / 3000.), float(STEPS) * 2.);
+          float tPrev = t0;
+          bool inside = false;
           for (int i = 0; i < STEPS * 2; i++){
             if (T < .03 || float(i) >= steps) break;
             float u0 = float(i) / steps, u1 = (float(i) + 1.) / steps;
             // a per-pixel offset turns the banding of the steps into fine grain
             float um = mix(u0, u1, jitter);
             float t = t0 + span * um * um;
+            float tEnd = t0 + span * u1 * u1;
             float dt = span * (u1 * u1 - u0 * u0);
             vec3 pos = ro + rd * t;
             float d = density(pos, t);
+            if (d > .002 && !inside){
+              // The ray entered a cloud somewhere since the last sample. Find where: shaded at the
+              // step it happened to land on, a cloud's face would be sliced into bands, one per step.
+              float lo = tPrev, hi = t;
+              for (int k = 0; k < DETAIL + 2; k++){
+                float mid = .5 * (lo + hi);
+                if (density(ro + rd * mid, mid) > .002) hi = mid;
+                else lo = mid;
+              }
+              t = hi;
+              pos = ro + rd * t;
+              d = max(density(pos, t), .003);
+              // only the rest of the step is inside the cloud
+              dt = tEnd - t;
+            }
+            inside = d > .002;
+            tPrev = t;
             if (d > .002){
               float h = clamp((pos.y - uBase) / (uTop - uBase), 0., 1.);
               // light from the sun, dimmed by the cloud above and toward it
@@ -311,9 +335,12 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     depthWrite: false,
     side: THREE.BackSide,
   });
-  // the box starts below the lowest cloud base any character uses
+  // The rays are marched from the inside of a drum around the camera, which starts below the lowest
+  // cloud base any character uses. Every point of it stays inside the camera's far plane (60 km):
+  // the corners of a box that reached as far along the axes were beyond it, and the clouds toward
+  // north-east, south-east and so on were cut off there.
   const bottom = 850;
-  const geometry = new THREE.BoxGeometry(96000, CIRRUS_Y + 400 - bottom, 96000).translate(0, (CIRRUS_Y + 400 + bottom) / 2, 0);
+  const geometry = new THREE.CylinderGeometry(DRUM, DRUM, CIRRUS_Y + 400 - bottom, 96, 1).translate(0, (CIRRUS_Y + 400 + bottom) / 2, 0);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 2;
   mesh.frustumCulled = false;
