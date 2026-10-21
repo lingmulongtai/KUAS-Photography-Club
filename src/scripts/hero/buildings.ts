@@ -251,10 +251,20 @@ const BUILDING_FS = /* glsl */ `
       // lit windows at night: warm homes and hotels, cooler offices. Some buildings are dark.
       float awake = step(.22, fract(seed * 5.31));
       float rate = uLit * (wooden ? .8 : 1.) * (use == 4. ? 1.3 : 1.) * awake;
-      float lit = step(hash12(id * vec2(1.7, 3.1) + seed * 31.), rate);
-      // far away a facade's windows are below a pixel: keep only a faint average so the city
-      // reads as dark masses with points of light, not a lit sheet
-      lit = mix(lit, rate * .1, tiny);
+      // Once single windows shrink under a few pixels, groups of rooms along a floor (2, then 4
+      // windows wide) switch together, so every distance keeps points of light a few pixels
+      // across. Fewer groups light than single windows would, so the city stays dark masses
+      // with points of light rather than a lit sheet. Neighbouring group sizes cross-fade
+      // without popping, and only beyond that does a facade fade to a dim average.
+      float cells = max(fw.x, fw.y);
+      rate *= mix(1., .25, tiny);
+      float lod = clamp(log2(max(cells * 3., 1.)), 0., 2.);
+      vec2 k0 = vec2(exp2(floor(lod)), 1.), k1 = vec2(min(k0.x * 2., 4.), 1.);
+      k0.y = max(1., k0.x * .5); k1.y = max(1., k1.x * .5);
+      float lit0 = step(hash12(floor(id / k0) * vec2(1.7, 3.1) + seed * 31. + (k0.x - 1.) * .37), rate);
+      float lit1 = step(hash12(floor(id / k1) * vec2(1.7, 3.1) + seed * 31. + (k1.x - 1.) * .37), rate);
+      float lit = mix(lit0, lit1, fract(lod));
+      lit = mix(lit, rate * .4, smoothstep(1.4, 2.8, cells));
       vec3 warm = vec3(1., .58, .26);
       vec3 cool = vec3(.95, .85, .7);
       vec3 lampCol = mix(warm, cool, (use == 4. ? .8 : .15) * mix(step(.4, hash12(id + seed)), .6, tiny));

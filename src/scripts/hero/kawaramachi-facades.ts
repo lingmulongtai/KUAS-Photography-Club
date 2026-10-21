@@ -14,6 +14,12 @@ const styles=[
   {id:'northwest-neighbour3',bounds:[838.46,-59.89,849.2,-29.58],floors:5,stone:[.39,.35,.29]},
 ];
 
+/** Stable 0..1 value per window, so the same rooms are lit on every load. */
+function hash(a:number,b:number,c:number){const v=Math.sin(a*12.9898+b*78.233+c*37.719)*43758.5453;return v-Math.floor(v);}
+/** The same glass as the unlit bands, so the facade is unchanged by day; glow above 2.5
+ * adds warm room light after dark (see the landmark shader). */
+const GLASS:Part['color']=[.028,.05,.063];
+
 function bounds(r:Float32Array){
   const b=[Infinity,Infinity,-Infinity,-Infinity];for(let i=0;i<r.length;i+=2){b[0]=Math.min(b[0],r[i]);b[1]=Math.min(b[1],r[i+1]);b[2]=Math.max(b[2],r[i]);b[3]=Math.max(b[3],r[i+1]);}return b;
 }
@@ -45,12 +51,23 @@ export function kawaramachiFacades(data:{boxes:BoxBuilding[];polys:PolyBuilding[
         const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute([...a,...d,...b,...b,...d,...c],3));geo.computeVertexNormals();parts.push({geo,color,glow});
       };
       face(0,1,.6,source.h-.3,style.stone as Part['color']);
+      const bays=Math.max(1,Math.ceil(len/(style.id==='takashimaya'?4.4:3.2)));
+      const site=styles.indexOf(style);
       for(let row=0;row<style.floors;row++){
         const y=row*floor;
-        face(.01,.99,y+floor*.25,y+floor*.8,[.028,.05,.063],.16,.6);
         face(0,1,y+floor*.85,y+floor*.98,style.stone as Part['color'],.2);
+        // Rooms lit after dark, bay by bay: shopfloors on the lower storeys, offices and
+        // restaurants thinning out toward the roof. The glass band is split where a bay
+        // changes between lit and dark, never layered, so nothing fights for depth from afar.
+        const rate=row===0?.9:.6-.3*row/style.floors;
+        let from=0,lit=hash(site,i*31,row)<rate;
+        for(let col=1;col<=bays;col++){
+          const next=col<bays&&hash(site,i*31+col,row)<rate;
+          if(col<bays&&next===lit)continue;
+          face(Math.max(.01,from/bays),Math.min(.99,col/bays),y+floor*.25,y+floor*.8,GLASS,.16,lit?3.0:.6);
+          from=col;lit=next;
+        }
       }
-      const bays=Math.max(1,Math.ceil(len/(style.id==='takashimaya'?4.4:3.2)));
       for(let col=0;col<=bays;col++){
         const u=col/bays,half=Math.min(.18/len,.05);
         face(Math.max(0,u-half),Math.min(1,u+half),.6,source.h-.3,style.stone as Part['color'],.22);
