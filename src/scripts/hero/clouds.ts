@@ -183,7 +183,9 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         if (t1 > t0){
           // steps grow with distance: fine where clouds are big on screen, coarse at the horizon
           float span = t1 - t0;
-          float jitter = hash12(gl_FragCoord.xy);
+          // a per-pixel offset trades the banding of the steps for a fine grain; kept to half a
+          // step, the grain stays below the film grain of the finish
+          float jitter = .25 + .5 * hash12(gl_FragCoord.xy);
           for (int i = 0; i < STEPS; i++){
             if (T < .03) break;
             float u0 = float(i) / float(STEPS), u1 = (float(i) + 1.) / float(STEPS);
