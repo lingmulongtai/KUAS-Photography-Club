@@ -32,12 +32,34 @@ window.runSceneryChecks=()=>{
   const info={name,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,points:renderer.info.render.points};
   if(info.calls<1)throw Error(name+' was not drawn');stats.push(info);scene.remove(object);
  }
- for(const seed of [0,9817,19634,29451,39268,49085]){
-  const clouds=buildClouds(env,seed),scene=new THREE.Scene();scene.add(clouds.mesh);
+ for(const quality of [.55,1]) for(const [climate,seed] of [['winter',7919],['winter',31676],['winter',39595],['summer',7919],['summer',31676],['summer',79190]]){
+  const clouds=buildClouds(env,seed,quality,climate),scene=new THREE.Scene();scene.add(clouds.mesh);
   camera.lookAt(0,1800,0);renderer.info.reset();renderer.render(scene,camera);
   const error=renderer.getContext().getError();if(error)throw Error('Cloud GPU error '+error);
   if(renderer.info.render.calls<1)throw Error('Cloud layer was not drawn');
-  stats.push({name:'cloud-'+clouds.weather.style,calls:renderer.info.render.calls});
+  stats.push({name:'cloud-'+climate+'-'+clouds.weather.style,quality,calls:renderer.info.render.calls});
+  if(climate==='winter'&&seed===7919){
+   // Run the shipped density function on fixed world positions, varying only its LOD distance.
+   // The old 6/14 km cut-offs produced large density jumps even for an infinitesimal move.
+   const fragment=clouds.mesh.material.fragmentShader.split('      void main(){')[0];
+   const probe=new THREE.ShaderMaterial({defines:clouds.mesh.material.defines,uniforms:{...clouds.uniforms,uCover:{value:.9},uClear:{value:0},uProbeDistance:{value:0}},
+    vertexShader:'void main(){gl_Position=vec4(position.xy,0.,1.);}',
+    fragmentShader:fragment+'uniform float uProbeDistance; void main(){vec3 pos=vec3((gl_FragCoord.x/64.-.5)*32000.,uBase+(uTop-uBase)*.35,(gl_FragCoord.y/32.-.5)*32000.);gl_FragColor=vec4(density(pos,uProbeDistance),0.,0.,1.);}'});
+   const geo=new THREE.PlaneGeometry(2,2),quad=new THREE.Mesh(geo,probe),probes=new THREE.Scene();quad.frustumCulled=false;probes.add(quad);
+   const target=new THREE.WebGLRenderTarget(64,32,{type:THREE.FloatType,depthBuffer:false});
+   const a=new Float32Array(64*32*4),b=new Float32Array(a.length);let maxJump=0,maxDensity=0;
+   renderer.setRenderTarget(target);
+   for(const boundary of [4000,6000,8000,10000,14000,16000]){
+    for(const [offset,pixels] of [[-.1,a],[.1,b]]){
+     probe.uniforms.uProbeDistance.value=boundary+offset;renderer.render(probes,camera);renderer.readRenderTargetPixels(target,0,0,64,32,pixels);
+    }
+    for(let i=0;i<a.length;i+=4){if(!Number.isFinite(a[i])||!Number.isFinite(b[i]))throw Error('Non-finite cloud density');maxJump=Math.max(maxJump,Math.abs(a[i]-b[i]));maxDensity=Math.max(maxDensity,a[i],b[i]);}
+   }
+   renderer.setRenderTarget(null);target.dispose();geo.dispose();probe.dispose();
+   if(maxDensity<.1)throw Error('Cloud continuity probe did not sample a cloud');
+   if(maxJump>.002)throw Error('Cloud detail distance discontinuity: '+maxJump);
+   stats.push({name:'winter-cloud-continuity',quality,maxJump,maxDensity});
+  }
   clouds.mesh.geometry.dispose();clouds.mesh.material.dispose();
  }
  const result={passed:true,stats};document.querySelector('pre').textContent=JSON.stringify(result,null,2);return result;
@@ -45,6 +67,6 @@ window.runSceneryChecks=()=>{
 `},bundle:true,format:'iife',write:false});
   http.createServer((req,res)=>{
     res.setHeader('content-type',req.url==='/bundle.js'?'application/javascript':'text/html');
-    res.end(req.url==='/bundle.js'?result.outputFiles[0].text:'<!doctype html><title>Scenery shader verification</title><pre>Ready: runSceneryChecks()</pre><script src="/bundle.js"></script>');
+    res.end(req.url==='/bundle.js'?result.outputFiles[0].text:'<!doctype html><title>Scenery shader verification</title><button onclick="runSceneryChecks()">Run scenery checks</button><pre>Ready</pre><script src="/bundle.js"></script>');
   }).listen(4331,'127.0.0.1',()=>console.log('http://127.0.0.1:4331'));
 })().catch(error=>{console.error(error);process.exitCode=1;});
