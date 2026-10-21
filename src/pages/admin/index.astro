@@ -2,7 +2,7 @@
 /**
  * Admin panel: add a photo trip, add photos to a trip, or write a month's schedule.
  * Publishing commits to GitHub through /api/admin/*, and Vercel redeploys the site.
- * Without ADMIN_PASSWORD and GITHUB_TOKEN set on Vercel it runs as a demo (password "demo").
+ * Without ADMIN_PASSWORD and GITHUB_TOKEN set on Vercel it runs as a demo (ID "admin", password "demo").
  */
 import { getCollection } from 'astro:content';
 import Base from '../../layouts/Base.astro';
@@ -39,10 +39,11 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
     <section class="card login" data-view="login" hidden>
       <h2>ログイン</h2>
       <form data-login>
+        <label>ログインID<input type="text" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required /></label>
         <label>パスワード<input type="password" name="password" autocomplete="current-password" required /></label>
         <button class="btn btn--primary" type="submit">ログイン</button>
         <p class="error" data-login-error hidden></p>
-        <p class="small muted" data-demo-hint hidden>いまはデモです。パスワードは <code>demo</code>。何を送ってもサイトには公開されません。</p>
+        <p class="small muted" data-demo-hint hidden>いまはデモです。ID は <code>admin</code>、パスワードは <code>demo</code>。何を送ってもサイトには公開されません。</p>
       </form>
     </section>
 
