@@ -1,0 +1,113 @@
+---
+interface Props { lang?: 'ja' | 'en'; }
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+---
+<dialog class="hero-intro" aria-labelledby="intro-title">
+  <div class="intro-content">
+    <p class="intro-eyebrow">KYOTO UNIVERSITY OF ADVANCED SCIENCE</p>
+    <div class="intro-frame">
+      <p id="intro-title" class="intro-title" tabindex="-1" autofocus>{en ? <>Photography<br />Club</> : '写真部'}</p>
+      <p class="intro-name">KUAS PHOTOGRAPHY CLUB</p>
+    </div>
+    <div class="intro-progress" role="progressbar" aria-label={en ? 'Preparing the Kyoto scenery' : '京都の景色の準備状況'} aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <span></span>
+    </div>
+    <div class="intro-caption">
+      <p role="status">{en ? 'Preparing Kyoto’s scenery…' : '京都の景色を、準備しています。'}</p>
+      <span class="intro-percent" aria-hidden="true">00%</span>
+    </div>
+    <button type="button" class="intro-skip">{en ? 'Enter the site now' : '待たずにサイトを見る'} <span aria-hidden="true">↗</span></button>
+  </div>
+</dialog>
+<script is:inline>
+  (() => {
+    const intro = document.currentScript.previousElementSibling;
+    if (!(intro instanceof HTMLDialogElement) || !intro.showModal) return;
+    const root = document.documentElement;
+    const progress = intro.querySelector('[role="progressbar"]');
+    const percent = intro.querySelector('.intro-percent');
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    let finished = false;
+    let timeout;
+    const cleanup = () => {
+      clearTimeout(timeout);
+      root.classList.remove('hero-intro-open');
+      document.removeEventListener('hero:progress', update);
+      document.removeEventListener('hero:ready', dismiss);
+      document.removeEventListener('hero:error', dismiss);
+    };
+    const dismiss = () => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      // Release the modal and scroll immediately; its non-interactive snapshot fades away.
+      intro.close();
+      if (!motion.matches && typeof intro.animate === 'function') {
+        intro.classList.add('is-leaving');
+        intro.animate([{opacity:1},{opacity:0}], {duration:360,easing:'ease-out'})
+          .finished.catch(() => {}).finally(() => intro.classList.remove('is-leaving'));
+      }
+    };
+    const update = (event) => {
+      const value = Math.round(Math.min(1, Math.max(0, event.detail)) * 100);
+      if (!Number.isFinite(value) || finished) return;
+      progress.setAttribute('aria-valuenow', String(value));
+      progress.style.setProperty('--progress', String(value / 100));
+      percent.textContent = `${String(value).padStart(2, '0')}%`;
+    };
+    intro.querySelector('button').addEventListener('click', dismiss);
+    intro.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
+    intro.addEventListener('close', cleanup);
+    document.addEventListener('hero:progress', update);
+    document.addEventListener('hero:ready', dismiss);
+    document.addEventListener('hero:error', dismiss);
+    try {
+      intro.showModal();
+      root.classList.add('hero-intro-open');
+      // A missing bundle or stalled connection must never hold the site behind an intro.
+      timeout = setTimeout(dismiss, 10000);
+    } catch { cleanup(); }
+  })();
+</script>
+<style>
+  :global(html.hero-intro-open) { overflow: hidden; }
+  .hero-intro {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+    border: 0;
+    overflow-y: auto;
+    color: #f1f6f4;
+    background: radial-gradient(ellipse at 50% 42%, #173035 0%, #0b171e 48%, #0a111b 100%);
+  }
+  .hero-intro[open], .hero-intro.is-leaving { display: grid; place-items: center; }
+  .hero-intro:not([open]):not(.is-leaving) { display: none; }
+  .hero-intro::backdrop { background: #0a111b; }
+  .is-leaving { z-index: 100; pointer-events: none; }
+  .intro-content { width: min(100%, 520px); text-align: center; }
+  .intro-eyebrow { font: 400 10px/1.7 var(--mono); letter-spacing: .15em; color: #91acae; }
+  .intro-frame { position: relative; margin: 28px 0 42px; padding: 38px 12px; }
+  .intro-frame::before, .intro-frame::after {
+    content: ''; position: absolute; width: 25px; height: 25px; border-color: #64bec6; border-style: solid; opacity: .65;
+  }
+  .intro-frame::before { top: 0; left: 0; border-width: 1px 0 0 1px; }
+  .intro-frame::after { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
+  .intro-title { font: 900 clamp(48px, 11vw, 104px)/1.15 var(--display); letter-spacing: .12em; text-indent: .12em; outline: none; }
+  :global(html[lang="en"]) .intro-title { font-size: clamp(38px, 8vw, 70px); letter-spacing: -.025em; text-indent: 0; }
+  .intro-name { margin-top: 20px; font: 500 11px/1.6 var(--mono); letter-spacing: .19em; color: #a5c6c7; }
+  .intro-progress { height: 2px; overflow: hidden; background: #ffffff1a; }
+  .intro-progress span { display: block; width: 100%; height: 100%; background: #84d0d4; transform: scaleX(var(--progress, 0)); transform-origin: left; transition: transform .3s ease; }
+  .intro-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 14px; color: #a5b8bd; font-size: 12px; }
+  .intro-percent { font: 400 11px/1.5 var(--mono); }
+  .intro-skip { min-height: 44px; margin-top: 32px; padding: 8px 14px; border: 1px solid #ffffff26; border-radius: 999px; background: transparent; color: #c2d5d7; font: 500 12px/1.5 var(--body); cursor: pointer; }
+  .intro-skip span { margin-left: 10px; }
+  .intro-skip:hover { border-color: #84d0d4; color: #fff; }
+  .intro-skip:focus-visible { outline: 2px solid #84d0d4; outline-offset: 5px; }
+  @media (prefers-reduced-motion: reduce) { .intro-progress span { transition: none; } }
+</style>
