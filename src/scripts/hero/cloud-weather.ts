@@ -1,27 +1,60 @@
 import {rng} from './util.ts';
+import type {Climate} from './seasons.ts';
 
 /**
- * Cloud characters. Each visit draws one low-cloud character plus its own amount of the two high
- * layers, so the sky mixes types instead of repeating one pattern:
- * 0 fair-weather cumulus, 1 a few small puffs under cirrus, 2 a broken stratocumulus deck,
- * 3 towering cumulus (congestus) with tall, sparse heads.
+ * Cloud characters for the low layer:
+ * 0 fair-weather cumulus, 1 a few small puffs, 2 a broken stratocumulus deck,
+ * 3 towering cumulus (congestus), 4 cumulonimbus (summer thunderheads with anvils),
+ * 5 a winter snow-cloud deck, low and grey.
  */
-export const CLOUD_STYLES=['cumulus','fair','stratocumulus','congestus'] as const;
+export const CLOUD_STYLES=['cumulus','fair','stratocumulus','congestus','cumulonimbus','snow'] as const;
 
-/** One weather character per visit; deterministic seeds make it reproducible in QA. */
-export function cloudWeather(seed:number) {
-  const random=rng(seed),style=Math.floor(random()*CLOUD_STYLES.length);
-  const cover=[.42,.3,.58,.34][style]+random()*.14;
-  // cloud base and top of the low layer, metres
-  const base=[1350,1500,1250,1300][style]+random()*250;
-  const top=base+[1250,700,600,2600][style]*(.8+random()*.4);
-  // high layers: cirrus streaks ~8 km up and an altocumulus field ~4.5 km up
-  const cirrus=style===1?.7+random()*.3:random()<.55?random()*.9:0;
-  const alto=style===2?0:random()<.4?.35+random()*.55:0;
-  return {style,cover,base,top,cirrus,alto,
+/** How often each character turns up in each season (weights in CLOUD_STYLES order). */
+const SEASON_STYLES:Record<Climate,number[]>={
+  spring:[3,4,2,1,0,0],
+  // thunderheads over the mountains are the summer sky in Kyoto
+  summer:[2,2,0,2,4,0],
+  // autumn is mostly clear, with mackerel skies (see `alto`)
+  autumn:[2,5,2,0,0,0],
+  winter:[0,3,3,0,0,4],
+};
+
+/**
+ * Low-cloud cover inside a group of clouds, base and depth for each character. `clear` is the
+ * share of the sky left as open gaps between groups, so the sky stays scattered, not crowded.
+ */
+const SHAPES=[
+  {cover:[.36,.46],clear:[.55,.8],base:[1350,1600],depth:[900,1500]},
+  {cover:[.28,.36],clear:[.5,.8],base:[1450,1750],depth:[450,800]},
+  {cover:[.46,.56],clear:[.3,.55],base:[1250,1500],depth:[450,700]},
+  {cover:[.32,.4],clear:[.65,.85],base:[1300,1550],depth:[2200,3400]},
+  {cover:[.38,.46],clear:[.75,.9],base:[1200,1450],depth:[5800,6800]},
+  {cover:[.56,.64],clear:[.1,.25],base:[850,1050],depth:[550,850]},
+];
+
+const pick=(random:()=>number,weights:number[])=>{
+  let r=random()*weights.reduce((a,b)=>a+b,0);
+  for(let i=0;i<weights.length;i++){r-=weights[i];if(r<0)return i;}
+  return weights.length-1;
+};
+
+/**
+ * One weather character per visit and season; deterministic seeds make it reproducible in QA.
+ * The seed also places the clouds, so the same character never lays out the same sky twice.
+ */
+export function cloudWeather(seed:number,climate:Climate='spring') {
+  const random=rng(seed),style=pick(random,SEASON_STYLES[climate]);
+  const shape=SHAPES[style],span=(r:number[])=>r[0]+random()*(r[1]-r[0]);
+  const cover=span(shape.cover),clear=span(shape.clear),base=span(shape.base),top=base+span(shape.depth);
+  // high layers: cirrus streaks ~8 km up and an altocumulus (mackerel) field ~4.5 km up
+  const cirrus=style===5?0:style===1&&random()<.6?.5+random()*.5:random()<.4?random()*.8:0;
+  const alto=style>=4?0:climate==='autumn'&&random()<.65?.5+random()*.5:random()<.25?.3+random()*.5:0;
+  return {style,cover,clear,base,top,cirrus,alto,
     offset:[random()*256,random()*256] as const,
     wind:[.0005+random()*.0005,(random()-.5)*.0008] as const};
 }
+
+export type CloudWeather=ReturnType<typeof cloudWeather>;
 
 /** Continuous drift plus cumulative user-requested time travel, never the live clock. */
 export function createCloudClock() {

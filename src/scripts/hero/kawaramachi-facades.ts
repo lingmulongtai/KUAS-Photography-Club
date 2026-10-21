@@ -33,10 +33,12 @@ function outline(b:BoxBuilding){
  * This preserves all setbacks and roads; facade bays are illustrative, without fake ads. */
 export function kawaramachiFacades(data:{boxes:BoxBuilding[];polys:PolyBuilding[]},hf:{height(x:number,z:number):number}){
   const parts:Part[]=[],sites:string[]=[];
+  /** the buildings given a facade, which keep their walls free of other dressing */
+  const dressed=new Set<BoxBuilding|PolyBuilding>();
   for(const source of [...data.polys,...data.boxes.filter(b=>b.x>600&&b.x<980&&b.z>-140&&b.z<150)]){
     const ring='ring' in source?source.ring:outline(source),b=bounds(ring);
     const style=styles.find(s=>s.bounds.every((v,i)=>Math.abs(v-b[i])<2));if(!style)continue;
-    sites.push(style.id);
+    sites.push(style.id);dressed.add(source);
     const base=hf.height('ring' in source?ring[0]:source.x,'ring' in source?ring[1]:source.z)+source.ground;
     const floor=source.h/style.floors;
     let area=0;for(let i=0;i<ring.length;i+=2){const j=(i+2)%ring.length;area+=ring[i]*ring[j+1]-ring[j]*ring[i+1];}
@@ -80,5 +82,5 @@ export function kawaramachiFacades(data:{boxes:BoxBuilding[];polys:PolyBuilding[
       }
     }
   }
-  return {parts,sites};
+  return {parts,sites,dressed};
 }
