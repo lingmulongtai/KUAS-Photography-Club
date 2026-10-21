@@ -190,6 +190,15 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       varying vec3 vWorld;
 
       vec2 boxUv(vec4 b, vec2 p){ return (p - b.xy) / (b.zw - b.xy); }
+      // World-fixed colour blocks across every photo sheet. Original gradients preserve mip
+      // filtering, and subpixel blocks fade out instead of shimmering on the distant slopes.
+      vec3 blockPhoto(sampler2D image, vec4 box, vec2 p, float fp){
+        vec2 uv=boxUv(box,p)*vec2(1.,-1.)+vec2(0.,1.);
+        vec2 cell=(floor(p/8.)+.5)*8.;
+        vec2 at=mix(p,cell,1.-smoothstep(1.5,5.,fp));
+        vec2 blockUv=boxUv(box,at)*vec2(1.,-1.)+vec2(0.,1.);
+        return textureGrad(image,blockUv,dFdx(uv),dFdy(uv)).rgb;
+      }
       float segment(vec2 p, vec4 s){
         vec2 ab = s.zw - s.xy;
         return length(p - s.xy - ab * clamp(dot(p - s.xy, ab) / dot(ab, ab), 0., 1.));
@@ -220,12 +229,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
 
         // aerial photo: the sharper city sheet where we have it
         vec2 uw = boxUv(uAerialWideBox, p);
-        vec3 photo = texture2D(uAerialWide, vec2(uw.x, 1. - uw.y)).rgb;
-        vec2 uo=boxUv(uOuterBox,p);
-        vec3 outerPhoto=texture2D(uOuterPhoto,vec2(uo.x,1.-uo.y)).rgb;
+        vec3 photo = blockPhoto(uAerialWide,uAerialWideBox,p,fp);
+        vec3 outerPhoto=blockPhoto(uOuterPhoto,uOuterBox,p,fp);
         photo=mix(photo,mix(outerPhoto,photo,inside(uAerialWideBox,p,300.)),uOuterOn);
-        vec2 uc = boxUv(uAerialCityBox, p);
-        vec3 city = texture2D(uAerialCity, vec2(uc.x, 1. - uc.y)).rgb;
+        vec3 city = blockPhoto(uAerialCity,uAerialCityBox,p,fp);
         float mappedForest = texture2D(uWoodland, uw).a * uWoodlandOn * inside(uAerialWideBox,p,5.);
         photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
         // Sharper local photos. Only a uniform condition guards the samples, never a spatial
@@ -233,9 +240,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         float detail = 0.;
         ${photos.map((_, i) => `
         if (uPhotoOn${i} > 0.) {
-          vec2 du = boxUv(uPhotoBox${i}, p);
           float k = inside(uPhotoBox${i}, p, 120.);
-          photo = mix(photo, texture2D(uPhoto${i}, vec2(du.x, 1. - du.y)).rgb, k);
+          photo = mix(photo, blockPhoto(uPhoto${i},uPhotoBox${i},p,fp), k);
           detail = max(detail, k);
         }`).join('')}
 
@@ -249,13 +255,14 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // each layer of canopy fades to its average once its blobs shrink below a few pixels
           float k1 = 1. - smoothstep(.2, .45, fp * .22);
           float k2 = 1. - smoothstep(.2, .45, fp * .55);
-          float c1 = vnoise(p * .22);
-          float c2 = vnoise(p * .55 + 7.);
+          vec2 canopyCell=(floor(p/4.)+.5)*4.;
+          float c1 = vnoise(canopyCell * .22);
+          float c2 = vnoise(canopyCell * .55 + 7.);
           float canopy = mix(.5, c1, k1) * .65 + mix(.5, c2, k2) * .35;
           float synthetic=green*near*mix(1.,.35,detail);
           // kept gentle: stronger contrast read as dark spots all over the hillsides
           photo *= mix(1., .72 + .56 * canopy, synthetic);
-          vec2 g = vec2(vnoise(p * .22 + vec2(.6, 0.)) - c1, vnoise(p * .22 + vec2(0., .6)) - c1);
+          vec2 g = vec2(vnoise(canopyCell * .22 + vec2(.6, 0.)) - c1, vnoise(canopyCell * .22 + vec2(0., .6)) - c1);
           n = normalize(n + vec3(-g.x, 0., -g.y) * .9 * synthetic * k1);
         }
 

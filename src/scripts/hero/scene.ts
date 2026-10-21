@@ -5,6 +5,7 @@ import { KYOTO, directionFrom, jstMinutes, jstParts, localSiderealAngle, moonPos
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import type { Box } from './geo';
 import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
+import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
 import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
 import { buildCelestial, buildSkyDome } from './sky';
@@ -67,7 +68,7 @@ export interface HeroStatus {
   moonAge: number;
 }
 
-export interface HeroOptions {
+export interface HeroOptions extends HeroLoadingCallbacks {
   lang?: 'ja' | 'en';
   /** Date to render for this frame. */
   now: () => Date;
@@ -76,7 +77,6 @@ export interface HeroOptions {
   quality: number;
   trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
-  onReady?: () => void;
   /** A neighbouring area is loading; all navigation remains available. */
   onAreaLoading?:(loading:boolean)=>void;
   onExplore?:(exploring:boolean)=>void;
@@ -160,13 +160,14 @@ export function createHero(
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const loading = createHeroLoading(opts, 9);
 
   (async () => {
-    const meta = await loadJSON<TerrainMeta>('terrain.json');
+    const meta = await loading.track(loadJSON<TerrainMeta>('terrain.json'));
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
-    const [hf, wide, outer] = await Promise.all([loadHeightfield(meta), loadTexture(wideFile, aniso),
-      meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
-        .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : null]);
+    const [hf, wide, outer] = await Promise.all([loading.track(loadHeightfield(meta)), loading.track(loadTexture(wideFile, aniso)),
+      loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
+        .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : Promise.resolve(null))]);
     groundAt = (x, z) => hf.height(x, z);
     eye.copy(eyeOf(VIEW));
     campus.y = hf.height(campus.x, campus.z) + 14;
@@ -216,7 +217,7 @@ export function createHero(
     casts(terrain.mesh);
     shadow.invalidate();
     const waterFiles=[...(meta.arashiyama?[meta.arashiyama.water.file]:[]),'water-kamo.json.gz'];
-    const [cityPhoto, buildings, lines, woodlandBytes] = await Promise.all([loadTexture(meta.aerialCity.file, aniso), loadBuildings(), loadLines(waterFiles), loadBinary('woodland.json.gz')]);
+    const [cityPhoto, buildings, lines, woodlandBytes] = await Promise.all([loading.track(loadTexture(meta.aerialCity.file, aniso)), loading.track(loadBuildings()), loading.track(loadLines(waterFiles)), loading.track(loadBinary('woodland.json.gz'))]);
     const channel=createKamoChannel(lines,(x,z)=>hf.height(x,z));
     terrain.setChannel(channel,kamoMask(channel));
     const bridges=buildBridges(env,hf,lines,channel);
@@ -382,8 +383,8 @@ export function createHero(
           terrain.uniforms.uRegionalOn.value=oldNormalOn;campusNormal.dispose();}
       };
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
-    const regionManifest=await loadJSON<{regions:CityRegion[]}>('regions.json')
-      .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};});
+    const regionManifest=await loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
+      .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
     let areaRequest=0;
     ensureCityRegion=center=>{
       let region=regionAt(regionManifest.regions,center);
@@ -396,8 +397,8 @@ export function createHero(
       void regionLoader.request(region).finally(()=>{if(request===areaRequest)opts.onAreaLoading?.(false);});
     };
     ensureCityRegion(landscapeCenter(VIEW));
-    opts.onReady?.();
-  })().catch((err) => console.error('Kyoto data failed to load', err));
+    loading.built();
+  })().catch((err) => { console.error('Kyoto data failed to load', err); loading.fail(err); });
 
   let lastStatus = '';
 
@@ -748,6 +749,7 @@ export function createHero(
       meteors.update(t, dt, camera.position, { az, half, top }, env.uStars.value, pxPerM);
       post.render(t);
       labels?.update(camera, width, height);
+      loading.frame();
       // keep the frame rate up on slower devices by rendering fewer pixels
       if (dt > 0) {
         slow = dt > 0.034 ? slow + 1 : Math.max(0, slow - 1);

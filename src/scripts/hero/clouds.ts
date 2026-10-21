@@ -173,9 +173,10 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         float n = vnoise3(q);
         // finer octaves only where they are bigger than a pixel; far away they would only alias.
         // Folded noise (1 - |2n - 1|) makes rounded lobes with sharp creases between them.
-        if (dist < 14000.) n = n * .62 + (1. - abs(vnoise3(q * 3.1 + 5.) * 2. - 1.)) * .38;
+        // Fade detail continuously: hard distance cut-offs slice low winter clouds into bands.
+        if (dist < 16000.) n = mix(n, 1. - abs(vnoise3(q * 3.1 + 5.) * 2. - 1.), .38 * (1. - smoothstep(10000., 16000., dist)));
         #if DETAIL > 1
-        if (dist < 6000.) n = n * .8 + (1. - abs(vnoise3(q * 8.3 - 3.) * 2. - 1.)) * .2;
+        if (dist < 8000.) n = mix(n, 1. - abs(vnoise3(q * 8.3 - 3.) * 2. - 1.), .2 * (1. - smoothstep(4000., 8000., dist)));
         #endif
         return erode(base, n);
       }
@@ -263,6 +264,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
             float dt = span * (u1 * u1 - u0 * u0);
             vec3 pos = ro + rd * t;
             float d = density(pos, t);
+            vec3 lightPos = pos;
             if (d > .002 && !inside){
               // The ray entered a cloud somewhere since the last sample. Find where: shaded at the
               // step it happened to land on, a cloud's face would be sliced into bands, one per step.
@@ -272,24 +274,23 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
                 if (density(ro + rd * mid, mid) > .002) hi = mid;
                 else lo = mid;
               }
-              t = hi;
-              pos = ro + rd * t;
-              d = max(density(pos, t), .003);
-              // only the rest of the step is inside the cloud
-              dt = tEnd - t;
+              // Shade just inside the surface, but keep the interior sample's density for
+              // absorption. Integrating the almost-empty boundary made each step a thin stripe.
+              lightPos = ro + rd * (hi + min(30., (tEnd - hi) * .5));
+              dt = tEnd - hi;
             }
             inside = d > .002;
             tPrev = t;
             if (d > .002){
-              float h = clamp((pos.y - uBase) / (uTop - uBase), 0., 1.);
+              float h = clamp((lightPos.y - uBase) / (uTop - uBase), 0., 1.);
               // light from the sun, dimmed by the cloud above and toward it
               // (bigger clouds shade themselves over a bigger distance)
               float ls = isStyle(4.) ? 3. : isStyle(3.) ? 1.8 : 1.;
               #if DETAIL > 1
               // near the surface the billows shade each other, which models the heads
-              float od = (lumps(pos + uSunDir * 90. * ls) * 90. + coarse(pos + uSunDir * 320. * ls) * 230.) * ls;
+              float od = (lumps(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
               #else
-              float od = (coarse(pos + uSunDir * 90. * ls) * 90. + coarse(pos + uSunDir * 320. * ls) * 230.) * ls;
+              float od = (coarse(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
               #endif
               // beer's law plus a softer second term for light scattered many times inside
               float toSun = exp(-od * .006) * .65 + exp(-od * .0014) * .35;

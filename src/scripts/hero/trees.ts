@@ -98,36 +98,18 @@ export function createForest(
     return { pos, size, tint, kind, lods, shapes,season };
   }
 
-  // broadleaf crown: two flattened blobs; cedar: a narrow cone. Both unit-sized, base at y = 0.
-  const blob1 = new THREE.IcosahedronGeometry(0.5, 1).scale(1, 0.7, 1).translate(0, 0.62, 0);
-  const blob2 = new THREE.IcosahedronGeometry(0.36, 1).scale(1, 0.75, 1).translate(0.18, 0.86, 0.1);
-  const crown = mergeGeometries([blob1, blob2]);
-  const trunk = new THREE.CylinderGeometry(.035, .05, .45, 6).translate(0, .225, 0).toNonIndexed();
-  for(const geo of [crown,trunk]) geo.deleteAttribute('uv');
-  crown.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(crown.getAttribute('position').count),1));
-  trunk.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(trunk.getAttribute('position').count).fill(1),1));
-  // Up close, crowns are built from blocks, voxel-game style (see voxelCrown); the smooth
-  // shapes above stay for the middle distance, where blocks would only shimmer.
+  // Keep block silhouettes in every ring. Beyond the close trees, two boxes then one replace
+  // the old round crowns; distant clusters cost 12 triangles instead of 20 and cannot sparkle
+  // with subpixel voxels. Population density, chunk culling and cache budgets stay the same.
   const closeCrown = voxelCrown();
-  void crown;
-  const farCrown = new THREE.IcosahedronGeometry(.5, 0).scale(1, .65, 1).translate(0, .65, 0);
-  // The 20-face crown has flat normals and glinted like a cut gem from the hills: shade it as
-  // the ellipsoid it stands for.
-  {
-    const p = farCrown.getAttribute('position'), n = farCrown.getAttribute('normal');
-    const v = new THREE.Vector3();
-    for (let i = 0; i < p.count; i++) {
-      v.set(p.getX(i) / .25, (p.getY(i) - .65) / (.325 * .325), p.getZ(i) / .25).normalize();
-      n.setXYZ(i, v.x, v.y, v.z);
-    }
-  }
-  const cone = new THREE.ConeGeometry(0.5, .75, 7, 1, true).translate(0, .625, 0).toNonIndexed();
-  for (const geo of [farCrown, cone]) {
-    geo.deleteAttribute('uv');
-    geo.setAttribute('aBark',new THREE.Float32BufferAttribute(new Float32Array(geo.getAttribute('position').count),1));
-  }
-  for (const geo of [farCrown, cone]) geo.setAttribute('aVox',new THREE.Float32BufferAttribute(new Float32Array(geo.getAttribute('position').count),1));
+  const midCrown = blocksGeometry([
+    {c:[0,.56,0],s:[.9,.48,.88],shade:.4,bark:0},
+    {c:[.15,.85,.08],s:[.58,.32,.56],shade:.7,bark:0},
+  ]);
+  const farCrown = blocksGeometry([{c:[0,.66,0],s:[.86,.65,.86],shade:.5,bark:0}]);
   const closeCedar=voxelCedar();
+  const midCedar=voxelCedar(2);
+  const farCedar=blocksGeometry([{c:[0,.625,0],s:[.65,.75,.65],shade:.5,bark:0}]);
 
   const vertexShader = /* glsl */ `
       attribute vec3 iPos;
@@ -254,7 +236,8 @@ export function createForest(
     });
     for (const idx of chunks.values()) {
       const first = idx[0];
-      const shape = kind[first] === 1 ? lods[first] === 0 ? closeCedar : cone : lods[first] === 0 ? closeCrown : farCrown;
+      const shapesByLod = kind[first] === 1 ? [closeCedar,midCedar,farCedar,farCedar] : [closeCrown,midCrown,farCrown,farCrown];
+      const shape = shapesByLod[lods[first]];
       const geo = new THREE.InstancedBufferGeometry();
       geo.setAttribute('position', shape.getAttribute('position'));
       geo.setAttribute('normal', shape.getAttribute('normal'));
@@ -376,14 +359,13 @@ function voxelCrown() {
 }
 
 /** A cedar as a stack of shrinking square tiers. */
-function voxelCedar() {
+function voxelCedar(tiers=5) {
   const blocks: Block[] = [];
-  const tiers = 5;
   for (let t = 0; t < tiers; t++) {
     const w = 0.95 * (1 - t / tiers) + 0.06;
     const h = 0.75 / tiers;
     blocks.push({ c: [0, 0.25 + h * (t + 0.5), 0], s: [w, h, w], shade: 0.25 + 0.6 * ((t * 0.37) % 1), bark: 0 });
   }
-  blocks.push({ c: [0, 0.14, 0], s: [0.07, 0.28, 0.07], shade: 0.5, bark: 1 });
+  if(tiers>2)blocks.push({ c: [0, 0.14, 0], s: [0.07, 0.28, 0.07], shade: 0.5, bark: 1 });
   return blocksGeometry(blocks);
 }
