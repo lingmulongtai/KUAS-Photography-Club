@@ -4,6 +4,10 @@ import KyotoHero from '../../components/KyotoHero.astro';
 import ClubFacts from '../../components/ClubFacts.astro';
 import UpcomingEvents from '../../components/UpcomingEvents.astro';
 import InstagramSection from '../../components/InstagramSection.astro';
+import ReelHero from '../../components/ReelHero.astro';
+import { reelPhotos } from '../../lib/trips';
+
+const reel = await reelPhotos('en');
 ---
 <Base lang="en" overlayHeader title="Photography under Kyoto’s sky" description="The website operated by the KUAS Photography Club. Visit, join, check confirmed plans and learn photography.">
   <KyotoHero lang="en" />
@@ -12,7 +16,17 @@ import InstagramSection from '../../components/InstagramSection.astro';
     <ClubFacts lang="en" /><p><a class="btn btn--primary" href="/en/join/">Plan a visit →</a></p>
   </div></section>
   <section class="section"><div class="wrap"><div class="section-head"><p class="edge">SCHEDULE</p><h2>Coming up</h2></div><UpcomingEvents lang="en" /><p><a href="/en/schedule/">See the schedule →</a></p></div></section>
-  <section class="section"><div class="wrap"><div class="section-head"><p class="edge">PHOTO TRIPS</p><h2>Outing records</h2><p>Members plan outings together. Public activity records are being prepared.</p></div><p><a href="/en/trips/">View outing records →</a></p></div></section>
+  <ReelHero
+    variant="section"
+    lang="en"
+    headingId="latest-title"
+    photos={reel.photos}
+    placeholder={reel.placeholder}
+    edge="PHOTO TRIPS"
+    title="Outing records"
+    lead="Members plan outings together, around Kyoto and a little beyond."
+    link={{ href: '/en/trips/', label: 'View outing records →' }}
+  />
   <section class="section"><div class="wrap"><div class="section-head"><p class="edge">LEARN</p><h2>Explore photography.</h2><p>Learn about shutter speed, aperture, focal length and developing.</p></div><p><a class="btn" href="/en/learn/">Start learning →</a></p></div></section>
   <InstagramSection lang="en" />
 </Base>

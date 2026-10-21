@@ -9,6 +9,10 @@ import type { ReelCard } from '../../data/reel-placeholders';
  * photos: each card takes the next photo while it is behind the viewer.
  *
  * Plain CSS 3D transforms. Card poses come from pose.ts.
+ *
+ * Further down a page (the home page's latest trips) the root carries data-entrance="view": the
+ * deal then waits until the reel has scrolled well into view. data-scale shrinks the cards for a
+ * shorter stage, and data-seen-key keeps its play-once-per-session flag apart from the hero's.
  */
 
 
@@ -18,6 +22,8 @@ const REVEAL_MS = 1700;
 const WAIT_MS = 4500;
 const AUTO_SPIN = 0.07;
 const SEEN_KEY = 'kuas-reel-seen';
+/** how much of a data-entrance="view" reel must show before the deal starts */
+const VIEW_SHARE = 0.45;
 
 export function mountReel(root: HTMLElement) {
   const photos = JSON.parse(root.dataset.photos ?? '[]') as ReelCard[];
@@ -28,22 +34,30 @@ export function mountReel(root: HTMLElement) {
   const caption = root.querySelector<HTMLElement>('[data-scramble]');
   const skip = root.querySelector<HTMLButtonElement>('[data-skip]');
   if (!photos.length || !slots.length) return;
+  const scale = Number(root.dataset.scale) || 1;
+  const seenKey = root.dataset.seenKey || SEEN_KEY;
+  const onView = root.dataset.entrance === 'view';
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let seen = false;
   try {
-    seen = sessionStorage.getItem(SEEN_KEY) === '1';
+    seen = sessionStorage.getItem(seenKey) === '1';
   } catch {
     // storage blocked: just play the entrance
   }
 
-  let layout: ReelLayout = layoutFor(stage.clientWidth || 1280);
-  let phase: 'deal' | 'reveal' | 'open' = reduced || seen ? 'open' : 'deal';
+  // phone cards are already small for the stage, so data-scale only shrinks wider layouts
+  const layoutNow = () => {
+    const w = stage.clientWidth || 1280;
+    return layoutFor(w, w < 700 ? 1 : scale);
+  };
+  let layout: ReelLayout = layoutNow();
+  let phase: 'wait' | 'deal' | 'reveal' | 'open' = reduced || seen ? 'open' : onView ? 'wait' : 'deal';
   let formation = phase === 'open' ? 1 : 0;
   let expansion = phase === 'open' ? 1 : 0;
   let spin = 0;
   let target = 0;
-  const start = performance.now();
+  let start = performance.now();
   let revealAt = 0;
 
   /* ---- what each slot shows ---- */
@@ -106,7 +120,8 @@ export function mountReel(root: HTMLElement) {
   progress();
 
   // the caption types itself in from scrambled letters
-  if (caption && phase === 'deal') {
+  const scramble = () => {
+    if (!caption) return;
     const word = caption.textContent ?? '';
     const glyphs = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let tick = 0;
@@ -115,9 +130,29 @@ export function mountReel(root: HTMLElement) {
       caption.textContent = [...word].map((c, i) => (c === ' ' || i < tick / 2 ? c : glyphs[(Math.random() * glyphs.length) | 0])).join('');
       if (tick / 2 >= word.length) clearInterval(timer);
     }, 45);
-  }
+  };
 
   /* ---- entrance ---- */
+  const beginDeal = () => {
+    if (phase !== 'wait') return;
+    phase = 'deal';
+    start = performance.now();
+    root.classList.add('is-entering');
+    scramble();
+  };
+  if (phase === 'deal') scramble();
+  if (phase === 'wait') {
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        io.disconnect();
+        beginDeal();
+      },
+      { threshold: VIEW_SHARE },
+    );
+    io.observe(root);
+  }
+
   const finishEntrance = () => {
     if (phase !== 'open') {
       phase = 'open';
@@ -126,16 +161,17 @@ export function mountReel(root: HTMLElement) {
     }
     root.classList.add('is-open');
     try {
-      sessionStorage.setItem(SEEN_KEY, '1');
+      sessionStorage.setItem(seenKey, '1');
     } catch {
       // fine
     }
   };
   if (phase === 'open') finishEntrance();
-  else root.classList.add('is-entering');
+  else if (phase === 'deal') root.classList.add('is-entering');
   skip?.addEventListener('click', finishEntrance);
   const onKey = (e: KeyboardEvent) => {
-    if (phase !== 'open' && (e.key === 'Escape' || e.key === 'Tab')) finishEntrance();
+    // only while the deal is on screen; a waiting reel further down the page leaves keys alone
+    if ((phase === 'deal' || phase === 'reveal') && (e.key === 'Escape' || e.key === 'Tab')) finishEntrance();
   };
   addEventListener('keydown', onKey);
 
@@ -216,7 +252,7 @@ export function mountReel(root: HTMLElement) {
   );
 
   addEventListener('resize', () => {
-    layout = layoutFor(stage.clientWidth || 1280);
+    layout = layoutNow();
   });
 
   /* ---- frame loop, paused while off screen ---- */
@@ -257,7 +293,7 @@ export function mountReel(root: HTMLElement) {
       if (x > 0.55) root.classList.add('is-open');
       if (x >= 1) finishEntrance();
     }
-    if (phase !== 'deal' && !reduced) {
+    if ((phase === 'reveal' || phase === 'open') && !reduced) {
       if (!dragging && !hover && now > idleUntil && !root.contains(document.activeElement)) target -= AUTO_SPIN * dt;
       spin += (target - spin) * (1 - Math.exp(-dt * 6));
     }

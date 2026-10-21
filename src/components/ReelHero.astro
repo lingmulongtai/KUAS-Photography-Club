@@ -6,6 +6,9 @@
  *
  * Until trips are published the cards are drawn cards for the places the club photographs,
  * linking to their spot pages: no photographs and no invented records.
+ *
+ * variant="section" is the same reel as a band further down a page (the home page's latest
+ * trips): an h2, smaller cards, a link onward, and the deal waits until it scrolls into view.
  */
 import type { ReelCard } from '../data/reel-placeholders';
 import type { SiteLanguage } from '../lib/i18n';
@@ -18,9 +21,16 @@ interface Props {
   /** the cards are places, not photos from outings yet */
   placeholder?: boolean;
   lang?: SiteLanguage;
+  variant?: 'hero' | 'section';
+  /** id of the heading, for a page that links to it */
+  headingId?: string;
+  /** a link onward under the title, e.g. to all trips */
+  link?: { href: string; label: string };
 }
-const { photos, edge, title, lead, placeholder = false, lang = 'ja' } = Astro.props;
+const { photos, edge, title, lead, placeholder = false, lang = 'ja', variant = 'hero', headingId = 'reel-title', link } = Astro.props;
 const en = lang === 'en';
+const section = variant === 'section';
+const Heading = section ? 'h2' : 'h1';
 const SLOTS = 16;
 const t = en
   ? {
@@ -42,14 +52,22 @@ const t = en
       placeholder: '撮影会の記録を公開すると、ここに写真が並びます。いまは撮影に出かける場所を表示しています。',
     };
 ---
-<section class="reel" data-reel data-photos={JSON.stringify(photos)} aria-labelledby="reel-title">
+<section
+  class:list={['reel', { 'reel--section': section }]}
+  data-reel
+  data-photos={JSON.stringify(photos)}
+  data-entrance={section ? 'view' : undefined}
+  data-scale={section ? '0.72' : undefined}
+  data-seen-key={section ? 'kuas-reel-seen-section' : undefined}
+  aria-labelledby={headingId}
+>
   <div class="motif" aria-hidden="true"><span class="dot"></span></div>
   <div class="reel-stage" data-reel-stage tabindex="0" role="group" aria-roledescription={en ? 'carousel' : 'カルーセル'} aria-label={t.ring}>
     <div class="reel-ring" data-reel-ring>
       {Array.from({ length: SLOTS }, (_, i) => (
         <a class="reel-card" data-slot={i} tabindex="-1" draggable="false">
           <span class="face front">
-            <img alt="" decoding="async" draggable="false" />
+            <img alt="" decoding="async" loading={section ? 'lazy' : undefined} draggable="false" />
             <span class="art" data-art hidden aria-hidden="true"><span class="art-name" data-art-name></span></span>
             <span class="cap">
               {placeholder && <span class="badge">PHOTO SPOT</span>}
@@ -72,9 +90,10 @@ const t = en
   <div class="copy">
     <div class="wrap">
       <p class="edge">{edge}</p>
-      <h1 id="reel-title" set:html={title} />
+      <Heading id={headingId} set:html={title} />
       {lead && <p class="lead">{lead}</p>}
       {placeholder && <p class="sample-note small">{t.placeholder}</p>}
+      {link && <a class="link-arrow onward" href={link.href}>{link.label}</a>}
     </div>
   </div>
 
@@ -93,14 +112,32 @@ const t = en
 <style>
   .reel {
     --card-w: 300px;
+    --reel-bg: var(--brand-pale);
     position: relative;
     height: clamp(560px, 82vh, 780px);
     overflow: hidden;
     isolation: isolate;
     background:
       radial-gradient(ellipse 70% 60% at 50% 42%, var(--raise-2), transparent 70%),
-      var(--brand-pale);
+      var(--reel-bg);
     margin-bottom: clamp(32px, 5vw, 56px);
+  }
+
+  /* a band between the page's sections: page-coloured, so it never runs into a pale section */
+  .reel--section {
+    --reel-bg: var(--base);
+    height: clamp(560px, 76vh, 680px);
+    margin-bottom: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  /* a little higher than the hero's, to keep the near cards clear of the title */
+  .reel--section .reel-stage {
+    perspective-origin: 50% 36%;
+  }
+
+  .reel--section .reel-ring {
+    top: 36%;
   }
 
   /* the dot of the logo's open circle; the ring itself is the circle */
@@ -377,7 +414,7 @@ const t = en
     inset: auto 0 0;
     z-index: 2;
     padding: clamp(80px, 14vh, 140px) 0 clamp(24px, 4vw, 44px);
-    background: linear-gradient(to top, var(--brand-pale) 34%, transparent);
+    background: linear-gradient(to top, var(--reel-bg) 34%, transparent);
     pointer-events: none;
     opacity: 0;
     transform: translateY(14px);
@@ -397,6 +434,15 @@ const t = en
 
   .copy h1 {
     font-size: var(--step-5);
+  }
+
+  .copy h2 {
+    font-size: var(--step-4);
+  }
+
+  .onward {
+    pointer-events: auto;
+    margin-top: 2px;
   }
 
   .copy .lead {
@@ -462,6 +508,18 @@ const t = en
 
     .reel-ring {
       top: 31%;
+    }
+
+    .reel--section {
+      height: clamp(560px, 82vh, 660px);
+    }
+
+    .reel--section .reel-stage {
+      perspective-origin: 50% 30%;
+    }
+
+    .reel--section .reel-ring {
+      top: 30%;
     }
 
     .copy .wrap {
