@@ -14,6 +14,7 @@ import {buildSnow} from './src/scripts/hero/season-effects.ts';
 import {buildKiyomizuBeam} from './src/scripts/hero/kiyomizu-beam.ts';
 import {buildRailways} from './src/scripts/hero/railways.ts';
 import {buildClouds} from './src/scripts/hero/clouds.ts';
+import {buildTerrain} from './src/scripts/hero/terrain.ts';
 const renderer=new THREE.WebGLRenderer({antialias:false});renderer.setSize(320,240);document.body.append(renderer.domElement);
 renderer.debug.onShaderError=(gl,program,vs,fs)=>{throw Error(gl.getProgramInfoLog(program)+' '+gl.getShaderInfoLog(vs)+' '+gl.getShaderInfoLog(fs));};
 const env=createEnv();env.uSnow.value=1;env.uSpring.value=1;env.uAutumn.value=1;env.uSunDir.value.set(.3,.8,.3).normalize();env.uSunLight.value.setRGB(1,1,1);
@@ -21,6 +22,9 @@ const depth=new THREE.DepthTexture(1,1,THREE.UnsignedIntType);depth.compareFunct
 const built=new THREE.DataTexture(new Uint8Array([0,0,0,0]),1,1);built.needsUpdate=true;env.uBuilt.value=built;
 const image=document.createElement('canvas');image.width=image.height=32;const ctx=image.getContext('2d');ctx.fillStyle='#22551e';ctx.fillRect(0,0,32,32);
 const hf={height:()=>0,normal:(_x,_z,_step,out)=>Object.assign(out,{x:0,y:1,z:0})};
+const box=[-11000,-11000,11000,11000],photo=new THREE.CanvasTexture(image);
+const normal=new THREE.DataTexture(new Uint8Array([128,255,128,255]),1,1);normal.needsUpdate=true;
+const terrain=buildTerrain(env,{...hf,bounds:box},{x:0,z:0},{aerialWide:photo,aerialWideBox:box,aerialCity:photo,aerialCityBox:box,normalFar:normal,normalFarBox:box,normalNear:normal,normalNearBox:box,photos:[box]},16);terrain.setPhoto(0,photo);
 const forest=createForest(env,hf,image,[-11000,-11000,11000,11000],.55,[{x:0,y:0,z:0,cherry:true}]);forest.plant({x:0,z:0},0);
 const snow=buildSnow(env,.55),rail=buildRailways(env,()=>0,${JSON.stringify(rails.routes)}),beam=buildKiyomizuBeam(env,()=>0);
 const camera=new THREE.PerspectiveCamera(60,4/3,1,60000);camera.position.set(0,80,130);camera.lookAt(0,0,0);
@@ -39,7 +43,7 @@ window.runSceneryChecks=()=>{
   if(farInstances<100)throw Error('Distant forest was not covered');
   stats.push({name:'block-forest-budget',quality,instances:canopy.count,farInstances,triangles});
  }
- for(const [name,object] of [['forest',forest.group],['snow',snow.points],['railways',rail.group],['beam',beam]]){
+ for(const [name,object] of [['terrain',terrain.mesh],['forest',forest.group],['snow',snow.points],['railways',rail.group],['beam',beam]]){
   const scene=new THREE.Scene();scene.add(object);renderer.info.reset();renderer.render(scene,camera);
   const error=renderer.getContext().getError();if(error)throw Error(name+' GPU error '+error);
   const info={name,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,points:renderer.info.render.points};
