@@ -104,8 +104,9 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           n = isStyle(4.) ? big : mix(small, big, smoothstep(.3, .7, vnoise(p * 1.3 - 9.7)));
         }
         float th = 1. - uCover * (.7 + .6 * region) + clear * .4;
-        // some heads stay flat while their neighbours tower
-        float tall = deck() || isStyle(4.) ? 1. : mix(.45, 1., vnoise(p * 3.3 + 1.9));
+        // some heads stay flat while their neighbours tower; a thunderhead climbs in turrets
+        float tall = deck() ? 1. : isStyle(4.) ? mix(.5, 1., vnoise(p * 6. + 1.9)) : mix(.45, 1., vnoise(p * 3.3 + 1.9));
+        if (isStyle(3.) || isStyle(4.)) tall *= mix(.75, 1., vnoise(p * 15. - 6.1));
         return vec3(n, th, tall);
       }
 
@@ -125,7 +126,14 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
       float coarse(vec3 pos){
         float h = (pos.y - uBase) / (uTop - uBase);
         if (h < 0. || h > 1.) return 0.;
-        vec3 f = field(pos.xz * K + uWind + uOffset);
+        vec2 xz = pos.xz;
+        if (isStyle(3.) || isStyle(4.)){
+          // towers lean and bulge as they climb, so their sides break into heaped lobes instead
+          // of running straight up from the outline at the base
+          vec3 w = pos * .00045;
+          xz += (vec2(vnoise3(w), vnoise3(w + 17.3)) - .5) * (uTop - uBase) * .22;
+        }
+        vec3 f = field(xz * K + uWind + uOffset);
         float c = cover(f, 0.);
         float d = smoothstep(0., .1, crown(c) * f.z - h) * smoothstep(0., .04, h) * smoothstep(0., .25, c);
         if (isStyle(4.)){
@@ -136,13 +144,30 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         return d;
       }
 
+      /** Where the billows are: tall clouds churn in bigger ones. */
+      vec3 billowAt(vec3 pos){
+        return (pos + vec3(uWind.x, 0., uWind.y) / K) * (isStyle(4.) ? .0011 : isStyle(3.) ? .0015 : .0021);
+      }
+
+      /** 3D noise n eats into the edges more than the core. */
+      float erode(float base, float n){
+        // a steep ramp keeps the edges crisp instead of fading out like fog
+        // (towering clouds are lumpier: their heads bulge out of the tower)
+        float bite = isStyle(4.) ? 1.25 : isStyle(3.) ? 1.05 : .9;
+        return clamp((base - (1. - base * .5) * smoothstep(.2, .85, n) * bite) * 2.4, 0., 1.);
+      }
+
+      /** The cloud with its big billows only: for the shadows the billows cast on each other. */
+      float lumps(vec3 pos){
+        float base = coarse(pos);
+        return base < .001 ? 0. : erode(base, vnoise3(billowAt(pos)));
+      }
+
       float density(vec3 pos, float dist){
         float base = coarse(pos);
         if (base < .001) return 0.;
-        // billows: 3D noise eats into the edges more than the core, so the outline turns into
-        // the rounded cauliflower heads of real cumulus
-        // tall clouds churn in bigger billows
-        vec3 q = (pos + vec3(uWind.x, 0., uWind.y) / K) * (isStyle(4.) ? .0011 : isStyle(3.) ? .0015 : .0021);
+        // billows: the outline turns into the rounded cauliflower heads of real cumulus
+        vec3 q = billowAt(pos);
         float n = vnoise3(q);
         // finer octaves only where they are bigger than a pixel; far away they would only alias.
         // Folded noise (1 - |2n - 1|) makes rounded lobes with sharp creases between them.
@@ -150,11 +175,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         #if DETAIL > 1
         if (dist < 6000.) n = n * .8 + (1. - abs(vnoise3(q * 8.3 - 3.) * 2. - 1.)) * .2;
         #endif
-        n = smoothstep(.2, .85, n);
-        // a steep ramp keeps the edges crisp instead of fading out like fog
-        // (towering clouds are lumpier: their heads bulge out of the tower)
-        float bite = isStyle(4.) ? 1.25 : isStyle(3.) ? 1.05 : .9;
-        return clamp((base - (1. - base * .5) * n * bite) * 2.4, 0., 1.);
+        return erode(base, n);
       }
 
       /** Henyey-Greenstein phase, times 4π so isotropic scattering is 1. */
@@ -240,7 +261,12 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
               // light from the sun, dimmed by the cloud above and toward it
               // (bigger clouds shade themselves over a bigger distance)
               float ls = isStyle(4.) ? 3. : isStyle(3.) ? 1.8 : 1.;
+              #if DETAIL > 1
+              // near the surface the billows shade each other, which models the heads
+              float od = (lumps(pos + uSunDir * 90. * ls) * 90. + coarse(pos + uSunDir * 320. * ls) * 230.) * ls;
+              #else
               float od = (coarse(pos + uSunDir * 90. * ls) * 90. + coarse(pos + uSunDir * 320. * ls) * 230.) * ls;
+              #endif
               // beer's law plus a softer second term for light scattered many times inside
               float toSun = exp(-od * .006) * .65 + exp(-od * .0014) * .35;
               // dark edges where light can't scatter back out ("powder"), mostly away from the sun
