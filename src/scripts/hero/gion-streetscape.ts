@@ -22,6 +22,8 @@ function outline(b:BoxBuilding){
  * timber screens, deep eaves and upper windows; dimensions/joinery are illustrative. */
 export function gionStreetscape(data:{boxes:BoxBuilding[];polys:PolyBuilding[]},hf:{height(x:number,z:number):number}){
   const parts:Part[]=[],fronts:{x:number;z:number;distance:number}[]=[];
+  /** the buildings given a street front, which keep their walls free of other dressing */
+  const dressed=new Set<BoxBuilding|PolyBuilding>();
   for(const source of [...data.polys,...data.boxes.filter(b=>b.x>1330&&b.x<1490&&b.z>-50&&b.z<265)]){
     if(source.h>16||source.h<4)continue;
     const r='ring' in source?source.ring:outline(source);
@@ -34,7 +36,7 @@ export function gionStreetscape(data:{boxes:BoxBuilding[];polys:PolyBuilding[]},
       if(len<3||len>45)continue;
       const x=(ax+bx)/2,z=(az+bz)/2,q=gionStreetPoint(x,z),nx=(bz-az)/len,nz=-(bx-ax)/len;
       if(z< -15||z>237||q.distance<3||q.distance>22||((q.x-x)*nx+(q.z-z)*nz)/q.distance<.7)continue;
-      fronts.push({x,z,distance:q.distance});
+      fronts.push({x,z,distance:q.distance});dressed.add(source);
       const wall:Part['color']=z<25?[.25,.043,.025]:[.15,.082,.04];
       const face=(u0:number,u1:number,y0:number,y1:number,color:Part['color'],offset=.15,glow=.1)=>{
         const point=(u:number,y:number)=>[ax+(bx-ax)*u+nx*offset,base+y,az+(bz-az)*u+nz*offset];
@@ -60,5 +62,5 @@ export function gionStreetscape(data:{boxes:BoxBuilding[];polys:PolyBuilding[]},
       parts.push({geo:lantern,color:[.48,.23,.1],glow:3});
     }
   }
-  return {parts,fronts};
+  return {parts,fronts,dressed};
 }

@@ -52,7 +52,7 @@ import {kameokaClearing} from './kameoka-grounds';
 import {buildRailways} from './railways';
 import type {RailwayRoute} from './railway-path';
 import {moveExplorer} from './free-explore';
-import {seasonWeights,type Season} from './seasons';
+import {climateOf,seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
 import {buildKiyomizuBeam} from './kiyomizu-beam';
@@ -119,7 +119,7 @@ export function createHero(
   const meteors = buildMeteors(opts.quality);
   // ?clouds=<seed> pins the visit's weather so a sky can be reproduced in QA
   const cloudSeed=Number(new URLSearchParams(location.search).get('clouds'));
-  const clouds = buildClouds(env, Number.isInteger(cloudSeed)&&cloudSeed>0?cloudSeed:undefined, opts.quality);
+  const clouds = buildClouds(env, Number.isInteger(cloudSeed)&&cloudSeed>0?cloudSeed:undefined, opts.quality, climateOf('auto',jstParts(opts.now()).month));
   const cloudClock=createCloudClock();
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
@@ -233,7 +233,8 @@ export function createHero(
     const lite = opts.quality < 0.75;
     scene.add(buildKiyomizuBeam(env,(x,z)=>hf.height(x,z)));
     const eyes = Object.values(VIEWS).map((v) => v.eye);
-    const landmarks = buildLandmarks(env, hf,[...kawaramachiFacades(buildings,hf).parts,...gionStreetscape(buildings,hf).parts]);
+    const kawaramachi = kawaramachiFacades(buildings,hf), gion = gionStreetscape(buildings,hf);
+    const landmarks = buildLandmarks(env, hf,[...kawaramachi.parts,...gion.parts]);
     const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30},
       {p:landmarks.positions.tojiKondo,w:47,d:32},{p:landmarks.positions.tojiKodo,w:48,d:29},{p:landmarks.positions.tojiJikido,w:42,d:33},
       {p:{x:2095.62,z:-1314.07},w:28,d:17}];
@@ -246,6 +247,8 @@ export function createHero(
     })};
     const city = buildCity(env, hf, modeledBuildings, (b) =>
       !replaced(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
+      opts.quality,
+      (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
     );
     const builtSize = lite ? 1024 : 2048;
     env.uBuilt.value = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
@@ -336,7 +339,7 @@ export function createHero(
         let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !isKameokaBuilding(x/(p.ring.length/2),z/(p.ring.length/2));
       }):data.buildings.polys;
       const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
-      const city=buildCity(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10));
+      const city=buildCity(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10),opts.quality);
       group.add(city.group,buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24,undefined,r.id==='yamashina'),buildIslands(env,hf,data.lines));
       let campusNormal:THREE.Texture|null=null;
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
@@ -406,6 +409,7 @@ export function createHero(
     const minutes = jstMinutes(date);
     env.uTime.value = t;
     const weights=seasonWeights(season,jstParts(date).month);
+    clouds.setClimate(climateOf(season,jstParts(date).month));
     env.uSpring.value=weights.spring;env.uAutumn.value=weights.autumn;env.uSnow.value=weights.snow;
     snow.points.visible=weights.snow>0;
     env.uSunDir.value.set(...directionFrom(sun));
