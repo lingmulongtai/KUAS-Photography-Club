@@ -6,6 +6,7 @@ import { hash1 } from './util';
 import { inCampus } from './geo';
 import { isDetailed } from './campus';
 import { BUILT_GLSL } from './building-occlusion';
+import { DetailList, WALL_GLSL, boxDetails, detailMaterial, detailMesh, polyDetails } from './building-details';
 
 /*
  * The city: every PLATEAU building at its measured height.
@@ -20,6 +21,8 @@ const CHUNK = 1500;
 const VOXEL = 0.75;
 /** Within this distance of the camera (metres to a chunk's centre), pitched roofs are built as stairs. */
 const STEPPED_NEAR = 2200;
+/** Size of the tiles facade details are modelled and shown in. */
+const DETAIL_TILE = 400;
 /** Walls run this far below the ground so buildings on slopes never float. */
 const FOOTING = 6;
 
@@ -241,14 +244,17 @@ const BUILDING_FS = /* glsl */ `
   varying vec3 vNormal;
   varying vec2 vWall;
   flat varying vec4 vInfo;
-
-  vec3 pick4(float r, vec3 a, vec3 b, vec3 c, vec3 d){ return r < .25 ? a : r < .5 ? b : r < .75 ? c : d; }
+  ${WALL_GLSL}
 
   void main(){
     vec3 n = normalize(vNormal);
     // everything that takes screen-space derivatives runs first, before any branch or discard
     float sh = sunShadow(vWorld, n);
     vec2 fwWall = fwidth(vWall);
+    // which way along a wall its coordinate runs, for the depth of the window recesses
+    vec3 across = normalize(vec3(-n.z, 0., n.x) + 1e-5);
+    vec2 dWall = vec2(dFdx(vWall.x), dFdy(vWall.x));
+    float alongSign = dot(dFdx(vWorld), across) * dWall.x + dot(dFdy(vWorld), across) * dWall.y < 0. ? -1. : 1.;
     // the detailed campus model (campus.ts) stands in for these blocks up close
     if (vInfo.x > 767.5 && uCampusDetail > .5) discard;
     float campus = step(255.5, vInfo.x) * uHighlight;
@@ -280,7 +286,8 @@ const BUILDING_FS = /* glsl */ `
     float vjit = hash12(vcell + vec2(seed * 57.3 + n.x * 7.1, n.y * 19.3 + n.z * 3.7)) - .5;
     float vedge = smoothstep(0., .08 + max(vfw.x, vfw.y), min(ve.x, ve.y));
     float voxShade = 1. + vox * (vjit * .18 - (1. - vedge) * .1);
-    vec2 wallAt = mix(vWall, (vcell + .5) * ${VOXEL.toFixed(2)}, vox);
+    // (only the old wooden houses: concrete walls get real window recesses instead, below)
+    vec2 wallAt = mix(vWall, (vcell + .5) * ${VOXEL.toFixed(2)}, wooden ? vox : 0.);
 
     vec3 albedo;
     vec3 emit = vec3(0.);
@@ -297,12 +304,7 @@ const BUILDING_FS = /* glsl */ `
         albedo *= .85 + .3 * mix(.5, vnoise(vWorld.xz * .15 + seed), 1. - smoothstep(.2, .5, fwWall.x * .15));
       }
     } else {
-      vec3 wall;
-      // Kyoto's walls: dark wood and plaster on the old houses, muted tile and concrete elsewhere
-      if (wooden) wall = pick4(r1, vec3(.36, .33, .28), vec3(.09, .065, .045), vec3(.24, .21, .18), vec3(.17, .16, .15));
-      else if (use == 4. || H > 31.) wall = pick4(r1, vec3(.3, .31, .32), vec3(.2, .22, .24), vec3(.36, .34, .31), vec3(.14, .16, .19));
-      else wall = pick4(r1, vec3(.4, .37, .33), vec3(.3, .27, .23), vec3(.44, .43, .41), vec3(.23, .2, .18));
-      wall *= .85 + .3 * r2;
+      vec3 wall = wallColor(kind, seed, H);
       // A darker plinth and the shadow below the eaves make a facade read as a building.
       wall *= mix(.73,1.,smoothstep(0.,2.,vWall.y));
       wall *= 1. - .22 * smoothstep(H-1.1,H-.15,vWall.y);
@@ -327,10 +329,30 @@ const BUILDING_FS = /* glsl */ `
       // old wooden houses only have a window here and there
       if (wooden) pane *= mix(step(.45, hash12(id + seed * 7.)), .55, tiny);
 
+      // Concrete walls: each window sits in a recess. Seen at an angle the glass slides back from
+      // the opening, so the opening's side and head show as darker concrete; the head also shades
+      // the top of the glass, and a mullion splits the pane. Only while a window is big on screen.
+      float deep = wooden ? 0. : 1. - smoothstep(.05, .14, max(fw.x, fw.y));
+      float reveal = 0., head = 0., mullion = 0.;
+      if (deep > 0.){
+        float vn = max(dot(-v, n), .15);
+        vec2 slide = vec2(dot(v, across) * alongSign, v.y) * .3 / vn / vec2(cellW, floorH);
+        vec2 q = g - id + slide;
+        float seen = step(.18, q.x) * step(q.x, .82) * step(.32, q.y) * step(q.y, .86);
+        float hole = wx * wy * valid;
+        reveal = hole * (1. - seen) * deep;
+        head = smoothstep(.66, .86, q.y) * seen * deep;
+        mullion = (1. - smoothstep(.008, .02, abs(q.x - .5))) * seen * deep;
+        pane = mix(pane, pane * seen, deep);
+      }
+
       // glass by day: darker panes that pick up a little sky
       float glassRefl = .03 + .18 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);
       vec3 glass = vec3(.025, .03, .035) + skyColor(reflect(v, n)) * glassRefl * (1. - tiny);
+      glass *= 1. - .55 * head;
+      glass = mix(glass, wall * .55, mullion);
       albedo = mix(wall, glass, pane * (.6 - .3 * tiny));
+      albedo = mix(albedo, wall * (.42 + .2 * max(n.y, 0.)), reveal);
 
       // lit windows at night: warm homes and hotels, cooler offices. Some buildings are dark.
       float awake = step(.22, fract(seed * 5.31));
@@ -354,7 +376,7 @@ const BUILDING_FS = /* glsl */ `
       vec3 lampCol = mix(warm, cool, (use == 4. ? .8 : .15) * mix(step(.4, hash12(id + seed)), .6, tiny));
       // bright enough to glow through the haze from the hills, not so bright they burn out up close
       float strength = wooden ? .75 : 1.05;
-      emit += lampCol * lit * pane * strength * uCity;
+      emit += lampCol * lit * pane * (1. - mullion) * strength * uCity;
       // shopfronts glow along the street
       float groundFloor=1.-smoothstep(floorH-fwWall.y,floorH+fwWall.y,vWall.y-.5);
       if (use == 3. || use == 5.) emit += warm * groundFloor * mix(smoothstep(.1,.5,f.y),.7,tiny) * valid * mix(1.2,.05,tiny) * uCity;
@@ -504,9 +526,16 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
   return geo;
 }
 
-/** `keep` can thin out the boxes (phones leave out small houses far from the viewpoint). */
-export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, keep: (b: BoxBuilding) => boolean = () => true) {
+/**
+ * `keep` can thin out the boxes (phones leave out small houses far from the viewpoint);
+ * `dressed` buildings have facades modelled elsewhere and get no facade or roof details.
+ */
+export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, keep: (b: BoxBuilding) => boolean = () => true, quality = 1, dressed: (b: BoxBuilding | PolyBuilding) => boolean = () => false) {
   const group = new THREE.Group();
+  const detailMat = detailMaterial(env, VOXEL);
+  // beyond these the parts are thinner than a pixel
+  const detailMid = quality > 0.75 ? 950 : 650;
+  const detailNear = quality > 0.75 ? 450 : 300;
   const instMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: INSTANCE_VS, fragmentShader: BUILDING_FS });
   const polyMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: POLY_VS, fragmentShader: BUILDING_FS });
   const instDepth = new THREE.ShaderMaterial({ uniforms:env, vertexShader: INSTANCE_VS, fragmentShader: DEPTH_FS });
@@ -542,6 +571,46 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
     chunkOf(cx, cz).polys.push({ p, y, seed: hash1(i * 13 + 5) });
   });
 
+  /**
+   * Facade and roof details, in tiles modelled the first time the camera comes near them: the
+   * small parts (ledges, balconies) show close to the camera, the rest a little further out.
+   * The parts are under a metre thick, finer than a texel of the sun's shadow map, so none casts one.
+   */
+  type Tile = { x: number; y: number; z: number; flat: Chunk['flat']; polys: Chunk['polys']; done: boolean; near: THREE.Mesh | null; mid: THREE.Mesh | null };
+  const tiles = new Map<string, Tile>();
+  const tileOf = (x: number, z: number) => {
+    const kx = Math.floor(x / DETAIL_TILE), kz = Math.floor(z / DETAIL_TILE);
+    const key = `${kx},${kz}`;
+    let t = tiles.get(key);
+    if (!t) {
+      const cx = (kx + 0.5) * DETAIL_TILE, cz = (kz + 0.5) * DETAIL_TILE;
+      tiles.set(key, (t = { x: cx, y: hf.height(cx, cz), z: cz, flat: [], polys: [], done: false, near: null, mid: null }));
+    }
+    return t;
+  };
+  for (const c of chunks.values()) {
+    for (const e of c.flat) if (!inCampus(e.b.x, e.b.z) && !dressed(e.b)) tileOf(e.b.x, e.b.z).flat.push(e);
+    for (const e of c.polys) if (!inCampus(e.p.ring[0], e.p.ring[1]) && !dressed(e.p)) tileOf(e.p.ring[0], e.p.ring[1]).polys.push(e);
+  }
+  const modelDetails = (t: Tile) => {
+    const lists = { near: new DetailList(), mid: new DetailList() };
+    for (const { b, y, seed } of t.flat) {
+      const { lift, inset } = separation(seed);
+      boxDetails(lists, b, Math.max(1, b.w - 2 * inset), Math.max(1, b.d - 2 * inset), b.h + lift, y, seed);
+    }
+    for (const { p, y, seed } of t.polys) polyDetails(lists, p.ring, p.kind, p.h + separation(seed).lift, y, seed);
+    const mesh = (list: DetailList) => {
+      if (!list.count) return null;
+      const m = detailMesh(list, detailMat);
+      m.visible = false;
+      group.add(m);
+      return m;
+    };
+    t.near = mesh(lists.near);
+    t.mid = mesh(lists.mid);
+    t.done = true;
+  };
+
   for (const c of chunks.values()) {
     const meshes: [THREE.BufferGeometry, THREE.ShaderMaterial, THREE.ShaderMaterial][] = [];
     if (c.flat.length) meshes.push([instanced(flat, c.flat, false), instMat, instDepth]);
@@ -570,8 +639,11 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
   }
   return {
     group,
-    /** Swap stepped and plain roofs by distance from the camera; call once a frame. True when any changed. */
-    updateLod(eye: { x: number; z: number }) {
+    /**
+     * Swap stepped and plain roofs, and show facade details, by distance from the camera; call once
+     * a frame. True when the roofs changed (the sun's shadow map needs redrawing).
+     */
+    updateLod(eye: { x: number; y: number; z: number }) {
       let changed = false;
       for (const l of roofLods) {
         const near = Math.hypot(l.x - eye.x, l.z - eye.z) < STEPPED_NEAR;
@@ -579,6 +651,22 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
         l.near.visible = near;
         l.far.visible = !near;
         changed = true;
+      }
+      // one tile's details are modelled per frame, the nearest first, so flying into a new area never stalls
+      let next: Tile | null = null, nextD = detailMid;
+      for (const t of tiles.values()) {
+        const d = Math.hypot(t.x - eye.x, t.y - eye.y, t.z - eye.z);
+        if (!t.done && d < nextD) {
+          next = t;
+          nextD = d;
+        }
+        if (t.mid) t.mid.visible = d < detailMid;
+        if (t.near) t.near.visible = d < detailNear;
+      }
+      if (next) {
+        modelDetails(next);
+        if (next.mid) next.mid.visible = true;
+        if (next.near) next.near.visible = nextD < detailNear;
       }
       return changed;
     },

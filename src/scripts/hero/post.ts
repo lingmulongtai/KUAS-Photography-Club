@@ -93,6 +93,12 @@ const BrightPassShader = {
     uTexel: { value: new THREE.Vector2(1, 1) },
     /** screen pixels across one bloom texel */
     uSpan: { value: 2 },
+    /**
+     * 1: a pixel over the threshold glows with all its light (the big soft glow of the sun and the
+     * sky round it by day and at sunset); 0: only with the light above the threshold (at night,
+     * when the threshold is low enough for every lamp and window to glow by its own brightness).
+     */
+    uWhole: { value: 1 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -103,6 +109,7 @@ const BrightPassShader = {
     uniform float luminosityThreshold;
     uniform vec2 uTexel;
     uniform float uSpan;
+    uniform float uWhole;
     varying vec2 vUv;
     vec3 bright(vec2 uv){
       vec3 c = textureLod(tDiffuse, uv, 0.).rgb;
@@ -110,7 +117,9 @@ const BrightPassShader = {
       float t = luminosityThreshold, k = t * .6 + 1e-4;
       float soft = clamp(l - t + k, 0., 2. * k);
       soft = soft * soft / (4. * k);
-      return c * max(soft, l - t) / max(l, 1e-4);
+      float part = max(soft, l - t) / max(l, 1e-4);
+      float whole = smoothstep(t, t + .01, l);
+      return c * mix(part, whole, uWhole);
     }
     void main(){
       vec2 o = uTexel * uSpan * .25;
@@ -163,6 +172,8 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   return {
     composer,
     bloom,
+    /** how much of a bright pixel's light the bloom takes (see BrightPassShader) */
+    bloomWhole: bright.uniforms.uWhole,
     grade: finish.uniforms.uGrade,
     setSize(w: number, h: number, dpr: number) {
       cssWidth = w;

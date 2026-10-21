@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import {cloudWeather} from './cloud-weather';
+import type {Climate} from './seasons';
 
 /** Height of the cirrus streaks and the altocumulus field, metres. */
 const CIRRUS_Y = 8200;
 const ALTO_Y = 4600;
 /** Clouds fade out into the haze before this distance. */
 const FAR = 44000;
+/** Radius of the drum the clouds are drawn on: beyond FAR, inside the camera's far plane. */
+const DRUM = 52000;
 
 /**
  * Clouds with volume. The low layer (cumulus heads, a stratocumulus deck or towering congestus,
@@ -19,11 +22,12 @@ const FAR = 44000;
  * The mesh is the inside of a box around the camera that reaches from the cloud base to above the
  * cirrus, so every ray that could meet a cloud covers a pixel; the shader works out where.
  */
-export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),quality=1) {
-  const weather=cloudWeather(seed);
+export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),quality=1,climate:Climate='spring') {
+  let weather=cloudWeather(seed,climate);
   const uniforms = {
     ...env,
     uCover: { value: weather.cover },
+    uClear: { value: weather.clear },
     uStyle: { value: weather.style },
     uBase: { value: weather.base },
     uTop: { value: weather.top },
@@ -48,6 +52,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
       uniform float uCover;
+      uniform float uClear;
       uniform float uStyle;
       uniform float uBase;
       uniform float uTop;
@@ -69,44 +74,102 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           f.z);
       }
 
-      /** Where the low clouds are, seen from above: 0 clear sky, 1 the thickest part of a cloud. */
-      float coverage(vec2 p){
+      // characters (cloud-weather.ts): 0 cumulus, 1 fair, 2 stratocumulus, 3 congestus,
+      // 4 cumulonimbus, 5 snow deck
+      bool isStyle(float s){ return abs(uStyle - s) < .5; }
+      bool deck(){ return isStyle(2.) || isStyle(5.); }
+
+      /**
+       * The low clouds seen from above: x is how cloudy the sky is at p, y the level above which
+       * it is cloud, z how tall the cloud there grows (0..1).
+       */
+      vec3 field(vec2 p){
+        // bend the weather map so the cells never line up in rows or repeat one size
+        p += (vec2(vnoise(p * 1.7 + 2.3), vnoise(p * 1.7 - 4.1)) - .5) * .4;
         // a regional swell, so some parts of the sky are busier than others
         float region = vnoise(p * .8 + 7.3);
+        // and wide clear stretches between groups of clouds: these take whole clouds away (the
+        // ones at the edge of a group come out smaller) rather than thinning every cloud
+        float clear = smoothstep(.35, .7, vnoise(p * .45 - 3.9)) * uClear;
         float n;
-        if (uStyle > 1.5 && uStyle < 2.5){
-          // stratocumulus: long rolls broken into cells
-          vec2 q = mat2(.87, -.5, .5, .87) * p;
+        if (deck()){
+          // long rolls broken into cells
+          vec2 q = mat2(.87, -.5, .5, .87) * p * (isStyle(5.) ? .7 : 1.);
           n = vnoise(q * vec2(2.6, 7.)) * .45 + vnoise(p * 13. + 3.1) * .35 + vnoise(p * 31. - 1.7) * .2;
         } else {
-          // separate heads about a kilometre or two across, lumpier the closer you look
-          float f = uStyle > .5 && uStyle < 1.5 ? 1.6 : uStyle > 2.5 ? .75 : 1.;
-          n = vnoise(p * 7. * f) * .55 + vnoise(p * 15. * f + 3.1) * .3 + vnoise(p * 33. * f - 1.7) * .15;
+          float f = isStyle(1.) ? 1.7 : isStyle(3.) ? .7 : isStyle(4.) ? .26 : 1.;
+          // big clouds in some parts of the sky, small ones in others: two sizes of cell, blended
+          // (scaling the coordinates by a varying amount would smear the cells into streaks)
+          float big = vnoise(p * 4.2 * f + 5.5) * .6 + vnoise(p * 9. * f - 2.2) * .4;
+          float small = vnoise(p * 9.5 * f) * .55 + vnoise(p * 21. * f + 3.1) * .3 + vnoise(p * 43. * f - 1.7) * .15;
+          // thunderheads are all big
+          n = isStyle(4.) ? big : mix(small, big, smoothstep(.3, .7, vnoise(p * 1.3 - 9.7)));
         }
-        float th = 1. - uCover * (.7 + .6 * region);
-        return clamp((n - th) / max(1. - th, .05), 0., 1.);
+        float th = 1. - uCover * (.7 + .6 * region) + clear * .4;
+        // some heads stay flat while their neighbours tower; a thunderhead climbs in turrets
+        float tall = deck() ? 1. : isStyle(4.) ? mix(.5, 1., vnoise(p * 6. + 1.9)) : mix(.45, 1., vnoise(p * 3.3 + 1.9));
+        if (isStyle(3.) || isStyle(4.)) tall *= mix(.75, 1., vnoise(p * 15. - 6.1));
+        return vec3(n, th, tall);
+      }
+
+      /** 0 clear sky, 1 the thickest part of a cloud; spread lets the cloud reach further out. */
+      float cover(vec3 f, float spread){
+        return clamp((f.x - f.y + spread) / max(1. - f.y, .05), 0., 1.);
       }
 
       /** How high a cloud with this coverage grows, as a share of the slab. */
       float crown(float c){
-        // decks have flat tops; heaps grow tall domes over their thickest parts
-        return uStyle > 1.5 && uStyle < 2.5 ? .55 + .45 * sqrt(c) : pow(c, .55);
+        // decks have flat tops; heaps grow domes over their thickest parts; thunderheads tower
+        // (a thunderhead is a broad dome of cloud, widest at the base, not a column or a spire)
+        return deck() ? .5 + .5 * sqrt(c) : isStyle(4.) ? sqrt(1. - (1. - c) * (1. - c)) : isStyle(3.) ? pow(c, .5) : pow(c, .6);
       }
 
       /** Cloud shape without the fine detail: for the light that reaches a point. */
       float coarse(vec3 pos){
         float h = (pos.y - uBase) / (uTop - uBase);
         if (h < 0. || h > 1.) return 0.;
-        float c = coverage(pos.xz * K + uWind + uOffset);
-        return smoothstep(0., .12, crown(c) - h) * smoothstep(0., .04, h) * smoothstep(0., .25, c);
+        vec2 xz = pos.xz;
+        if (isStyle(3.) || isStyle(4.)){
+          // towers lean and bulge as they climb, so their sides break into heaped lobes instead
+          // of running straight up from the outline at the base
+          vec3 w = pos * .00045;
+          xz += (vec2(vnoise3(w), vnoise3(w + 17.3)) - .5) * (uTop - uBase) * .22;
+        }
+        vec3 f = field(xz * K + uWind + uOffset);
+        float c = cover(f, 0.);
+        float d = smoothstep(0., .1, crown(c) * f.z - h) * smoothstep(0., .04, h) * smoothstep(0., .25, c);
+        if (isStyle(4.)){
+          // the anvil: at the top of the troposphere a thunderhead spreads out into a flat sheet
+          float band = smoothstep(.8, .88, h) * (1. - smoothstep(.95, 1., h));
+          d = max(d, band * smoothstep(0., .3, cover(f, .07)) * .7);
+        }
+        return d;
+      }
+
+      /** Where the billows are: tall clouds churn in bigger ones. */
+      vec3 billowAt(vec3 pos){
+        return (pos + vec3(uWind.x, 0., uWind.y) / K) * (isStyle(4.) ? .0011 : isStyle(3.) ? .0015 : .0021);
+      }
+
+      /** 3D noise n eats into the edges more than the core. */
+      float erode(float base, float n){
+        // a steep ramp keeps the edges crisp instead of fading out like fog
+        // (towering clouds are lumpier: their heads bulge out of the tower)
+        float bite = isStyle(4.) ? 1.25 : isStyle(3.) ? 1.05 : .9;
+        return clamp((base - (1. - base * .5) * smoothstep(.2, .85, n) * bite) * 2.4, 0., 1.);
+      }
+
+      /** The cloud with its big billows only: for the shadows the billows cast on each other. */
+      float lumps(vec3 pos){
+        float base = coarse(pos);
+        return base < .001 ? 0. : erode(base, vnoise3(billowAt(pos)));
       }
 
       float density(vec3 pos, float dist){
         float base = coarse(pos);
         if (base < .001) return 0.;
-        // billows: 3D noise eats into the edges more than the core, so the outline turns into
-        // the rounded cauliflower heads of real cumulus
-        vec3 q = (pos + vec3(uWind.x, 0., uWind.y) / K) * .0021;
+        // billows: the outline turns into the rounded cauliflower heads of real cumulus
+        vec3 q = billowAt(pos);
         float n = vnoise3(q);
         // finer octaves only where they are bigger than a pixel; far away they would only alias.
         // Folded noise (1 - |2n - 1|) makes rounded lobes with sharp creases between them.
@@ -114,9 +177,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         #if DETAIL > 1
         if (dist < 6000.) n = n * .8 + (1. - abs(vnoise3(q * 8.3 - 3.) * 2. - 1.)) * .2;
         #endif
-        n = smoothstep(.2, .85, n);
-        // a steep ramp keeps the edges crisp instead of fading out like fog
-        return clamp((base - (1. - base * .5) * n * .9) * 2.4, 0., 1.);
+        return erode(base, n);
       }
 
       /** Henyey-Greenstein phase, times 4π so isotropic scattering is 1. */
@@ -185,30 +246,63 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           float span = t1 - t0;
           // a per-pixel offset trades the banding of the steps for a fine grain; kept to half a
           // step, the grain stays below the film grain of the finish
-          float jitter = .25 + .5 * hash12(gl_FragCoord.xy);
-          for (int i = 0; i < STEPS; i++){
-            if (T < .03) break;
-            float u0 = float(i) / float(STEPS), u1 = (float(i) + 1.) / float(STEPS);
+          // (interleaved gradient noise: neighbouring pixels take evenly spread offsets, which reads
+          // as a finer, calmer grain than independent random ones)
+          float jitter = .25 + .5 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))));
+          // tall slabs (towering clouds) need more steps to stay solid
+          float steps = min(float(STEPS) * (1. + (uTop - uBase) / 3000.), float(STEPS) * 2.);
+          float tPrev = t0;
+          bool inside = false;
+          for (int i = 0; i < STEPS * 2; i++){
+            if (T < .03 || float(i) >= steps) break;
+            float u0 = float(i) / steps, u1 = (float(i) + 1.) / steps;
             // a per-pixel offset turns the banding of the steps into fine grain
             float um = mix(u0, u1, jitter);
             float t = t0 + span * um * um;
+            float tEnd = t0 + span * u1 * u1;
             float dt = span * (u1 * u1 - u0 * u0);
             vec3 pos = ro + rd * t;
             float d = density(pos, t);
+            if (d > .002 && !inside){
+              // The ray entered a cloud somewhere since the last sample. Find where: shaded at the
+              // step it happened to land on, a cloud's face would be sliced into bands, one per step.
+              float lo = tPrev, hi = t;
+              for (int k = 0; k < DETAIL + 2; k++){
+                float mid = .5 * (lo + hi);
+                if (density(ro + rd * mid, mid) > .002) hi = mid;
+                else lo = mid;
+              }
+              t = hi;
+              pos = ro + rd * t;
+              d = max(density(pos, t), .003);
+              // only the rest of the step is inside the cloud
+              dt = tEnd - t;
+            }
+            inside = d > .002;
+            tPrev = t;
             if (d > .002){
               float h = clamp((pos.y - uBase) / (uTop - uBase), 0., 1.);
               // light from the sun, dimmed by the cloud above and toward it
-              float od = coarse(pos + uSunDir * 90.) * 90. + coarse(pos + uSunDir * 320.) * 230.;
+              // (bigger clouds shade themselves over a bigger distance)
+              float ls = isStyle(4.) ? 3. : isStyle(3.) ? 1.8 : 1.;
+              #if DETAIL > 1
+              // near the surface the billows shade each other, which models the heads
+              float od = (lumps(pos + uSunDir * 90. * ls) * 90. + coarse(pos + uSunDir * 320. * ls) * 230.) * ls;
+              #else
+              float od = (coarse(pos + uSunDir * 90. * ls) * 90. + coarse(pos + uSunDir * 320. * ls) * 230.) * ls;
+              #endif
               // beer's law plus a softer second term for light scattered many times inside
               float toSun = exp(-od * .006) * .65 + exp(-od * .0014) * .35;
               // dark edges where light can't scatter back out ("powder"), mostly away from the sun
               float powder = mix(1. - exp(-d * 6.), 1., .35 + .4 * max(mu, 0.));
-              vec3 sun = uCloudLight * phase * toSun * powder * .85;
+              // a snow deck is thick and grey all through
+              vec3 sun = uCloudLight * phase * toSun * powder * (isStyle(5.) ? .45 : .85);
               // the sky lights the tops more than the bases; the city lights the bases at night
               // (at night the sky's own glow is faint: the clouds are lit from below by the city)
-              vec3 sky = amb * (.55 + .75 * h) * (.85 + .15 * d) * (1. - .5 * uCity);
+              vec3 sky = amb * (.55 + .75 * h) * (.85 + .15 * d) * (1. - .5 * uCity) * (isStyle(5.) ? .75 : 1.);
               vec3 below = cityGlow * (1. - h) * (1. - h) * 1.6 + moon * toSun;
-              vec3 col = sun + sky + below;
+              // snow clouds are thick and grey all the way through
+              vec3 col = (sun + sky + below) * (isStyle(5.) ? .62 : 1.);
               float a = 1. - exp(-d * .007 * dt);
               L += T * a * col;
               distSum += T * a * t;
@@ -241,12 +335,34 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     depthWrite: false,
     side: THREE.BackSide,
   });
-  const height = CIRRUS_Y + 400 - weather.base;
-  const geometry = new THREE.BoxGeometry(96000, height, 96000).translate(0, weather.base + height / 2, 0);
+  // The rays are marched from the inside of a drum around the camera, which starts below the lowest
+  // cloud base any character uses. Every point of it stays inside the camera's far plane (60 km):
+  // the corners of a box that reached as far along the axes were beyond it, and the clouds toward
+  // north-east, south-east and so on were cut off there.
+  const bottom = 850;
+  const geometry = new THREE.CylinderGeometry(DRUM, DRUM, CIRRUS_Y + 400 - bottom, 96, 1).translate(0, (CIRRUS_Y + 400 + bottom) / 2, 0);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 2;
   mesh.frustumCulled = false;
-  return { mesh, uniforms, weather };
+  let shown = climate;
+  return {
+    mesh, uniforms,
+    get weather() { return weather; },
+    /** Redraw the sky for another season (the same visit keeps its seed). */
+    setClimate(next: Climate) {
+      if (next === shown) return;
+      shown = next;
+      weather = cloudWeather(seed, next);
+      uniforms.uCover.value = weather.cover;
+      uniforms.uClear.value = weather.clear;
+      uniforms.uStyle.value = weather.style;
+      uniforms.uBase.value = weather.base;
+      uniforms.uTop.value = weather.top;
+      uniforms.uCirrus.value = weather.cirrus;
+      uniforms.uAlto.value = weather.alto;
+      uniforms.uOffset.value.set(...weather.offset);
+    },
+  };
 }
 
 /** Cloud cover for a given day: different every day, the same all day. */
