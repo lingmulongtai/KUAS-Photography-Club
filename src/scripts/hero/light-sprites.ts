@@ -13,10 +13,13 @@ export function lightSpriteGeometry(centres:THREE.InstancedBufferAttribute) {
 export const LIGHT_SPRITE_VERTEX=/* glsl */ `
   attribute vec3 aLightPosition;
   uniform float uScale;
+  /** device pixels per CSS pixel: sizes below are CSS pixels, so a light carries the same
+   *  brightness and glow on every screen density */
+  uniform float uDpr;
   varying vec2 vLightUv;
   vec4 lightSprite(vec4 mv, float pixels){
     vLightUv=position.xy*2.;
-    mv.xy+=position.xy*pixels*max(-mv.z, .01)/uScale;
+    mv.xy+=position.xy*pixels*uDpr*max(-mv.z, .01)/uScale;
     return projectionMatrix*mv;
   }
 `;

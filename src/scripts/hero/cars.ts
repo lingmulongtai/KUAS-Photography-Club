@@ -198,7 +198,7 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
   lgeo.setAttribute('aDir', ldir);
   lgeo.setAttribute('aHead', new THREE.InstancedBufferAttribute(head, 1));
   const lightMat = new THREE.ShaderMaterial({
-    uniforms: { ...env, uScale: { value: 1 } },
+    uniforms: { ...env, uScale: { value: 1 }, uDpr: { value: 1 } },
     vertexShader: /* glsl */ `
       ${ENV_GLSL}
       ${LIGHT_SPRITE_VERTEX}
@@ -213,12 +213,15 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
         vec3 c = aHead > .5 ? vec3(1., .9, .72) * 2.4 : vec3(1., .07, .03) * 1.7;
         vec4 mv = viewMatrix * vec4(aLightPosition, 1.);
         float dist = max(-mv.z,.01);
-        float core = clamp(uScale * 1.5 / dist, 1., 3.5);
+        float s = uScale / uDpr * 1.5 / dist;
+        float core = clamp(s, 1., 3.5);
         float px = max(4.,core*2.);
         // only after dark, and not so big right under the viewpoint that they flood the bloom
-        float near = 1. - smoothstep(2., 3.5, uScale * 1.5 / dist) * .6;
-        // lights drawn larger than they are, far away, would pile up into glare
-        float far = pow(clamp(uScale * 1.5 / dist, .12, 1.), .6);
+        float near = 1. - smoothstep(2., 3.5, s) * .6;
+        // far lights are drawn larger than they are and dim with their true area, so a far
+        // road glows the same on every screen width rather than piling up into glare
+        float fade = clamp(s, .05, 1.);
+        float far = min(1., pow(fade, 1.5) * 7.);
         vColor = c * seen * uCity * near * far * mix(hazeTransmittance(aLightPosition), 1., .4) * (core*core/(px*px));
         gl_Position = lightSprite(mv,px);
       }
@@ -288,5 +291,5 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
 
   const group = new THREE.Group();
   group.add(bodies, points);
-  return { group, update, uniforms: lightMat.uniforms as typeof lightMat.uniforms & { uScale: { value: number } }, count };
+  return { group, update, uniforms: lightMat.uniforms as typeof lightMat.uniforms & { uScale: { value: number }; uDpr: { value: number } }, count };
 }
