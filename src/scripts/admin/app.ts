@@ -251,7 +251,8 @@ export function startAdmin(root: HTMLElement) {
     const err = $('[data-login-error]');
     err.hidden = true;
     try {
-      await call('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: new FormData(form).get('password') }) });
+      const credentials = new FormData(form);
+      await call('/api/admin/login', { method: 'POST', body: JSON.stringify({ username: credentials.get('username'), password: credentials.get('password') }) });
       form.reset();
       show(await call<Session>('/api/admin/session'));
     } catch (x) {
