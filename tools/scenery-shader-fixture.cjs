@@ -26,6 +26,19 @@ const snow=buildSnow(env,.55),rail=buildRailways(env,()=>0,${JSON.stringify(rail
 const camera=new THREE.PerspectiveCamera(60,4/3,1,60000);camera.position.set(0,80,130);camera.lookAt(0,0,0);
 window.runSceneryChecks=()=>{
  const stats=[];
+ for(const quality of [.55,1]){
+  const canopy=createForest(env,hf,image,[-11000,-11000,11000,11000],quality);canopy.plant({x:0,z:0},0);
+  let farInstances=0,triangles=0;
+  for(const mesh of canopy.group.children){
+   const geo=mesh.geometry,pos=geo.getAttribute('iPos'),vox=geo.getAttribute('aVox'),faces=geo.getAttribute('position').count/3;
+   if(!Array.from(vox.array).every(v=>v>0))throw Error('Round canopy returned in a forest LOD');
+   triangles+=faces*geo.instanceCount;
+   for(let i=0;i<pos.count;i++)if(Math.hypot(pos.getX(i),pos.getZ(i))>=1200){if(faces>12)throw Error('Far canopy exceeded its box budget');farInstances++;}
+   geo.dispose();
+  }
+  if(farInstances<100)throw Error('Distant forest was not covered');
+  stats.push({name:'block-forest-budget',quality,instances:canopy.count,farInstances,triangles});
+ }
  for(const [name,object] of [['forest',forest.group],['snow',snow.points],['railways',rail.group],['beam',beam]]){
   const scene=new THREE.Scene();scene.add(object);renderer.info.reset();renderer.render(scene,camera);
   const error=renderer.getContext().getError();if(error)throw Error(name+' GPU error '+error);
