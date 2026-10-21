@@ -3,33 +3,39 @@ import type { AstroCookies } from 'astro';
 
 /*
  * Admin sign-in. Configure on Vercel (Project → Settings → Environment Variables):
+ *   ADMIN_USERNAME   shared sign-in ID (defaults to "admin").
  *   ADMIN_PASSWORD   the password for /admin/. Without it the panel runs in demo mode
- *                    (password "demo") and nothing is published.
+ *                    (ID "admin", password "demo") and nothing is published.
  *   GITHUB_TOKEN     a fine-grained token with Contents: read and write on this repository,
  *                    so publishing can commit photos and Markdown (Vercel then redeploys).
- *   SESSION_SECRET   optional; signs the sign-in cookie (derived from the above if unset).
+ *   SESSION_SECRET   optional; adds a secret to the credential-bound cookie signature.
  */
 
 const COOKIE = 'kuas_admin';
 const HOURS = 12;
+export const DEFAULT_USERNAME = 'admin';
 export const DEMO_PASSWORD = 'demo';
 
 export const isDemo = () => !process.env.ADMIN_PASSWORD;
 export const canPublish = () => !isDemo() && !!process.env.GITHUB_TOKEN;
 
+const username = () => isDemo() ? DEFAULT_USERNAME : process.env.ADMIN_USERNAME || DEFAULT_USERNAME;
+const password = () => process.env.ADMIN_PASSWORD || DEMO_PASSWORD;
+
 const secret = () =>
-  process.env.SESSION_SECRET ||
   createHash('sha256')
-    .update(`kuas-admin:${process.env.ADMIN_PASSWORD ?? DEMO_PASSWORD}:${process.env.GITHUB_TOKEN ?? ''}`)
+    .update(JSON.stringify(['kuas-admin:v2', username(), password(), process.env.GITHUB_TOKEN || '', process.env.SESSION_SECRET || '']))
     .digest('hex');
 
 const sign = (body: string) => createHmac('sha256', secret()).update(body).digest('base64url');
 
 const digest = (s: string) => createHash('sha256').update(s).digest();
 
-export function checkPassword(password: unknown) {
-  if (typeof password !== 'string') return false;
-  return timingSafeEqual(digest(password), digest(process.env.ADMIN_PASSWORD ?? DEMO_PASSWORD));
+export function checkCredentials(id: unknown, inputPassword: unknown) {
+  if (typeof id !== 'string' || typeof inputPassword !== 'string') return false;
+  const validId = timingSafeEqual(digest(id), digest(username()));
+  const validPassword = timingSafeEqual(digest(inputPassword), digest(password()));
+  return validId && validPassword;
 }
 
 export function signIn(cookies: AstroCookies) {
