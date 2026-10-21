@@ -29,6 +29,17 @@ test('panoramas turn at a fixed observation point', () => {
   assert.equal('funaoka' in VIEWS,false);
 });
 
+test('Osaka panorama looks down from Tennozan instead of the low riverside', () => {
+  const view=VIEWS.tennozan;
+  assert.deepEqual(view.ref,toLocal(34.897931,135.679798));
+  assert.deepEqual(view.eye,view.ref);
+  assert.ok(view.above>=45,'clear the mountain canopy');
+  assert.ok(view.pitch<=-10,'look down over the plain');
+  assert.ok(view.bearing>=145&&view.bearing<=180,'face the confluence and Osaka');
+  assert.ok(PANORAMA_VIEWS.includes('tennozan'));
+  assert.equal('sewaritei' in VIEWS,false);
+});
+
 test('every map spot has a camera destination and landmarks stay centred', () => {
   for (const spot of SPOTS) {
     const id=spotDestination(spot.id);
