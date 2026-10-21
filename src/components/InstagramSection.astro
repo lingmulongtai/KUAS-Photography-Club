@@ -14,7 +14,7 @@ const embedUrl = new URL('embed/', `${club.instagram.url.replace(/\/$/, '')}/`);
       <p class="edge">INSTAGRAM ▸ @{club.instagram.handle}</p>
       <h2 id="insta-title">{en ? 'A glimpse of our photography.' : '写真部の Instagram を、のぞいてみませんか。'}</h2>
       <p class="muted">{en ? 'Explore the club’s posts in the official Instagram preview. You can also contact us by DM from our profile.' : '公式の埋め込みから、写真部の投稿をご覧いただけます。プロフィールから DM でのお問い合わせもできます。'}</p>
-      <a class="btn btn--primary" href={club.instagram.url} target="_blank" rel="noopener">{en ? 'Open Instagram' : 'Instagram を見る'} <span class="arrow" aria-hidden="true">↗</span></a>
+      <a class="btn instagram-button" href={club.instagram.url} target="_blank" rel="noopener">{en ? 'Open Instagram' : 'Instagram を見る'} <span class="arrow" aria-hidden="true">↗</span></a>
       <p class="small muted">{en ? 'If the preview does not load, open our profile using the button above.' : '埋め込みが表示されない場合は、上のボタンからプロフィールをご覧ください。'}</p>
     </div>
     <div class="embed">
@@ -45,6 +45,64 @@ const embedUrl = new URL('embed/', `${club.instagram.url.replace(/\/$/, '')}/`);
 
   h2 {
     font-size: var(--step-4);
+  }
+
+  .instagram-button,
+  .instagram-button:hover {
+    position: relative;
+    isolation: isolate;
+    border-color: transparent;
+    background: linear-gradient(115deg, #d2762f -45%, #bf354f 28%, #ae299b 65%, #6048cf 115%);
+    color: #fff;
+  }
+
+  .instagram-button::before,
+  .instagram-button::after {
+    content: '';
+    position: absolute;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .instagram-button::before {
+    inset: -4px;
+    z-index: -2;
+    background: linear-gradient(110deg, #ffb64d, #f35c89, #bf59eb, #647dff, #57d4c2);
+    filter: blur(9px);
+    opacity: 0;
+    transition: opacity .24s ease;
+  }
+
+  .instagram-button::after {
+    inset: 0;
+    z-index: -1;
+    background: inherit;
+  }
+
+  .instagram-button:is(:hover, :focus-visible) {
+    transform: translateY(-2px);
+  }
+
+  .instagram-button:is(:hover, :focus-visible)::before {
+    opacity: .65;
+  }
+
+  .instagram-button:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 6px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .instagram-button,
+    .instagram-button::before,
+    .instagram-button .arrow {
+      transition: none;
+    }
+
+    .instagram-button:is(:hover, :focus-visible),
+    .instagram-button:hover .arrow {
+      transform: none;
+    }
   }
 
   .embed {

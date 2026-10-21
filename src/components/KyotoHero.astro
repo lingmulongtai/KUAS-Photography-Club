@@ -5,6 +5,7 @@
  * Tap a map pin to explore its spot, or the sky for a shooting star.
  */
 import { club } from '../data/club';
+import HeroIntro from './HeroIntro.astro';
 import { languagePath } from '../lib/i18n';
 interface Props { lang?: 'ja' | 'en'; }
 const { lang = 'ja' } = Astro.props;
@@ -19,6 +20,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
   .map((t) => ({ spot: t.data.spot!, title: t.data.title, href: `/trips/${encodeURIComponent(t.id)}/`, src: t.data.photos[0].src, alt: t.data.photos[0].alt, credit: credit(t.data.photos[0], t.data.date), sample: t.data.sample }))).map(t => en && t.sample ? { ...t, title: 'Activity records', credit: 'Records are being prepared', href: '/en/trips/' } : t);
 ---
+<HeroIntro lang={lang} />
 <section class="hero" aria-labelledby="hero-title" data-view="city" data-lang={lang}>
   <div class="stage hero-stage" data-demo="hero" data-trips={JSON.stringify(pinTrips)}>
     <canvas aria-label={en ? 'Explore Kyoto in 3D using real terrain and building data. Drag to look around and select a place to move closer.' : '実際の地形と建物データから作った京都の3D。ドラッグで見回し、地点を選ぶと近づけます。'}></canvas>
@@ -37,10 +39,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <span class="visually-hidden" role="status" data-place-status></span>
       <span class="area-status" role="status" data-area-status hidden>{en ? 'Loading the surrounding area…' : '周辺の景色を読み込んでいます…'}</span>
       <button type="button" class="explore-toggle" aria-pressed="false" disabled>{en ? 'Free explore' : '自由に散策'}</button>
-    </div>
-    <div class="loading" aria-hidden="true">
-      <span class="spin"></span>
-      <span>{en ? 'Loading Kyoto' : '京都の街を読み込んでいます'}</span>
     </div>
   </div>
   <div class="scrim" aria-hidden="true"></div>
@@ -219,7 +217,14 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const quality = coarse || cores < 6 || window.innerWidth < 900 ? 0.55 : 1;
 
     let demo: ReturnType<typeof createHero> | null = null;
-    const mounted = mountStage(
+    const fallback = () => {
+      const look = lookAt((sunPosition(new Date()).altitude * 180) / Math.PI, createLook());
+      stage.style.setProperty('--fb', `linear-gradient(${look.zenith.getStyle()}, ${look.mid.getStyle()} 55%, ${look.horizon.getStyle()} 85%, #05070c)`);
+      hero.classList.add('is-ready', 'no-3d');
+      document.dispatchEvent(new Event('hero:error'));
+    };
+    let mounted = null;
+    try { mounted = mountStage(
       stage,
       (renderer, el) =>
         (demo = createHero(renderer, el, {
@@ -231,7 +236,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
           get reducedMotion() { return motion.matches; },
           drift: !coarse,
           onStatus,
-          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false; viewButtons.forEach(b=>b.disabled=false); },
+          onProgress: progress => document.dispatchEvent(new CustomEvent('hero:progress', {detail:progress})),
+          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false; viewButtons.forEach(b=>b.disabled=false); document.dispatchEvent(new Event('hero:ready')); },
+          onError: fallback,
           onAreaLoading: loading=>{areaStatus.hidden=!loading;},
           onExplore: enabled=>{
             hero.classList.toggle('is-exploring',enabled);exploreToggle.setAttribute('aria-pressed',String(enabled));
@@ -253,7 +260,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           },
         })),
       { maxDpr: quality < 1 ? 1.5 : 2, alwaysOn: false },
-    );
+    ); } catch (error) { console.warn('Kyoto scene unavailable', error); }
 
     const returnToPanorama=()=>demo?.flyTo(panorama);
     hero.querySelector<HTMLSelectElement>('[data-season]')!.addEventListener('change',e=>demo?.setSeason((e.target as HTMLSelectElement).value as Season));
@@ -276,13 +283,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     );
 
     if (!mounted) {
-      // No WebGL: paint today's sky as a still gradient instead
-      const look = lookAt((sunPosition(new Date()).altitude * 180) / Math.PI, createLook());
-      stage.style.setProperty(
-        '--fb',
-        `linear-gradient(${look.zenith.getStyle()}, ${look.mid.getStyle()} 55%, ${look.horizon.getStyle()} 85%, #05070c)`,
-      );
-      hero.classList.add('is-ready', 'no-3d');
+      fallback();
     }
   }
 </script>
@@ -409,40 +410,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .spot-select { width: clamp(120px, 40vw, 190px); }
   .spot-select option { color: var(--ink); background: var(--raise); }
   .spot-nav [hidden] { display: none; }
-
-  .loading {
-    position: absolute;
-    left: 50%;
-    top: 46%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font: 500 13px/1 var(--body);
-    letter-spacing: 0.12em;
-    color: rgba(255, 255, 255, 0.85);
-    transition: opacity 0.8s;
-    pointer-events: none;
-  }
-
-  .spin {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.25);
-    border-top-color: var(--brand);
-    animation: spin 0.9s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .is-ready .loading {
-    opacity: 0;
-  }
 
   .scrim {
     position: absolute;
