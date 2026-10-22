@@ -49,7 +49,7 @@ const t = en
       {Array.from({ length: SLOTS }, (_, i) => (
         <a class="reel-card" data-slot={i} tabindex="-1" draggable="false">
           <span class="face front">
-            <img alt="" decoding="async" draggable="false" />
+            <img alt="" loading="lazy" decoding="async" draggable="false" />
             <span class="art" data-art hidden aria-hidden="true"><span class="art-name" data-art-name></span></span>
             <span class="cap">
               {placeholder && <span class="badge">PHOTO SPOT</span>}
@@ -482,16 +482,4 @@ const t = en
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .copy,
-    .controls,
-    .loader {
-      transition: none;
-    }
-
-    .front img,
-    .col::before {
-      transition: none;
-    }
-  }
 </style>
