@@ -45,8 +45,8 @@ const city = [
         <g class="intro-dot"><circle cx="97" cy="50" r="2.3" /></g>
       </svg>
     </div>
-    <p id="intro-title" class:list={['intro-title', { 'is-latin': en }]} tabindex="-1" autofocus>{en ? 'Photography Club' : '写真部'}</p>
-    <p class="intro-name">{en ? '— KUAS · Kyoto —' : '— KUAS Photography Club —'}</p>
+    <p id="intro-title" class:list={['intro-title', { 'is-latin': en }]} tabindex="-1" autofocus>{en ? 'KUAS Photography Club' : '写真部'}</p>
+    <p class="intro-name">{en ? '— Kyoto University of Advanced Science —' : '— KUAS Photography Club —'}</p>
   </div>
   <svg class="intro-city" viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
     <!-- all of it faintly, as the circle's track, then the same lines drawn over it -->
@@ -187,7 +187,8 @@ const city = [
     outline: none;
   }
   :global(:root[data-theme]:not([data-theme="light"])) .intro-title { text-shadow: none; }
-  .intro-title.is-latin { font: 600 clamp(26px, 4.6vw, 38px)/1.2 var(--latin); letter-spacing: .06em; text-indent: .06em; }
+  .intro-title.is-latin { font: 600 clamp(24px, 4.4vw, 38px)/1.2 var(--latin); letter-spacing: .06em; text-indent: .06em; text-wrap: balance; }
+  .is-latin + .intro-name { letter-spacing: .08em; }
   .intro-name { margin-top: 10px; font: 600 12px/1.6 var(--latin); letter-spacing: .14em; }
 
   /* at least a sixth of its width tall, so a wide, short screen crops only empty sky */
