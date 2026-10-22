@@ -57,6 +57,7 @@ const city = [
     <p role="status">{en ? 'Preparing Kyoto’s scenery' : '京都の景色を準備しています'}<span class="intro-percent" aria-hidden="true">00%</span></p>
     <button type="button" class="intro-skip">{en ? 'Enter the site now' : '待たずにサイトを見る'} <span aria-hidden="true">↗</span></button>
   </div>
+  <span class="intro-flash" aria-hidden="true"></span>
 </dialog>
 <script is:inline>
   (() => {
@@ -79,11 +80,22 @@ const city = [
       if (finished) return;
       finished = true;
       cleanup();
-      // Release the modal and scroll immediately; its non-interactive snapshot fades away.
+      const animate = !motion.matches && typeof intro.animate === 'function';
+      // measured while the dialog is still laid out
+      const box = animate && progress.getBoundingClientRect();
+      // Release the modal and scroll immediately; its non-interactive snapshot leaves on its own.
       intro.close();
-      if (!motion.matches && typeof intro.animate === 'function') {
+      if (animate) {
+        // A shutter flash, then the logo's circle opens like an iris onto Kyoto.
+        const x = box.left + box.width / 2;
+        const y = box.top + box.height / 2;
+        const reach = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+        intro.style.setProperty('--iris-x', `${x}px`);
+        intro.style.setProperty('--iris-y', `${y}px`);
         intro.classList.add('is-leaving');
-        intro.animate([{opacity:1},{opacity:0}], {duration:360,easing:'ease-out'})
+        intro.querySelector('.intro-flash').animate([{opacity:0},{opacity:.7,offset:.25},{opacity:0}], {duration:420,easing:'ease-out'});
+        // Without registered custom properties the iris cannot grow; the closing fade still runs.
+        intro.animate([{'--iris':'0px',opacity:1},{opacity:1,offset:.8},{'--iris':`${reach}px`,opacity:0}], {duration:1000,delay:90,easing:'cubic-bezier(.6,0,.3,1)'})
           .finished.catch(() => {}).finally(() => intro.classList.remove('is-leaving'));
       }
     };
@@ -110,6 +122,7 @@ const city = [
   })();
 </script>
 <style>
+  @property --iris { syntax: '<length>'; inherits: false; initial-value: 0px; }
   :global(html.hero-intro-open) { overflow: hidden; }
 
   /* the logo: a white open circle round the photographer, 写真部 beneath, all on the club's teal */
@@ -133,7 +146,12 @@ const city = [
   .hero-intro[open], .hero-intro.is-leaving { display: grid; grid-template-rows: minmax(min-content, 1fr) auto auto; }
   .hero-intro:not([open]):not(.is-leaving) { display: none; }
   .hero-intro::backdrop { background: var(--band, #64bec6); }
-  .is-leaving { z-index: 100; pointer-events: none; }
+  .is-leaving {
+    z-index: 100;
+    pointer-events: none;
+    -webkit-mask-image: radial-gradient(circle at var(--iris-x) var(--iris-y), transparent var(--iris), #000 calc(var(--iris) + 1px));
+    mask-image: radial-gradient(circle at var(--iris-x) var(--iris-y), transparent var(--iris), #000 calc(var(--iris) + 1px));
+  }
 
   .intro-head {
     display: grid;
@@ -213,6 +231,7 @@ const city = [
   .intro-skip span { margin-left: 6px; }
   .intro-skip:hover { border-color: var(--ink); background: color-mix(in srgb, var(--ink) 10%, transparent); }
   .intro-skip:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .intro-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 
   @media (max-height: 560px) {
     .hero-intro { --emblem: clamp(84px, 26vh, 140px); --city: clamp(70px, 20vh, 110px); }
