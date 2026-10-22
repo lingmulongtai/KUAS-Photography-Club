@@ -69,11 +69,21 @@ const city = [
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
     let finished = false;
     let timeout;
+    // The picture trails the reported progress. Loading arrives in jumps (15% to 60% at once), and
+    // the circle, the city and the count should draw through them rather than snap.
+    let target = 0;
+    let shown = 0;
+    let speed = 0;
+    let last = 0;
+    let frame = 0;
+    let closing = false;
     const cleanup = () => {
       clearTimeout(timeout);
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
       root.classList.remove('hero-intro-open');
       document.removeEventListener('hero:progress', update);
-      document.removeEventListener('hero:ready', dismiss);
+      document.removeEventListener('hero:ready', ready);
       document.removeEventListener('hero:error', dismiss);
     };
     const dismiss = () => {
@@ -99,19 +109,55 @@ const city = [
           .finished.catch(() => {}).finally(() => intro.classList.remove('is-leaving'));
       }
     };
-    const update = (event) => {
-      const value = Math.round(Math.min(1, Math.max(0, event.detail)) * 100);
-      if (!Number.isFinite(value) || finished) return;
-      progress.setAttribute('aria-valuenow', String(value));
+    const show = () => {
       // The circle and the city both draw from this.
-      intro.style.setProperty('--progress', String(value / 100));
-      percent.textContent = `${String(value).padStart(2, '0')}%`;
+      intro.style.setProperty('--progress', String(Math.round(shown * 1000) / 1000));
+      percent.textContent = `${String(Math.round(shown * 100)).padStart(2, '0')}%`;
+    };
+    const tick = (now) => {
+      frame = 0;
+      if (finished) return;
+      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+      last = now;
+      // ease toward the reported value, at most 60% a second; four times that once it is ready
+      const want = Math.min((target - shown) * (closing ? 10 : 4), closing ? 2.4 : 0.6);
+      speed += (want - speed) * (1 - Math.exp(-dt * 10));
+      shown = Math.min(target, shown + Math.max(speed, 0) * dt);
+      if (target - shown < 0.002) shown = target;
+      show();
+      if (shown < target) frame = requestAnimationFrame(tick);
+      else if (closing) dismiss();
+      else last = speed = 0;
+    };
+    const follow = () => {
+      if (motion.matches) {
+        shown = target;
+        show();
+      } else if (!frame) frame = requestAnimationFrame(tick);
+    };
+    const update = (event) => {
+      const value = Math.min(1, Math.max(0, event.detail));
+      if (!Number.isFinite(value) || finished || closing) return;
+      target = Math.max(target, value);
+      progress.setAttribute('aria-valuenow', String(Math.round(target * 100)));
+      follow();
+    };
+    const ready = () => {
+      if (finished) return;
+      target = 1;
+      progress.setAttribute('aria-valuenow', '100');
+      if (motion.matches || shown >= 1) return dismiss();
+      // the count finishes before the scene opens, but never holds it back for long
+      closing = true;
+      clearTimeout(timeout);
+      timeout = setTimeout(dismiss, 900);
+      follow();
     };
     intro.querySelector('button').addEventListener('click', dismiss);
     intro.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
     intro.addEventListener('close', cleanup);
     document.addEventListener('hero:progress', update);
-    document.addEventListener('hero:ready', dismiss);
+    document.addEventListener('hero:ready', ready);
     document.addEventListener('hero:error', dismiss);
     try {
       intro.showModal();
@@ -243,8 +289,6 @@ const city = [
   @media (prefers-reduced-motion: no-preference) {
     .hero-intro[open] .intro-emblem { animation: intro-in .9s cubic-bezier(.22, .61, .36, 1) both; }
     .hero-intro[open] .intro-title, .hero-intro[open] .intro-name { animation: intro-in .9s .15s cubic-bezier(.22, .61, .36, 1) both; }
-    .intro-arc, .intro-city path { transition: stroke-dashoffset .9s cubic-bezier(.22, .61, .36, 1), fill-opacity .9s; }
-    .intro-dot { transition: transform .9s cubic-bezier(.22, .61, .36, 1); }
     .intro-dot circle { transform-box: fill-box; transform-origin: center; animation: intro-pulse 1.4s ease-in-out infinite alternate; }
   }
   @keyframes intro-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
