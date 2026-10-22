@@ -95,7 +95,10 @@ const city = [
       const box = animate && progress.getBoundingClientRect();
       // Release the modal and scroll immediately; its non-interactive snapshot leaves on its own.
       intro.close();
-      if (animate) {
+      // the page can greet the visitor once the intro is out of the way
+      const gone = () => document.dispatchEvent(new Event('hero:intro-done'));
+      if (!animate) gone();
+      else {
         // A shutter flash, then the logo's circle opens like an iris onto Kyoto.
         const x = box.left + box.width / 2;
         const y = box.top + box.height / 2;
@@ -106,7 +109,7 @@ const city = [
         intro.querySelector('.intro-flash').animate([{opacity:0},{opacity:.7,offset:.25},{opacity:0}], {duration:420,easing:'ease-out'});
         // Without registered custom properties the iris cannot grow; the closing fade still runs.
         intro.animate([{'--iris':'0px',opacity:1},{opacity:1,offset:.8},{'--iris':`${reach}px`,opacity:0}], {duration:1000,delay:90,easing:'cubic-bezier(.6,0,.3,1)'})
-          .finished.catch(() => {}).finally(() => intro.classList.remove('is-leaving'));
+          .finished.catch(() => {}).finally(() => { intro.classList.remove('is-leaving'); gone(); });
       }
     };
     const show = () => {
