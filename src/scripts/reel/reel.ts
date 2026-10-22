@@ -2,9 +2,10 @@ import { TAU, cardPose, easeOutQuart, layoutFor, photoFor, ringPose, type ReelLa
 import type { ReelCard } from '../../data/reel-placeholders';
 
 /*
- * The photo reel at the top of the trips page. On arrival the cards are dealt round a small
- * ring while a counter shows how many photos have loaded; once both are done the ring opens
- * around the viewer and keeps turning slowly. Drag, swipe, the arrow keys or the buttons turn
+ * The photo reel. When it comes into view the cards are dealt round
+ * a small ring while a counter shows how many photos have loaded; once both are done the ring
+ * opens around the viewer and keeps turning slowly. It plays the same way on every visit and
+ * every device. Drag, swipe, the arrow keys or the buttons turn
  * it; a spring follows so it never snaps. Sixteen cards (twelve on phones) show any number of
  * photos: each card takes the next photo while it is behind the viewer.
  *
@@ -17,7 +18,8 @@ const REVEAL_MS = 1700;
 /** reveal anyway if photos are this slow */
 const WAIT_MS = 4500;
 const AUTO_SPIN = 0.07;
-const SEEN_KEY = 'kuas-reel-seen';
+/** how much of the reel must be on screen before the deal starts */
+const START_RATIO = 0.3;
 
 export function mountReel(root: HTMLElement) {
   const photos = JSON.parse(root.dataset.photos ?? '[]') as ReelCard[];
@@ -29,21 +31,14 @@ export function mountReel(root: HTMLElement) {
   const skip = root.querySelector<HTMLButtonElement>('[data-skip]');
   if (!photos.length || !slots.length) return;
 
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let seen = false;
-  try {
-    seen = sessionStorage.getItem(SEEN_KEY) === '1';
-  } catch {
-    // storage blocked: just play the entrance
-  }
-
   let layout: ReelLayout = layoutFor(stage.clientWidth || 1280);
-  let phase: 'deal' | 'reveal' | 'open' = reduced || seen ? 'open' : 'deal';
-  let formation = phase === 'open' ? 1 : 0;
-  let expansion = phase === 'open' ? 1 : 0;
+  let phase: 'deal' | 'reveal' | 'open' = 'deal';
+  let formation = 0;
+  let expansion = 0;
   let spin = 0;
   let target = 0;
-  const start = performance.now();
+  /** when the deal began; 0 until the reel is far enough on screen */
+  let start = 0;
   let revealAt = 0;
 
   /* ---- what each slot shows ---- */
@@ -105,8 +100,12 @@ export function mountReel(root: HTMLElement) {
   }
   progress();
 
-  // the caption types itself in from scrambled letters
-  if (caption && phase === 'deal') {
+  /* ---- entrance ---- */
+  const begin = (now: number) => {
+    start = now;
+    root.classList.add('is-entering');
+    // the caption types itself in from scrambled letters
+    if (!caption) return;
     const word = caption.textContent ?? '';
     const glyphs = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let tick = 0;
@@ -115,9 +114,7 @@ export function mountReel(root: HTMLElement) {
       caption.textContent = [...word].map((c, i) => (c === ' ' || i < tick / 2 ? c : glyphs[(Math.random() * glyphs.length) | 0])).join('');
       if (tick / 2 >= word.length) clearInterval(timer);
     }, 45);
-  }
-
-  /* ---- entrance ---- */
+  };
   const finishEntrance = () => {
     if (phase !== 'open') {
       phase = 'open';
@@ -125,17 +122,11 @@ export function mountReel(root: HTMLElement) {
       expansion = 1;
     }
     root.classList.add('is-open');
-    try {
-      sessionStorage.setItem(SEEN_KEY, '1');
-    } catch {
-      // fine
-    }
   };
-  if (phase === 'open') finishEntrance();
-  else root.classList.add('is-entering');
   skip?.addEventListener('click', finishEntrance);
+  // only while the deal is playing on screen: a key pressed elsewhere on the page must not spend it
   const onKey = (e: KeyboardEvent) => {
-    if (phase !== 'open' && (e.key === 'Escape' || e.key === 'Tab')) finishEntrance();
+    if (start && phase !== 'open' && (e.key === 'Escape' || e.key === 'Tab')) finishEntrance();
   };
   addEventListener('keydown', onKey);
 
@@ -161,7 +152,6 @@ export function mountReel(root: HTMLElement) {
     lastX = e.clientX;
     moved += Math.abs(dx);
     target += dx * pxToAngle();
-    if (reduced) spin = target;
   });
   const endDrag = () => {
     if (!dragging) return;
@@ -170,7 +160,6 @@ export function mountReel(root: HTMLElement) {
     root.classList.remove('is-dragging');
     // land on a card
     target = Math.round(target / step) * step;
-    if (reduced) spin = target;
   };
   stage.addEventListener('pointerup', endDrag);
   stage.addEventListener('pointercancel', endDrag);
@@ -188,12 +177,10 @@ export function mountReel(root: HTMLElement) {
     e.preventDefault();
     target -= e.deltaX * pxToAngle();
     idleUntil = performance.now() + 2500;
-    if (reduced) spin = target;
   }, { passive: false });
   const turn = (by: number) => {
     target = Math.round(target / step) * step + by * step;
     idleUntil = performance.now() + 4000;
-    if (reduced) spin = target;
   };
   root.querySelector('[data-prev]')?.addEventListener('click', () => turn(1));
   root.querySelector('[data-next]')?.addEventListener('click', () => turn(-1));
@@ -211,7 +198,6 @@ export function mountReel(root: HTMLElement) {
       const p = cardPose(i, layout, { formation, expansion, spin });
       target = spin - p.angle;
       idleUntil = performance.now() + 4000;
-      if (reduced) spin = target;
     }),
   );
 
@@ -230,8 +216,9 @@ export function mountReel(root: HTMLElement) {
   };
   new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
+    if (!start && entry.intersectionRatio >= START_RATIO) begin(performance.now());
     run();
-  }).observe(root);
+  }, { threshold: [0, START_RATIO] }).observe(root);
 
   const last = { tilt: '', roll: '', p: '', w: '' };
   const transforms = slots.map(() => '');
@@ -244,7 +231,7 @@ export function mountReel(root: HTMLElement) {
     }
     const dt = Math.min(0.1, (now - prev) / 1000);
     prev = now;
-    if (phase === 'deal') {
+    if (phase === 'deal' && start) {
       formation = Math.min(1, (now - start) / DEAL_MS);
       if (formation >= 1 && (ready || now - start > WAIT_MS)) {
         phase = 'reveal';
@@ -257,7 +244,7 @@ export function mountReel(root: HTMLElement) {
       if (x > 0.55) root.classList.add('is-open');
       if (x >= 1) finishEntrance();
     }
-    if (phase !== 'deal' && !reduced) {
+    if (phase !== 'deal') {
       if (!dragging && !hover && now > idleUntil && !root.contains(document.activeElement)) target -= AUTO_SPIN * dt;
       spin += (target - spin) * (1 - Math.exp(-dt * 6));
     }
