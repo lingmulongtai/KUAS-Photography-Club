@@ -11,9 +11,9 @@ const classes=()=>{
 };
 function mount({unsupported=false,throws=false}={}) {
   const document=new EventTarget(),button=new EventTarget(),attributes=new Map(),styles=new Map(),percent={textContent:'00%'};
-  const progress={setAttribute:(key,value)=>attributes.set(key,value),style:{setProperty:(key,value)=>styles.set(key,value)}};
+  const progress={setAttribute:(key,value)=>attributes.set(key,value)};
   class Dialog extends EventTarget {
-    open=false;closed=0;classList=classes();
+    open=false;closed=0;classList=classes();style={setProperty:(key,value)=>styles.set(key,value)};
     showModal(){if(throws)throw Error('unsupported state');this.open=true;}
     close(){this.open=false;this.closed++;this.dispatchEvent(new Event('close'));}
     querySelector(selector){return selector==='button'?button:selector==='.intro-percent'?percent:progress;}

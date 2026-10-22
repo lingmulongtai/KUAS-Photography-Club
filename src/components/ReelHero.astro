@@ -1,8 +1,9 @@
 ---
 /**
- * Top of the trips page: a ring of portrait photo cards. It is dealt out while the photos load,
- * opens around the viewer and keeps turning slowly; drag, swipe, the arrow keys or the buttons
- * turn it. The ring echoes the open circle of the club logo. Motion lives in scripts/reel/.
+ * A ring of portrait photo cards: the top of the trips page, and a section of the home page. It is
+ * dealt out as it comes into view while the photos load, opens around the viewer and keeps turning
+ * slowly; drag, swipe, the arrow keys or the buttons turn it. The ring echoes the open circle of
+ * the club logo. Motion lives in scripts/reel/.
  *
  * Until trips are published the cards are drawn cards for the places the club photographs,
  * linking to their spot pages: no photographs and no invented records.
@@ -18,9 +19,14 @@ interface Props {
   /** the cards are places, not photos from outings yet */
   placeholder?: boolean;
   lang?: SiteLanguage;
+  /** h2 and a shorter stage for a section inside a page; h1 as the top of the trips page */
+  heading?: 'h1' | 'h2';
+  /** a link under the title, such as to all records */
+  link?: { href: string; label: string };
 }
-const { photos, edge, title, lead, placeholder = false, lang = 'ja' } = Astro.props;
+const { photos, edge, title, lead, placeholder = false, lang = 'ja', heading = 'h1', link } = Astro.props;
 const en = lang === 'en';
+const Heading = heading;
 const SLOTS = 16;
 const t = en
   ? {
@@ -42,14 +48,14 @@ const t = en
       placeholder: '撮影会の記録を公開すると、ここに写真が並びます。いまは撮影に出かける場所を表示しています。',
     };
 ---
-<section class="reel" data-reel data-photos={JSON.stringify(photos)} aria-labelledby="reel-title">
+<section class:list={['reel', { 'is-section': heading === 'h2' }]} data-reel data-photos={JSON.stringify(photos)} aria-labelledby="reel-title">
   <div class="motif" aria-hidden="true"><span class="dot"></span></div>
   <div class="reel-stage" data-reel-stage tabindex="0" role="group" aria-roledescription={en ? 'carousel' : 'カルーセル'} aria-label={t.ring}>
     <div class="reel-ring" data-reel-ring>
       {Array.from({ length: SLOTS }, (_, i) => (
         <a class="reel-card" data-slot={i} tabindex="-1" draggable="false">
           <span class="face front">
-            <img alt="" decoding="async" draggable="false" />
+            <img alt="" loading="lazy" decoding="async" draggable="false" />
             <span class="art" data-art hidden aria-hidden="true"><span class="art-name" data-art-name></span></span>
             <span class="cap">
               {placeholder && <span class="badge">PHOTO SPOT</span>}
@@ -72,9 +78,10 @@ const t = en
   <div class="copy">
     <div class="wrap">
       <p class="edge">{edge}</p>
-      <h1 id="reel-title" set:html={title} />
+      <Heading id="reel-title" set:html={title} />
       {lead && <p class="lead">{lead}</p>}
       {placeholder && <p class="sample-note small">{t.placeholder}</p>}
+      {link && <a class="link-arrow more" href={link.href}>{link.label}</a>}
     </div>
   </div>
 
@@ -93,14 +100,23 @@ const t = en
 <style>
   .reel {
     --card-w: 300px;
+    --reel-ground: var(--brand-pale);
     position: relative;
     height: clamp(560px, 82vh, 780px);
     overflow: hidden;
     isolation: isolate;
     background:
       radial-gradient(ellipse 70% 60% at 50% 42%, var(--raise-2), transparent 70%),
-      var(--brand-pale);
+      var(--reel-ground);
     margin-bottom: clamp(32px, 5vw, 56px);
+  }
+
+  /* inside a page, between the page's own sections */
+  .reel.is-section {
+    --reel-ground: var(--base);
+    height: clamp(540px, 78vh, 720px);
+    margin-bottom: 0;
+    border-top: 1px solid var(--line);
   }
 
   /* the dot of the logo's open circle; the ring itself is the circle */
@@ -377,7 +393,7 @@ const t = en
     inset: auto 0 0;
     z-index: 2;
     padding: clamp(80px, 14vh, 140px) 0 clamp(24px, 4vw, 44px);
-    background: linear-gradient(to top, var(--brand-pale) 34%, transparent);
+    background: linear-gradient(to top, var(--reel-ground) 34%, transparent);
     pointer-events: none;
     opacity: 0;
     transform: translateY(14px);
@@ -397,6 +413,18 @@ const t = en
 
   .copy h1 {
     font-size: var(--step-5);
+  }
+
+  .copy h2 {
+    font-size: var(--step-4);
+  }
+
+  .copy .more {
+    justify-self: start;
+  }
+
+  .is-open .copy .more {
+    pointer-events: auto;
   }
 
   .copy .lead {
@@ -482,16 +510,4 @@ const t = en
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .copy,
-    .controls,
-    .loader {
-      transition: none;
-    }
-
-    .front img,
-    .col::before {
-      transition: none;
-    }
-  }
 </style>

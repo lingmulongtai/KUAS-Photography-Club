@@ -2,14 +2,16 @@
 import Base from '../layouts/Base.astro';
 import KyotoHero from '../components/KyotoHero.astro';
 import TripCard from '../components/TripCard.astro';
+import ReelHero from '../components/ReelHero.astro';
 import LearnCards from '../components/learn/LearnCards.astro';
 import InstagramSection from '../components/InstagramSection.astro';
 import UpcomingEvents from '../components/UpcomingEvents.astro';
-import { getTrips } from '../lib/trips';
+import { getTrips, reelPhotos } from '../lib/trips';
 import { club } from '../data/club';
 
 const trips = await getTrips();
 const latest = trips.slice(0, 3);
+const reel = await reelPhotos('ja');
 ---
 <Base overlayHeader>
   <KyotoHero />
@@ -48,21 +50,24 @@ const latest = trips.slice(0, 3);
     </div>
   </section>
 
-  <section class="section" aria-labelledby="latest-title">
-    <div class="wrap stack">
-      <div class="head-row">
-        <div class="section-head">
-          <p class="edge">PHOTO TRIPS ▸ LATEST ROLLS</p>
-          <h2 id="latest-title">最近の撮影会</h2>
+  <ReelHero
+    heading="h2"
+    photos={reel.photos}
+    placeholder={reel.placeholder}
+    edge="PHOTO TRIPS ▸ LATEST ROLLS"
+    title="最近の撮影会"
+    lead="部員で相談しながら、京都の街や近くの府県へ撮影に出かけています。"
+    link={{ href: '/trips/', label: 'すべての撮影会 →' }}
+  />
+  {latest.length > 0 && (
+    <section class="section latest" aria-label="最近の撮影会の記録">
+      <div class="wrap">
+        <div class="list">
+          {latest.map((trip) => <TripCard trip={trip} />)}
         </div>
-        <a class="link-arrow" href="/trips/">すべての撮影会 →</a>
       </div>
-      {latest.length === 0 && <p class="muted">活動記録を準備中です。</p>}
-      <div class="list">
-        {latest.map((trip) => <TripCard trip={trip} />)}
-      </div>
-    </div>
-  </section>
+    </section>
+  )}
 
   <section class="section" aria-labelledby="learn-title">
     <div class="wrap stack">
