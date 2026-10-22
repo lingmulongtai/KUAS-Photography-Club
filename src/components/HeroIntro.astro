@@ -53,7 +53,8 @@ const en = lang === 'en';
       const value = Math.round(Math.min(1, Math.max(0, event.detail)) * 100);
       if (!Number.isFinite(value) || finished) return;
       progress.setAttribute('aria-valuenow', String(value));
-      progress.style.setProperty('--progress', String(value / 100));
+      // on the dialog, so every part of the picture can draw from it
+      intro.style.setProperty('--progress', String(value / 100));
       percent.textContent = `${String(value).padStart(2, '0')}%`;
     };
     intro.querySelector('button').addEventListener('click', dismiss);
