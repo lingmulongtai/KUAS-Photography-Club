@@ -2,21 +2,59 @@
 interface Props { lang?: 'ja' | 'en'; }
 const { lang = 'ja' } = Astro.props;
 const en = lang === 'en';
+
+/*
+ * Kyoto in one white line, drawn while the 3D scene loads: a 1200×200 panorama standing on the
+ * ground at y = 196. Each line draws over its own stretch of the progress (from, span). The middle,
+ * with Kyoto Tower, the Yasaka pagoda and Daimonji, is what a phone shows. A `hide` shape is filled
+ * with the ground colour so the ridge passes behind the landmark drawn over it.
+ */
+const city = [
+  // the ground and the eastern hills, spreading out from the middle
+  { d: 'M600 196 H0', from: 0, span: .45 },
+  { d: 'M600 196 H1200', from: 0, span: .45 },
+  { d: 'M600 112 C570 116 540 120 500 118 C460 116 430 104 390 106 C350 108 300 126 250 124 C200 122 160 98 115 96 C70 94 30 110 0 112', from: .04, span: .5, kind: 'far' },
+  { d: 'M600 112 C630 108 660 92 700 86 C730 82 760 100 800 102 C840 104 870 86 905 82 C940 78 980 100 1030 104 C1080 108 1140 96 1200 100', from: .04, span: .5, kind: 'far' },
+  // machiya roofs
+  { d: 'M408 196 V185 L412 179 H431 L435 185 V181 L439 175 H464 L468 181 V188 L472 182 H484 L488 188 V196', from: .18, span: .35 },
+  { d: 'M572 196 V188 L576 182 H590 L594 188 V184 L598 178 H622 L626 184 V196', from: .22, span: .3 },
+  { d: 'M684 196 V189 L688 183 H716 L720 189 V185 L724 179 H743 L747 185 V181 L751 175 H776 L780 181 V188 L784 182 H812 L816 188 V196', from: .26, span: .4 },
+  { d: 'M0 196 V187 L4 181 H26 L30 187 V183 L34 177 H50 L54 183 V189 L58 183 H86 L90 189 V185 L94 179 H113 L117 185 V181 L121 175 H146 L150 181 V188 L154 182 H168 L172 188 V184 L176 178 H206 L210 184 V187 L214 181 H232 L236 187 V183 L240 177 H262 L266 183 V189 L270 183 H286 L290 189 V185 L294 179 H322 L326 185 V181 L330 175 H348 L352 181 V196', from: .3, span: .45 },
+  { d: 'M944 196 V181 L948 175 H973 L977 181 V188 L981 182 H995 L999 188 V184 L1003 178 H1033 L1037 184 V187 L1041 181 H1059 L1063 187 V183 L1067 177 H1089 L1093 183 V189 L1097 183 H1113 L1117 189 V185 L1121 179 H1149 L1153 185 V181 L1157 175 H1176 L1180 181 V188 L1184 182 H1196 L1200 188 V196', from: .34, span: .45 },
+  // Kyoto Tower, from its building up to the needle
+  { d: 'M523.5 170 L525.5 97 H534.5 L536.5 170 Z', from: .2, span: .45, kind: 'hide' },
+  { d: 'M492 196 V170 H568 V196 M497 180 H563 M524 170 L526 97 M536 170 L534 97 M519 97 H541 V87 H519 Z M522 87 Q530 80 538 87 M530 83.5 V50', from: .2, span: .45 },
+  // the Yasaka pagoda, tier by tier
+  { d: 'M652 92 H658 V116 H652 Z', from: .32, span: .45, kind: 'hide' },
+  { d: 'M644 196 V177 M666 196 V177 M630 174 Q655 179 680 174 L666 169 H644 L630 174 M645 169 V162 M665 169 V162 M633 159 Q655 164 677 159 L665 154 H645 L633 159 M646 154 V148 M664 154 V148 M635.5 145 Q655 150 674.5 145 L664 140 H646 L635.5 145 M647 140 V135 M663 140 V135 M638 132 Q655 137 672 132 L663 127 H647 L638 132 M648 127 V123 M662 127 V123 M640 120 Q655 125 670 120 L662 115 H648 L640 120 M655 115 V90 M652 109 H658 M652.4 105 H657.6 M652.8 101 H657.2 M653.2 97 H656.8', from: .32, span: .45 },
+  // the Heian Shrine torii and a bridge over the Kamo
+  { d: 'M371 196 L372.5 162 M389 196 L387.5 162 M360 157 Q380 162 400 157 M364 162 H396 M366 170 H394 M380 162 V170', from: .45, span: .3 },
+  { d: 'M820 192 Q880 182 940 192 M820 186 Q880 176 940 186 M835 189.8 V183.8 M850 188.3 V182.3 M865 187.3 V181.3 M880 187 V181 M895 187.3 V181.3 M910 188.3 V182.3 M925 189.8 V183.8 M860 187.6 V196 M900 187.6 V196', from: .5, span: .3 },
+  // 大 on Daimonji, last
+  { d: 'M687 99 H701 M694 92 Q693.5 101 686 108 M694 99.5 Q697.5 104.5 702 107', from: .6, span: .2 },
+];
 ---
 <dialog class="hero-intro" aria-labelledby="intro-title">
-  <div class="intro-content">
-    <p class="intro-eyebrow">KYOTO UNIVERSITY OF ADVANCED SCIENCE</p>
-    <div class="intro-frame">
-      <p id="intro-title" class="intro-title" tabindex="-1" autofocus>{en ? <>Photography<br />Club</> : '写真部'}</p>
-      <p class="intro-name">KUAS PHOTOGRAPHY CLUB</p>
+  <div class="intro-head">
+    <div class="intro-emblem" role="progressbar" aria-label={en ? 'Preparing the Kyoto scenery' : '京都の景色の準備状況'} aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <img src="/brand/mark-512.webp" alt="" width="512" height="512" decoding="async" />
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <!-- the logo's open circle: it starts below its gap and stops short of it -->
+        <circle class="intro-track" cx="50" cy="50" r="47" pathLength="100" transform="rotate(-26 50 50)" />
+        <circle class="intro-arc" cx="50" cy="50" r="47" pathLength="100" transform="rotate(-26 50 50)" />
+        <g class="intro-dot"><circle cx="97" cy="50" r="2.3" /></g>
+      </svg>
     </div>
-    <div class="intro-progress" role="progressbar" aria-label={en ? 'Preparing the Kyoto scenery' : '京都の景色の準備状況'} aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-      <span></span>
-    </div>
-    <div class="intro-caption">
-      <p role="status">{en ? 'Preparing Kyoto’s scenery…' : '京都の景色を、準備しています。'}</p>
-      <span class="intro-percent" aria-hidden="true">00%</span>
-    </div>
+    <p id="intro-title" class:list={['intro-title', { 'is-latin': en }]} tabindex="-1" autofocus>{en ? 'Photography Club' : '写真部'}</p>
+    <p class="intro-name">{en ? '— KUAS · Kyoto —' : '— KUAS Photography Club —'}</p>
+  </div>
+  <svg class="intro-city" viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <!-- all of it faintly, as the circle's track, then the same lines drawn over it -->
+    <g class="intro-ghost">{city.map((line) => <path class={line.kind} d={line.d} />)}</g>
+    {city.map((line) => <path class={line.kind} d={line.d} pathLength={line.kind === 'hide' ? undefined : 1} style={`--from:${line.from};--span:${line.span}`} />)}
+  </svg>
+  <div class="intro-foot">
+    <p role="status">{en ? 'Preparing Kyoto’s scenery' : '京都の景色を準備しています'}<span class="intro-percent" aria-hidden="true">00%</span></p>
     <button type="button" class="intro-skip">{en ? 'Enter the site now' : '待たずにサイトを見る'} <span aria-hidden="true">↗</span></button>
   </div>
 </dialog>
@@ -53,7 +91,7 @@ const en = lang === 'en';
       const value = Math.round(Math.min(1, Math.max(0, event.detail)) * 100);
       if (!Number.isFinite(value) || finished) return;
       progress.setAttribute('aria-valuenow', String(value));
-      // on the dialog, so every part of the picture can draw from it
+      // The circle and the city both draw from this.
       intro.style.setProperty('--progress', String(value / 100));
       percent.textContent = `${String(value).padStart(2, '0')}%`;
     };
@@ -73,7 +111,12 @@ const en = lang === 'en';
 </script>
 <style>
   :global(html.hero-intro-open) { overflow: hidden; }
+
+  /* the logo: a white open circle round the photographer, 写真部 beneath, all on the club's teal */
   .hero-intro {
+    --progress: 0;
+    --emblem: clamp(132px, min(58vmin, 30vh), 260px);
+    --city: clamp(120px, 30vh, 280px);
     position: fixed;
     inset: 0;
     width: 100%;
@@ -81,34 +124,109 @@ const en = lang === 'en';
     height: 100%;
     max-height: none;
     margin: 0;
-    padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+    padding: 0;
     border: 0;
-    overflow-y: auto;
-    color: #f1f6f4;
-    background: radial-gradient(ellipse at 50% 42%, #173035 0%, #0b171e 48%, #0a111b 100%);
+    overflow: hidden auto;
+    color: var(--ink);
+    background: var(--band);
   }
-  .hero-intro[open], .hero-intro.is-leaving { display: grid; place-items: center; }
+  .hero-intro[open], .hero-intro.is-leaving { display: grid; grid-template-rows: minmax(min-content, 1fr) auto auto; }
   .hero-intro:not([open]):not(.is-leaving) { display: none; }
-  .hero-intro::backdrop { background: #0a111b; }
+  .hero-intro::backdrop { background: var(--band, #64bec6); }
   .is-leaving { z-index: 100; pointer-events: none; }
-  .intro-content { width: min(100%, 520px); text-align: center; }
-  .intro-eyebrow { font: 400 10px/1.7 var(--mono); letter-spacing: .15em; color: #91acae; }
-  .intro-frame { position: relative; margin: 28px 0 42px; padding: 38px 12px; }
-  .intro-frame::before, .intro-frame::after {
-    content: ''; position: absolute; width: 25px; height: 25px; border-color: #64bec6; border-style: solid; opacity: .65;
+
+  .intro-head {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    padding: max(24px, env(safe-area-inset-top)) var(--gutter) 12px;
+    text-align: center;
+    color: #fff;
   }
-  .intro-frame::before { top: 0; left: 0; border-width: 1px 0 0 1px; }
-  .intro-frame::after { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
-  .intro-title { font: 900 clamp(48px, 11vw, 104px)/1.15 var(--display); letter-spacing: .12em; text-indent: .12em; outline: none; }
-  :global(html[lang="en"]) .intro-title { font-size: clamp(38px, 8vw, 70px); letter-spacing: -.025em; text-indent: 0; }
-  .intro-name { margin-top: 20px; font: 500 11px/1.6 var(--mono); letter-spacing: .19em; color: #a5c6c7; }
-  .intro-progress { height: 2px; overflow: hidden; background: #ffffff1a; }
-  .intro-progress span { display: block; width: 100%; height: 100%; background: #84d0d4; transform: scaleX(var(--progress, 0)); transform-origin: left; transition: transform .3s ease; }
-  .intro-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 14px; color: #a5b8bd; font-size: 12px; }
-  .intro-percent { font: 400 11px/1.5 var(--mono); }
-  .intro-skip { min-height: 44px; margin-top: 32px; padding: 8px 14px; border: 1px solid #ffffff26; border-radius: 999px; background: transparent; color: #c2d5d7; font: 500 12px/1.5 var(--body); cursor: pointer; }
-  .intro-skip span { margin-left: 10px; }
-  .intro-skip:hover { border-color: #84d0d4; color: #fff; }
-  .intro-skip:focus-visible { outline: 2px solid #84d0d4; outline-offset: 5px; }
-  @media (prefers-reduced-motion: reduce) { .intro-progress span { transition: none; } }
+  .intro-emblem { position: relative; width: var(--emblem); aspect-ratio: 1; }
+  /* inside the mark's own circle, which the drawn one replaces */
+  .intro-emblem img { position: absolute; inset: 0; width: 100%; height: 100%; clip-path: circle(43.5%); }
+  .intro-emblem svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .intro-track { fill: none; stroke: #fff; stroke-opacity: .28; stroke-width: 1; stroke-dasharray: 92.8 200; }
+  .intro-arc {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-dasharray: 100 200;
+    /* about 93% of the circle, the length of the logo's */
+    stroke-dashoffset: calc(101 - 93.8 * var(--progress));
+  }
+  /* the logo's dot leads the line and settles in the gap */
+  .intro-dot { transform-box: view-box; transform-origin: 50% 50%; transform: rotate(calc(-26deg + 342deg * var(--progress))); }
+  .intro-dot circle { fill: #fff; }
+  .intro-title {
+    margin-top: clamp(14px, 2.8vh, 28px);
+    font: 400 clamp(30px, 5.6vw, 44px)/1.2 var(--display);
+    letter-spacing: .5em;
+    text-indent: .5em;
+    text-shadow: 0 1px 14px rgb(27 54 61 / .2);
+    outline: none;
+  }
+  :global(:root[data-theme]:not([data-theme="light"])) .intro-title { text-shadow: none; }
+  .intro-title.is-latin { font: 600 clamp(26px, 4.6vw, 38px)/1.2 var(--latin); letter-spacing: .06em; text-indent: .06em; }
+  .intro-name { margin-top: 10px; font: 600 12px/1.6 var(--latin); letter-spacing: .14em; }
+
+  /* at least a sixth of its width tall, so a wide, short screen crops only empty sky */
+  .intro-city { display: block; width: 100%; height: max(var(--city), 13.5vw); }
+  .intro-city path {
+    --local: clamp(0, (var(--progress) - var(--from)) / var(--span), 1);
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1 2;
+    stroke-dashoffset: calc(1.02 - 1.02 * var(--local));
+  }
+  .intro-city .far { stroke-width: .9; stroke-opacity: .7; }
+  .intro-city .hide { fill: var(--band); fill-opacity: var(--local); stroke: none; }
+  .intro-ghost path { stroke-opacity: .2; stroke-dasharray: none; stroke-dashoffset: 0; }
+  .intro-ghost .far { stroke-opacity: .14; }
+  .intro-ghost .hide { fill-opacity: 1; }
+
+  .intro-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 20px;
+    padding: 14px max(var(--gutter), env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+  }
+  .intro-foot p { font: 500 13px/1.6 var(--body); letter-spacing: .06em; }
+  .intro-percent { margin-left: .8em; font: 500 12px/1 var(--mono); font-variant-numeric: tabular-nums; }
+  .intro-skip {
+    min-height: 44px;
+    padding: 8px 18px;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 50%, transparent);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink);
+    font: 700 13px/1.4 var(--body);
+    cursor: pointer;
+  }
+  .intro-skip span { margin-left: 6px; }
+  .intro-skip:hover { border-color: var(--ink); background: color-mix(in srgb, var(--ink) 10%, transparent); }
+  .intro-skip:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+  @media (max-height: 560px) {
+    .hero-intro { --emblem: clamp(84px, 26vh, 140px); --city: clamp(70px, 20vh, 110px); }
+    .intro-title { margin-top: 10px; font-size: clamp(24px, 8vh, 34px); }
+    .intro-name { display: none; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-intro[open] .intro-emblem { animation: intro-in .9s cubic-bezier(.22, .61, .36, 1) both; }
+    .hero-intro[open] .intro-title, .hero-intro[open] .intro-name { animation: intro-in .9s .15s cubic-bezier(.22, .61, .36, 1) both; }
+    .intro-arc, .intro-city path { transition: stroke-dashoffset .9s cubic-bezier(.22, .61, .36, 1), fill-opacity .9s; }
+    .intro-dot { transition: transform .9s cubic-bezier(.22, .61, .36, 1); }
+    .intro-dot circle { transform-box: fill-box; transform-origin: center; animation: intro-pulse 1.4s ease-in-out infinite alternate; }
+  }
+  @keyframes intro-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+  @keyframes intro-pulse { to { transform: scale(1.4); opacity: .65; } }
 </style>
