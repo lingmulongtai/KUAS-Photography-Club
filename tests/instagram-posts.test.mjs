@@ -20,3 +20,8 @@ test('the site serves its own copy of each listed photo, and only those', () => 
   for (const post of posts) assert.ok(existsSync(new URL(`public/instagram/${code(post.url)}.webp`, root)), `run npm run instagram for ${post.url}`);
   assert.deepEqual(saved.sort(), posts.map((p) => `${code(p.url)}.webp`).sort(), 'run npm run instagram -- --prune');
 });
+
+test('the home and about pages no longer depend on Instagram loading in the browser', () => {
+  const section = readFileSync(new URL('src/components/InstagramSection.astro', root), 'utf8');
+  assert.doesNotMatch(section, /<iframe|instagram\.com\/embed|embed\.js/);
+});
