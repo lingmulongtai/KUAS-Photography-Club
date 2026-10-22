@@ -9,7 +9,7 @@ const classes=()=>{
   const set=new Set();
   return {add:value=>set.add(value),remove:value=>set.delete(value),contains:value=>set.has(value)};
 };
-function mount({unsupported=false,throws=false}={}) {
+function mount({unsupported=false,throws=false,reduced=true}={}) {
   const document=new EventTarget(),button=new EventTarget(),attributes=new Map(),styles=new Map(),percent={textContent:'00%'};
   const progress={setAttribute:(key,value)=>attributes.set(key,value)};
   class Dialog extends EventTarget {
@@ -20,11 +20,14 @@ function mount({unsupported=false,throws=false}={}) {
   }
   const intro=new Dialog();if(unsupported)intro.showModal=undefined;
   document.currentScript={previousElementSibling:intro};document.documentElement={classList:classes()};
-  let timeout,delay,cleared=false;
-  runInNewContext(script,{document,HTMLDialogElement:Dialog,matchMedia:()=>({matches:true}),
-    setTimeout:(callback,ms)=>{timeout=callback;delay=ms;return 1;},clearTimeout:()=>{cleared=true;}});
+  let timeout,delay,cleared=false,frames=[],clock=0;
+  runInNewContext(script,{document,HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
+    setTimeout:(callback,ms)=>{timeout=callback;delay=ms;return 1;},clearTimeout:()=>{cleared=true;},
+    requestAnimationFrame:callback=>frames.push(callback),cancelAnimationFrame:()=>{frames=[];}});
   const emit=(type,detail)=>document.dispatchEvent(new CustomEvent(type,{detail}));
-  return {intro,document,button,attributes,styles,percent,emit,get delay(){return delay;},expire:()=>timeout(),get cleared(){return cleared;}};
+  // play display frames at 60 fps
+  const run=seconds=>{for(let i=0;i<Math.round(seconds*60);i++){const due=frames;frames=[];clock+=1000/60;due.forEach(frame=>frame(clock));}};
+  return {intro,document,button,attributes,styles,percent,emit,run,get delay(){return delay;},expire:()=>timeout(),get cleared(){return cleared;}};
 }
 
 test('intro opens immediately, reports real progress, then releases the page on readiness',()=>{
@@ -63,4 +66,31 @@ test('unsupported or failed modal setup leaves the document usable',()=>{
     assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false);
     state.emit('hero:progress',.5);assert.equal(state.percent.textContent,'00%');
   }
+});
+
+test('a jump in loading is counted through on screen, never snapped or run ahead',()=>{
+  const state=mount({reduced:false});
+  state.emit('hero:progress',.15);state.run(1);assert.equal(state.percent.textContent,'15%');
+  state.emit('hero:progress',.6);assert.equal(state.attributes.get('aria-valuenow'),'60','assistive technology hears the real value');
+  const seen=[];
+  for(let i=0;i<150;i++){state.run(1/60);seen.push(parseInt(state.percent.textContent));}
+  assert.ok(seen[5]<30,'no snap to the new value');
+  assert.ok(seen.every((value,i)=>i===0||value>=seen[i-1]),'never runs backwards');
+  assert.ok(seen.filter(value=>value>15&&value<60).length>20,'passes through the values between');
+  assert.equal(Math.max(...seen),60,'never ahead of the real progress');
+  assert.equal(seen.at(-1),60);
+  assert.equal(state.styles.get('--progress'),'0.6');
+});
+
+test('readiness lets the count reach 100% before the scene opens, but never holds the page for long',()=>{
+  const state=mount({reduced:false});
+  state.emit('hero:progress',.6);state.run(3);state.emit('hero:ready');
+  assert.equal(state.intro.open,true,'the count finishes first');
+  state.run(.6);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
+  // frames stop in a background tab: the page still opens soon after readiness
+  const stalled=mount({reduced:false});stalled.emit('hero:progress',.3);stalled.emit('hero:ready');
+  assert.equal(stalled.delay,900);stalled.expire();assert.equal(stalled.intro.open,false);
+  // skipping does not wait for the count
+  const skipped=mount({reduced:false});skipped.emit('hero:progress',.4);skipped.emit('hero:ready');
+  skipped.button.dispatchEvent(new Event('click'));assert.equal(skipped.intro.open,false);
 });
