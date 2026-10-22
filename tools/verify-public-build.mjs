@@ -63,15 +63,12 @@ for (const path of ['index.html', 'about/index.html', 'en/index.html', 'en/about
   const source = byPath.get(path);
   const section = source.match(/<section\b[^>]*aria-labelledby="insta-title"[^>]*>([\s\S]*?)<\/section>/)?.[1];
   assert.ok(section, `Missing Instagram section: ${path}`);
-  // The posts are the site's own copies, so they show wherever Instagram's embed would be blocked.
-  assert.doesNotMatch(section, /<iframe\b/, `Instagram embed returned: ${path}`);
-  const posts = [...section.matchAll(/<a\b[^>]*href="https:\/\/www\.instagram\.com\/p\/([\w-]+)\/"[^>]*>\s*<img\b([^>]*)>/g)];
-  assert.ok(posts.length >= 3, `Missing Instagram posts: ${path}`);
-  for (const [, code, img] of posts) {
-    assert.match(img, new RegExp(`src="/instagram/${code}\\.webp"`), `Photo for ${code}: ${path}`);
-    assert.match(img, /alt="[^"]+"/, `Alt text for ${code}: ${path}`);
-    assert.ok(existsSync(join(output, 'instagram', `${code}.webp`)), `Missing photo file for ${code}`);
-  }
-  assert.match(section, /<a\b[^>]*href="https:\/\/www\.instagram\.com\/kuas_photographyclub"/);
+  const iframe = section.match(/<iframe\b[^>]*>/)?.[0];
+  assert.ok(iframe, `Missing official Instagram embed: ${path}`);
+  assert.match(iframe, /src="https:\/\/www\.instagram\.com\/kuas_photographyclub\/embed\/"/);
+  assert.match(iframe, /loading="lazy"/);
+  assert.match(iframe, path.startsWith('en/') ? /title="[^"]*Instagram profile and posts"/ : /title="[^"]*プロフィールと投稿"/);
+  // The profile remains reachable when Instagram or scripts are blocked.
+  assert.match(section.replace(/<iframe\b[\s\S]*?<\/iframe>/g, ''), /<a\b[^>]*href="https:\/\/www\.instagram\.com\/kuas_photographyclub"/);
 }
 console.log(`Public output verified: ${html.length} HTML files, ${sampleSlugs.length} sample trip routes excluded, local links intact.`);
