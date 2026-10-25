@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { canvasTexture, loadGltf } from './assets';
+import { heroFlower } from './studio/flowers';
 
-export type SubjectId = 'bust' | 'mannequin' | 'horse' | 'stilllife' | 'camera' | 'chess';
+export type SubjectId = 'bust' | 'mannequin' | 'horse' | 'stilllife' | 'camera' | 'chess' | 'flower' | 'tree';
 
 export interface Subject {
   id: SubjectId;
@@ -24,6 +25,8 @@ export const SUBJECT_NAMES: Record<SubjectId, string> = {
   stilllife: 'ティーセットと果物',
   camera: 'クラシックカメラ',
   chess: 'チェス盤',
+  flower: 'コスモスの花',
+  tree: '一本の木',
 };
 
 const PEDESTAL_TOP = 1.08;
@@ -272,5 +275,43 @@ async function chess(): Promise<Subject> {
   return { id: 'chess', group: g, focus: new THREE.Vector3(0, top + 0.05, 0.12), frame: 0.34, pitch: 0.32 };
 }
 
-const builders: Record<SubjectId, () => Subject | Promise<Subject>> = { bust, mannequin, horse, stilllife: stillLife, camera, chess };
+/** A lone broad-leaved tree, about 5 m tall: a foreground for the night sky. */
+function tree(): Subject {
+  const g = new THREE.Group();
+  const bark = new THREE.MeshStandardMaterial({ color: '#4a3a2c', roughness: 0.95 });
+  const leaf = new THREE.MeshStandardMaterial({ color: '#2f4a24', roughness: 0.9, flatShading: true });
+  const leafGeo = new THREE.IcosahedronGeometry(1, 0);
+  let seed = 3;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const branch = (from: THREE.Vector3, dir: THREE.Vector3, len: number, r: number, depth: number) => {
+    const to = from.clone().addScaledVector(dir, len);
+    const geo = new THREE.CylinderGeometry(r * 0.7, r, len, 7, 1);
+    const m = new THREE.Mesh(geo, bark);
+    m.position.copy(from).add(to).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    g.add(m);
+    if (depth === 0) {
+      // small clumps of leaves round the tip, loose enough for the sky to show through
+      for (let i = 0; i < 6; i++) {
+        const c = new THREE.Mesh(leafGeo, leaf);
+        c.position.copy(to).add(new THREE.Vector3((rnd() - 0.5) * 0.9, (rnd() - 0.3) * 0.6, (rnd() - 0.5) * 0.9));
+        c.scale.setScalar(0.12 + rnd() * 0.16).multiply(new THREE.Vector3(1, 0.6, 1));
+        c.rotation.set(rnd() * 3, rnd() * 3, 0);
+        g.add(c);
+      }
+      return;
+    }
+    const kids = depth === 4 ? 4 : 3;
+    for (let i = 0; i < kids; i++) {
+      const a = (i / kids) * Math.PI * 2 + rnd();
+      const d = dir.clone().multiplyScalar(0.55).add(new THREE.Vector3(Math.cos(a), 0.45 + rnd() * 0.3, Math.sin(a)).multiplyScalar(0.7)).normalize();
+      branch(to, d, len * (0.6 + rnd() * 0.15), r * 0.6, depth - 1);
+    }
+  };
+  branch(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.05, 1, 0).normalize(), 1.7, 0.2, 4);
+  shadowed(g);
+  return { id: 'tree', group: g, focus: new THREE.Vector3(0, 1.6, 0.2), aim: new THREE.Vector3(0, 2.6, 0), frame: 5, pitch: -0.05 };
+}
+
+const builders: Record<SubjectId, () => Subject | Promise<Subject>> = { bust, mannequin, horse, stilllife: stillLife, camera, chess, flower: heroFlower, tree };
 export const buildSubject = async (id: SubjectId) => builders[id]();

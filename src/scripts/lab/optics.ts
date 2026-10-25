@@ -2,6 +2,7 @@
  * Camera arithmetic shared by every learning-lab proposal.
  * Distances are metres, focal lengths millimetres, shutter speeds seconds.
  */
+import type { FilterEffect, LensCharacter } from './pipeline';
 
 /** Full-frame sensor height (m). A crop factor divides it. */
 export const SENSOR_H = 0.024;
@@ -25,11 +26,19 @@ export interface Shot {
   peaking?: boolean;
   /** Stripe the clipped highlights. */
   zebra?: boolean;
-  /** Extra exposure in stops on top of the settings (bracketing, compensation). */
+  /** Extra exposure in stops on top of the settings (bracketing, compensation, an ND filter). */
   bias?: number;
+  /** Fringing, softness, vignetting and flare of a particular lens. */
+  lens?: LensCharacter;
+  /** A filter in front of the lens. */
+  filter?: FilterEffect;
+  /** Narrow the view and dim the picture when focusing close, as a real lens does (macro). */
+  breathing?: boolean;
 }
 
 export const SHUTTER_STOPS = [1 / 4000, 1 / 2000, 1 / 1000, 1 / 500, 1 / 250, 1 / 125, 1 / 60, 1 / 30, 1 / 15, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8] as const;
+/** The full range of a camera body, down to the 30-second exposures used for the night sky. */
+export const SHUTTER_FULL = [1 / 8000, 1 / 4000, 1 / 2000, 1 / 1000, 1 / 500, 1 / 250, 1 / 125, 1 / 60, 1 / 30, 1 / 15, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 15, 30] as const;
 export const APERTURE_STOPS = [1.4, 2, 2.8, 4, 5.6, 8, 11, 16, 22] as const;
 export const ISO_LADDER = [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600] as const;
 export const FOCAL_LADDER = [14, 16, 20, 24, 28, 35, 50, 70, 85, 100, 135, 200] as const;
