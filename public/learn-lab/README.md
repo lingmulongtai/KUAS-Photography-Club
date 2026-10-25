@@ -9,7 +9,9 @@ Models (1k textures, glTF): `marble_bust_01`, `horse_statue_01`, `tea_set_01`, `
 
 Panoramas (`<name>.jpg` seen behind the subject, `<name>_1k.hdr` for lighting):
 `ninomaru_teien` (Nagoya Castle Ninomaru garden), `autumn_forest_04`, `shanghai_bund`,
-`studio_small_09`, `the_sky_is_on_fire`.
+`studio_small_09`, `the_sky_is_on_fire`, `flower_road`, `snowy_forest_path_01`,
+`cobblestone_street_night`, `neon_photostudio`.
 
-The drawing mannequin, the torii gates and the pinwheel are generated in code
-(`src/scripts/lab/`).
+The drawing mannequin, the torii gates, the pinwheel, the cosmos field, the lone tree and the
+night sky are generated in code (`src/scripts/lab/`). `stars_thumb.jpg` is a picture taken in
+the studio prototype itself.

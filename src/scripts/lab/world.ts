@@ -3,7 +3,9 @@ import { GroundedSkybox } from 'three/addons/objects/GroundedSkybox.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BACKDROPS, canvasTexture, loadHdr, loadPanorama, type Backdrop, type BackdropId } from './assets';
 import { buildSubject, type Subject, type SubjectId } from './subjects';
-import type { Exposable } from './pipeline';
+import { isLowPower, type Exposable } from './pipeline';
+import { FlowerField } from './studio/flowers';
+import { StarSky } from './studio/stars';
 
 export interface WorldOptions {
   backdrop: BackdropId;
@@ -17,6 +19,8 @@ export interface WorldOptions {
   /** A modelled white studio sweep instead of the panorama (looks right from any viewpoint). */
   cyclorama?: boolean;
 }
+
+type PrepareHook = (camera: THREE.PerspectiveCamera, open: number, close: number, pxAngle: number) => void;
 
 const envCache = new WeakMap<THREE.WebGLRenderer, Map<string, THREE.Texture>>();
 
@@ -32,6 +36,8 @@ export class World implements Exposable {
   onChange: (() => void) | null = null;
   private renderer: THREE.WebGLRenderer;
   private sky: GroundedSkybox | null = null;
+  /** The sun (or a street lamp) itself: the panorama's JPEG clips it, so it is drawn again at full strength. */
+  private sunDisc: THREE.Mesh | null = null;
   private skyUniforms = { skyGain: { value: 1 }, lift: { value: 1 } };
   private sun = new THREE.DirectionalLight('#ffffff', 2);
   private pinwheel: THREE.Group | null = null;
@@ -40,6 +46,18 @@ export class World implements Exposable {
   private dummy = new THREE.Object3D();
   private subjectToken = 0;
   private backdropToken = 0;
+  private sweep: THREE.Group | null = null;
+  flowers: FlowerField | null = null;
+  private snow: THREE.InstancedMesh | null = null;
+  private snowSeeds: Float32Array | null = null;
+  stars: StarSky | null = null;
+  /** The brightest light in the panorama, for lens flare and the polariser. */
+  flareSource: { dir: THREE.Vector3; power: number } | null = null;
+  /** Called once per picture (the studio's lights and flash, the night sky). */
+  readonly prepareHooks: PrepareHook[] = [];
+  readonly subframeHooks: ((i: number, n: number) => void)[] = [];
+  /** 0..1: how strongly a polarising filter darkens the blue sky. */
+  private plUniforms = { plDir: { value: new THREE.Vector3(0, 1, 0) }, plAmt: { value: 0 } };
 
   constructor(renderer: THREE.WebGLRenderer, private opts: WorldOptions) {
     this.renderer = renderer;
@@ -67,7 +85,10 @@ export class World implements Exposable {
     this.scene.add(catcher);
 
     if (opts.torii) this.scene.add(toriiTunnel());
-    if (opts.cyclorama) this.scene.add(cyclorama());
+    if (opts.cyclorama) {
+      this.sweep = cyclorama();
+      this.scene.add(this.sweep);
+    }
     if (opts.pinwheel) {
       this.pinwheel = pinwheel();
       this.scene.add(this.pinwheel);
@@ -78,62 +99,147 @@ export class World implements Exposable {
 
   /** Show or hide the panorama (top views draw a plain floor instead). */
   set skyVisible(v: boolean) {
-    if (this.sky) this.sky.visible = v && !this.opts.cyclorama;
+    if (this.sky) this.sky.visible = v && !this.opts.cyclorama && (this.backdrop.kind ?? 'pano') === 'pano';
+    if (this.sunDisc) this.sunDisc.visible = !!this.sky?.visible && this.sunDisc.userData.on;
   }
 
   get moving() {
-    return !!this.pinwheel || !!(this.leaves && this.leaves.visible);
+    return (
+      !!(this.pinwheel && this.pinwheel.visible) ||
+      !!(this.leaves && this.leaves.visible) ||
+      !!(this.snow && this.snow.visible) ||
+      !!(this.flowers && this.flowers.group.visible) ||
+      !!this.subject?.group.userData.step
+    );
+  }
+
+  set pinwheelVisible(v: boolean) {
+    if (this.pinwheel) this.pinwheel.visible = v;
+  }
+
+  /** How strongly a polariser darkens the sky (0..1). */
+  set polarizer(v: number) {
+    this.plUniforms.plAmt.value = v;
+  }
+
+  prepare(camera: THREE.PerspectiveCamera, open: number, close: number, pxAngle: number) {
+    for (const h of this.prepareHooks) h(camera, open, close, pxAngle);
+  }
+
+  subframe(i: number, n: number) {
+    for (const h of this.subframeHooks) h(i, n);
   }
 
   async setBackdrop(id: BackdropId) {
     const token = ++this.backdropToken;
     const b = BACKDROPS[id];
-    const [pano, hdr] = await Promise.all([loadPanorama(id), loadHdr(id)]);
+    const kind = b.kind ?? 'pano';
+    const loaded = kind === 'stars' ? null : await Promise.all([loadPanorama(id), loadHdr(id)]);
     if (token !== this.backdropToken) return;
     this.backdrop = b;
     this.ev = b.ev;
-    let byRenderer = envCache.get(this.renderer);
-    if (!byRenderer) envCache.set(this.renderer, (byRenderer = new Map()));
-    let env = byRenderer.get(b.file);
-    if (!env) {
-      const pmrem = new THREE.PMREMGenerator(this.renderer);
-      env = pmrem.fromEquirectangular(hdr).texture;
-      pmrem.dispose();
-      byRenderer.set(b.file, env);
-    }
     const yaw = 2 * Math.PI * b.center - Math.PI / 2;
-    this.scene.environment = env;
-    this.scene.environmentIntensity = b.env;
-    this.scene.environmentRotation.set(0, yaw + Math.PI / 2, 0);
     if (this.sky) {
       this.scene.remove(this.sky);
       this.sky.geometry.dispose();
+      this.sky = null;
     }
-    const sky = new GroundedSkybox(pano, b.height, 60, 96);
-    const mat = sky.material as THREE.MeshBasicMaterial;
-    mat.depthWrite = true;
-    this.skyUniforms.skyGain.value = b.sky;
-    this.skyUniforms.lift.value = b.highlights;
-    mat.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, this.skyUniforms);
-      shader.fragmentShader = shader.fragmentShader
-        .replace('void main() {', 'uniform float skyGain; uniform float lift;\nvoid main() {')
-        .replace(
-          '#include <map_fragment>',
-          `#include <map_fragment>
-          float hl = max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b));
-          diffuseColor.rgb *= skyGain * (1. + lift * pow(smoothstep(.5, 1., hl), 3.));`,
-        );
-    };
-    sky.position.y = b.height;
-    sky.rotation.y = yaw;
-    this.sky = sky;
-    sky.visible = !this.opts.cyclorama;
-    this.scene.add(sky);
+    this.flareSource = null;
+    if (this.sunDisc) this.sunDisc.visible = this.sunDisc.userData.on = false;
+    if (loaded) {
+      const [pano, hdr] = loaded;
+      let byRenderer = envCache.get(this.renderer);
+      if (!byRenderer) envCache.set(this.renderer, (byRenderer = new Map()));
+      let env = byRenderer.get(b.file);
+      if (!env) {
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        env = pmrem.fromEquirectangular(hdr).texture;
+        pmrem.dispose();
+        byRenderer.set(b.file, env);
+      }
+      this.scene.environment = env;
+      this.scene.environmentIntensity = b.env;
+      this.scene.environmentRotation.set(0, yaw + Math.PI / 2, 0);
+      const sky = new GroundedSkybox(pano, b.height, 60, 96);
+      const mat = sky.material as THREE.MeshBasicMaterial;
+      mat.depthWrite = true;
+      this.skyUniforms.skyGain.value = b.sky;
+      this.skyUniforms.lift.value = b.highlights;
+      mat.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, this.skyUniforms, this.plUniforms);
+        shader.vertexShader = shader.vertexShader
+          .replace('void main() {', 'varying vec3 vSkyDir;\nvoid main() {')
+          .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvSkyDir = (modelMatrix * vec4(position, 1.)).xyz - cameraPosition;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('void main() {', 'uniform float skyGain; uniform float lift; uniform vec3 plDir; uniform float plAmt; varying vec3 vSkyDir;\nvoid main() {')
+          .replace(
+            '#include <map_fragment>',
+            `#include <map_fragment>
+            float hl = max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b));
+            diffuseColor.rgb *= skyGain * (1. + lift * pow(smoothstep(.5, 1., hl), 3.));
+            if (plAmt > 0.) {
+              // a polariser darkens blue sky most at 90 degrees from the sun
+              vec3 sd = normalize(vSkyDir);
+              float c = dot(sd, plDir);
+              float blue = smoothstep(.0, .25, diffuseColor.b - diffuseColor.r) * smoothstep(-.05, .15, sd.y);
+              diffuseColor.rgb *= 1. - plAmt * .7 * (1. - c * c) * blue;
+            }`,
+          );
+      };
+      sky.position.y = b.height;
+      sky.rotation.y = yaw;
+      sky.userData.isSky = true;
+      this.sky = sky;
+      sky.visible = !this.opts.cyclorama && kind === 'pano';
+      this.scene.add(sky);
+      const peak = brightest(hdr);
+      if (peak) {
+        // the sky sphere maps u to a direction as SphereGeometry does (mirrored in z by
+        // GroundedSkybox), then turns by `yaw`
+        const dir = new THREE.Vector3(-Math.cos(2 * Math.PI * peak.u) * Math.cos(peak.lat), Math.sin(peak.lat), -Math.sin(2 * Math.PI * peak.u) * Math.cos(peak.lat));
+        dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        if (peak.lat > -0.05) this.flareSource = { dir, power: peak.power };
+        this.plUniforms.plDir.value.copy(dir);
+        // a real sun or lamp is a small point far brighter than the sky around it
+        if (peak.lat > -0.05 && peak.power > 2000 && sky.visible) {
+          const disc = this.sunDisc ?? (this.sunDisc = new THREE.Mesh(new THREE.CircleGeometry(0.3, 24), new THREE.MeshBasicMaterial({ depthWrite: false })));
+          const centre = new THREE.Vector3(0, b.height, 0);
+          disc.position.copy(centre).addScaledVector(dir, 55);
+          disc.lookAt(centre);
+          (disc.material as THREE.MeshBasicMaterial).color.setRGB(...peak.rgb).multiplyScalar(b.sky * Math.min(400, peak.power * 0.006));
+          disc.userData.on = disc.visible = true;
+          if (!disc.parent) this.scene.add(disc);
+        }
+      }
+    } else {
+      this.scene.environment = null;
+    }
+    this.scene.background = new THREE.Color(kind === 'room' ? '#0b0c0e' : '#20242a');
+    // the paper sweep of the dark studio
+    if (kind === 'room' && !this.sweep) {
+      this.sweep = cyclorama(false);
+      this.scene.add(this.sweep);
+    }
+    if (this.sweep) this.sweep.visible = kind === 'room' || !!this.opts.cyclorama;
+    if (kind === 'stars' && !this.stars) {
+      this.stars = new StarSky();
+      this.scene.add(this.stars.group);
+      this.prepareHooks.push((_c, open, close, px) => this.stars?.group.visible && this.stars.prepare(open, close, px));
+    }
+    if (this.stars) this.stars.group.visible = kind === 'stars';
+    if (id === 'flowers' && !this.flowers) {
+      this.flowers = new FlowerField(isLowPower());
+      this.scene.add(this.flowers.group);
+    }
+    if (this.flowers) this.flowers.group.visible = id === 'flowers';
+    if (b.snow && !this.snow) this.makeSnow();
+    if (this.snow) this.snow.visible = !!b.snow;
     this.sun.color.set(b.sun.color);
     this.sun.intensity = b.sun.intensity;
-    this.sun.position.set(...b.sun.dir).normalize().multiplyScalar(7);
+    const sunDir = b.sun.auto && this.flareSource ? this.flareSource.dir.clone().setY(Math.max(0.12, this.flareSource.dir.y)).normalize() : new THREE.Vector3(...b.sun.dir).normalize();
+    this.sun.position.copy(sunDir).multiplyScalar(7);
     this.sun.position.y += 0.6;
+    this.sun.position.add(this.sun.target.position);
     if (this.leaves) {
       this.leaves.visible = !!b.leaves;
       if (b.leaves) (this.leaves.material as THREE.MeshStandardMaterial).color.set(b.leaves);
@@ -162,6 +268,9 @@ export class World implements Exposable {
 
   step(time: number) {
     if (this.pinwheel) this.pinwheel.userData.wheel.rotation.z = -time * Math.PI * 2 * 4;
+    this.flowers?.step(time);
+    this.subject?.group.userData.step?.(time);
+    if (this.snow?.visible) this.stepSnow(time);
     const leaves = this.leaves;
     const seeds = this.leafSeeds;
     if (leaves && seeds && leaves.visible) {
@@ -179,6 +288,54 @@ export class World implements Exposable {
       leaves.instanceMatrix.needsUpdate = true;
     }
   }
+
+  /** Snowflakes drifting down in front of the subject. */
+  private makeSnow() {
+    const tex = canvasTexture(64, 64, (g) => {
+      const grad = g.createRadialGradient(32, 32, 0, 32, 32, 30);
+      grad.addColorStop(0, '#fff');
+      grad.addColorStop(0.5, 'rgba(255,255,255,.9)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 64, 64);
+    });
+    const count = 600;
+    const mat = new THREE.MeshBasicMaterial({ color: '#f4f7ff', alphaMap: tex, transparent: true, depthWrite: false });
+    const snow = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.012, 0.012), mat, count);
+    snow.frustumCulled = false;
+    const seeds = new Float32Array(count * 4);
+    let s = 5;
+    for (let i = 0; i < seeds.length; i++) {
+      s = (s * 16807) % 2147483647;
+      seeds[i] = s / 2147483647;
+    }
+    this.snow = snow;
+    this.snowSeeds = seeds;
+    this.scene.add(snow);
+  }
+
+  private stepSnow(time: number) {
+    const snow = this.snow!;
+    const seeds = this.snowSeeds!;
+    const d = this.dummy;
+    const cam = this.snowCenter;
+    for (let i = 0; i < snow.count; i++) {
+      const k = i * 4;
+      const fall = 0.5 + seeds[k] * 0.4;
+      const y = 3.2 - ((time * fall + seeds[k + 1] * 3.2) % 3.2);
+      const drift = Math.sin(time * (0.8 + seeds[k + 2]) + seeds[k + 3] * 6.28) * 0.12;
+      d.position.set(cam.x + (seeds[k + 2] - 0.5) * 6 + drift, y, cam.z + (seeds[k + 3] - 0.5) * 6);
+      d.quaternion.copy(this.snowFacing);
+      d.scale.setScalar(0.6 + seeds[k] * 0.9);
+      d.updateMatrix();
+      snow.setMatrixAt(i, d.matrix);
+    }
+    snow.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Where the snow falls around, and how the flakes face (towards the camera). */
+  snowCenter = new THREE.Vector3();
+  snowFacing = new THREE.Quaternion();
 
   private makeLeaves() {
     const tex = canvasTexture(128, 128, (g) => {
@@ -216,7 +373,7 @@ export class World implements Exposable {
 }
 
 /** A white studio sweep: floor curving up into a back wall, with two softboxes. */
-function cyclorama() {
+function cyclorama(softboxes = true) {
   const g = new THREE.Group();
   const shape: THREE.Vector2[] = [];
   const R = 1.2;
@@ -237,6 +394,8 @@ function cyclorama() {
   const paper = new THREE.Mesh(sweep, new THREE.MeshStandardMaterial({ color: '#e9e7e3', roughness: 0.95, side: THREE.DoubleSide }));
   paper.receiveShadow = true;
   g.add(paper);
+  paper.userData.occludes = true;
+  if (!softboxes) return g;
   const frame = new THREE.MeshStandardMaterial({ color: '#202326', roughness: 0.5, metalness: 0.4 });
   const glow = new THREE.MeshBasicMaterial({ color: '#ffffff' });
   for (const s of [-1, 1]) {
@@ -321,4 +480,42 @@ function toriiTunnel(count = 34, start = -2.2, spacing = 0.9) {
     g.add(mesh);
   }
   return g;
+}
+
+/** The brightest spot of an HDR panorama: where it is and how much brighter than the average. */
+function brightest(tex: THREE.DataTexture) {
+  const img = tex.image as { data: ArrayLike<number>; width: number; height: number };
+  const { data, width: w, height: h } = img;
+  if (!data || !w) return null;
+  const half = data instanceof Uint16Array;
+  const read = (i: number) => (half ? THREE.DataUtils.fromHalfFloat(data[i]) : data[i]);
+  const step = 4;
+  let best = 0;
+  let bi = 0;
+  let sum = 0;
+  let n = 0;
+  for (let y = 0; y < h; y += 2) {
+    for (let x = 0; x < w; x += 2) {
+      const i = (y * w + x) * step;
+      const l = 0.2126 * read(i) + 0.7152 * read(i + 1) + 0.0722 * read(i + 2);
+      sum += l;
+      n++;
+      if (l > best) {
+        best = l;
+        bi = y * w + x;
+      }
+    }
+  }
+  const x = bi % w;
+  const y = Math.floor(bi / w);
+  const rgb = [read(bi * step), read(bi * step + 1), read(bi * step + 2)];
+  const top = Math.max(...rgb, 1e-6);
+  // HDRLoader keeps the file's top row first; v runs up the texture
+  const v = 1 - (y + 0.5) / h;
+  return {
+    u: (x + 0.5) / w,
+    lat: (v - 0.5) * Math.PI,
+    power: best / Math.max(1e-6, sum / n),
+    rgb: rgb.map((c) => c / top) as [number, number, number],
+  };
 }
