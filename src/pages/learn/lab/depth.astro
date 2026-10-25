@@ -1,0 +1,326 @@
+---
+import LabLayout from '../../../layouts/LabLayout.astro';
+import Proposal from '../../../components/lab/Proposal.astro';
+import LabSlider from '../../../components/lab/LabSlider.astro';
+import { APERTURE_STOPS, FOCAL_LADDER } from '../../../scripts/lab/optics';
+---
+<LabLayout
+  title="被写界深度（ボケ）のデザイン案"
+  current="depth"
+  lead="「背景をぼかしたい」は新入生がいちばん知りたいことです。ピントの合う範囲（被写界深度）を、絞り・焦点距離・距離・センサーの大きさから見せる5案です。ボケは奥行きから計算していて、絞り羽根の形も出ます。"
+>
+  <Proposal
+    id="depth-a"
+    code="ボケ A"
+    title="横から見た「くっきり写る範囲」"
+    concept="写真の下に、カメラから奥までを横から見た図を置き、くっきり写る範囲を帯で表示する案。胸像と後ろの鳥居が図の上にも並んでいるので、絞りを開けると帯が細くなり、鳥居が帯から外れてぼける、という因果がつながります。"
+    good={['「なぜぼけるか」を距離の図で説明できる。いちばん理屈がわかる', '焦点距離と絞りの両方の効果を同じ図で比べられる', 'ピント位置を前後にずらす「前ピン・後ピン」の話もできる']}
+    care={['図を読む力が少し要る。初心者には説明の一言が必要', '横長の図なので、スマホでは文字を小さくする工夫が要る']}
+  >
+    <div class="stage lab-stage" data-demo="depth-a">
+      <canvas aria-label="胸像と鳥居を撮り、くっきり写る範囲を変える3Dデモ"></canvas>
+      <div class="vf"><div class="corners"></div><div class="top"><span class="pill" data-readout></span></div></div>
+    </div>
+    <div class="cam side-view">
+      <svg viewBox="0 0 640 120" aria-hidden="true">
+        <line x1="40" x2="620" y1="92" y2="92" class="ground" />
+        <rect data-band x="200" y="18" width="60" height="74" class="band" />
+        <line data-focus-line x1="230" x2="230" y1="14" y2="96" class="focus" />
+        <g class="cam-icon"><rect x="6" y="64" width="26" height="18" rx="3" /><rect x="30" y="68" width="10" height="10" /></g>
+        <g data-subj><ellipse cx="0" cy="66" rx="7" ry="9" class="subj" /><rect x="-6" y="75" width="12" height="17" class="subj" /></g>
+        <g data-gates class="gates"></g>
+        <text x="40" y="112" class="tick">0.3m</text>
+        <text x="300" y="112" class="tick" text-anchor="middle">4m</text>
+        <text x="620" y="112" class="tick" text-anchor="end">60m</text>
+      </svg>
+      <p>くっきり写る範囲：<b data-near></b> 〜 <b data-far></b>（帯の中は、ほぼピントが合って見える）</p>
+      <div class="cam-grid">
+        <LabSlider name="N" label="絞り" stops={APERTURE_STOPS} value={2.8} format="f" />
+        <LabSlider name="mm" label="焦点距離（胸像の大きさは同じ）" stops={FOCAL_LADDER} value={85} format="mm" />
+        <LabSlider name="shift" label="ピントを前後にずらす" stops={[-0.5, -0.3, -0.15, -0.05, 0, 0.05, 0.15, 0.3, 0.5, 1, 2]} value={0} format="m" />
+      </div>
+    </div>
+  </Proposal>
+
+  <Proposal
+    id="depth-b"
+    code="ボケ B"
+    title="チェス盤をタップしてピント合わせ"
+    concept="ローアングルから見たチェス盤で、タップした駒にピントが合う案（スマホのカメラと同じ操作）。F1.4 だと駒1つ分しかくっきりせず、F11 だと盤全体が写ります。ピントの移動もなめらかに動くので「ピント送り」の感覚がつかめます。"
+    good={['スマホと同じ「タップでピント」なので説明不要', '駒が奥まで等間隔に並ぶので、ピントの薄さが一目でわかる', '触って遊べる。ページ滞在時間が延びそう']}
+    care={['チェス盤のデータが約7MBと重め（本番では軽量化する）', '人物や風景の話には直接つながらない']}
+  >
+    <div class="stage lab-stage" data-demo="depth-b">
+      <canvas aria-label="チェス盤の駒をタップしてピントを合わせる3Dデモ"></canvas>
+      <div class="vf"><span class="af" style="left:50%;top:55%"></span><div class="top"><span class="pill" data-readout></span><span class="pill">駒をタップしてピント合わせ</span></div></div>
+    </div>
+    <div class="cam cam-grid">
+      <LabSlider name="N" label="絞り" stops={APERTURE_STOPS} value={2} format="f" />
+      <LabSlider name="mm" label="焦点距離" stops={[35, 50, 85, 135]} value={85} format="mm" />
+    </div>
+  </Proposal>
+
+  <Proposal
+    id="depth-c"
+    code="ボケ C"
+    title="絞り羽根と玉ボケの形"
+    concept="夜の街の光を背にした白磁の馬を望遠で撮り、背景の光を大きな玉ボケにする案。右にはレンズの絞り羽根を表示し、F値を上げると羽根が閉じて、玉ボケが丸から多角形に変わる様子を同時に見せます。羽根の枚数（5・7・9枚、円形絞り）も切り替えられます。"
+    good={['いちばん「映える」。トップや一覧ページのサムネイルにも使える', 'F値＝穴の大きさ、という意味が絞り羽根の絵で直接わかる', 'レンズ選びの話（羽根の枚数、円形絞り）につなげられる']}
+    care={['夜景以外では玉ボケが目立たない', '羽根の形の話はやや上級者向け']}
+  >
+    <div class="lab-split">
+      <div class="stage lab-stage" data-demo="depth-c">
+        <canvas aria-label="夜の街の光を玉ボケにして白磁の馬を撮る3Dデモ"></canvas>
+        <div class="vf"><div class="top"><span class="pill" data-readout></span></div></div>
+      </div>
+      <div class="cam iris-panel">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <defs>
+            <radialGradient id="glass" cx="40%" cy="35%"><stop offset="0" stop-color="#3b5560" /><stop offset="1" stop-color="#0b1216" /></radialGradient>
+          </defs>
+          <circle cx="100" cy="100" r="96" class="barrel" />
+          <g data-iris class="iris">
+            <circle cx="100" cy="100" r="86" class="blades" />
+          </g>
+          <polygon data-hole class="hole" points="" />
+          <circle cx="100" cy="100" r="86" class="rim" />
+        </svg>
+        <LabSlider name="N" label="絞り" stops={APERTURE_STOPS} value={2.8} format="f" />
+        <div class="cam-row">
+          <span class="cam-title">絞り羽根</span>
+          <div class="seg">
+            <button type="button" data-seg="blades" data-value="5" aria-pressed="false">5枚</button>
+            <button type="button" data-seg="blades" data-value="7" aria-pressed="false">7枚</button>
+            <button type="button" data-seg="blades" data-value="9" aria-pressed="true">9枚</button>
+            <button type="button" data-seg="blades" data-value="0" aria-pressed="false">円形</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Proposal>
+
+  <Proposal
+    id="depth-d"
+    code="ボケ D"
+    title="フォーカスリングとピーキング"
+    concept="本物のレンズのフォーカスリング（距離目盛りつき）を横に回してピントを合わせる案。ピントが合っている輪郭が赤く光る「ピーキング」表示と、目盛りの下にくっきり写る範囲（被写界深度目盛り）を表示します。マニュアルフォーカスの練習にもなります。"
+    good={['ピントがどこに合っているかが赤い輪郭で一目でわかる', 'レンズの距離目盛りの読み方が身につく（フィルムカメラにも役立つ）', '静物の前後の並びで、ピントの薄さがよくわかる']}
+    care={['リングを回す操作はマウスだとやや独特', 'ピーキングの色が写真の色とかぶることがある']}
+  >
+    <div class="stage lab-stage" data-demo="depth-d">
+      <canvas aria-label="フォーカスリングでピントを合わせ、ピーキングで合焦部分を表示する3Dデモ"></canvas>
+      <div class="vf"><div class="top"><span class="pill" data-readout></span></div></div>
+    </div>
+    <div class="cam">
+      <div class="ring" data-ring tabindex="0" role="slider" aria-label="フォーカスリング（左右にドラッグ）" aria-valuemin="0" aria-valuemax="100">
+        <div class="ring-track" data-ring-track></div>
+        <span class="ring-dof" data-dof></span>
+        <span class="ring-index"></span>
+      </div>
+      <div class="cam-grid">
+        <LabSlider name="N" label="絞り" stops={APERTURE_STOPS} value={2} format="f" />
+        <div class="cam-row"><button type="button" class="cam-btn" data-toggle="peak" aria-pressed="true">ピーキング表示</button><p>リングを左右にドラッグ（ホイールでも回せます）</p></div>
+      </div>
+    </div>
+  </Proposal>
+
+  <Proposal
+    id="depth-e"
+    code="ボケ E"
+    title="スマホと一眼の「ボケの違い」を並べる"
+    concept="同じ人を同じ大きさ・同じF値で、スマホ・APS-C・フルサイズの3台で撮って並べる案。センサーが小さいほどボケにくい理由を、実際の写りで見せます。「スマホのポートレートモードは計算でぼかしている」という話にもつなげられます。"
+    good={['「一眼にするとなぜボケるの？」という定番の疑問に、1画面で答えられる', 'スマホで撮っている人にも身近', '機材の買い方の相談につなげやすい']}
+    care={['3枚並ぶので、スマホでは縦長の小さい絵になる', '換算F値の話が少しややこしい']}
+  >
+    <div class="stage lab-stage wide" data-demo="depth-e">
+      <canvas aria-label="スマホ・APS-C・フルサイズで同じ人形を撮り比べる3Dデモ"></canvas>
+      <div class="vf triple">
+        {[0, 1, 2].map((i) => <div class="sensor" data-sensor={i}><b></b><span></span></div>)}
+      </div>
+    </div>
+    <div class="cam cam-grid">
+      <LabSlider name="N" label="3台とも同じF値" stops={[1.4, 1.8, 2.8, 4, 5.6, 8]} value={1.8} format="f" />
+      <div class="cam-row">
+        <span class="cam-title">被写体</span>
+        <div class="seg">
+          <button type="button" data-seg="subject" data-value="mannequin" aria-pressed="true">デッサン人形</button>
+          <button type="button" data-seg="subject" data-value="bust" aria-pressed="false">胸像</button>
+        </div>
+      </div>
+    </div>
+  </Proposal>
+</LabLayout>
+
+<script>
+  import '../../../scripts/lab/proposals/depth';
+</script>
+
+<style>
+  .side-view svg {
+    width: 100%;
+    height: auto;
+  }
+
+  .ground {
+    stroke: var(--cam-line-strong);
+  }
+
+  .band {
+    fill: rgba(100, 190, 198, 0.28);
+    stroke: var(--cam-accent);
+    transition: x 0.2s, width 0.2s;
+  }
+
+  .focus {
+    stroke: var(--cam-warn);
+    stroke-width: 2;
+  }
+
+  .cam-icon rect {
+    fill: var(--cam-ink);
+  }
+
+  .subj {
+    fill: #e9e4dc;
+  }
+
+  .gates :global(rect) {
+    fill: #e0401c;
+  }
+
+  .tick {
+    font: 500 10px var(--mono);
+    fill: var(--cam-muted);
+  }
+
+  .af.hit {
+    animation: af 0.45s ease;
+  }
+
+  @keyframes af {
+    0% {
+      transform: scale(1.6);
+      border-color: #fff;
+    }
+
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .iris-panel svg {
+    width: min(100%, 240px);
+    justify-self: center;
+  }
+
+  .barrel {
+    fill: #0a0b0d;
+    stroke: #3a3f46;
+    stroke-width: 4;
+  }
+
+  .blades {
+    fill: #23272c;
+  }
+
+  .hole {
+    fill: url(#glass);
+    stroke: #6f7a82;
+    stroke-width: 1;
+  }
+
+  .rim {
+    fill: none;
+    stroke: #2b3036;
+    stroke-width: 6;
+  }
+
+  .ring {
+    position: relative;
+    height: 74px;
+    overflow: hidden;
+    border-radius: 10px;
+    cursor: ew-resize;
+    touch-action: none;
+    background:
+      repeating-linear-gradient(90deg, #0d0f12 0 3px, #24282e 3px 6px) 0 0 / 100% 22px no-repeat,
+      linear-gradient(#1a1d22, #101215);
+    box-shadow: inset 0 0 0 1px var(--cam-line), inset 0 -18px 30px rgba(0, 0, 0, 0.4);
+  }
+
+  .ring:focus-visible {
+    outline: 2px solid var(--cam-accent);
+    outline-offset: 2px;
+  }
+
+  .ring-track {
+    position: absolute;
+    inset: 22px 0 0;
+  }
+
+  .ring-track :global(span) {
+    position: absolute;
+    top: 8px;
+    transform: translateX(-50%);
+    font: 500 13px/1 var(--mono);
+    color: var(--cam-ink);
+  }
+
+  .ring-track :global(span)::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -9px;
+    width: 1px;
+    height: 6px;
+    background: var(--cam-muted);
+  }
+
+  .ring-index {
+    position: absolute;
+    left: 50%;
+    top: 22px;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--cam-warn);
+  }
+
+  .ring-dof {
+    position: absolute;
+    bottom: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(100, 190, 198, 0.55);
+    box-shadow: 0 0 0 1px var(--cam-accent);
+  }
+
+  .triple {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .sensor {
+    display: grid;
+    align-content: start;
+    justify-items: start;
+    gap: 4px;
+    padding: 10px;
+  }
+
+  .sensor b,
+  .sensor span {
+    padding: 3px 7px;
+    border-radius: 3px;
+    background: rgba(10, 12, 14, 0.6);
+    font-weight: 500;
+  }
+
+  .sensor b {
+    color: var(--cam-accent);
+  }
+
+  .sensor span {
+    font-size: 10px;
+  }
+</style>

@@ -1,0 +1,45 @@
+---
+/** A turning view of one subject in front of one backdrop, with three ready-made shots. */
+import type { BackdropId } from '../../scripts/lab/assets';
+import type { SubjectId } from '../../scripts/lab/subjects';
+interface Props {
+  subject: SubjectId;
+  backdrop: BackdropId;
+  label: string;
+  /** Which switcher to offer under the stage. */
+  switcher: 'bg' | 'subject';
+  torii?: boolean;
+}
+const { subject, backdrop, label, switcher, torii = false } = Astro.props;
+const shots = [
+  { v: '24/8', label: '24mm F8 広角で近く' },
+  { v: '50/4', label: '50mm F4 標準' },
+  { v: '85/2', label: '85mm F2 ポートレート' },
+  { v: '200/2.8', label: '200mm F2.8 望遠' },
+];
+const bgs: [BackdropId, string][] = [['garden', '日本庭園'], ['autumn', '晩秋の林'], ['night', '夜の街'], ['studio', 'スタジオ'], ['sunset', '夕焼け']];
+const subjects: [SubjectId, string][] = [['bust', '胸像'], ['mannequin', 'デッサン人形'], ['horse', '白磁の馬'], ['stilllife', '静物'], ['camera', 'カメラ']];
+---
+<div data-gallery data-subject={subject} data-backdrop={backdrop} data-torii={String(torii)}>
+  <div class="stage lab-stage">
+    <canvas aria-label={label}></canvas>
+    <div class="vf"><div class="corners"></div><div class="top"><span class="pill" data-readout></span><span class="pill">ドラッグで回り込めます</span></div></div>
+  </div>
+  <div class="cam cam-row">
+    <div class="seg">
+      {shots.map((s) => <button type="button" data-seg="shot" data-value={s.v} aria-pressed={s.v === '85/2' ? 'true' : 'false'}>{s.label}</button>)}
+    </div>
+    {switcher === 'bg' ? (
+      <div class="seg">{bgs.map(([id, name]) => <button type="button" data-seg="bg" data-value={id} aria-pressed={id === backdrop ? 'true' : 'false'}>{name}</button>)}</div>
+    ) : (
+      <div class="seg">{subjects.map(([id, name]) => <button type="button" data-seg="subject" data-value={id} aria-pressed={id === subject ? 'true' : 'false'}>{name}</button>)}</div>
+    )}
+  </div>
+</div>
+
+<style>
+  [data-gallery] {
+    display: grid;
+    gap: 14px;
+  }
+</style>
