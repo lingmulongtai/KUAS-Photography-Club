@@ -1,0 +1,69 @@
+---
+import LabLayout from '../../../layouts/LabLayout.astro';
+import Proposal from '../../../components/lab/Proposal.astro';
+import GalleryStage from '../../../components/lab/GalleryStage.astro';
+---
+<LabLayout
+  title="背景のデザイン案"
+  current="background"
+  lead="今の障子・森・夜の街の背景は作り物感が強かったので、実際に撮影された360°パノラマ写真（CC0）に置き換えました。地面まで写真がつながっているので、カメラを動かしても立体的に見えます。下のボタンで望遠やF2にすると、背景ごとのボケ方・迫り方の違いがわかります。"
+>
+  <Proposal
+    id="background-a"
+    code="背景 A"
+    title="日本庭園（名古屋城 二の丸庭園）"
+    concept="名古屋城の二の丸庭園で朝に撮られたパノラマです。竹垣・苔・砂利道のある日本庭園なので、京都の寺社や庭園での撮影会の雰囲気にいちばん近い背景です。昼の自然光で、ボケも素直に出ます。千本鳥居を足した版も作れます（焦点距離 E 案）。"
+    good={['京都の庭園に近い雰囲気で、京都の大学の写真部として「らしい」', '緑と石の細かい模様で、ボケ具合がよくわかる', '昼の光なので、露出の基本（晴れ・日陰）の説明に使える']}
+    care={['京都ではなく名古屋の庭園（京都で撮られた CC0 パノラマが見つからなかったため。本番で部員が京都で360°写真を撮れば差し替えられる）', '夜の玉ボケの練習には向かない']}
+  >
+    <GalleryStage subject="bust" backdrop="garden" label="日本庭園を背景にした胸像" switcher="subject" />
+  </Proposal>
+
+  <Proposal
+    id="background-b"
+    code="背景 B"
+    title="晩秋の林と夕方の逆光"
+    concept="落ち葉の積もった林に、低い太陽が差し込むパノラマです。逆光の撮り方（顔が暗くなる、露出補正をプラスにする）や、木々の細い枝のボケ方を見せられます。暖かい色で、写真としての雰囲気が出やすい背景です。"
+    good={['逆光で、露出補正の話がしやすい', '細い枝がたくさんあり、ボケの量の違いがはっきり出る', '暖色の光で写真がきれいに見える']}
+    care={['紅葉の時期の京都とは少し雰囲気が違う（海外の林）']}
+  >
+    <GalleryStage subject="mannequin" backdrop="autumn" label="晩秋の林を背景にしたデッサン人形" switcher="subject" />
+  </Proposal>
+
+  <Proposal
+    id="background-c"
+    code="背景 C"
+    title="夜の街（玉ボケ）"
+    concept="夜景の明かりがたくさんあるパノラマ（上海・外灘）です。明かりの部分を明るく扱っているので、望遠で絞りを開けると大きな玉ボケになります。暗い場所でのシャッタースピードと ISO の話にもそのまま使えます。"
+    good={['玉ボケがいちばんきれいに出る', '暗い場面の露出（手ブレ・ノイズ）の練習に必須', '写真映えするので、ページのメイン画像にもなる']}
+    care={['京都の夜景ではない（京都の夜景の CC0 パノラマは見つからなかったため）']}
+  >
+    <GalleryStage subject="horse" backdrop="night" label="夜の街を背景にした白磁の馬" switcher="subject" />
+  </Proposal>
+
+  <Proposal
+    id="background-d"
+    code="背景 D"
+    title="撮影スタジオ（白ホリ）"
+    concept="白い背景紙とソフトボックスのある撮影スタジオです。余計なものがないので、被写体そのものの写り（パース・立体感）を説明したいときに使います。焦点距離 D 案のように、外から見たスタジオ模型としても使えます。"
+    good={['背景が単純なので、教えたいことだけに集中できる', 'ライティング（光の当て方）の話に発展できる', '軽くて、古いスマホでも動きやすい']}
+    care={['ボケや圧縮の効果は見えにくい（背景に模様がないため）']}
+  >
+    <GalleryStage subject="stilllife" backdrop="studio" label="撮影スタジオを背景にした静物" switcher="subject" />
+  </Proposal>
+
+  <Proposal
+    id="background-e"
+    code="背景 E"
+    title="海辺の夕焼け"
+    concept="空が赤く焼けた海辺のパノラマです。空が明るく被写体が暗くなりやすいので、シルエット写真や「空に合わせるか、人に合わせるか」という露出の判断を説明できます。色がドラマチックで、写真の楽しさが伝わります。"
+    good={['明暗差の大きい場面の露出（シルエット）が学べる', '夕焼けの色がきれいで、触ってみたくなる', '望遠で太陽の近くを切り取ると、圧縮で空が大きく見える']}
+    care={['京都らしさはない', '逆光で被写体が暗くなりやすいので、説明が要る']}
+  >
+    <GalleryStage subject="camera" backdrop="sunset" label="海辺の夕焼けを背景にしたクラシックカメラ" switcher="subject" />
+  </Proposal>
+</LabLayout>
+
+<script>
+  import '../../../scripts/lab/proposals/gallery';
+</script>

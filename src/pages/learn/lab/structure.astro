@@ -1,0 +1,419 @@
+---
+import LabLayout from '../../../layouts/LabLayout.astro';
+import Proposal from '../../../components/lab/Proposal.astro';
+import LabSlider from '../../../components/lab/LabSlider.astro';
+import StudioDemo from '../../../components/lab/StudioDemo.astro';
+import { APERTURE_STOPS, FOCAL_LADDER, ISO_LADDER, SHUTTER_STOPS } from '../../../scripts/lab/optics';
+const topics = [
+  { no: '01', name: '露出の三角形', line: '明るさを決める3つの設定' },
+  { no: '02', name: 'シャッタースピード', line: '動きを止める・流す' },
+  { no: '03', name: '絞りとボケ', line: '背景をとろけさせる' },
+  { no: '04', name: 'ISO 感度', line: '暗い場所とノイズ' },
+  { no: '05', name: '焦点距離と遠近感', line: 'ズームと立ち位置' },
+];
+const steps = [
+  { set: { mm: 50, N: 5.6, t: 1 / 250, iso: 100, shake: 1, bg: 'garden' }, h: '1. まずは普通に撮る', p: '50mm・F5.6。目で見た印象に近い、いちばん素直な写り。ここから1つずつ変えていきます。' },
+  { set: { mm: 135, N: 5.6 }, h: '2. 下がって望遠にする', p: '胸像の大きさはそのままに、135mm で離れて撮ると、後ろの鳥居がぐっと迫ってきます。' },
+  { set: { mm: 135, N: 1.4 }, h: '3. 絞りを開ける', p: 'F1.4 にすると、ピントの合う範囲がとても薄くなり、鳥居がとろけます。' },
+  { set: { mm: 50, N: 11, t: 1 / 8, shake: 0 }, h: '4. シャッターを遅くする', p: '三脚を立てて 1/8 秒。風車の羽根が流れて写り、動きが見えるようになります。' },
+  { set: { mm: 50, N: 2, t: 1 / 60, iso: 6400, shake: 1, bg: 'night' }, h: '5. 夜は ISO を上げる', p: '夜の街では光が足りないので ISO 6400。明るく撮れるかわりに、ザラザラしたノイズが出ます。' },
+];
+---
+<LabLayout
+  title="全体の構成のデザイン案"
+  current="structure"
+  lead="「ページを分けるか、分けないか」を含めた、学ぶページ全体の作り方の5案です。どの案でも、焦点距離・露出・ボケの各ページの案はそのまま組み合わせられます。A案はすべての設定をひとつの撮影スタジオで試せる形で、別ページに大きな試作も置きました。"
+>
+  <Proposal
+    id="structure-a"
+    code="構成 A"
+    title="ひとつの撮影スタジオで全部試す（ページを分けない）"
+    concept="1つの3Dの撮影現場に、焦点距離・絞り・シャッタースピード・ISO・ピントをすべて備えたカメラを置く案。場所（庭園・林・夜の街など）と撮るものを選び、シャッターを切ると写真が下に並びます。右の「いまの写り」が設定の意味をその場で説明するので、ページを行き来せずに全部を学べます。"
+    good={['本物のカメラと同じで、設定どうしの関係（トレードオフ）が自然にわかる', '撮った写真が残るので、見比べて学べる。遊びとしても楽しい', '1ページで完結するので、部の講習でプロジェクターに映して使いやすい']}
+    care={['最初に画面を開いたとき、何から触ればよいか迷いやすい（B〜D案の要素で導入を補うとよい）', '一つひとつの理屈（なぜぼけるか等）は、別に説明文が要る']}
+  >
+    <StudioDemo torii />
+    <p class="lab-caption">大きい画面の試作：<a href="/learn/lab/studio/">撮影スタジオの試作ページ</a></p>
+  </Proposal>
+
+  <Proposal
+    id="structure-b"
+    code="構成 B"
+    title="テーマごとにページを分ける（露出もちゃんと1ページに）"
+    concept="今のように「シャッタースピード」「絞り」などテーマごとにページを分け、露出の三角形と ISO も独立したページにする案。一覧ページのカードが、それぞれのテーマの写りを3Dで動かしながら見せます。各ページは同じ型（触る → しくみ → 撮るときのコツ → ミニクイズ）でそろえます。"
+    good={['検索から来た人が、知りたいテーマに直接たどり着ける', '1ページの情報量が少なく、スマホで読みやすい', '各ページに焦点距離・露出・ボケの案をそのまま入れられる']}
+    care={['ページ間を行き来しないと全体の関係が見えにくい（最後にA案のスタジオを置くとよい）']}
+  >
+    <div class="stage lab-stage" data-demo="structure-b">
+      <canvas aria-label="テーマごとの写りを並べた一覧ページのイメージ"></canvas>
+      <div class="vf topic-grid">
+        {topics.map((t) => <a class="topic" href="#structure-b"><b>{t.no}</b><strong>{t.name}</strong><span>{t.line} →</span></a>)}
+        <a class="topic dark" href="/learn/darkroom/"><b>06</b><strong>現像</strong><span>いまの暗室ページを活用 →</span></a>
+      </div>
+    </div>
+    <ol class="template">
+      <li><b>触る</b><span>ページの一番上に3Dのデモ。まず動かしてもらう</span></li>
+      <li><b>しくみ</b><span>図とアニメーションで「なぜそうなるか」</span></li>
+      <li><b>撮るときのコツ</b><span>スマホ・カメラでの具体的な設定例</span></li>
+      <li><b>ミニクイズ</b><span>写真を見て「どの設定で撮った？」を当てる</span></li>
+      <li><b>次のテーマへ</b><span>関係するテーマへのリンク</span></li>
+    </ol>
+  </Proposal>
+
+  <Proposal
+    id="structure-c"
+    code="構成 C"
+    title="スクロールで進む一本道のストーリー"
+    concept="1ページを上から読み進めるだけで、写真が少しずつ変わっていく案（スクロールテリング）。左の3Dの写真は画面に固定され、右の文章をスクロールすると、焦点距離 → 絞り → シャッター → ISO と順番に設定が変わります。最後に自由に触れるスタジオ（A案）へつなげます。"
+    good={['何も操作しなくても学べるので、はじめての人に一番やさしい', '順番が決まっているので、説明の流れを作り込める', '見た目の演出が強く、サイトの印象に残る']}
+    care={['自分で試したい人には物足りない（最後にA案を置く前提）', '途中から読むと流れがわからない']}
+  >
+    <div class="scrolly">
+      <div class="scrolly-stage">
+        <div class="stage lab-stage" data-demo="structure-c">
+          <canvas aria-label="スクロールに合わせて設定が変わる3Dの写真"></canvas>
+          <div class="vf"><div class="corners"></div><div class="top"><span class="pill" data-readout></span></div></div>
+        </div>
+      </div>
+      <div class="scrolly-steps">
+        {steps.map((s, i) => (
+          <div class={`step${i === 0 ? ' on' : ''}`} data-step={JSON.stringify(s.set)}>
+            <h3>{s.h}</h3>
+            <p>{s.p}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </Proposal>
+
+  <Proposal
+    id="structure-d"
+    code="構成 D"
+    title="ミッションをクリアしながら学ぶ"
+    concept="「鳥居をとろけさせて目にピントを」「風車を止めよう」など、撮影のお題（ミッション）を出し、カメラの設定を変えてクリアしていく案。条件を満たすと自動でクリアになります。答えを教えるのではなく、自分で設定を探すので記憶に残ります。"
+    good={['ゲーム感覚で、自分から設定を試すようになる', '「どうすれば撮れるか」という実践の考え方が身につく', 'お題を増やせば、新歓イベントや講習の課題にも使える']}
+    care={['クリア条件の作り込みに手間がかかる', '解けないと離脱しやすいので、ヒントの出し方が大事']}
+  >
+    <div class="lab-split">
+      <div class="stage lab-stage" data-demo="structure-d">
+        <canvas aria-label="お題に合わせてカメラの設定を変える3Dデモ"></canvas>
+        <div class="vf">
+          <div class="top"><span class="pill" data-verdict></span></div>
+          <div class="mission-card" data-card>
+            <strong data-card-title></strong>
+            <span data-card-hint></span>
+            <em>クリア！</em>
+          </div>
+        </div>
+      </div>
+      <div class="cam">
+        <h3>ミッション</h3>
+        <ol class="missions">
+          <li data-mission="0">背景をぼかす</li>
+          <li data-mission="1">動きを止める</li>
+          <li data-mission="2">動きを流す</li>
+        </ol>
+        <LabSlider name="mm" label="焦点距離" stops={FOCAL_LADDER} value={35} format="mm" />
+        <LabSlider name="N" label="絞り" stops={APERTURE_STOPS} value={8} format="f" />
+        <LabSlider name="t" label="シャッタースピード" stops={SHUTTER_STOPS} value={1 / 125} format="ss" />
+        <LabSlider name="iso" label="ISO 感度" stops={ISO_LADDER} value={200} format="iso" />
+        <div class="cam-row">
+          <div class="seg">
+            <button type="button" data-seg="hold" data-value="hand" aria-pressed="true">手持ち</button>
+            <button type="button" data-seg="hold" data-value="tripod" aria-pressed="false">三脚</button>
+          </div>
+          <button type="button" class="cam-btn" data-next>次のミッション →</button>
+        </div>
+      </div>
+    </div>
+  </Proposal>
+
+  <Proposal
+    id="structure-e"
+    code="構成 E"
+    title="左右で比べるラボ"
+    concept="同じ場面を2台のカメラで撮り、画面の真ん中の線を左右にドラッグして比べる案（ビフォー・アフター）。「F1.4 と F11」「1/2000 と 1/8」のように、比べたい組み合わせをボタンで選びます。違いだけに集中できるので、説明文と組み合わせやすい形です。"
+    good={['違いが一番はっきり伝わる', '操作が「線を動かす」だけで、迷わない', 'B案の各ページの一番上に置くデモとしても使える']}
+    care={['自由に設定を作る楽しさは少ない', '組み合わせは用意したものだけになる']}
+  >
+    <div class="stage lab-stage" data-demo="structure-e">
+      <canvas aria-label="同じ場面を2つの設定で撮って左右に並べ、境目を動かして比べる3Dデモ"></canvas>
+      <div class="vf">
+        <span class="split-label left" data-label="a"></span>
+        <span class="split-label right" data-label="b"></span>
+        <div class="divider" data-divider><span>⇔</span></div>
+      </div>
+    </div>
+    <div class="cam cam-row">
+      <span class="cam-title">比べる</span>
+      <div class="seg">
+        <button type="button" data-seg="pair" data-value="bokeh" aria-pressed="true">絞り</button>
+        <button type="button" data-seg="pair" data-value="focal" aria-pressed="false">焦点距離</button>
+        <button type="button" data-seg="pair" data-value="motion" aria-pressed="false">シャッター</button>
+        <button type="button" data-seg="pair" data-value="iso" aria-pressed="false">ISO</button>
+      </div>
+    </div>
+  </Proposal>
+</LabLayout>
+
+<script>
+  import '../../../scripts/lab/proposals/structure';
+</script>
+
+<style>
+  .lab-caption a {
+    color: var(--accent);
+  }
+
+  .topic-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+  }
+
+  .topic-grid[data-cols="2"] {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+  }
+
+  .topic {
+    display: grid;
+    align-content: end;
+    gap: 2px;
+    padding: 14px;
+    margin: 3px;
+    border-radius: 4px;
+    color: #fff;
+    text-decoration: none;
+    pointer-events: auto;
+    background: linear-gradient(transparent 45%, rgba(0, 0, 0, 0.65));
+  }
+
+  .topic b {
+    font: 500 11px/1 var(--mono);
+    color: var(--cam-accent);
+  }
+
+  .topic strong {
+    font: 700 17px/1.3 var(--display);
+  }
+
+  .topic span {
+    font: 400 12px/1.4 var(--body);
+    color: #ddd;
+  }
+
+  .topic.dark {
+    background:
+      radial-gradient(circle at 25% 0%, rgba(255, 46, 31, 0.55), transparent 65%),
+      #140505;
+  }
+
+  .template {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px;
+    counter-reset: t;
+  }
+
+  .template li {
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px dashed var(--line-strong);
+    background: var(--raise);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .template b {
+    color: var(--ink);
+  }
+
+  .scrolly {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .scrolly-stage {
+    position: sticky;
+    top: calc(var(--header-h) + 16px);
+  }
+
+  .scrolly-steps {
+    display: grid;
+    gap: 40vh;
+    padding-block: 10vh 30vh;
+  }
+
+  .step {
+    padding: 18px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--raise);
+    opacity: 0.45;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+
+  .step.on {
+    opacity: 1;
+    transform: translateX(-6px);
+    border-color: var(--accent);
+  }
+
+  .step h3 {
+    font-size: var(--step-1);
+    margin-bottom: 6px;
+  }
+
+  .step p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  .mission-card {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    display: grid;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: rgba(10, 12, 14, 0.7);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--cam-line-strong);
+  }
+
+  .mission-card strong {
+    font: 700 15px/1.5 var(--body);
+  }
+
+  .mission-card span {
+    font: 400 12px/1.5 var(--body);
+    color: var(--cam-muted);
+  }
+
+  .mission-card em {
+    display: none;
+    position: absolute;
+    right: 14px;
+    top: -14px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--cam-accent);
+    color: #0e2328;
+    font: 700 13px/1.4 var(--body);
+    font-style: normal;
+  }
+
+  .mission-card:global(.clear) {
+    border-color: var(--cam-accent);
+  }
+
+  .mission-card:global(.clear) em {
+    display: block;
+  }
+
+  .missions {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .missions li {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--cam-line);
+    font-size: 12px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--cam-muted);
+  }
+
+  .missions li:global(.now) {
+    border-color: var(--cam-ink);
+    color: var(--cam-ink);
+  }
+
+  .missions li:global(.done)::before {
+    content: "✓ ";
+    color: var(--cam-accent);
+  }
+
+  .split-label {
+    position: absolute;
+    top: 14px;
+    padding: 5px 9px;
+    border-radius: 4px;
+    background: rgba(10, 12, 14, 0.6);
+  }
+
+  .split-label.left {
+    left: 14px;
+  }
+
+  .split-label.right {
+    right: 14px;
+  }
+
+  .divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  }
+
+  .divider span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 36px;
+    height: 36px;
+    margin: -18px 0 0 -18px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #fff;
+    color: #111;
+    font-size: 16px;
+  }
+
+  @media (max-width: 760px) {
+    .scrolly {
+      grid-template-columns: 1fr;
+    }
+
+    .scrolly-stage {
+      top: calc(var(--header-h) + 8px);
+      z-index: 2;
+    }
+
+    .scrolly-steps {
+      gap: 50vh;
+    }
+
+    .topic strong {
+      font-size: 13px;
+    }
+
+    .topic span {
+      display: none;
+    }
+  }
+</style>

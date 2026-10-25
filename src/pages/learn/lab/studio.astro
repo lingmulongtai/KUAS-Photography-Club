@@ -1,0 +1,39 @@
+---
+import LabLayout from '../../../layouts/LabLayout.astro';
+import StudioDemo from '../../../components/lab/StudioDemo.astro';
+---
+<LabLayout title="試作：撮影スタジオ" current="studio" lead="" bare>
+  <section class="studio-page" id="studio">
+    <div class="wrap">
+      <header class="studio-head">
+        <p class="edge">構成 A の試作 ▸ ONE STUDIO</p>
+        <h1>写真を、触って学ぶ。</h1>
+        <p class="lead">焦点距離・絞り・シャッタースピード・ISO を、ひとつのカメラで全部試せる撮影スタジオです。場所と撮るものを選んで、シャッターを切ってみてください。右の「いまの写り」が、設定の意味をその場で説明します。</p>
+      </header>
+      <StudioDemo />
+    </div>
+  </section>
+</LabLayout>
+
+<style>
+  .studio-page {
+    padding-block: clamp(28px, 5vw, 56px) 24px;
+    background:
+      radial-gradient(circle at 80% 0%, rgba(100, 190, 198, 0.16), transparent 40%),
+      var(--base);
+  }
+
+  .studio-head {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  .studio-head h1 {
+    font-size: var(--step-4);
+  }
+
+  .studio-head .lead {
+    max-width: 50em;
+  }
+</style>
