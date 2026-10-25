@@ -4,6 +4,8 @@ import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { club } from '../data/club';
 import { languagePath } from '../lib/i18n';
+import Analytics from '@vercel/analytics/astro';
+import SpeedInsights from '@vercel/speed-insights/astro';
 
 interface Props {
   /** Page name. The club name is appended automatically. */
@@ -84,6 +86,9 @@ const hasLanguagePair = languagePath(englishPath, 'ja') === japanesePath;
       <slot />
     </main>
     <SiteFooter lang={lang} />
+    <!-- Vercel Web Analytics and Speed Insights; they only send data on Vercel deployments. -->
+    <Analytics />
+    <SpeedInsights />
   </body>
 </html>
 
