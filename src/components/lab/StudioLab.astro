@@ -44,203 +44,208 @@ const slider = (ctl: string, label: string) => ({ ctl, label, id: `sl-${ctl}` })
 const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), slider('t', 'シャッター'), slider('iso', 'ISO 感度')];
 ---
 <div class="sl" data-studio-lab>
-  <div class="sl-main">
-    <div class="stage lab-stage sl-stage">
-      <canvas aria-label="カメラの設定を変えて撮影できる3Dの撮影スタジオ。ドラッグで構図を動かし、タップでピントを合わせます"></canvas>
-      <div class="vf">
-        <div class="corners"></div>
-        <span class="af" data-af style="left:50%;top:50%"></span>
-        <div class="top">
-          <span class="pill" data-info></span>
-          <span class="pill sl-badges" data-badges></span>
-        </div>
-        <canvas class="lab-hist sl-hist" width="144" height="56" data-hist aria-hidden="true"></canvas>
-        <div class="sl-mission-bar" data-mission-bar hidden></div>
-        <div class="sl-bottom">
-          <span class="sl-chip" data-chip></span>
-          <div class="meter sl-meter"><div class="scale"><span class="caret"></span></div><div class="labels">{meterLabels.map((l) => <span>{l}</span>)}</div></div>
-        </div>
-        <div class="sl-progress" data-progress hidden>
-          <p data-progress-text></p>
-          <div class="sl-progress-bar"><span data-progress-fill></span></div>
-        </div>
-        <div class="sl-toast" data-toast hidden></div>
-      </div>
-      <div class="sl-flash" data-flash-fx></div>
-    </div>
-
-    <div class="cam sl-deck">
-      <div class="sl-sliders">
-        {main.map((s) => (
-          <div class="lab-slider" data-ctl={s.ctl}>
-            <label for={s.id}>{s.label}</label>
-            <output for={s.id}></output>
-            <input id={s.id} type="range" min="0" max="1" step="1" value="0" />
+  <div class="sl-top">
+    <div class="sl-main">
+      <div class="stage lab-stage sl-stage">
+        <canvas aria-label="カメラの設定を変えて撮影できる3Dの撮影スタジオ。ドラッグで構図を動かし、タップでピントを合わせます"></canvas>
+        <div class="vf">
+          <div class="corners"></div>
+          <span class="af" data-af style="left:50%;top:50%"></span>
+          <div class="top">
+            <span class="pill" data-info></span>
+            <span class="pill sl-badges" data-badges></span>
           </div>
-        ))}
-      </div>
-      <button type="button" class="sl-shutter" data-shutter aria-label="シャッターを切る（撮った写真は下に並びます）"><span></span></button>
-    </div>
-
-    <div class="cam sl-tabs">
-      <div class="sl-tablist" role="tablist" aria-label="カメラの設定">
-        {tabs.map(([id, name], i) => (
-          <button type="button" role="tab" id={`tab-${id}`} aria-controls={`panel-${id}`} aria-selected={i === 0 ? 'true' : 'false'} data-tab={id}>{name}</button>
-        ))}
-      </div>
-
-      <div class="sl-panel" role="tabpanel" id="panel-hold" aria-labelledby="tab-hold" data-panel="hold">
-        <div class="sl-field">
-          <h3>カメラの持ち方</h3>
-          <div class="seg">
-            <button type="button" data-seg="hold" data-value="tripod" aria-pressed="true">三脚</button>
-            <button type="button" data-seg="hold" data-value="hand" aria-pressed="false">手持ち</button>
-            <button type="button" data-seg="hold" data-value="ibis" aria-pressed="false">手持ち＋手ぶれ補正</button>
+          <canvas class="lab-hist sl-hist" width="144" height="56" data-hist aria-hidden="true"></canvas>
+          <div class="sl-mission-bar" data-mission-bar hidden></div>
+          <div class="sl-bottom">
+            <span class="sl-chip" data-chip></span>
+            <div class="meter sl-meter"><div class="scale"><span class="caret"></span></div><div class="labels">{meterLabels.map((l) => <span>{l}</span>)}</div></div>
           </div>
-        </div>
-        <div class="sl-field">
-          <h3>カメラの高さ</h3>
-          <div class="seg">
-            <button type="button" data-seg="angle" data-value="low" aria-pressed="false">下から見上げる</button>
-            <button type="button" data-seg="angle" data-value="level" aria-pressed="true">目線</button>
-            <button type="button" data-seg="angle" data-value="high" aria-pressed="false">上から見下ろす</button>
+          <div class="sl-progress" data-progress hidden>
+            <p data-progress-text></p>
+            <div class="sl-progress-bar"><span data-progress-fill></span></div>
           </div>
+          <div class="sl-toast" data-toast hidden></div>
         </div>
-        <div class="lab-slider" data-ctl="dist">
-          <label for="sl-dist">被写体までの距離</label>
-          <output for="sl-dist"></output>
-          <input id="sl-dist" type="range" min="0" max="1" step="1" value="0" />
-        </div>
-        <div class="sl-field sl-row">
-          <button type="button" class="cam-btn" data-toggle="pinwheel" aria-pressed="false">風車を置く</button>
-          <button type="button" class="cam-btn" data-recenter>被写体に向き直す</button>
-        </div>
-        <p>立ち位置は右の「真上から見た図」でカメラをドラッグしても変えられます。画面をドラッグすると、その場で向きを変えます。</p>
+        <div class="sl-flash" data-flash-fx></div>
       </div>
 
-      <div class="sl-panel" role="tabpanel" id="panel-lens" aria-labelledby="tab-lens" data-panel="lens" hidden>
-        <div class="sl-lenses">
-          {LENSES.map((l) => (
-            <button type="button" class="sl-lens" data-seg="lens" data-value={l.id} aria-pressed={l.id === 'std' ? 'true' : 'false'}>
-              <span class={`sl-grade g-${l.grade}`}>{l.grade}</span>
-              <b>{l.name}</b>
-              <span>{l.note}</span>
-            </button>
+      <div class="sl-card sl-deck">
+        <div class="sl-sliders">
+          {main.map((s) => (
+            <div class="sl-slider" data-ctl={s.ctl}>
+              <label for={s.id}>{s.label}</label>
+              <output for={s.id}></output>
+              <input id={s.id} type="range" min="0" max="1" step="1" value="0" />
+            </div>
           ))}
         </div>
+        <button type="button" class="sl-shutter" data-shutter aria-label="シャッターを切る（撮った写真は下に並びます）"><span></span></button>
       </div>
 
-      <div class="sl-panel" role="tabpanel" id="panel-focus" aria-labelledby="tab-focus" data-panel="focus" hidden>
-        <div class="sl-field sl-row">
-          <div class="seg">
-            <button type="button" data-seg="fmode" data-value="af" aria-pressed="true">AF（オート）</button>
-            <button type="button" data-seg="fmode" data-value="mf" aria-pressed="false">MF（マニュアル）</button>
-          </div>
-          <button type="button" class="cam-btn" data-toggle="peaking" aria-pressed="false">ピーキング</button>
+      <div class="sl-card sl-tabs">
+        <div class="sl-tablist" role="tablist" aria-label="カメラの設定">
+          {tabs.map(([id, name], i) => (
+            <button type="button" role="tab" id={`tab-${id}`} aria-controls={`panel-${id}`} aria-selected={i === 0 ? 'true' : 'false'} data-tab={id}>{name}</button>
+          ))}
         </div>
-        <div class="lab-slider" data-ctl="mf">
-          <label for="sl-mf">ピントリング（MF）</label>
-          <output for="sl-mf"></output>
-          <input id="sl-mf" type="range" min="0" max="1" step="1" value="0" />
-        </div>
-        <p data-focus-info></p>
-        <p>AF では被写体（目・花の芯・レンズ）に合わせます。画面をタップすると、その場所に合わせます。</p>
-      </div>
 
-      <div class="sl-panel" role="tabpanel" id="panel-filter" aria-labelledby="tab-filter" data-panel="filter" hidden>
-        <div class="seg sl-wrap">
-          {FILTERS.map((f, i) => <button type="button" data-seg="filter" data-value={f.id} aria-pressed={i === 0 ? 'true' : 'false'}>{f.name}</button>)}
+        <div class="sl-panel" role="tabpanel" id="panel-hold" aria-labelledby="tab-hold" data-panel="hold">
+          <div class="sl-field">
+            <h3>カメラの持ち方</h3>
+            <div class="sl-seg">
+              <button type="button" data-seg="hold" data-value="tripod" aria-pressed="true">三脚</button>
+              <button type="button" data-seg="hold" data-value="hand" aria-pressed="false">手持ち</button>
+              <button type="button" data-seg="hold" data-value="ibis" aria-pressed="false">手持ち＋手ぶれ補正</button>
+            </div>
+          </div>
+          <div class="sl-field">
+            <h3>カメラの高さ</h3>
+            <div class="sl-seg">
+              <button type="button" data-seg="angle" data-value="low" aria-pressed="false">下から見上げる</button>
+              <button type="button" data-seg="angle" data-value="level" aria-pressed="true">目線</button>
+              <button type="button" data-seg="angle" data-value="high" aria-pressed="false">上から見下ろす</button>
+            </div>
+          </div>
+          <div class="sl-slider" data-ctl="dist">
+            <label for="sl-dist">被写体までの距離</label>
+            <output for="sl-dist"></output>
+            <input id="sl-dist" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+          <div class="sl-row">
+            <button type="button" class="sl-btn" data-toggle="pinwheel" aria-pressed="false">風車を置く</button>
+            <button type="button" class="sl-btn" data-recenter>被写体に向き直す</button>
+          </div>
+          <p>立ち位置は「真上から見た図」でカメラをドラッグしても変えられます。画面をドラッグすると、その場で向きを変えます。</p>
         </div>
-        <div class="lab-slider" data-ctl="pl" hidden>
-          <label for="sl-pl">C-PL の回転</label>
-          <output for="sl-pl"></output>
-          <input id="sl-pl" type="range" min="0" max="1" step="1" value="0" />
-        </div>
-        <p data-filter-note>レンズの前に付けるフィルター。ND は光を減らし、C-PL は反射を取って空を濃くし、ソフト・ミスト・クロスは光のにじみ方を変えます。</p>
-      </div>
 
-      <div class="sl-panel" role="tabpanel" id="panel-flash" aria-labelledby="tab-flash" data-panel="flash" hidden>
-        <div class="sl-field sl-row">
-          <div class="seg">
-            <button type="button" data-seg="flash" data-value="off" aria-pressed="true">オフ</button>
-            <button type="button" data-seg="flash" data-value="ttl" aria-pressed="false">TTL（自動調光）</button>
-            <button type="button" data-seg="flash" data-value="manual" aria-pressed="false">マニュアル</button>
-          </div>
-          <div class="seg">
-            <button type="button" data-seg="curtain" data-value="front" aria-pressed="true">先幕</button>
-            <button type="button" data-seg="curtain" data-value="rear" aria-pressed="false">後幕</button>
-          </div>
-        </div>
-        <div class="sl-two">
-          <div class="lab-slider" data-ctl="fp">
-            <label for="sl-fp">発光量（マニュアル）</label>
-            <output for="sl-fp"></output>
-            <input id="sl-fp" type="range" min="0" max="1" step="1" value="0" />
-          </div>
-          <div class="lab-slider" data-ctl="fec">
-            <label for="sl-fec">調光補正（TTL）</label>
-            <output for="sl-fec"></output>
-            <input id="sl-fec" type="range" min="0" max="1" step="1" value="0" />
+        <div class="sl-panel" role="tabpanel" id="panel-lens" aria-labelledby="tab-lens" data-panel="lens" hidden>
+          <div class="sl-lenses">
+            {LENSES.map((l) => (
+              <button type="button" class="sl-lens" data-seg="lens" data-value={l.id} aria-pressed={l.id === 'std' ? 'true' : 'false'}>
+                <span class={`sl-grade g-${l.grade}`}>{l.grade}</span>
+                <b>{l.name}</b>
+                <span>{l.note}</span>
+              </button>
+            ))}
           </div>
         </div>
-        <p data-flash-info>カメラの上のフラッシュ（ガイドナンバー 36）。TTL はカメラが試し光りして明るさを決め、マニュアルは自分で発光量を決めます。置きライトは右の図の「＋ライト」で。</p>
-      </div>
 
-      <div class="sl-panel" role="tabpanel" id="panel-drive" aria-labelledby="tab-drive" data-panel="drive" hidden>
-        <div class="sl-field sl-row">
-          <div class="seg">
-            <button type="button" data-seg="drive" data-value="single" aria-pressed="true">1枚ずつ</button>
-            <button type="button" data-seg="drive" data-value="interval" aria-pressed="false">インターバル撮影</button>
+        <div class="sl-panel" role="tabpanel" id="panel-focus" aria-labelledby="tab-focus" data-panel="focus" hidden>
+          <div class="sl-row">
+            <div class="sl-seg">
+              <button type="button" data-seg="fmode" data-value="af" aria-pressed="true">AF（オート）</button>
+              <button type="button" data-seg="fmode" data-value="mf" aria-pressed="false">MF（マニュアル）</button>
+            </div>
+            <button type="button" class="sl-btn" data-toggle="peaking" aria-pressed="false">ピーキング</button>
           </div>
-          <div class="seg">
-            <button type="button" data-seg="blend" data-value="lighten" aria-pressed="true">比較明合成</button>
-            <button type="button" data-seg="blend" data-value="average" aria-pressed="false">加算平均</button>
+          <div class="sl-slider" data-ctl="mf">
+            <label for="sl-mf">ピントリング（MF）</label>
+            <output for="sl-mf"></output>
+            <input id="sl-mf" type="range" min="0" max="1" step="1" value="0" />
           </div>
+          <p data-focus-info></p>
+          <p>AF では被写体（目・花の芯・レンズ）に合わせます。画面をタップすると、その場所に合わせます。</p>
         </div>
-        <div class="lab-slider" data-ctl="frames">
-          <label for="sl-frames">枚数</label>
-          <output for="sl-frames"></output>
-          <input id="sl-frames" type="range" min="0" max="1" step="1" value="0" />
+
+        <div class="sl-panel" role="tabpanel" id="panel-filter" aria-labelledby="tab-filter" data-panel="filter" hidden>
+          <div class="sl-seg">
+            {FILTERS.map((f, i) => <button type="button" data-seg="filter" data-value={f.id} aria-pressed={i === 0 ? 'true' : 'false'}>{f.name}</button>)}
+          </div>
+          <div class="sl-slider" data-ctl="pl" hidden>
+            <label for="sl-pl">C-PL の回転</label>
+            <output for="sl-pl"></output>
+            <input id="sl-pl" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+          <p data-filter-note>レンズの前に付けるフィルター。ND は光を減らし、C-PL は反射を取って空を濃くし、ソフト・ミスト・クロスは光のにじみ方を変えます。</p>
         </div>
-        <p data-drive-info></p>
+
+        <div class="sl-panel" role="tabpanel" id="panel-flash" aria-labelledby="tab-flash" data-panel="flash" hidden>
+          <div class="sl-row">
+            <div class="sl-seg">
+              <button type="button" data-seg="flash" data-value="off" aria-pressed="true">オフ</button>
+              <button type="button" data-seg="flash" data-value="ttl" aria-pressed="false">TTL（自動調光）</button>
+              <button type="button" data-seg="flash" data-value="manual" aria-pressed="false">マニュアル</button>
+            </div>
+            <div class="sl-seg">
+              <button type="button" data-seg="curtain" data-value="front" aria-pressed="true">先幕</button>
+              <button type="button" data-seg="curtain" data-value="rear" aria-pressed="false">後幕</button>
+            </div>
+          </div>
+          <div class="sl-two">
+            <div class="sl-slider" data-ctl="fp">
+              <label for="sl-fp">発光量（マニュアル）</label>
+              <output for="sl-fp"></output>
+              <input id="sl-fp" type="range" min="0" max="1" step="1" value="0" />
+            </div>
+            <div class="sl-slider" data-ctl="fec">
+              <label for="sl-fec">調光補正（TTL）</label>
+              <output for="sl-fec"></output>
+              <input id="sl-fec" type="range" min="0" max="1" step="1" value="0" />
+            </div>
+          </div>
+          <p data-flash-info>カメラの上のフラッシュ（ガイドナンバー 36）。TTL はカメラが試し光りして明るさを決め、マニュアルは自分で発光量を決めます。置きライトは「真上から見た図」の「＋ライト」で。</p>
+        </div>
+
+        <div class="sl-panel" role="tabpanel" id="panel-drive" aria-labelledby="tab-drive" data-panel="drive" hidden>
+          <div class="sl-row">
+            <div class="sl-seg">
+              <button type="button" data-seg="drive" data-value="single" aria-pressed="true">1枚ずつ</button>
+              <button type="button" data-seg="drive" data-value="interval" aria-pressed="false">インターバル撮影</button>
+            </div>
+            <div class="sl-seg">
+              <button type="button" data-seg="blend" data-value="lighten" aria-pressed="true">比較明合成</button>
+              <button type="button" data-seg="blend" data-value="average" aria-pressed="false">加算平均</button>
+            </div>
+          </div>
+          <div class="sl-slider" data-ctl="frames">
+            <label for="sl-frames">枚数</label>
+            <output for="sl-frames"></output>
+            <input id="sl-frames" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+          <p data-drive-info></p>
+        </div>
       </div>
     </div>
+
+    <aside class="sl-side" aria-label="アドバイスと真上から見た図">
+      <div class="sl-card">
+        <h3 class="sl-title"><span>ADVICE</span>アドバイス</h3>
+        <ul class="sl-advice" data-advice aria-live="polite"></ul>
+      </div>
+      <div class="sl-card">
+        <div class="sl-map-head">
+          <h3 class="sl-title"><span>TOP VIEW</span>真上から見た図</h3>
+          <button type="button" class="sl-btn sl-btn-sm" data-add-light>＋ライト</button>
+        </div>
+        <canvas class="sl-map" data-map aria-label="被写体・カメラ・ライトを真上から見た図。カメラとライトはドラッグで動かせます"></canvas>
+        <div class="sl-light" data-light-panel hidden>
+          <div class="sl-row">
+            <div class="sl-seg">
+              <button type="button" data-seg="lkind" data-value="soft" aria-pressed="true">ソフトボックス</button>
+              <button type="button" data-seg="lkind" data-value="spot" aria-pressed="false">スポット</button>
+            </div>
+            <button type="button" class="sl-btn sl-btn-sm" data-remove-light>削除</button>
+          </div>
+          <div class="sl-seg">
+            {Object.entries(LIGHT_COLORS).map(([id, [, name]], i) => <button type="button" data-seg="lcolor" data-value={id} aria-pressed={i === 0 ? 'true' : 'false'}>{name}</button>)}
+          </div>
+          <div class="sl-slider" data-ctl="level">
+            <label for="sl-level">明るさ（1m で）</label>
+            <output for="sl-level"></output>
+            <input id="sl-level" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+        </div>
+      </div>
+    </aside>
   </div>
 
-  <aside class="sl-side">
-    <div class="cam">
-      <h3>アドバイス</h3>
-      <ul class="sl-advice" data-advice aria-live="polite"></ul>
-    </div>
-    <div class="cam">
-      <div class="sl-map-head">
-        <h3>真上から見た図（立ち位置）</h3>
-        <button type="button" class="cam-btn" data-add-light>＋ライト</button>
-      </div>
-      <canvas class="sl-map" data-map aria-label="被写体・カメラ・ライトを真上から見た図。カメラとライトはドラッグで動かせます"></canvas>
-      <div class="sl-light" data-light-panel hidden>
-        <div class="sl-row">
-          <div class="seg">
-            <button type="button" data-seg="lkind" data-value="soft" aria-pressed="true">ソフトボックス</button>
-            <button type="button" data-seg="lkind" data-value="spot" aria-pressed="false">スポット</button>
-          </div>
-          <button type="button" class="cam-btn" data-remove-light>削除</button>
-        </div>
-        <div class="seg">
-          {Object.entries(LIGHT_COLORS).map(([id, [, name]], i) => <button type="button" data-seg="lcolor" data-value={id} aria-pressed={i === 0 ? 'true' : 'false'}>{name}</button>)}
-        </div>
-        <div class="lab-slider" data-ctl="level">
-          <label for="sl-level">明るさ（1m で）</label>
-          <output for="sl-level"></output>
-          <input id="sl-level" type="range" min="0" max="1" step="1" value="0" />
-        </div>
-      </div>
-    </div>
-  </aside>
-
-  <section class="sl-pick">
+  <section class="sl-section sl-pick" aria-labelledby="sl-h-place">
     <div>
-      <h3>撮る場所</h3>
+      <div class="sl-head">
+        <p class="edge">PLACES</p>
+        <h2 id="sl-h-place">撮る場所</h2>
+      </div>
       <div class="sl-places">
         {STUDIO_PLACES.map((id, i) => (
           <button type="button" data-seg="place" data-value={id} aria-pressed={i === 0 ? 'true' : 'false'} title={BACKDROPS[id].name}>
@@ -251,16 +256,20 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
       </div>
     </div>
     <div>
-      <h3>撮るもの</h3>
-      <div class="sl-subjects">
-        {subjects.map(([id, name], i) => <button type="button" class="sl-chipbtn" data-seg="subject" data-value={id} aria-pressed={i === 0 ? 'true' : 'false'}>{name}</button>)}
+      <div class="sl-head">
+        <p class="edge">SUBJECTS</p>
+        <h2>撮るもの</h2>
+      </div>
+      <div class="sl-seg sl-subjects">
+        {subjects.map(([id, name], i) => <button type="button" data-seg="subject" data-value={id} aria-pressed={i === 0 ? 'true' : 'false'}>{name}</button>)}
       </div>
     </div>
   </section>
 
-  <section class="sl-missions">
-    <div class="sl-section-head">
-      <h3>お題に挑戦</h3>
+  <section class="sl-section" aria-labelledby="sl-h-mission">
+    <div class="sl-head">
+      <p class="edge">CHALLENGES</p>
+      <h2 id="sl-h-mission">お題に挑戦</h2>
       <p>わざと「惜しい」設定から始まります。条件を満たして撮れたらクリア。</p>
     </div>
     <ol class="sl-mission-list">
@@ -277,9 +286,10 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     </ol>
   </section>
 
-  <section class="sl-contact">
-    <div class="sl-section-head">
-      <h3>撮った写真</h3>
+  <section class="sl-section" aria-labelledby="sl-h-photos">
+    <div class="sl-head">
+      <p class="edge">CONTACT SHEET</p>
+      <h2 id="sl-h-photos">撮った写真</h2>
       <p>クリックで大きく表示します。</p>
     </div>
     <div class="sl-sheet" data-sheet><p class="empty">シャッターボタンを押すと、ここに並びます。</p></div>
@@ -294,30 +304,277 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
       </figcaption>
     </figure>
     <div class="sl-lb-nav">
-      <button type="button" class="cam-btn" data-lb-prev aria-label="前の写真">←</button>
-      <a class="cam-btn" data-lb-save download="kuas-studio.jpg">保存</a>
-      <button type="button" class="cam-btn" data-lb-next aria-label="次の写真">→</button>
-      <button type="button" class="cam-btn" data-lb-close>閉じる</button>
+      <button type="button" class="sl-btn" data-lb-prev aria-label="前の写真">←</button>
+      <button type="button" class="sl-btn" data-lb-next aria-label="次の写真">→</button>
+      <a class="sl-btn sl-btn-primary" data-lb-save download="kuas-studio.jpg">保存</a>
+      <button type="button" class="sl-btn" data-lb-close>閉じる</button>
     </div>
   </dialog>
 </div>
 
 <style>
+  /* Matches the rest of the site: cards on the page ground, teal accents, pill buttons.
+     Only the picture itself stays dark, like every other demo stage. */
   .sl {
     display: grid;
+    gap: 0;
+  }
+
+  .sl-top {
+    display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
-    gap: 14px;
+    gap: 16px;
     align-items: start;
+    padding-bottom: clamp(40px, 6vw, 64px);
   }
 
   .sl-main {
     display: grid;
-    gap: 12px;
+    gap: 16px;
     min-width: 0;
   }
 
+  /* follows the camera while you scroll the controls, but only within the studio itself */
+  .sl-side {
+    position: sticky;
+    top: calc(var(--header-h) + 16px);
+    max-height: calc(100vh - var(--header-h) - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    display: grid;
+    gap: 16px;
+  }
+
+  .sl-card {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+    color: var(--ink);
+    font: 500 14px/1.6 var(--body);
+  }
+
+  .sl-card p {
+    margin: 0;
+    font-size: var(--step--1);
+    line-height: 1.75;
+    color: var(--muted);
+  }
+
+  .sl-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    margin: 0;
+    font: 700 13px/1.4 var(--body);
+    letter-spacing: 0.06em;
+    color: var(--ink);
+  }
+
+  .sl-title span {
+    font: 700 11px/1.4 var(--latin);
+    letter-spacing: 0.22em;
+    color: var(--accent);
+  }
+
+  .sl-field {
+    display: grid;
+    gap: 8px;
+  }
+
+  .sl-field h3 {
+    margin: 0;
+    font: 700 13px/1.4 var(--body);
+    color: var(--muted);
+  }
+
+  .sl-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    align-items: center;
+  }
+
+  .sl-two {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px 20px;
+  }
+
+  /* ---------- sliders ---------- */
+
+  .sl-slider {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    align-items: baseline;
+    min-width: 0;
+  }
+
+  .sl-slider[hidden],
+  .sl-panel[hidden],
+  .sl-light[hidden] {
+    display: none;
+  }
+
+  .sl-slider label {
+    font: 700 13px/1.4 var(--body);
+    color: var(--muted);
+  }
+
+  .sl-slider output {
+    font: 700 17px/1.2 var(--latin);
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+
+  .sl-slider input {
+    grid-column: 1 / -1;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 28px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .sl-slider input:disabled {
+    cursor: default;
+    opacity: 0.45;
+  }
+
+  .sl-slider input::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent) calc(var(--p, 0) * 100%), var(--line) 0);
+  }
+
+  .sl-slider input::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent) calc(var(--p, 0) * 100%), var(--line) 0);
+  }
+
+  .sl-slider input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -8px;
+    border-radius: 50%;
+    background: var(--raise);
+    border: 2px solid var(--accent);
+    box-shadow: var(--shadow);
+  }
+
+  .sl-slider input::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--raise);
+    border: 2px solid var(--accent);
+  }
+
+  .sl-slider input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- buttons: the site's pill chips ---------- */
+
+  .sl-seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .sl-seg button,
+  .sl-btn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--raise);
+    color: var(--ink);
+    font: 700 13px/1.2 var(--body);
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .sl-seg button:hover,
+  .sl-btn:hover {
+    border-color: var(--ink);
+  }
+
+  .sl-seg button[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .sl-btn {
+    border: 1.5px solid var(--ink);
+    background: transparent;
+  }
+
+  .sl-btn:hover {
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .sl-btn[aria-pressed="true"],
+  .sl-btn-primary {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-accent);
+  }
+
+  .sl-btn-primary:hover {
+    background: var(--brand-ink);
+    border-color: var(--brand-ink);
+    color: var(--on-dark);
+  }
+
+  .sl-btn-sm {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .sl-seg button:focus-visible,
+  .sl-btn:focus-visible,
+  .sl-tablist button:focus-visible,
+  .sl-lens:focus-visible,
+  .sl-places button:focus-visible,
+  .sl-mission-list button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- the picture ---------- */
+
   .sl-stage {
     cursor: crosshair;
+  }
+
+  .sl-stage .pill {
+    border-radius: 2px;
+    background: var(--hud-bg);
+    color: var(--hud);
+  }
+
+  .sl-badges {
+    color: var(--brand);
   }
 
   .sl-hist {
@@ -326,10 +583,6 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     top: 48px;
     width: 144px;
     height: 56px;
-  }
-
-  .sl-badges {
-    color: var(--cam-accent);
   }
 
   .sl-bottom {
@@ -346,19 +599,22 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
   .sl-meter {
     width: 100%;
     padding: 12px 14px 8px;
-    border-radius: 6px;
-    background: rgba(10, 12, 14, 0.55);
+    border-radius: var(--radius-sm);
+    background: var(--hud-bg);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
   }
 
   .sl-chip {
     max-width: 100%;
-    padding: 5px 10px;
+    padding: 6px 12px;
     border-radius: 999px;
-    font: 600 12px/1.35 var(--body);
+    font: 700 12px/1.35 var(--body);
     letter-spacing: 0;
     text-align: center;
-    background: rgba(10, 12, 14, 0.7);
-    border: 1px solid var(--cam-line-strong);
+    color: var(--hud);
+    background: rgba(8, 12, 14, 0.72);
+    border: 1px solid var(--hud-line);
   }
 
   .sl-chip:empty {
@@ -366,18 +622,18 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
   }
 
   .sl-chip[data-level="bad"] {
-    border-color: var(--cam-red);
-    color: #ffb3ad;
+    border-color: #ff8a7a;
+    color: #ffc9c1;
   }
 
   .sl-chip[data-level="warn"] {
-    border-color: var(--cam-warn);
-    color: #ffd59a;
+    border-color: #f0c46b;
+    color: #ffe2a8;
   }
 
   .sl-chip[data-level="good"] {
-    border-color: #6fcf8e;
-    color: #b9f0c8;
+    border-color: #8bd9ac;
+    color: #c6f0d6;
   }
 
   .sl-mission-bar {
@@ -385,12 +641,13 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     left: 14px;
     top: 48px;
     max-width: min(58%, 420px);
-    padding: 8px 10px;
-    border-radius: 6px;
-    background: rgba(10, 12, 14, 0.7);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(8, 12, 14, 0.72);
     border-left: 3px solid var(--brand);
-    font: 500 12px/1.5 var(--body);
+    font: 500 12px/1.6 var(--body);
     letter-spacing: 0;
+    color: var(--hud);
   }
 
   .sl-progress {
@@ -399,13 +656,14 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     top: 50%;
     transform: translate(-50%, -50%);
     width: min(360px, 80%);
-    padding: 14px 16px;
-    border-radius: 10px;
-    background: rgba(10, 12, 14, 0.72);
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    background: rgba(8, 12, 14, 0.78);
     display: grid;
     gap: 10px;
     text-align: center;
-    font: 500 13px/1.5 var(--body);
+    font: 500 13px/1.6 var(--body);
+    color: var(--hud);
   }
 
   .sl-progress[hidden],
@@ -421,7 +679,7 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
   .sl-progress-bar {
     height: 6px;
     border-radius: 3px;
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.16);
     overflow: hidden;
   }
 
@@ -429,7 +687,7 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     display: block;
     height: 100%;
     width: 0;
-    background: var(--cam-accent);
+    background: var(--brand);
   }
 
   .sl-toast {
@@ -439,16 +697,19 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     transform: translate(-50%, -50%);
     max-width: 80%;
     padding: 14px 18px;
-    border-radius: 10px;
-    background: rgba(10, 12, 14, 0.85);
-    border: 1px solid var(--cam-line-strong);
-    font: 600 14px/1.6 var(--body);
+    border-radius: var(--radius);
+    background: var(--raise);
+    color: var(--ink);
+    border-top: 4px solid var(--accent);
+    box-shadow: var(--shadow);
+    font: 500 14px/1.7 var(--body);
     letter-spacing: 0;
+    text-shadow: none;
     text-align: center;
   }
 
-  .sl-toast.ok {
-    border-color: #6fcf8e;
+  .sl-toast:global(.ok) {
+    border-top-color: var(--ok);
   }
 
   .sl-flash {
@@ -474,35 +735,42 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     }
   }
 
+  /* ---------- the four main dials and the shutter ---------- */
+
   .sl-deck {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
+    gap: 14px 24px;
   }
 
   .sl-sliders {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 10px 18px;
+    gap: 10px 22px;
   }
 
   .sl-shutter {
-    width: 74px;
-    height: 74px;
+    width: 76px;
+    height: 76px;
+    padding: 6px;
     border-radius: 50%;
-    border: 3px solid #4a5058;
-    background: radial-gradient(circle at 35% 30%, #5a6068, #24282d);
+    border: 2px solid var(--ink);
+    background: var(--raise);
     display: grid;
     place-items: center;
     cursor: pointer;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
   }
 
   .sl-shutter span {
-    width: 44px;
-    height: 44px;
+    width: 100%;
+    height: 100%;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #f3f0ea, #b9b3aa);
-    transition: transform 0.08s, border-radius 0.2s;
+    background: var(--brand);
+    transition: transform 0.08s, background-color 0.2s, border-radius 0.2s, width 0.2s, height 0.2s;
+  }
+
+  .sl-shutter:hover span {
+    background: var(--brand-deep);
   }
 
   .sl-shutter:active span {
@@ -513,79 +781,51 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     width: 26px;
     height: 26px;
     border-radius: 4px;
-    background: var(--cam-red);
+    background: var(--safe);
   }
 
   .sl-shutter:focus-visible {
-    outline: 3px solid var(--cam-accent);
+    outline: 3px solid var(--accent);
     outline-offset: 3px;
   }
 
-  .sl-tabs {
-    gap: 12px;
-  }
+  /* ---------- settings tabs ---------- */
 
   .sl-tablist {
     display: flex;
-    gap: 4px;
+    gap: 2px;
+    margin: -4px -4px 0;
     overflow-x: auto;
-    padding-bottom: 2px;
-    border-bottom: 1px solid var(--cam-line);
+    border-bottom: 1px solid var(--line);
     scrollbar-width: thin;
   }
 
   .sl-tablist button {
     appearance: none;
     border: 0;
-    background: none;
-    color: var(--cam-muted);
-    font: 700 13px/1.2 var(--body);
-    padding: 9px 12px;
     border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: none;
+    color: var(--muted);
+    font: 700 14px/1.2 var(--body);
+    letter-spacing: 0.04em;
+    padding: 10px 12px 12px;
     cursor: pointer;
     white-space: nowrap;
   }
 
-  .sl-tablist button[aria-selected="true"] {
-    color: var(--cam-ink);
-    border-bottom-color: var(--cam-accent);
+  .sl-tablist button:hover {
+    color: var(--ink);
   }
 
-  .sl-tablist button:focus-visible {
-    outline: 2px solid var(--cam-accent);
-    outline-offset: -2px;
+  .sl-tablist button[aria-selected="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--brand);
   }
 
   .sl-panel {
     display: grid;
-    gap: 14px;
-  }
-
-  .sl-panel[hidden],
-  .lab-slider[hidden] {
-    display: none;
-  }
-
-  .sl-field {
-    display: grid;
-    gap: 6px;
-  }
-
-  .sl-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    align-items: center;
-  }
-
-  .sl-two {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 10px 18px;
-  }
-
-  .seg.sl-wrap {
-    display: flex;
+    gap: 16px;
   }
 
   .sl-lenses {
@@ -600,52 +840,60 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     gap: 4px;
     align-content: start;
     text-align: left;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--cam-line);
-    background: rgba(0, 0, 0, 0.22);
-    color: var(--cam-muted);
-    font: 400 12px/1.6 var(--body);
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--base);
+    color: var(--muted);
+    font: 500 12.5px/1.65 var(--body);
     cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .sl-lens:hover {
+    border-color: var(--line-strong);
   }
 
   .sl-lens b {
-    color: var(--cam-ink);
-    font-size: 13px;
+    color: var(--ink);
+    font-size: 14px;
   }
 
   .sl-lens[aria-pressed="true"] {
-    border-color: var(--cam-accent);
-    background: rgba(100, 190, 198, 0.12);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+    background: var(--raise);
   }
 
   .sl-grade {
     justify-self: start;
-    padding: 1px 7px;
+    padding: 1px 9px;
     border-radius: 999px;
-    font: 700 10px/1.6 var(--body);
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--cam-ink);
+    font: 700 11px/1.7 var(--body);
+    background: var(--raise-2);
+    color: var(--ink);
+    border: 1px solid var(--line);
   }
 
   .g-入門 {
-    background: #6b5a3a;
+    background: var(--warning-bg);
+    border-color: var(--warning-line);
   }
 
   .g-高級 {
-    background: #2f6b5a;
+    background: var(--brand-pale);
+    border-color: var(--line-strong);
+    color: var(--accent);
   }
 
-  .g-特殊 {
-    background: #4a3f78;
+  .g-特殊,
+  .g-試作 {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--on-ink);
   }
 
-  .sl-side {
-    display: grid;
-    gap: 12px;
-    position: sticky;
-    top: 12px;
-  }
+  /* ---------- advice ---------- */
 
   .sl-advice {
     list-style: none;
@@ -657,42 +905,54 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
 
   .sl-advice :global(li) {
     display: grid;
-    gap: 3px;
-    padding: 9px 11px;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.25);
-    border-left: 3px solid var(--cam-line-strong);
-    font-size: 12.5px;
-    line-height: 1.65;
-    color: var(--cam-muted);
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--base);
+    border-left: 4px solid var(--line-strong);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
   }
 
   .sl-advice :global(li b) {
-    color: var(--cam-ink);
-    font-size: 13px;
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.5;
   }
 
   .sl-advice :global(li small) {
-    font: 500 10px/1.2 var(--mono);
+    font: 700 11px/1.4 var(--body);
     letter-spacing: 0.08em;
-    color: var(--cam-muted);
+    color: var(--muted);
   }
 
   .sl-advice :global(li.bad) {
-    border-left-color: var(--cam-red);
+    border-left-color: var(--error);
+  }
+
+  .sl-advice :global(li.bad small) {
+    color: var(--error);
   }
 
   .sl-advice :global(li.warn) {
-    border-left-color: var(--cam-warn);
+    border-left-color: var(--warning-line);
+    background: var(--warning-bg);
   }
 
   .sl-advice :global(li.good) {
-    border-left-color: #6fcf8e;
+    border-left-color: var(--ok);
+  }
+
+  .sl-advice :global(li.good small) {
+    color: var(--ok);
   }
 
   .sl-advice :global(li.tip) {
-    border-left-color: var(--cam-accent);
+    border-left-color: var(--brand);
   }
+
+  /* ---------- floor plan ---------- */
 
   .sl-map-head {
     display: flex;
@@ -702,56 +962,87 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
   }
 
   .sl-map {
+    --map-bg: var(--base);
+    --map-grid: var(--line);
+    --map-ink: var(--ink);
+    --map-muted: var(--muted);
+    --map-accent: var(--brand-deep);
     width: 100%;
     aspect-ratio: 1 / 0.85;
-    border-radius: 8px;
-    background: #12161a;
-    border: 1px solid var(--cam-line);
+    border-radius: var(--radius-sm);
+    background: var(--base);
+    border: 1px solid var(--line);
     cursor: grab;
   }
 
   .sl-light {
     display: grid;
-    gap: 10px;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
   }
 
-  .sl-light[hidden] {
-    display: none;
+  /* ---------- below the studio ---------- */
+
+  .sl-section {
+    display: grid;
+    gap: 18px;
+    padding-block: clamp(36px, 5vw, 56px);
+    border-top: 1px solid var(--line);
+  }
+
+  .sl-head {
+    display: grid;
+    gap: 6px;
+  }
+
+  .sl-head h2 {
+    font-size: var(--step-3);
+  }
+
+  .sl-head p:not(.edge) {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--muted);
   }
 
   .sl-pick {
-    grid-column: 1 / -1;
-    display: grid;
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-    gap: 18px;
+    gap: 32px;
+    align-items: start;
   }
 
-  .sl-pick h3,
-  .sl-section-head h3 {
-    font: 700 15px/1.5 var(--body);
-    color: var(--accent);
-    margin-bottom: 8px;
+  .sl-pick > div {
+    display: grid;
+    gap: 18px;
   }
 
   .sl-places {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    gap: 8px;
   }
 
   .sl-places button {
     position: relative;
     padding: 0;
-    border: 2px solid transparent;
-    border-radius: 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
     overflow: hidden;
-    background: #0d0f12;
+    background: var(--rebate);
     cursor: pointer;
-    aspect-ratio: 2 / 1.1;
+    aspect-ratio: 2 / 1.15;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .sl-places button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
   }
 
   .sl-places button[aria-pressed="true"] {
     border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
   }
 
   .sl-places img {
@@ -763,54 +1054,13 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
 
   .sl-places span {
     position: absolute;
-    left: 4px;
-    bottom: 4px;
-    font: 600 10.5px/1.2 var(--body);
-    color: #fff;
-    padding: 2px 6px;
-    border-radius: 3px;
-    background: rgba(0, 0, 0, 0.6);
-  }
-
-  .sl-subjects {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .sl-chipbtn {
-    appearance: none;
-    padding: 8px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    background: var(--raise);
-    color: var(--ink);
-    font: 600 13px/1.2 var(--body);
-    cursor: pointer;
-  }
-
-  .sl-chipbtn[aria-pressed="true"] {
-    background: var(--ink);
-    color: var(--base);
-    border-color: var(--ink);
-  }
-
-  .sl-missions,
-  .sl-contact {
-    grid-column: 1 / -1;
-  }
-
-  .sl-section-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 14px;
-  }
-
-  .sl-section-head p {
-    margin: 0;
-    font-size: 13px;
-    color: var(--muted);
+    left: 5px;
+    bottom: 5px;
+    font: 700 11px/1.2 var(--body);
+    color: var(--hud);
+    padding: 3px 7px;
+    border-radius: 2px;
+    background: var(--hud-bg);
   }
 
   .sl-mission-list {
@@ -818,8 +1068,8 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
   }
 
   .sl-mission-list button {
@@ -827,17 +1077,17 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     width: 100%;
     height: 100%;
     display: grid;
-    gap: 4px;
+    gap: 6px;
     align-content: start;
     text-align: left;
-    padding: 12px 14px;
-    border-radius: 10px;
+    padding: 16px 18px;
+    border-radius: var(--radius);
     border: 1px solid var(--line);
     background: var(--raise);
     color: var(--ink);
-    font: 400 12.5px/1.6 var(--body);
+    font: 500 13px/1.7 var(--body);
     cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
   }
 
   .sl-mission-list button:hover {
@@ -846,11 +1096,13 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
   }
 
   .sl-mission-list b {
-    font-size: 14px;
+    font-size: 15px;
+    line-height: 1.5;
   }
 
   .sl-mplace {
-    font: 600 11px/1.3 var(--mono);
+    font: 700 11px/1.4 var(--body);
+    letter-spacing: 0.12em;
     color: var(--accent);
   }
 
@@ -860,38 +1112,48 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
 
   .sl-mstate {
     font-weight: 700;
-    color: #2f8a52;
+    color: var(--ok);
+  }
+
+  .sl-mstate:empty {
+    display: none;
   }
 
   .sl-mission-list li[data-active] button {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent) inset;
+    box-shadow: 0 0 0 1px var(--accent) inset;
   }
 
   .sl-sheet {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
   }
 
   .sl-sheet .empty {
     grid-column: 1 / -1;
     margin: 0;
-    font-size: 13px;
+    font-size: var(--step--1);
     color: var(--muted);
   }
 
   .sl-sheet :global(button) {
     appearance: none;
     margin: 0;
-    padding: 6px;
-    border: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
     display: grid;
-    gap: 4px;
-    background: var(--rebate);
-    border-radius: 4px;
+    background: var(--raise);
     cursor: zoom-in;
     text-align: left;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .sl-sheet :global(button:hover) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
   }
 
   .sl-sheet :global(img) {
@@ -899,76 +1161,81 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     aspect-ratio: 3 / 2;
     object-fit: cover;
     display: block;
+    background: var(--rebate);
   }
 
   .sl-sheet :global(span) {
-    font: 500 10px/1.35 var(--mono);
-    color: #d8d2c8;
+    padding: 8px 10px 10px;
+    font: 500 11px/1.5 var(--mono);
+    color: var(--muted);
   }
 
   .sl-sheet:has(button) .empty {
     display: none;
   }
 
+  /* ---------- the enlarged picture ---------- */
+
   .sl-lightbox {
     width: min(1200px, 96vw);
     max-height: 96vh;
-    padding: 12px;
-    border: 0;
-    border-radius: 12px;
-    background: #0d0f12;
-    color: var(--cam-ink);
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+    color: var(--ink);
   }
 
   .sl-lightbox::backdrop {
-    background: rgba(0, 0, 0, 0.82);
+    background: rgba(15, 25, 28, 0.82);
   }
 
   .sl-lightbox figure {
     margin: 0;
     display: grid;
-    gap: 10px;
+    gap: 12px;
   }
 
   .sl-lightbox img {
     width: 100%;
-    max-height: 76vh;
+    max-height: 74vh;
     object-fit: contain;
     display: block;
-    background: #000;
+    border-radius: var(--radius-sm);
+    background: var(--rebate);
   }
 
   .sl-lightbox figcaption {
     display: grid;
     gap: 4px;
-    font: 500 12.5px/1.6 var(--body);
-    color: var(--cam-muted);
+    font: 500 13px/1.7 var(--body);
+    color: var(--muted);
   }
 
   .sl-lightbox figcaption b {
-    font: 600 14px/1.4 var(--mono);
-    color: var(--cam-ink);
+    font: 700 15px/1.5 var(--latin);
+    color: var(--ink);
   }
 
   .sl-lb-nav {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     justify-content: flex-end;
-    margin-top: 10px;
-  }
-
-  .sl-lb-nav a {
-    text-decoration: none;
+    margin-top: 12px;
   }
 
   @media (max-width: 1100px) {
-    .sl {
+    .sl-top {
       grid-template-columns: 1fr;
     }
 
     .sl-side {
       position: static;
+      max-height: none;
+      overflow: visible;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      align-items: start;
     }
 
     .sl-pick {
@@ -977,6 +1244,10 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
   }
 
   @media (max-width: 600px) {
+    .sl-card {
+      padding: 14px;
+    }
+
     .sl-deck {
       grid-template-columns: 1fr;
     }
@@ -1004,7 +1275,7 @@ const main = [slider('mm', '焦点距離'), slider('N', '絞り（F値）'), sli
     }
 
     .sl-places {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .sl-mission-bar {

@@ -25,6 +25,15 @@ export interface MapHandlers {
   select(id: number | null): void;
 }
 
+/** Colours come from the page (CSS custom properties on the canvas), so the plan follows the site's light and dark themes. */
+interface Palette {
+  bg: string;
+  grid: string;
+  ink: string;
+  muted: string;
+  accent: string;
+}
+
 export class FloorMap {
   private g: CanvasRenderingContext2D;
   private scale = 60;
@@ -85,8 +94,21 @@ export class FloorMap {
     else this.on.light(this.drag.id, p.x, p.z);
   }
 
+  private palette(): Palette {
+    const cs = getComputedStyle(this.canvas);
+    const v = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
+    return {
+      bg: v('--map-bg', '#f7fbfb'),
+      grid: v('--map-grid', '#d4e7e9'),
+      ink: v('--map-ink', '#1b363d'),
+      muted: v('--map-muted', '#557079'),
+      accent: v('--map-accent', '#3a9ca6'),
+    };
+  }
+
   draw(s: MapState) {
     this.last = s;
+    const P = this.palette();
     const c = this.canvas;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = c.clientWidth;
@@ -116,7 +138,7 @@ export class FloorMap {
 
     // grid: 10 cm, 1 m or 5 m depending on the zoom
     const stepM = this.scale > 300 ? 0.1 : this.scale > 30 ? 1 : 5;
-    g.strokeStyle = 'rgba(239,233,223,.07)';
+    g.strokeStyle = P.grid;
     g.lineWidth = 1;
     const x0 = this.center.x - w / 2 / this.scale;
     const z0 = this.center.z - h / 2 / this.scale;
@@ -134,7 +156,7 @@ export class FloorMap {
     g.stroke();
 
     if (s.dots) {
-      g.fillStyle = 'rgba(240,150,190,.55)';
+      g.fillStyle = 'rgba(214,96,150,.55)';
       for (let i = 0; i < s.dots.length; i += 2) {
         const q = this.toScreen(s.dots[i], s.dots[i + 1]);
         if (q.x < -4 || q.y < -4 || q.x > w + 4 || q.y > h + 4) continue;
@@ -148,8 +170,8 @@ export class FloorMap {
     const a0 = s.camera.heading - s.camera.hfov / 2;
     const a1 = s.camera.heading + s.camera.hfov / 2;
     const dir = (a: number) => ({ x: Math.sin(a), y: Math.cos(a) });
-    g.fillStyle = 'rgba(100,190,198,.16)';
-    g.strokeStyle = 'rgba(100,190,198,.8)';
+    g.fillStyle = withAlpha(P.accent, 0.16);
+    g.strokeStyle = withAlpha(P.accent, 0.85);
     g.beginPath();
     g.moveTo(cam.x, cam.y);
     g.lineTo(cam.x + dir(a0).x * L, cam.y + dir(a0).y * L);
@@ -168,11 +190,13 @@ export class FloorMap {
       const t = this.toScreen(s.aim.x, s.aim.z);
       const ang = Math.atan2(t.y - p.y, t.x - p.x);
       const col = LIGHT_COLORS[l.color][0];
+      // daylight is near white: draw its beam warmer so it shows on a light plan
+      const beam = l.color === 'day' ? '#f2c25c' : col;
       const spread = l.kind === 'soft' ? 0.6 : 0.25;
       const len = Math.hypot(t.x - p.x, t.y - p.y) * 1.15;
       const grad = g.createRadialGradient(p.x, p.y, 4, p.x, p.y, len);
-      grad.addColorStop(0, hexA(col, 0.45));
-      grad.addColorStop(1, hexA(col, 0));
+      grad.addColorStop(0, withAlpha(beam, 0.45));
+      grad.addColorStop(1, withAlpha(beam, 0));
       g.fillStyle = grad;
       g.beginPath();
       g.moveTo(p.x, p.y);
@@ -182,9 +206,9 @@ export class FloorMap {
       g.save();
       g.translate(p.x, p.y);
       g.rotate(ang);
-      g.fillStyle = '#1c1f23';
-      g.strokeStyle = l.id === s.selected ? '#64bec6' : col;
-      g.lineWidth = l.id === s.selected ? 3 : 2;
+      g.fillStyle = col;
+      g.strokeStyle = l.id === s.selected ? P.accent : P.ink;
+      g.lineWidth = l.id === s.selected ? 3 : 1.5;
       g.beginPath();
       if (l.kind === 'soft') g.rect(-5, -12, 10, 24);
       else g.arc(0, 0, 8, 0, Math.PI * 2);
@@ -195,32 +219,32 @@ export class FloorMap {
 
     // subject
     const sp = this.toScreen(s.aim.x, s.aim.z);
-    g.fillStyle = '#efe9df';
+    g.fillStyle = P.ink;
     g.beginPath();
     g.arc(sp.x, sp.y, 7, 0, Math.PI * 2);
     g.fill();
-    g.font = '600 11px system-ui, sans-serif';
+    g.font = `700 11px ${FONT}`;
     g.textAlign = 'center';
-    g.fillStyle = 'rgba(239,233,223,.85)';
+    g.fillStyle = P.ink;
     g.fillText(s.subject, sp.x, sp.y - 12);
 
     // the camera
     g.save();
     g.translate(cam.x, cam.y);
     g.rotate(-s.camera.heading);
-    g.fillStyle = '#efe9df';
-    g.strokeStyle = '#0d0f12';
+    g.fillStyle = P.ink;
+    g.strokeStyle = P.bg;
     g.lineWidth = 2;
     g.beginPath();
     g.roundRect(-13, -9, 26, 14, 3);
     g.fill();
     g.stroke();
-    g.fillStyle = '#64bec6';
+    g.fillStyle = P.accent;
     g.fillRect(-6, 5, 12, 8);
     g.restore();
 
     // sun or north
-    g.font = '600 11px system-ui, sans-serif';
+    g.font = `700 11px ${FONT}`;
     if (s.sun) {
       const len = Math.hypot(s.sun.x, s.sun.z) || 1;
       const ux = s.sun.x / len;
@@ -228,11 +252,11 @@ export class FloorMap {
       const r = Math.min(w, h) / 2 - 16;
       const x = w / 2 + ux * r;
       const y = h / 2 + uz * r;
-      g.fillStyle = '#ffcc55';
+      g.fillStyle = SUN;
       g.beginPath();
       g.arc(x, y, 7, 0, Math.PI * 2);
       g.fill();
-      g.strokeStyle = 'rgba(255,204,85,.5)';
+      g.strokeStyle = withAlpha(SUN, 0.6);
       g.beginPath();
       g.moveTo(x - ux * 12, y - uz * 12);
       g.lineTo(x - ux * 34, y - uz * 34);
@@ -240,15 +264,15 @@ export class FloorMap {
       g.fillText('光源', x, y - 11);
     }
     if (s.north) {
-      g.fillStyle = '#9fb4ff';
+      g.fillStyle = P.accent;
       g.fillText('北 ↑（北極星）', w / 2, 14);
       g.fillText('南（天の川）↓', w / 2, h - 6);
     }
 
     // scale bar
     const bar = stepM * this.scale;
-    g.strokeStyle = 'rgba(239,233,223,.6)';
-    g.fillStyle = 'rgba(239,233,223,.7)';
+    g.strokeStyle = P.muted;
+    g.fillStyle = P.muted;
     g.lineWidth = 2;
     g.beginPath();
     g.moveTo(10, h - 10);
@@ -259,7 +283,21 @@ export class FloorMap {
   }
 }
 
-function hexA(hex: string, a: number) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+const FONT = '"Zen Kaku Gothic New", system-ui, sans-serif';
+const SUN = '#e0a11b';
+
+/** A CSS colour (#rgb, #rrggbb or rgb()) with an alpha. */
+function withAlpha(color: string, a: number) {
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (color.startsWith('#')) {
+    const h = color.length === 4 ? color.replace(/^#(.)(.)(.)$/, '#$1$1$2$2$3$3') : color;
+    const n = parseInt(h.slice(1, 7), 16);
+    [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  } else {
+    const m = color.match(/[\d.]+/g);
+    if (m) [r, g, b] = m.map(Number);
+  }
+  return `rgba(${r},${g},${b},${a})`;
 }
