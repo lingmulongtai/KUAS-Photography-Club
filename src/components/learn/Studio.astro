@@ -1,0 +1,1440 @@
+---
+/**
+ * The photo studio at the top of 写真を学ぶ: one 3D set where every camera setting, lens,
+ * filter, flash and light can be tried, with a floor plan, a coach, shooting challenges (お題)
+ * and a contact sheet that opens each picture large. The script reads the language from
+ * `data-lang`.
+ */
+import { BACKDROPS, STUDIO_PLACES, backdropThumb } from '../../scripts/studio/assets';
+import { GRADES, LENSES, FILTERS } from '../../scripts/studio/gear';
+import { MISSIONS } from '../../scripts/studio/missions';
+import { LIGHT_COLORS } from '../../scripts/studio/lights';
+import { SUBJECT_NAMES, type SubjectId } from '../../scripts/studio/subjects';
+import { picker, tr } from '../../scripts/studio/i18n';
+import type { SiteLanguage } from '../../lib/i18n';
+
+interface Props {
+  lang?: SiteLanguage;
+}
+const { lang = 'ja' } = Astro.props;
+const t = picker(lang);
+
+const meterLabels = ['−3', '−2', '−1', '0', '+1', '+2', '+3'];
+const subjects: SubjectId[] = ['bust', 'mannequin', 'horse', 'stilllife', 'camera', 'chess', 'flower', 'tree'];
+const tabs: [string, string][] = [
+  ['hold', t('撮り方', 'Position')],
+  ['lens', t('レンズ', 'Lens')],
+  ['focus', t('ピント', 'Focus')],
+  ['filter', t('フィルター', 'Filter')],
+  ['flash', t('フラッシュ', 'Flash')],
+  ['drive', t('連写・合成', 'Drive')],
+];
+const slider = (ctl: string, label: string) => ({ ctl, label, id: `sl-${ctl}` });
+const main = [
+  slider('mm', t('焦点距離', 'Focal length')),
+  slider('N', t('絞り（F値）', 'Aperture')),
+  slider('t', t('シャッター', 'Shutter')),
+  slider('iso', t('ISO 感度', 'ISO')),
+];
+---
+<div class="sl" data-studio data-lang={lang}>
+  <div class="sl-top">
+    <div class="sl-main">
+      <div class="stage sl-stage" data-loading={t('3D を読み込んでいます…', 'Loading the 3D studio…')} data-failed={t('3D 素材を読み込めませんでした', 'The 3D studio could not be loaded')}>
+        <canvas aria-label={t('カメラの設定を変えて撮影できる3Dの撮影スタジオ。ドラッグで構図を動かし、タップでピントを合わせます', 'A 3D photo studio where you change the camera settings and take pictures. Drag to frame, tap to focus')}></canvas>
+        <div class="vf">
+          <div class="corners"></div>
+          <span class="af" data-af style="left:50%;top:50%"></span>
+          <div class="top">
+            <span class="pill" data-info></span>
+            <span class="pill sl-badges" data-badges></span>
+          </div>
+          <canvas class="sl-hist" width="144" height="56" data-hist aria-hidden="true"></canvas>
+          <div class="sl-mission-bar" data-mission-bar hidden></div>
+          <div class="sl-bottom">
+            <span class="sl-chip" data-chip></span>
+            <div class="meter sl-meter"><div class="scale"><span class="caret"></span></div><div class="labels">{meterLabels.map((l) => <span>{l}</span>)}</div></div>
+          </div>
+          <div class="sl-progress" data-progress hidden>
+            <p data-progress-text></p>
+            <div class="sl-progress-bar"><span data-progress-fill></span></div>
+          </div>
+          <div class="sl-toast" data-toast hidden></div>
+        </div>
+        <div class="sl-flash" data-flash-fx></div>
+      </div>
+
+      <div class="sl-card sl-deck">
+        <div class="sl-sliders">
+          {main.map((s) => (
+            <div class="sl-slider" data-ctl={s.ctl}>
+              <label for={s.id}>{s.label}</label>
+              <output for={s.id}></output>
+              <input id={s.id} type="range" min="0" max="1" step="1" value="0" />
+            </div>
+          ))}
+        </div>
+        <button type="button" class="sl-shutter" data-shutter aria-label={t('シャッターを切る（撮った写真は下に並びます）', 'Take a picture (it appears below)')}><span></span></button>
+      </div>
+
+      <div class="sl-card sl-tabs">
+        <div class="sl-tablist" role="tablist" aria-label={t('カメラの設定', 'Camera settings')}>
+          {tabs.map(([id, name], i) => (
+            <button type="button" role="tab" id={`tab-${id}`} aria-controls={`panel-${id}`} aria-selected={i === 0 ? 'true' : 'false'} data-tab={id}>{name}</button>
+          ))}
+        </div>
+
+        <div class="sl-panel" role="tabpanel" id="panel-hold" aria-labelledby="tab-hold" data-panel="hold">
+          <div class="sl-field">
+            <h3>{t('カメラの持ち方', 'Holding the camera')}</h3>
+            <div class="sl-seg">
+              <button type="button" data-seg="hold" data-value="tripod" aria-pressed="true">{t('三脚', 'Tripod')}</button>
+              <button type="button" data-seg="hold" data-value="hand" aria-pressed="false">{t('手持ち', 'Handheld')}</button>
+              <button type="button" data-seg="hold" data-value="ibis" aria-pressed="false">{t('手持ち＋手ぶれ補正', 'Handheld + stabiliser')}</button>
+            </div>
+          </div>
+          <div class="sl-field">
+            <h3>{t('カメラの高さ', 'Camera height')}</h3>
+            <div class="sl-seg">
+              <button type="button" data-seg="angle" data-value="low" aria-pressed="false">{t('下から見上げる', 'Low, looking up')}</button>
+              <button type="button" data-seg="angle" data-value="level" aria-pressed="true">{t('目線', 'Eye level')}</button>
+              <button type="button" data-seg="angle" data-value="high" aria-pressed="false">{t('上から見下ろす', 'High, looking down')}</button>
+            </div>
+          </div>
+          <div class="sl-slider" data-ctl="dist">
+            <label for="sl-dist">{t('被写体までの距離', 'Distance to the subject')}</label>
+            <output for="sl-dist"></output>
+            <input id="sl-dist" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+          <div class="sl-row">
+            <button type="button" class="sl-btn" data-toggle="pinwheel" aria-pressed="false">{t('風車を置く', 'Add a pinwheel')}</button>
+            <button type="button" class="sl-btn" data-recenter>{t('被写体に向き直す', 'Face the subject')}</button>
+          </div>
+          <p>{t('立ち位置は「真上から見た図」でカメラをドラッグしても変えられます。画面をドラッグすると、その場で向きを変えます。', 'You can also move by dragging the camera in the top view. Dragging the picture turns the camera where it stands.')}</p>
+        </div>
+
+        <div class="sl-panel" role="tabpanel" id="panel-lens" aria-labelledby="tab-lens" data-panel="lens" hidden>
+          <div class="sl-lenses">
+            {LENSES.map((l) => (
+              <button type="button" class="sl-lens" data-seg="lens" data-value={l.id} aria-pressed={l.id === 'std' ? 'true' : 'false'}>
+                <span class={`sl-grade g-${l.grade}`}>{tr(GRADES[l.grade], lang)}</span>
+                <b>{tr(l.name, lang)}</b>
+                <span>{tr(l.note, lang)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div class="sl-panel" role="tabpanel" id="panel-focus" aria-labelledby="tab-focus" data-panel="focus" hidden>
+          <div class="sl-row">
+            <div class="sl-seg">
+              <button type="button" data-seg="fmode" data-value="af" aria-pressed="true">{t('AF（オート）', 'AF (auto)')}</button>
+              <button type="button" data-seg="fmode" data-value="mf" aria-pressed="false">{t('MF（マニュアル）', 'MF (manual)')}</button>
+            </div>
+            <button type="button" class="sl-btn" data-toggle="peaking" aria-pressed="false">{t('ピーキング', 'Focus peaking')}</button>
+          </div>
+          <div class="sl-slider" data-ctl="mf">
+            <label for="sl-mf">{t('ピントリング（MF）', 'Focus ring (MF)')}</label>
+            <output for="sl-mf"></output>
+            <input id="sl-mf" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+          <p data-focus-info></p>
+          <p>{t('AF では被写体（目・花の芯・レンズ）に合わせます。画面をタップすると、その場所に合わせます。', 'AF focuses on the subject (an eye, the heart of a flower, a lens). Tap the picture to focus there instead.')}</p>
+        </div>
+
+        <div class="sl-panel" role="tabpanel" id="panel-filter" aria-labelledby="tab-filter" data-panel="filter" hidden>
+          <div class="sl-seg">
+            {FILTERS.map((f, i) => <button type="button" data-seg="filter" data-value={f.id} aria-pressed={i === 0 ? 'true' : 'false'}>{tr(f.name, lang)}</button>)}
+          </div>
+          <div class="sl-slider" data-ctl="pl" hidden>
+            <label for="sl-pl">{t('C-PL の回転', 'C-PL rotation')}</label>
+            <output for="sl-pl"></output>
+            <input id="sl-pl" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+          <p data-filter-note>{t('レンズの前に付けるフィルター。ND は光を減らし、C-PL は反射を取って空を濃くし、ソフト・ミスト・クロスは光のにじみ方を変えます。', 'Filters go in front of the lens. ND cuts the light, C-PL removes reflections and deepens the sky, and soft, mist and cross filters change how light spreads.')}</p>
+        </div>
+
+        <div class="sl-panel" role="tabpanel" id="panel-flash" aria-labelledby="tab-flash" data-panel="flash" hidden>
+          <div class="sl-row">
+            <div class="sl-seg">
+              <button type="button" data-seg="flash" data-value="off" aria-pressed="true">{t('オフ', 'Off')}</button>
+              <button type="button" data-seg="flash" data-value="ttl" aria-pressed="false">{t('TTL（自動調光）', 'TTL (auto)')}</button>
+              <button type="button" data-seg="flash" data-value="manual" aria-pressed="false">{t('マニュアル', 'Manual')}</button>
+            </div>
+            <div class="sl-seg">
+              <button type="button" data-seg="curtain" data-value="front" aria-pressed="true">{t('先幕', 'Front curtain')}</button>
+              <button type="button" data-seg="curtain" data-value="rear" aria-pressed="false">{t('後幕', 'Rear curtain')}</button>
+            </div>
+          </div>
+          <div class="sl-two">
+            <div class="sl-slider" data-ctl="fp">
+              <label for="sl-fp">{t('発光量（マニュアル）', 'Power (manual)')}</label>
+              <output for="sl-fp"></output>
+              <input id="sl-fp" type="range" min="0" max="1" step="1" value="0" />
+            </div>
+            <div class="sl-slider" data-ctl="fec">
+              <label for="sl-fec">{t('調光補正（TTL）', 'Flash compensation (TTL)')}</label>
+              <output for="sl-fec"></output>
+              <input id="sl-fec" type="range" min="0" max="1" step="1" value="0" />
+            </div>
+          </div>
+          <p data-flash-info>{t('カメラの上のフラッシュ（ガイドナンバー 36）。TTL はカメラが試し光りして明るさを決め、マニュアルは自分で発光量を決めます。置きライトは「真上から見た図」の「＋ライト」で。', 'A flash on top of the camera (guide number 36). In TTL the camera fires a test flash to set the power; in manual you set it yourself. For lights on stands, use “+ Light” in the top view.')}</p>
+        </div>
+
+        <div class="sl-panel" role="tabpanel" id="panel-drive" aria-labelledby="tab-drive" data-panel="drive" hidden>
+          <div class="sl-row">
+            <div class="sl-seg">
+              <button type="button" data-seg="drive" data-value="single" aria-pressed="true">{t('1枚ずつ', 'Single')}</button>
+              <button type="button" data-seg="drive" data-value="interval" aria-pressed="false">{t('インターバル撮影', 'Interval')}</button>
+            </div>
+            <div class="sl-seg">
+              <button type="button" data-seg="blend" data-value="lighten" aria-pressed="true">{t('比較明合成', 'Lighten')}</button>
+              <button type="button" data-seg="blend" data-value="average" aria-pressed="false">{t('加算平均', 'Average')}</button>
+            </div>
+          </div>
+          <div class="sl-slider" data-ctl="frames">
+            <label for="sl-frames">{t('枚数', 'Frames')}</label>
+            <output for="sl-frames"></output>
+            <input id="sl-frames" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+          <p data-drive-info></p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="sl-side" aria-label={t('アドバイスと真上から見た図', 'Advice and top view')}>
+      <div class="sl-card">
+        <h3 class="sl-title"><span>ADVICE</span>{t('アドバイス', 'Advice')}</h3>
+        <ul class="sl-advice" data-advice aria-live="polite"></ul>
+      </div>
+      <div class="sl-card">
+        <div class="sl-map-head">
+          <h3 class="sl-title"><span>TOP VIEW</span>{t('真上から見た図', 'Seen from above')}</h3>
+          <button type="button" class="sl-btn sl-btn-sm" data-add-light>{t('＋ライト', '+ Light')}</button>
+        </div>
+        <canvas class="sl-map" data-map aria-label={t('被写体・カメラ・ライトを真上から見た図。カメラとライトはドラッグで動かせます', 'The subject, camera and lights seen from above. Drag the camera or a light to move it')}></canvas>
+        <div class="sl-light" data-light-panel hidden>
+          <div class="sl-row">
+            <div class="sl-seg">
+              <button type="button" data-seg="lkind" data-value="soft" aria-pressed="true">{t('ソフトボックス', 'Softbox')}</button>
+              <button type="button" data-seg="lkind" data-value="spot" aria-pressed="false">{t('スポット', 'Spot')}</button>
+            </div>
+            <button type="button" class="sl-btn sl-btn-sm" data-remove-light>{t('削除', 'Remove')}</button>
+          </div>
+          <div class="sl-seg">
+            {Object.entries(LIGHT_COLORS).map(([id, [, name]], i) => <button type="button" data-seg="lcolor" data-value={id} aria-pressed={i === 0 ? 'true' : 'false'}>{tr(name, lang)}</button>)}
+          </div>
+          <div class="sl-slider" data-ctl="level">
+            <label for="sl-level">{t('明るさ（1m で）', 'Brightness (at 1 m)')}</label>
+            <output for="sl-level"></output>
+            <input id="sl-level" type="range" min="0" max="1" step="1" value="0" />
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="sl-section sl-pick" aria-labelledby="sl-h-place">
+    <div>
+      <div class="sl-head">
+        <p class="edge">PLACES</p>
+        <h2 id="sl-h-place">{t('撮る場所', 'Places')}</h2>
+      </div>
+      <div class="sl-places">
+        {STUDIO_PLACES.map((id, i) => (
+          <button type="button" data-seg="place" data-value={id} aria-pressed={i === 0 ? 'true' : 'false'} title={tr(BACKDROPS[id].name, lang)}>
+            <img src={backdropThumb(id)} alt="" loading="lazy" width="160" height="80" />
+            <span>{tr(BACKDROPS[id].short, lang)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+    <div>
+      <div class="sl-head">
+        <p class="edge">SUBJECTS</p>
+        <h2>{t('撮るもの', 'Subjects')}</h2>
+      </div>
+      <div class="sl-seg sl-subjects">
+        {subjects.map((id, i) => <button type="button" data-seg="subject" data-value={id} aria-pressed={i === 0 ? 'true' : 'false'}>{tr(SUBJECT_NAMES[id].short, lang)}</button>)}
+      </div>
+    </div>
+  </section>
+
+  <section class="sl-section" aria-labelledby="sl-h-mission">
+    <div class="sl-head">
+      <p class="edge">CHALLENGES</p>
+      <h2 id="sl-h-mission">{t('お題に挑戦', 'Challenges')}</h2>
+      <p>{t('わざと「惜しい」設定から始まります。条件を満たして撮れたらクリア。', 'Each one starts from settings that are not quite right. Take a picture that meets the goal to clear it.')}</p>
+    </div>
+    <ol class="sl-mission-list">
+      {MISSIONS.map((m) => (
+        <li data-mission={m.id}>
+          <button type="button" data-start-mission={m.id}>
+            <span class="sl-mplace">{tr(m.place, lang)}</span>
+            <b>{tr(m.title, lang)}</b>
+            <span class="sl-mgoal">{tr(m.goal, lang)}</span>
+            <span class="sl-mstate" data-mstate></span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="sl-section" aria-labelledby="sl-h-photos">
+    <div class="sl-head">
+      <p class="edge">CONTACT SHEET</p>
+      <h2 id="sl-h-photos">{t('撮った写真', 'Your pictures')}</h2>
+      <p>{t('クリックで大きく表示します。', 'Click one to see it large.')}</p>
+    </div>
+    <div class="sl-sheet" data-sheet><p class="empty">{t('シャッターボタンを押すと、ここに並びます。', 'Press the shutter button and your pictures appear here.')}</p></div>
+  </section>
+
+  <p class="sl-credit">
+    {t(
+      '写りは本物のカメラの考え方に沿った簡易表現で、実際のカメラとは細部が異なります。3D モデルとパノラマ写真は Poly Haven の CC0 素材です。',
+      'The pictures follow how a real camera works, simplified; details differ from a real camera. The 3D models and panoramas are CC0 assets from Poly Haven.',
+    )}
+  </p>
+
+  <dialog class="sl-lightbox" data-lightbox aria-label={t('撮った写真', 'Your pictures')}>
+    <figure>
+      <img data-lb-img alt="" />
+      <figcaption>
+        <b data-lb-title></b>
+        <span data-lb-detail></span>
+      </figcaption>
+    </figure>
+    <div class="sl-lb-nav">
+      <button type="button" class="sl-btn" data-lb-prev aria-label={t('前の写真', 'Previous picture')}>←</button>
+      <button type="button" class="sl-btn" data-lb-next aria-label={t('次の写真', 'Next picture')}>→</button>
+      <a class="sl-btn sl-btn-primary" data-lb-save download="kuas-studio.jpg">{t('保存', 'Save')}</a>
+      <button type="button" class="sl-btn" data-lb-close>{t('閉じる', 'Close')}</button>
+    </div>
+  </dialog>
+</div>
+
+<style>
+  /* Matches the rest of the site: cards on the page ground, teal accents, pill buttons.
+     Only the picture itself stays dark, like every other demo stage. */
+  .sl {
+    display: grid;
+    gap: 0;
+  }
+
+  .sl-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 16px;
+    align-items: start;
+    padding-bottom: clamp(40px, 6vw, 64px);
+  }
+
+  .sl-main {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  /* follows the camera while you scroll the controls, but only within the studio itself */
+  .sl-side {
+    position: sticky;
+    top: calc(var(--header-h) + 16px);
+    max-height: calc(100vh - var(--header-h) - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    display: grid;
+    gap: 16px;
+  }
+
+  .sl-card {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+    color: var(--ink);
+    font: 500 14px/1.6 var(--body);
+  }
+
+  .sl-card p {
+    margin: 0;
+    font-size: var(--step--1);
+    line-height: 1.75;
+    color: var(--muted);
+  }
+
+  .sl-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    margin: 0;
+    font: 700 13px/1.4 var(--body);
+    letter-spacing: 0.06em;
+    color: var(--ink);
+  }
+
+  .sl-title span {
+    font: 700 11px/1.4 var(--latin);
+    letter-spacing: 0.22em;
+    color: var(--accent);
+  }
+
+  .sl-field {
+    display: grid;
+    gap: 8px;
+  }
+
+  .sl-field h3 {
+    margin: 0;
+    font: 700 13px/1.4 var(--body);
+    color: var(--muted);
+  }
+
+  .sl-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    align-items: center;
+  }
+
+  .sl-two {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px 20px;
+  }
+
+  /* ---------- sliders ---------- */
+
+  .sl-slider {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    align-items: baseline;
+    min-width: 0;
+  }
+
+  .sl-slider[hidden],
+  .sl-panel[hidden],
+  .sl-light[hidden] {
+    display: none;
+  }
+
+  .sl-slider label {
+    font: 700 13px/1.4 var(--body);
+    color: var(--muted);
+  }
+
+  .sl-slider output {
+    font: 700 17px/1.2 var(--latin);
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+
+  .sl-slider input {
+    grid-column: 1 / -1;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 28px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .sl-slider input:disabled {
+    cursor: default;
+    opacity: 0.45;
+  }
+
+  .sl-slider input::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent) calc(var(--p, 0) * 100%), var(--line) 0);
+  }
+
+  .sl-slider input::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent) calc(var(--p, 0) * 100%), var(--line) 0);
+  }
+
+  .sl-slider input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -8px;
+    border-radius: 50%;
+    background: var(--raise);
+    border: 2px solid var(--accent);
+    box-shadow: var(--shadow);
+  }
+
+  .sl-slider input::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--raise);
+    border: 2px solid var(--accent);
+  }
+
+  .sl-slider input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- buttons: the site's pill chips ---------- */
+
+  .sl-seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .sl-seg button,
+  .sl-btn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--raise);
+    color: var(--ink);
+    font: 700 13px/1.2 var(--body);
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .sl-seg button:hover,
+  .sl-btn:hover {
+    border-color: var(--ink);
+  }
+
+  .sl-seg button[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .sl-btn {
+    border: 1.5px solid var(--ink);
+    background: transparent;
+  }
+
+  .sl-btn:hover {
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .sl-btn[aria-pressed="true"],
+  .sl-btn-primary {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: var(--on-accent);
+  }
+
+  .sl-btn-primary:hover {
+    background: var(--brand-ink);
+    border-color: var(--brand-ink);
+    color: var(--on-dark);
+  }
+
+  .sl-btn-sm {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .sl-seg button:focus-visible,
+  .sl-btn:focus-visible,
+  .sl-tablist button:focus-visible,
+  .sl-lens:focus-visible,
+  .sl-places button:focus-visible,
+  .sl-mission-list button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- the picture ---------- */
+
+  .sl-stage {
+    aspect-ratio: 3 / 2;
+    background: var(--rebate);
+    cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .sl-stage::before {
+    content: attr(data-loading);
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    font: 500 13px/1.4 var(--mono);
+    color: var(--hud);
+    background:
+      radial-gradient(circle at 50% 45%, rgba(100, 190, 198, 0.14), transparent 45%),
+      var(--rebate);
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+  }
+
+  .sl-stage:global(.is-ready)::before {
+    opacity: 0;
+  }
+
+  .sl-stage:global(.is-failed)::before {
+    content: attr(data-failed);
+  }
+
+  /* the viewfinder drawn over the picture */
+  .vf {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    color: var(--hud);
+    font: 500 12px/1.3 var(--mono);
+    letter-spacing: 0.04em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+
+  .vf .corners {
+    --c: var(--hud);
+    position: absolute;
+    inset: 12px;
+    background:
+      linear-gradient(var(--c), var(--c)) top left / 18px 1.5px no-repeat,
+      linear-gradient(var(--c), var(--c)) top left / 1.5px 18px no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / 18px 1.5px no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / 1.5px 18px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / 18px 1.5px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / 1.5px 18px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / 18px 1.5px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / 1.5px 18px no-repeat;
+    opacity: 0.7;
+  }
+
+  .vf .af {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    margin: -17px 0 0 -17px;
+    border: 1.5px solid var(--brand);
+    border-radius: 3px;
+    transition: left 0.25s, top 0.25s;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+  }
+
+  .vf .top {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    top: 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .vf .pill {
+    padding: 5px 8px;
+    border-radius: 2px;
+    background: var(--hud-bg);
+    color: var(--hud);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+
+  /* exposure level indicator: −3 … +3 */
+  .meter {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    font: 500 10px/1 var(--mono);
+    color: var(--hud);
+  }
+
+  .meter .scale {
+    position: relative;
+    height: 16px;
+    background:
+      repeating-linear-gradient(90deg, var(--hud-line) 0 1px, transparent 1px calc(100% / 18)) 0 100% / 100% 6px no-repeat,
+      repeating-linear-gradient(90deg, var(--hud) 0 1.5px, transparent 1.5px calc(100% / 6)) 0 100% / calc(100% + 1.5px) 12px no-repeat;
+  }
+
+  .meter .caret {
+    position: absolute;
+    top: -6px;
+    left: calc(50% + var(--stops, 0) * 100% / 6);
+    width: 0;
+    height: 0;
+    margin-left: -6px;
+    border: 6px solid transparent;
+    border-top-color: var(--brand);
+    transition: left 0.25s ease;
+  }
+
+  .meter:global(.off) .caret {
+    border-top-color: #f0c46b;
+  }
+
+  .meter .labels {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .sl-badges {
+    color: var(--brand);
+  }
+
+  .sl-hist {
+    position: absolute;
+    right: 14px;
+    top: 48px;
+    width: 144px;
+    height: 56px;
+    display: block;
+    border-radius: 2px;
+    background: var(--hud-bg);
+  }
+
+  .sl-bottom {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    width: min(340px, 78%);
+  }
+
+  .sl-meter {
+    width: 100%;
+    padding: 12px 14px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--hud-bg);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+
+  .sl-chip {
+    max-width: 100%;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font: 700 12px/1.35 var(--body);
+    letter-spacing: 0;
+    text-align: center;
+    color: var(--hud);
+    background: rgba(8, 12, 14, 0.72);
+    border: 1px solid var(--hud-line);
+  }
+
+  .sl-chip:empty {
+    display: none;
+  }
+
+  .sl-chip[data-level="bad"] {
+    border-color: #ff8a7a;
+    color: #ffc9c1;
+  }
+
+  .sl-chip[data-level="warn"] {
+    border-color: #f0c46b;
+    color: #ffe2a8;
+  }
+
+  .sl-chip[data-level="good"] {
+    border-color: #8bd9ac;
+    color: #c6f0d6;
+  }
+
+  .sl-mission-bar {
+    position: absolute;
+    left: 14px;
+    top: 48px;
+    max-width: min(58%, 420px);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(8, 12, 14, 0.72);
+    border-left: 3px solid var(--brand);
+    font: 500 12px/1.6 var(--body);
+    letter-spacing: 0;
+    color: var(--hud);
+  }
+
+  .sl-progress {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(360px, 80%);
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    background: rgba(8, 12, 14, 0.78);
+    display: grid;
+    gap: 10px;
+    text-align: center;
+    font: 500 13px/1.6 var(--body);
+    color: var(--hud);
+  }
+
+  .sl-progress[hidden],
+  .sl-toast[hidden],
+  .sl-mission-bar[hidden] {
+    display: none;
+  }
+
+  .sl-progress p {
+    margin: 0;
+  }
+
+  .sl-progress-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.16);
+    overflow: hidden;
+  }
+
+  .sl-progress-bar span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--brand);
+  }
+
+  .sl-toast {
+    position: absolute;
+    left: 50%;
+    top: 40%;
+    transform: translate(-50%, -50%);
+    max-width: 80%;
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    background: var(--raise);
+    color: var(--ink);
+    border-top: 4px solid var(--accent);
+    box-shadow: var(--shadow);
+    font: 500 14px/1.7 var(--body);
+    letter-spacing: 0;
+    text-shadow: none;
+    text-align: center;
+  }
+
+  .sl-toast:global(.ok) {
+    border-top-color: var(--ok);
+  }
+
+  .sl-flash {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sl-flash:global(.on) {
+    animation: sl-flash 0.35s ease-out;
+  }
+
+  @keyframes sl-flash {
+    0% {
+      opacity: 0.85;
+    }
+
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* ---------- the four main dials and the shutter ---------- */
+
+  .sl-deck {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px 24px;
+  }
+
+  .sl-sliders {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px 22px;
+  }
+
+  .sl-shutter {
+    width: 76px;
+    height: 76px;
+    padding: 6px;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+    background: var(--raise);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+
+  .sl-shutter span {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--brand);
+    transition: transform 0.08s, background-color 0.2s, border-radius 0.2s, width 0.2s, height 0.2s;
+  }
+
+  .sl-shutter:hover span {
+    background: var(--brand-deep);
+  }
+
+  .sl-shutter:active span {
+    transform: scale(0.9);
+  }
+
+  .sl-shutter[data-busy] span {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background: var(--safe);
+  }
+
+  .sl-shutter:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  /* ---------- settings tabs ---------- */
+
+  .sl-tablist {
+    display: flex;
+    gap: 2px;
+    margin: -4px -4px 0;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: thin;
+  }
+
+  .sl-tablist button {
+    appearance: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: none;
+    color: var(--muted);
+    font: 700 14px/1.2 var(--body);
+    letter-spacing: 0.04em;
+    padding: 10px 12px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .sl-tablist button:hover {
+    color: var(--ink);
+  }
+
+  .sl-tablist button[aria-selected="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--brand);
+  }
+
+  .sl-panel {
+    display: grid;
+    gap: 16px;
+  }
+
+  .sl-lenses {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 8px;
+  }
+
+  .sl-lens {
+    appearance: none;
+    display: grid;
+    gap: 4px;
+    align-content: start;
+    text-align: left;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--base);
+    color: var(--muted);
+    font: 500 12.5px/1.65 var(--body);
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .sl-lens:hover {
+    border-color: var(--line-strong);
+  }
+
+  .sl-lens b {
+    color: var(--ink);
+    font-size: 14px;
+  }
+
+  .sl-lens[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+    background: var(--raise);
+  }
+
+  .sl-grade {
+    justify-self: start;
+    padding: 1px 9px;
+    border-radius: 999px;
+    font: 700 11px/1.7 var(--body);
+    background: var(--raise-2);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+
+  .g-entry {
+    background: var(--warning-bg);
+    border-color: var(--warning-line);
+  }
+
+  .g-pro {
+    background: var(--brand-pale);
+    border-color: var(--line-strong);
+    color: var(--accent);
+  }
+
+  .g-special,
+  .g-ideal {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--on-ink);
+  }
+
+  /* ---------- advice ---------- */
+
+  .sl-advice {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  .sl-advice :global(li) {
+    display: grid;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--base);
+    border-left: 4px solid var(--line-strong);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .sl-advice :global(li b) {
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .sl-advice :global(li small) {
+    font: 700 11px/1.4 var(--body);
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .sl-advice :global(li.bad) {
+    border-left-color: var(--error);
+  }
+
+  .sl-advice :global(li.bad small) {
+    color: var(--error);
+  }
+
+  .sl-advice :global(li.warn) {
+    border-left-color: var(--warning-line);
+    background: var(--warning-bg);
+  }
+
+  .sl-advice :global(li.good) {
+    border-left-color: var(--ok);
+  }
+
+  .sl-advice :global(li.good small) {
+    color: var(--ok);
+  }
+
+  .sl-advice :global(li.tip) {
+    border-left-color: var(--brand);
+  }
+
+  /* ---------- floor plan ---------- */
+
+  .sl-map-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sl-map {
+    --map-bg: var(--base);
+    --map-grid: var(--line);
+    --map-ink: var(--ink);
+    --map-muted: var(--muted);
+    --map-accent: var(--brand-deep);
+    width: 100%;
+    aspect-ratio: 1 / 0.85;
+    border-radius: var(--radius-sm);
+    background: var(--base);
+    border: 1px solid var(--line);
+    cursor: grab;
+  }
+
+  .sl-light {
+    display: grid;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  /* ---------- below the studio ---------- */
+
+  .sl-section {
+    display: grid;
+    gap: 18px;
+    padding-block: clamp(36px, 5vw, 56px);
+    border-top: 1px solid var(--line);
+  }
+
+  .sl-credit {
+    margin: 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .sl-head {
+    display: grid;
+    gap: 6px;
+  }
+
+  .sl-head h2 {
+    font-size: var(--step-3);
+  }
+
+  .sl-head p:not(.edge) {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .sl-pick {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+  }
+
+  .sl-pick > div {
+    display: grid;
+    gap: 18px;
+  }
+
+  .sl-places {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .sl-places button {
+    position: relative;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--rebate);
+    cursor: pointer;
+    aspect-ratio: 2 / 1.15;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .sl-places button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .sl-places button[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .sl-places img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .sl-places span {
+    position: absolute;
+    left: 5px;
+    bottom: 5px;
+    font: 700 11px/1.2 var(--body);
+    color: var(--hud);
+    padding: 3px 7px;
+    border-radius: 2px;
+    background: var(--hud-bg);
+  }
+
+  .sl-mission-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  .sl-mission-list button {
+    appearance: none;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    text-align: left;
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--raise);
+    color: var(--ink);
+    font: 500 13px/1.7 var(--body);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .sl-mission-list button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .sl-mission-list b {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .sl-mplace {
+    font: 700 11px/1.4 var(--body);
+    letter-spacing: 0.12em;
+    color: var(--accent);
+  }
+
+  .sl-mgoal {
+    color: var(--muted);
+  }
+
+  .sl-mstate {
+    font-weight: 700;
+    color: var(--ok);
+  }
+
+  .sl-mstate:empty {
+    display: none;
+  }
+
+  .sl-mission-list li[data-active] button {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+
+  .sl-sheet {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .sl-sheet .empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .sl-sheet :global(button) {
+    appearance: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    display: grid;
+    background: var(--raise);
+    cursor: zoom-in;
+    text-align: left;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .sl-sheet :global(button:hover) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .sl-sheet :global(img) {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    display: block;
+    background: var(--rebate);
+  }
+
+  .sl-sheet :global(span) {
+    padding: 8px 10px 10px;
+    font: 500 11px/1.5 var(--mono);
+    color: var(--muted);
+  }
+
+  .sl-sheet:has(button) .empty {
+    display: none;
+  }
+
+  /* ---------- the enlarged picture ---------- */
+
+  .sl-lightbox {
+    width: min(1200px, 96vw);
+    max-height: 96vh;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+    color: var(--ink);
+  }
+
+  .sl-lightbox::backdrop {
+    background: rgba(15, 25, 28, 0.82);
+  }
+
+  .sl-lightbox figure {
+    margin: 0;
+    display: grid;
+    gap: 12px;
+  }
+
+  .sl-lightbox img {
+    width: 100%;
+    max-height: 74vh;
+    object-fit: contain;
+    display: block;
+    border-radius: var(--radius-sm);
+    background: var(--rebate);
+  }
+
+  .sl-lightbox figcaption {
+    display: grid;
+    gap: 4px;
+    font: 500 13px/1.7 var(--body);
+    color: var(--muted);
+  }
+
+  .sl-lightbox figcaption b {
+    font: 700 15px/1.5 var(--latin);
+    color: var(--ink);
+  }
+
+  .sl-lb-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+
+  @media (max-width: 1100px) {
+    .sl-top {
+      grid-template-columns: 1fr;
+    }
+
+    .sl-side {
+      position: static;
+      max-height: none;
+      overflow: visible;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      align-items: start;
+    }
+
+    .sl-pick {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .sl-stage {
+      aspect-ratio: 4 / 3;
+    }
+
+    .sl-card {
+      padding: 14px;
+    }
+
+    .sl-deck {
+      grid-template-columns: 1fr;
+    }
+
+    /* six tabs do not fit one row on a phone: two rows of three, all visible */
+    .sl-tablist {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      overflow: visible;
+    }
+
+    .sl-tablist button {
+      padding: 10px 4px 11px;
+      font-size: 13px;
+    }
+
+    .sl-sliders {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .sl-shutter {
+      justify-self: center;
+    }
+
+    .sl-hist {
+      display: none;
+    }
+
+    .sl-bottom {
+      width: 86%;
+      bottom: 8px;
+      gap: 6px;
+    }
+
+    .sl-meter {
+      padding: 8px 10px 6px;
+    }
+
+    .sl-places {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .sl-mission-bar {
+      display: none;
+    }
+
+    .sl-side {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  import '../../scripts/studio/main';
+</script>

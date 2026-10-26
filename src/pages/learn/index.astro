@@ -1,18 +1,18 @@
 ---
 import Base from '../../layouts/Base.astro';
 import PageHero from '../../components/PageHero.astro';
-import ExposureSim from '../../components/learn/ExposureSim.astro';
+import Studio from '../../components/learn/Studio.astro';
 import LearnCards from '../../components/learn/LearnCards.astro';
 ---
-<Base title="写真を学ぶ" description="シャッタースピード・絞り・ISO・焦点距離・現像。写真の基礎を、触って試せるデモで学べるページです。KUAS Photography Club が、はじめての人向けにまとめています。">
+<Base title="写真を学ぶ" description="ひとつの3Dの撮影スタジオで、絞り・シャッタースピード・ISO・レンズ・フィルター・フラッシュを触って試せます。星空や花畑、お題つき。KUAS Photography Club が、はじめての人向けにまとめています。">
   <PageHero
-    edge="LEARN ▸ 4 TOPICS ▸ FOR BEGINNERS"
-    title="写真を、触って学ぶ。"
-    lead="カメラの設定は、文章で読むより動かしてみるほうが早くわかります。写真部の新入生向けにまとめた写真の基礎を、ブラウザの中で試せるようにしました。カメラがなくても、スマホで撮っている人にも役に立つ内容です。"
+    edge="LEARN ▸ ONE STUDIO ▸ FOR BEGINNERS"
+    title={`写真を、<span class="nobr">触って学ぶ。</span>`}
+    lead="カメラの設定は、文章で読むより動かしてみるほうが早くわかります。ひとつの撮影現場で、絞り・シャッター・ISO・レンズ・フィルター・フラッシュ・ライトを全部試せます。撮る場所と撮るものを選んで、シャッターを切ってみてください。カメラがなくても、スマホで撮っている人にも役に立つ内容です。"
   />
 
-  <section class="wrap topics">
-    <LearnCards />
+  <section class="wrap studio-wrap" id="studio" aria-label="撮影スタジオ">
+    <Studio />
   </section>
 
   <section class="section" aria-labelledby="triangle">
@@ -24,7 +24,6 @@ import LearnCards from '../../components/learn/LearnCards.astro';
           写真の明るさは、シャッタースピード・絞り・ISO感度の3つで決まります。どれかを1段明るくしたら、ほかのどれかを1段暗くすれば、同じ明るさのまま写りだけが変わります。
         </p>
       </div>
-      <ExposureSim />
       <div class="notes">
         <div>
           <h3>シャッタースピード</h3>
@@ -40,16 +39,27 @@ import LearnCards from '../../components/learn/LearnCards.astro';
         </div>
         <div>
           <h3>晴れの日は「f/16 · 1/ISO」</h3>
-          <p>晴れた屋外なら、f/16・ISO 100・1/125 秒くらいでちょうどよく写ります（サニー16ルール）。シミュレーターの最初の設定がこれです。</p>
+          <p>晴れた屋外なら、f/16・ISO 100・1/125 秒くらいでちょうどよく写ります（サニー16ルール）。スタジオの日本庭園で試してみてください。</p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="topics">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="edge">WHY IT WORKS</p>
+        <h2 id="topics">仕組みを読む</h2>
+        <p class="lead">スタジオで試したことの理屈を、テーマごとにまとめています。各ページから、そのテーマのお題をスタジオで開けます。</p>
+      </div>
+      <LearnCards />
     </div>
   </section>
 </Base>
 
 <style>
-  .topics {
-    padding-bottom: clamp(56px, 8vw, 96px);
+  .studio-wrap {
+    padding-bottom: clamp(16px, 3vw, 32px);
   }
 
   .notes {

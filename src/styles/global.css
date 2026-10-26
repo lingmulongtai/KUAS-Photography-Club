@@ -140,6 +140,11 @@ textarea {
   color: var(--mark);
 }
 
+/* keeps a phrase on one line in a large heading */
+.nobr {
+  display: inline-block;
+}
+
 .num {
   font-family: var(--latin);
   font-weight: 700;

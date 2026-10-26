@@ -1,0 +1,123 @@
+---
+/**
+ * On a topic page, in place of a demo: the studio's challenges (お題) for that topic. Each
+ * one opens the studio on /learn/ already set up for it.
+ */
+import { MISSIONS, TOPIC_MISSIONS } from '../../scripts/studio/missions';
+import { picker, tr } from '../../scripts/studio/i18n';
+import type { SiteLanguage } from '../../lib/i18n';
+
+interface Props {
+  slug: string;
+  lang?: SiteLanguage;
+}
+const { slug, lang = 'ja' } = Astro.props;
+const t = picker(lang);
+const studio = lang === 'en' ? '/en/learn/' : '/learn/';
+const missions = (TOPIC_MISSIONS[slug] ?? []).map((id) => MISSIONS.find((m) => m.id === id)!);
+---
+<div class="try">
+  <div class="try-head">
+    <p class="edge">STUDIO</p>
+    <h2>{t('撮影スタジオで試す', 'Try it in the photo studio')}</h2>
+    <p>{t('「写真を学ぶ」の3Dスタジオで、このページの内容をお題にしました。選ぶと、わざと「惜しい」設定のスタジオが開きます。', 'Challenges on this topic in the 3D studio. Pick one and the studio opens with settings that are not quite right yet.')}</p>
+  </div>
+  <ul class="try-list">
+    {missions.map((m) => (
+      <li>
+        <a href={`${studio}?mission=${m.id}#studio`}>
+          <span class="try-place">{tr(m.place, lang)}</span>
+          <b>{tr(m.title, lang)}</b>
+          <span class="try-goal">{tr(m.goal, lang)}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+  <p class="try-all"><a class="btn" href={`${studio}#studio`}>{t('スタジオを開く', 'Open the studio')} <span class="arrow">→</span></a></p>
+</div>
+
+<style>
+  .try {
+    display: grid;
+    gap: 18px;
+    padding: clamp(20px, 3vw, 32px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise-2);
+  }
+
+  .try-head {
+    display: grid;
+    gap: 6px;
+  }
+
+  .try-head h2 {
+    margin: 0;
+    font-size: var(--step-2);
+  }
+
+  .try-head p:not(.edge) {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .try-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .try-list a {
+    height: 100%;
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--raise);
+    color: var(--ink);
+    font: 500 13px/1.7 var(--body);
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .try-list a:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+    border-color: var(--accent);
+  }
+
+  .try-list b {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .try-place {
+    font: 700 11px/1.4 var(--body);
+    letter-spacing: 0.12em;
+    color: var(--accent);
+  }
+
+  .try-goal {
+    color: var(--muted);
+  }
+
+  .try-all {
+    margin: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .try-list a {
+      transition: none;
+    }
+
+    .try-list a:hover {
+      transform: none;
+    }
+  }
+</style>
