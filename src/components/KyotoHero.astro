@@ -56,19 +56,21 @@ const pinTrips = completeSpotPreviews((await getTrips())
       </div>
     </div>
 
-    <aside class="sky-chip" aria-label="いまの京都の空">
+    <aside class="sky-chip" aria-label={en ? 'Kyoto sky' : '京都の空'}>
       <p class="now">
         <span class="clock num" data-clock>--:--</span>
         <span data-phase>—</span>
         <span class="moon" data-moon></span>
         <span class="moon" data-moon-times></span>
       </p>
-      <div class="times" role="group" aria-label="空の時間を切り替える">
-        <button type="button" data-time="now" aria-pressed="true">{en ? 'Now' : 'いま'}</button>
-        <button type="button" data-time="morning" aria-pressed="false">{en ? 'Morning' : '朝'}</button>
-        <button type="button" data-time="noon" aria-pressed="false">{en ? 'Day' : '昼'}</button>
-        <button type="button" data-time="sunset" aria-pressed="false">{en ? 'Sunset' : '夕焼け'}</button>
-        <button type="button" data-time="night" aria-pressed="false">{en ? 'Night' : '夜'}</button>
+      <div class="time-control">
+        <div class="time-heading"><label for="sky-time">{en ? 'Time in Kyoto' : '京都の時間'}</label><button type="button" data-time="now" aria-pressed="true">{en ? 'Now' : 'いま'}</button></div>
+        <div class="time-slider" style="--progress: 0.5">
+          <span class="time-track" aria-hidden="true"><span class="time-fill"></span></span>
+          <span class="time-thumb" aria-hidden="true"></span>
+          <input id="sky-time" type="range" min="0" max="1439" step="1" value="720" aria-label={en ? 'Time in Kyoto' : '京都の時間'} aria-valuetext="12:00" disabled />
+        </div>
+        <div class="time-marks" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
       </div>
       <label class="season-picker">{en?'Seasonal scenery':'季節の演出'}
         <select data-season aria-label={en?'Choose seasonal scenery':'季節の演出を選ぶ'}>
@@ -104,7 +106,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { mountStage } from '../scripts/gl/stage';
   import { createHero, type HeroMode, type HeroStatus, type HeroView } from '../scripts/hero/scene';
   import { createLook, lookAt } from '../scripts/hero/palette';
-  import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonTimes, sunPosition, sunTimes } from '../scripts/hero/astro';
+  import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonTimes, sunPosition } from '../scripts/hero/astro';
+  import { createSkyTime, wrapDay } from '../scripts/hero/sky-time';
   import { SPOTS, type SpotId } from '../data/spots';
   import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
   import type {Season} from '../scripts/hero/seasons';
@@ -153,51 +156,40 @@ const pinTrips = completeSpotPreviews((await getTrips())
       return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
     };
     /* the sky follows the real time unless someone picks another time of today */
-    const sky = { live: true, from: 0, delta: 0, start: 0, dur: 0 };
-    const cloudTravel={from:0,delta:0};
-    const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-    const shown = () => {
+    const sky = createSkyTime();
+    const shown = () => sky.shown(jstMinutes(new Date()), performance.now());
+    const timeSlider = hero.querySelector<HTMLInputElement>('#sky-time')!;
+    const timeTrack = hero.querySelector<HTMLElement>('.time-slider')!;
+    const nowButton = hero.querySelector<HTMLButtonElement>('[data-time="now"]')!;
+    let adjustingTime = false;
+    const updateSlider = (minutes: number) => {
+      const value = Math.min(1439, Math.floor(wrapDay(minutes)));
+      timeSlider.value = String(value);
+      timeSlider.setAttribute('aria-valuetext', hhmm(value));
+      timeTrack.style.setProperty('--progress', String(value / 1439));
+    };
+    timeSlider.addEventListener('pointerdown', () => { adjustingTime = true; timeTrack.classList.add('is-held'); });
+    const releaseTime = () => { adjustingTime = false; timeTrack.classList.remove('is-held'); };
+    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur']) timeSlider.addEventListener(event, releaseTime);
+    window.addEventListener('pointerup', releaseTime);
+    window.addEventListener('blur', releaseTime);
+    timeSlider.addEventListener('input', () => {
+      const value = Number(timeSlider.value);
+      sky.scrub(value, jstMinutes(new Date()), performance.now());
+      nowButton.setAttribute('aria-pressed', 'false');
+      updateSlider(value);
+      if (out.clock) out.clock.textContent = hhmm(value);
+    });
+    nowButton.addEventListener('click', () => {
       const real = jstMinutes(new Date());
-      if (!sky.dur) return sky.live ? real : sky.from + sky.delta;
-      const p = Math.min(1, (performance.now() - sky.start) / sky.dur);
-      const m = sky.from + sky.delta * ease(p);
-      if (p >= 1) {
-        sky.dur = 0;
-        sky.from = m;
-        sky.delta = 0;
-      }
-      return m;
-    };
-    const cloudShown=()=>cloudTravel.from+cloudTravel.delta*(sky.dur?ease(Math.min(1,(performance.now()-sky.start)/sky.dur)):1);
-    const presets = (key: string) => {
-      const { sunrise, sunset } = sunTimes(new Date());
-      return { morning: sunrise - 6, noon: 12 * 60 + 30, sunset: sunset - 14, night: sunset + 100 }[key] ?? jstMinutes(new Date());
-    };
-    const timeButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-time]'));
-    timeButtons.forEach((b) =>
-      b.addEventListener('click', () => {
-        const key = b.dataset.time!;
-        const cloudFrom=cloudShown();
-        const from = shown();
-        const to = key === 'now' ? jstMinutes(new Date()) : presets(key);
-        // take the short way round the clock
-        const delta = ((((to - from) % 1440) + 2160) % 1440) - 720;
-        cloudTravel.from=cloudFrom;cloudTravel.delta=delta;
-        sky.live = key === 'now';
-        sky.from = from;
-        sky.delta = delta;
-        sky.start = performance.now();
-        sky.dur = motion.matches ? 0 : 2800;
-        if (!sky.dur) {
-          sky.from = from + delta;
-          sky.delta = 0;
-        }
-        timeButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      }),
-    );
+      sky.select(real, true, real, performance.now(), motion.matches);
+      nowButton.setAttribute('aria-pressed', 'true');
+      if (out.status) out.status.textContent = `${en ? 'Now' : 'いま'} ${hhmm(real)}`;
+    });
 
     const onStatus = (s: HeroStatus) => {
       if (out.clock) out.clock.textContent = hhmm(s.minutes);
+      if (!adjustingTime) updateSlider(s.minutes);
       const phase = en ? (s.altitude < -12 ? 'Night' : s.altitude < 0 ? 'Twilight' : s.altitude < 20 ? 'Low sunlight' : 'Day') : s.phase;
       if (out.phase) out.phase.textContent = phase;
       if (out.moon) out.moon.textContent = `${en ? 'Moon age' : '月齢'} ${s.moonAge.toFixed(1)} ${moonPhaseName(s.moonAge, en)}`;
@@ -246,8 +238,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
       stage,
       (renderer, el) =>
         (demo = createHero(renderer, el, {
-          now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
-          cloudTravelMinutes: cloudShown,
+          now: () => (sky.live && !sky.transitioning ? new Date() : jstDateAt(new Date(), wrapDay(shown()))),
+          cloudTravelMinutes: () => sky.clouds(performance.now()),
           quality,
           lang: en?'en':'ja',
           trips: JSON.parse(stage.dataset.trips ?? '[]'),
@@ -255,7 +247,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           drift: !coarse,
           onStatus,
           onProgress: progress => document.dispatchEvent(new CustomEvent('hero:progress', {detail:progress})),
-          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false; viewButtons.forEach(b=>b.disabled=false); document.dispatchEvent(new Event('hero:ready')); },
+          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false;timeSlider.disabled=false; viewButtons.forEach(b=>b.disabled=false); document.dispatchEvent(new Event('hero:ready')); },
           onError: fallback,
           onAreaLoading: loading=>{areaStatus.hidden=!loading;},
           onExplore: enabled=>{
@@ -522,35 +514,25 @@ const pinTrips = completeSpotPreviews((await getTrips())
     max-width: 360px;
   }
 
-  .times {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  .times button {
-    appearance: none;
-    padding: 4px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--on-dark);
-    font: 700 11px/1.4 var(--body);
-    letter-spacing: 0.06em;
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
-  }
-
-  .times button:hover {
-    border-color: var(--brand);
-  }
-
-  .times button[aria-pressed='true'] {
-    background: linear-gradient(160deg, #b4e5e7, var(--brand) 65%, #4ba4af);
-    border-color: var(--brand);
-    color: var(--on-accent);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.65), 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
+  /* Slider proportions and transparent native thumb adapted from Glisse (MIT). */
+  .time-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 11px; }
+  .time-heading button { border: 0; border-radius: 999px; padding: 5px 12px; color: inherit; background: rgba(255,255,255,.1); font: inherit; cursor: pointer; }
+  .time-heading button[aria-pressed='true'] { background: rgba(255,255,255,.23); }
+  .time-heading button:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+  .time-slider { position: relative; height: 40px; }
+  .time-track { position: absolute; inset: 17px 0 auto; height: 6px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.2); pointer-events: none; }
+  .time-fill { display: block; height: 100%; background: #0a84ff; transform: scaleX(var(--progress)); transform-origin: left; }
+  .time-thumb { position: absolute; top: 8px; left: calc((100% - 36px) * var(--progress)); width: 36px; height: 24px; border-radius: 999px; pointer-events: none; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.28), inset 0 0 0 1px rgba(0,0,0,.07); transition: transform .2s cubic-bezier(.2,.8,.2,1), background-color .2s; }
+  .time-slider.is-held .time-thumb { transform: scale(1.18); background: rgba(255,255,255,.9); }
+  .time-slider input { position: relative; z-index: 1; display: block; width: 100%; height: 40px; margin: 0; background: transparent; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
+  .time-slider input::-webkit-slider-runnable-track { height: 6px; background: transparent; }
+  .time-slider input::-webkit-slider-thumb { width: 36px; height: 40px; margin-top: -17px; border: 0; background: transparent; opacity: 0; touch-action: none; appearance: none; -webkit-appearance: none; }
+  .time-slider input::-moz-range-track { height: 6px; background: transparent; }
+  .time-slider input::-moz-range-thumb { width: 36px; height: 40px; border: 0; background: transparent; opacity: 0; }
+  .time-slider:has(input:focus-visible) .time-thumb { outline: 2px solid white; outline-offset: 3px; }
+  .time-slider:has(input:disabled) { opacity: .45; }
+  .time-marks { display: flex; justify-content: space-between; font: 600 10px/1 var(--latin); color: rgba(255,255,255,.65); }
+  @media (prefers-reduced-motion: reduce) { .time-thumb { transition: none; } }
 
   @media (prefers-reduced-transparency: reduce) {
     .views, .sky-chip, .btn--glass { background: #0c1b25; -webkit-backdrop-filter: none; backdrop-filter: none; }
