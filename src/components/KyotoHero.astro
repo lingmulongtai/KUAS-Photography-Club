@@ -61,6 +61,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
         <span class="clock num" data-clock>--:--</span>
         <span data-phase>—</span>
         <span class="moon" data-moon></span>
+        <span class="moon" data-moon-times></span>
       </p>
       <div class="times" role="group" aria-label="空の時間を切り替える">
         <button type="button" data-time="now" aria-pressed="true">{en ? 'Now' : 'いま'}</button>
@@ -103,7 +104,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { mountStage } from '../scripts/gl/stage';
   import { createHero, type HeroMode, type HeroStatus, type HeroView } from '../scripts/hero/scene';
   import { createLook, lookAt } from '../scripts/hero/palette';
-  import { jstDateAt, jstMinutes, sunPosition, sunTimes } from '../scripts/hero/astro';
+  import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonTimes, sunPosition, sunTimes } from '../scripts/hero/astro';
   import { SPOTS, type SpotId } from '../data/spots';
   import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
   import type {Season} from '../scripts/hero/seasons';
@@ -117,6 +118,22 @@ const pinTrips = completeSpotPreviews((await getTrips())
       clock: hero.querySelector('[data-clock]'),
       phase: hero.querySelector('[data-phase]'),
       moon: hero.querySelector('[data-moon]'),
+      moonTimes: hero.querySelector('[data-moon-times]'),
+    };
+    // moonrise and moonset for today in Japan, worked out once a day
+    let moonDay = '';
+    let moonDayText = '';
+    const moonTimesText = () => {
+      const now = new Date();
+      const { year, month, day } = jstParts(now);
+      const key = `${year}-${month}-${day}`;
+      if (key !== moonDay) {
+        moonDay = key;
+        const { rise, set } = moonTimes(now);
+        const t = (m: number) => (Number.isNaN(m) ? '—' : hhmm(m));
+        moonDayText = en ? `Moonrise ${t(rise)} · set ${t(set)}` : `月の出 ${t(rise)}・月の入り ${t(set)}`;
+      }
+      return moonDayText;
     };
     const card = hero.querySelector<HTMLElement>('.campus-card')!;
     const back = card.querySelector<HTMLButtonElement>('.back')!;
@@ -183,7 +200,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
       if (out.clock) out.clock.textContent = hhmm(s.minutes);
       const phase = en ? (s.altitude < -12 ? 'Night' : s.altitude < 0 ? 'Twilight' : s.altitude < 20 ? 'Low sunlight' : 'Day') : s.phase;
       if (out.phase) out.phase.textContent = phase;
-      if (out.moon) out.moon.textContent = `${en ? 'Moon age' : '月齢'} ${s.moonAge.toFixed(1)}`;
+      if (out.moon) out.moon.textContent = `${en ? 'Moon age' : '月齢'} ${s.moonAge.toFixed(1)} ${moonPhaseName(s.moonAge, en)}`;
+      if (out.moonTimes) out.moonTimes.textContent = moonTimesText();
       if (out.status) out.status.textContent = `${sky.live ? (en ? 'Now' : 'いま') : (en ? 'Viewing' : '表示中')} ${hhmm(s.minutes)} · ${phase}`;
     };
 
