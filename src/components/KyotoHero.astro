@@ -340,10 +340,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
     gap: 4px;
     padding: 4px;
     border-radius: 999px;
-    background: rgba(10, 18, 28, 0.38);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.015) 48%, rgba(100, 190, 198, 0.06)), rgba(8, 17, 26, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.23);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.18);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    backdrop-filter: blur(10px) saturate(1.2);
     max-width: calc(100% - var(--gutter) * 2);
     overflow-x: auto;
     scrollbar-width: none;
@@ -385,7 +386,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .views button[aria-pressed='true'] {
-    background: var(--brand);
+    background: linear-gradient(160deg, #b4e5e7, var(--brand) 65%, #4ba4af);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.65), 0 2px 8px rgba(0, 0, 0, 0.2);
     color: var(--on-accent);
   }
 
@@ -493,8 +495,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
   .btn--glass {
     color: var(--on-dark);
-    background: rgba(255, 255, 255, 0.1);
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.04)), rgba(8, 17, 26, 0.7);
     border-color: rgba(255, 255, 255, 0.55);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 5px 16px rgba(0, 0, 0, 0.16);
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
   }
@@ -510,11 +513,12 @@ const pinTrips = completeSpotPreviews((await getTrips())
     display: grid;
     gap: 6px;
     padding: 14px 18px;
-    border-radius: var(--radius);
-    background: rgba(10, 18, 28, 0.42);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    border-radius: 18px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.015) 45%, rgba(100, 190, 198, 0.06)), rgba(8, 17, 26, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.23);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 12px 32px rgba(0, 0, 0, 0.2);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    backdrop-filter: blur(10px) saturate(1.2);
     max-width: 360px;
   }
 
@@ -542,9 +546,15 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .times button[aria-pressed='true'] {
-    background: var(--brand);
+    background: linear-gradient(160deg, #b4e5e7, var(--brand) 65%, #4ba4af);
     border-color: var(--brand);
     color: var(--on-accent);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.65), 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .views, .sky-chip, .btn--glass { background: #0c1b25; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .btn--glass:hover { background: var(--on-dark); }
   }
 
   .now {
