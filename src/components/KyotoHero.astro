@@ -26,7 +26,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
     <canvas aria-label={en ? 'Explore Kyoto in 3D using real terrain and building data. Drag to look around and select a place to move closer.' : '実際の地形と建物データから作った京都の3D。ドラッグで見回し、地点を選ぶと近づけます。'}></canvas>
     <nav class="views" aria-label={en ? 'Scenic viewpoints' : '展望地点'}>
       <span class="views-label">VIEW</span>
-      {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed={view==='shogunzuka'} disabled>{VIEWS[view][lang]}</button>)}
+      <div class="view-options">
+        <span class="view-lens" aria-hidden="true"></span>
+        {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed={view==='shogunzuka'} disabled>{VIEWS[view][lang]}</button>)}
+      </div>
     </nav>
     <div class="spot-nav">
       <label class="visually-hidden" for="hero-spot">{en ? 'Explore a place in 3D' : '3Dで近づくスポット'}</label>
@@ -56,19 +59,21 @@ const pinTrips = completeSpotPreviews((await getTrips())
       </div>
     </div>
 
-    <aside class="sky-chip" aria-label="いまの京都の空">
+    <aside class="sky-chip" aria-label={en ? 'Kyoto sky' : '京都の空'}>
       <p class="now">
         <span class="clock num" data-clock>--:--</span>
         <span data-phase>—</span>
         <span class="moon" data-moon></span>
         <span class="moon" data-moon-times></span>
       </p>
-      <div class="times" role="group" aria-label="空の時間を切り替える">
-        <button type="button" data-time="now" aria-pressed="true">{en ? 'Now' : 'いま'}</button>
-        <button type="button" data-time="morning" aria-pressed="false">{en ? 'Morning' : '朝'}</button>
-        <button type="button" data-time="noon" aria-pressed="false">{en ? 'Day' : '昼'}</button>
-        <button type="button" data-time="sunset" aria-pressed="false">{en ? 'Sunset' : '夕焼け'}</button>
-        <button type="button" data-time="night" aria-pressed="false">{en ? 'Night' : '夜'}</button>
+      <div class="time-control">
+        <div class="time-heading"><label for="sky-time">{en ? 'Time in Kyoto' : '京都の時間'}</label><button type="button" data-time="now" aria-pressed="true">{en ? 'Now' : 'いま'}</button></div>
+        <div class="time-slider" style="--progress: 0.5">
+          <span class="time-track" aria-hidden="true"><span class="time-fill"></span></span>
+          <span class="time-thumb" aria-hidden="true"></span>
+          <input id="sky-time" type="range" min="0" max="1439" step="1" value="720" aria-label={en ? 'Time in Kyoto' : '京都の時間'} aria-valuetext="12:00" disabled />
+        </div>
+        <div class="time-marks" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
       </div>
       <label class="season-picker">{en?'Seasonal scenery':'季節の演出'}
         <select data-season aria-label={en?'Choose seasonal scenery':'季節の演出を選ぶ'}>
@@ -103,8 +108,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
 <script>
   import { mountStage } from '../scripts/gl/stage';
   import { createHero, type HeroMode, type HeroStatus, type HeroView } from '../scripts/hero/scene';
-  import { createLook, lookAt } from '../scripts/hero/palette';
-  import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonTimes, sunPosition, sunTimes } from '../scripts/hero/astro';
+  import { createLook, kelvin, lookAt, phaseName } from '../scripts/hero/palette';
+  import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonPosition, moonTimes, sunPosition } from '../scripts/hero/astro';
+  import { createSkyTime, wrapDay } from '../scripts/hero/sky-time';
   import { SPOTS, type SpotId } from '../data/spots';
   import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
   import type {Season} from '../scripts/hero/seasons';
@@ -146,6 +152,26 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const areaStatus=hero.querySelector<HTMLElement>('[data-area-status]')!;
     const exploreToggle=hero.querySelector<HTMLButtonElement>('.explore-toggle')!;
     const viewButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('button[data-view]'));
+    const viewBar = hero.querySelector<HTMLElement>('.views')!;
+    const viewOptions = hero.querySelector<HTMLElement>('.view-options')!;
+    const viewLens = hero.querySelector<HTMLElement>('.view-lens')!;
+    const moveLens = (button: HTMLButtonElement | undefined, immediate = false) => {
+      viewLens.hidden = !button;
+      if (!button) return;
+      if (immediate) viewLens.classList.add('no-motion');
+      viewLens.style.width = `${button.offsetWidth}px`;
+      viewLens.style.transform = `translateX(${button.offsetLeft}px)`;
+      if (immediate) requestAnimationFrame(() => viewLens.classList.remove('no-motion'));
+    };
+    const revealView = (button: HTMLButtonElement | undefined) => {
+      if (!button) return;
+      const view = button.getBoundingClientRect(), bar = viewBar.getBoundingClientRect();
+      const offset = view.right > bar.right ? view.right - bar.right + 8 : view.left < bar.left ? view.left - bar.left - 8 : 0;
+      if (offset) viewBar.scrollBy({ left: offset, behavior: motion.matches ? 'instant' : 'smooth' });
+    };
+    viewOptions.classList.add('is-enhanced');
+    moveLens(viewButtons[0], true);
+    new ResizeObserver(() => moveLens(viewButtons.find(b => b.getAttribute('aria-pressed') === 'true'), true)).observe(viewOptions);
     let panorama: HeroView='shogunzuka';
 
     const hhmm = (m: number) => {
@@ -153,57 +179,58 @@ const pinTrips = completeSpotPreviews((await getTrips())
       return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
     };
     /* the sky follows the real time unless someone picks another time of today */
-    const sky = { live: true, from: 0, delta: 0, start: 0, dur: 0 };
-    const cloudTravel={from:0,delta:0};
-    const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-    const shown = () => {
+    const sky = createSkyTime();
+    const shown = () => sky.shown(jstMinutes(new Date()), performance.now());
+    const timeSlider = hero.querySelector<HTMLInputElement>('#sky-time')!;
+    const timeTrack = hero.querySelector<HTMLElement>('.time-slider')!;
+    const nowButton = hero.querySelector<HTMLButtonElement>('[data-time="now"]')!;
+    let adjustingTime = false;
+    const updateSlider = (minutes: number) => {
+      const value = Math.min(1439, Math.floor(wrapDay(minutes)));
+      timeSlider.value = String(value);
+      timeSlider.setAttribute('aria-valuetext', hhmm(value));
+      timeTrack.style.setProperty('--progress', String(value / 1439));
+    };
+    timeSlider.addEventListener('pointerdown', () => { adjustingTime = true; timeTrack.classList.add('is-held'); });
+    const releaseTime = () => { adjustingTime = false; timeTrack.classList.remove('is-held'); };
+    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur']) timeSlider.addEventListener(event, releaseTime);
+    window.addEventListener('pointerup', releaseTime);
+    window.addEventListener('blur', releaseTime);
+    timeSlider.addEventListener('input', () => {
+      const value = Number(timeSlider.value);
+      sky.scrub(value, jstMinutes(new Date()), performance.now());
+      nowButton.setAttribute('aria-pressed', 'false');
+      updateSlider(value);
+      showTimeStatus(value);
+    });
+    nowButton.addEventListener('click', () => {
       const real = jstMinutes(new Date());
-      if (!sky.dur) return sky.live ? real : sky.from + sky.delta;
-      const p = Math.min(1, (performance.now() - sky.start) / sky.dur);
-      const m = sky.from + sky.delta * ease(p);
-      if (p >= 1) {
-        sky.dur = 0;
-        sky.from = m;
-        sky.delta = 0;
-      }
-      return m;
-    };
-    const cloudShown=()=>cloudTravel.from+cloudTravel.delta*(sky.dur?ease(Math.min(1,(performance.now()-sky.start)/sky.dur)):1);
-    const presets = (key: string) => {
-      const { sunrise, sunset } = sunTimes(new Date());
-      return { morning: sunrise - 6, noon: 12 * 60 + 30, sunset: sunset - 14, night: sunset + 100 }[key] ?? jstMinutes(new Date());
-    };
-    const timeButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('[data-time]'));
-    timeButtons.forEach((b) =>
-      b.addEventListener('click', () => {
-        const key = b.dataset.time!;
-        const cloudFrom=cloudShown();
-        const from = shown();
-        const to = key === 'now' ? jstMinutes(new Date()) : presets(key);
-        // take the short way round the clock
-        const delta = ((((to - from) % 1440) + 2160) % 1440) - 720;
-        cloudTravel.from=cloudFrom;cloudTravel.delta=delta;
-        sky.live = key === 'now';
-        sky.from = from;
-        sky.delta = delta;
-        sky.start = performance.now();
-        sky.dur = motion.matches ? 0 : 2800;
-        if (!sky.dur) {
-          sky.from = from + delta;
-          sky.delta = 0;
-        }
-        timeButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      }),
-    );
+      sky.select(real, true, real, performance.now(), true);
+      nowButton.setAttribute('aria-pressed', 'true');
+      showTimeStatus(real);
+    });
 
     const onStatus = (s: HeroStatus) => {
       if (out.clock) out.clock.textContent = hhmm(s.minutes);
+      if (!adjustingTime) updateSlider(s.minutes);
       const phase = en ? (s.altitude < -12 ? 'Night' : s.altitude < 0 ? 'Twilight' : s.altitude < 20 ? 'Low sunlight' : 'Day') : s.phase;
       if (out.phase) out.phase.textContent = phase;
       if (out.moon) out.moon.textContent = `${en ? 'Moon age' : '月齢'} ${s.moonAge.toFixed(1)} ${moonPhaseName(s.moonAge, en)}`;
       if (out.moonTimes) out.moonTimes.textContent = moonTimesText();
       if (out.status) out.status.textContent = `${sky.live ? (en ? 'Now' : 'いま') : (en ? 'Viewing' : '表示中')} ${hhmm(s.minutes)} · ${phase}`;
     };
+    // The canvas pauses when it is offscreen, but its controls can still be visible on a phone.
+    const showTimeStatus = (minutes: number) => {
+      const date = jstDateAt(new Date(), minutes);
+      const altitude = sunPosition(date).altitude * 180 / Math.PI;
+      onStatus({ minutes, altitude, phase: phaseName(altitude, minutes), kelvin: kelvin(altitude), moonAge: moonPosition(date).age });
+    };
+    // Keep the visible clock live even when the scene has paused outside the viewport.
+    window.setInterval(() => {
+      if (!sky.live || sky.transitioning || document.hidden) return;
+      const rect = timeTrack.getBoundingClientRect();
+      if (rect.bottom >= 0 && rect.top <= window.innerHeight) showTimeStatus(jstMinutes(new Date()));
+    }, 30_000);
 
     const setView = (mode: HeroMode, arrived: boolean) => {
       hero.dataset.view = mode;
@@ -219,6 +246,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
         ? (en ? `Now viewing ${placeName}.` : `${placeName}を表示しています。`)
         : (en ? 'Moving to the selected place.' : '選んだ地点へ移動しています。');
       viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(mode==='city' && b.dataset.view===demo?.view)));
+      const activeView = viewButtons.find(b => b.getAttribute('aria-pressed') === 'true');
+      moveLens(activeView);
+      revealView(activeView);
       cameraHint.textContent = demo?.orbiting && mode==='city'
         ? (en ? 'Drag or swipe to orbit this place.' : 'ドラッグでスポットを中心に360°回れます。スマホは横スワイプ。')
         : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
@@ -227,7 +257,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
         if (arrived) back.focus({ preventScroll: true });
       } else if (!arrived) card.hidden = true;
       if (arrived && !atPanorama && mode==='city') spotSelect.focus({preventScroll:true});
-      if (arrived && atPanorama) viewButtons.find(b=>b.dataset.view===panorama)?.focus({preventScroll:true});
+      if (arrived && atPanorama && !hero.querySelector('.time-control')?.contains(document.activeElement)) viewButtons.find(b=>b.dataset.view===panorama)?.focus({preventScroll:true});
     };
 
     const coarse = matchMedia('(pointer: coarse)').matches;
@@ -246,8 +276,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
       stage,
       (renderer, el) =>
         (demo = createHero(renderer, el, {
-          now: () => (sky.live && !sky.dur ? new Date() : jstDateAt(new Date(), ((shown() % 1440) + 1440) % 1440)),
-          cloudTravelMinutes: cloudShown,
+          now: () => (sky.live && !sky.transitioning ? new Date() : jstDateAt(new Date(), wrapDay(shown()))),
+          cloudTravelMinutes: () => sky.clouds(performance.now()),
           quality,
           lang: en?'en':'ja',
           trips: JSON.parse(stage.dataset.trips ?? '[]'),
@@ -255,7 +285,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           drift: !coarse,
           onStatus,
           onProgress: progress => document.dispatchEvent(new CustomEvent('hero:progress', {detail:progress})),
-          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false; viewButtons.forEach(b=>b.disabled=false); document.dispatchEvent(new Event('hero:ready')); },
+          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false;timeSlider.disabled=false; viewButtons.forEach(b=>b.disabled=false); document.dispatchEvent(new Event('hero:ready')); },
           onError: fallback,
           onAreaLoading: loading=>{areaStatus.hidden=!loading;},
           onExplore: enabled=>{
@@ -269,7 +299,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           avoid: () => {
             const base = stage.getBoundingClientRect();
             // the header and the view bar float over the top of the stage: no pin under them either
-            return [hero.querySelector('.copy'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views'), hero.querySelector('.spot-nav')]
+            return [hero.querySelector('.copy'), hero.querySelector('.copy h1'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views'), hero.querySelector('.spot-nav')]
               .filter((n): n is Element => !!n)
               .map((n) => {
                 const r = n.getBoundingClientRect();
@@ -299,6 +329,71 @@ const pinTrips = completeSpotPreviews((await getTrips())
         demo.flyTo(b.dataset.view as HeroView);
       }),
     );
+    // Like Glisse's tab bar, the selected lens can be dragged as well as clicked.
+    let viewDrag: { id: number; x: number; moved: boolean; target: HTMLButtonElement } | null = null;
+    let suppressViewClick = false;
+    const nearestView = (x: number) => viewButtons.reduce((nearest, button) => {
+      const r = button.getBoundingClientRect();
+      const distance = Math.abs(x - (r.left + r.width / 2));
+      return distance < nearest.distance ? { button, distance } : nearest;
+    }, { button: viewButtons[0], distance: Infinity }).button;
+    viewOptions.addEventListener('pointerdown', event => {
+      const button = (event.target as Element).closest<HTMLButtonElement>('button[data-view]');
+      if (!button || button.disabled || event.button !== 0) return;
+      viewDrag = { id: event.pointerId, x: event.clientX, moved: false, target: button };
+      viewOptions.classList.add('is-held');
+    });
+    window.addEventListener('pointermove', event => {
+      if (!viewDrag || event.pointerId !== viewDrag.id) return;
+      if (!viewDrag.moved && Math.abs(event.clientX - viewDrag.x) > 6) {
+        viewDrag.moved = true;
+        viewOptions.setPointerCapture(event.pointerId);
+        viewLens.hidden = false;
+        viewOptions.classList.add('is-dragging');
+      }
+      if (!viewDrag.moved) return;
+      const bounds = viewBar.getBoundingClientRect();
+      if (event.clientX > bounds.right - 28) viewBar.scrollLeft += 12;
+      else if (event.clientX < bounds.left + 28) viewBar.scrollLeft -= 12;
+      viewDrag.target = nearestView(event.clientX);
+      const width = viewDrag.target.offsetWidth;
+      const left = Math.max(0, Math.min(viewOptions.scrollWidth - width, event.clientX - viewOptions.getBoundingClientRect().left - width / 2));
+      viewLens.style.width = `${width}px`;
+      viewLens.style.transform = `translateX(${left}px)`;
+    });
+    const finishViewDrag = (event: PointerEvent) => {
+      if (!viewDrag || event.pointerId !== viewDrag.id) return;
+      const { moved, target } = viewDrag;
+      viewDrag = null;
+      viewOptions.classList.remove('is-held', 'is-dragging');
+      if (moved && event.type === 'pointerup') {
+        suppressViewClick = true;
+        target.click();
+        setTimeout(() => { suppressViewClick = false; }, 0);
+      } else if (moved) moveLens(viewButtons.find(b => b.getAttribute('aria-pressed') === 'true'));
+    };
+    window.addEventListener('pointerup', finishViewDrag);
+    window.addEventListener('pointercancel', finishViewDrag);
+    window.addEventListener('blur', () => {
+      if (!viewDrag) return;
+      viewDrag = null;
+      viewOptions.classList.remove('is-held', 'is-dragging');
+      moveLens(viewButtons.find(b => b.getAttribute('aria-pressed') === 'true'));
+    });
+    viewOptions.addEventListener('click', event => {
+      if (suppressViewClick && event.isTrusted && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); }
+    }, true);
+    viewOptions.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      const current = viewButtons.indexOf(event.target as HTMLButtonElement);
+      if (current < 0) return;
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? viewButtons.length - 1
+        : Math.max(0, Math.min(viewButtons.length - 1, current + (event.key === 'ArrowRight' ? 1 : -1)));
+      if (viewButtons[next].disabled) return;
+      event.preventDefault();
+      viewButtons[next].click();
+      viewButtons[next].focus({ preventScroll: true });
+    });
 
     if (!mounted) {
       fallback();
@@ -340,11 +435,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
     gap: 4px;
     padding: 4px;
     border-radius: 999px;
-    background: linear-gradient(155deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.015) 48%, rgba(100, 190, 198, 0.06)), rgba(8, 17, 26, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.23);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.18);
-    -webkit-backdrop-filter: blur(10px) saturate(1.2);
-    backdrop-filter: blur(10px) saturate(1.2);
+    background: rgba(30, 30, 34, .65);
+    border: 1px solid rgba(255, 255, 255, .1);
+    box-shadow: inset 0 0 0 .5px rgba(255,255,255,.08), 0 2px 8px rgba(0,0,0,.15);
+    -webkit-backdrop-filter: blur(3px) saturate(1.5);
+    backdrop-filter: blur(3px) saturate(1.5);
     max-width: calc(100% - var(--gutter) * 2);
     overflow-x: auto;
     scrollbar-width: none;
@@ -361,13 +456,22 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .views-label {
+    flex: none;
     padding: 0 8px 0 10px;
     font: 700 10px/1 var(--latin);
     letter-spacing: 0.2em;
     color: var(--brand);
   }
 
+  .view-options { position: relative; display: flex; flex: none; align-items: center; gap: 4px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .view-lens { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px; pointer-events: none; background: rgba(255,255,255,.2); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.18), 0 1px 3px rgba(0,0,0,.16); transition: transform .35s cubic-bezier(.2,.8,.2,1), width .35s cubic-bezier(.2,.8,.2,1), background-color .15s; }
+  .view-lens[hidden] { display: none; }
+  .view-lens.no-motion, .is-dragging .view-lens { transition: none; }
+  .is-held .view-lens { background: rgba(255,255,255,.32); }
+
   .views button {
+    position: relative;
+    z-index: 1;
     flex: none;
     appearance: none;
     padding: 7px 13px;
@@ -375,8 +479,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
     border: 0;
     background: transparent;
     color: var(--on-dark);
-    font: 700 12px/1.3 var(--body);
-    letter-spacing: 0.06em;
+    font: 600 12px/1.3 var(--body);
+    letter-spacing: 0.02em;
     cursor: pointer;
     transition: background-color 0.25s, color 0.25s;
   }
@@ -390,6 +494,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
     box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.65), 0 2px 8px rgba(0, 0, 0, 0.2);
     color: var(--on-accent);
   }
+  .view-options.is-enhanced button[aria-pressed='true'] { background: transparent; color: var(--on-dark); box-shadow: none; }
+  .views button:focus-visible { outline: 2px solid white; outline-offset: -2px; }
+  @media (prefers-reduced-motion: reduce) { .view-lens { transition: none; } }
 
   .spot-nav {
     position: absolute;
@@ -522,35 +629,25 @@ const pinTrips = completeSpotPreviews((await getTrips())
     max-width: 360px;
   }
 
-  .times {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  .times button {
-    appearance: none;
-    padding: 4px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--on-dark);
-    font: 700 11px/1.4 var(--body);
-    letter-spacing: 0.06em;
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
-  }
-
-  .times button:hover {
-    border-color: var(--brand);
-  }
-
-  .times button[aria-pressed='true'] {
-    background: linear-gradient(160deg, #b4e5e7, var(--brand) 65%, #4ba4af);
-    border-color: var(--brand);
-    color: var(--on-accent);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.65), 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
+  /* Slider proportions and transparent native thumb adapted from Glisse (MIT). */
+  .time-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 11px; }
+  .time-heading button { border: 0; border-radius: 999px; padding: 5px 12px; color: inherit; background: rgba(255,255,255,.1); font: inherit; cursor: pointer; }
+  .time-heading button[aria-pressed='true'] { background: rgba(255,255,255,.23); }
+  .time-heading button:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+  .time-slider { position: relative; height: 40px; }
+  .time-track { position: absolute; inset: 17px 0 auto; height: 6px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.2); pointer-events: none; }
+  .time-fill { display: block; height: 100%; background: #0a84ff; transform: scaleX(var(--progress)); transform-origin: left; }
+  .time-thumb { position: absolute; top: 8px; left: calc((100% - 36px) * var(--progress)); width: 36px; height: 24px; border-radius: 999px; pointer-events: none; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.28), inset 0 0 0 1px rgba(0,0,0,.07); transition: transform .2s cubic-bezier(.2,.8,.2,1), background-color .2s; }
+  .time-slider.is-held .time-thumb { transform: scale(1.18); background: rgba(255,255,255,.9); }
+  .time-slider input { position: relative; z-index: 1; display: block; width: 100%; height: 40px; margin: 0; background: transparent; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
+  .time-slider input::-webkit-slider-runnable-track { height: 6px; background: transparent; }
+  .time-slider input::-webkit-slider-thumb { width: 36px; height: 40px; margin-top: -17px; border: 0; background: transparent; opacity: 0; touch-action: none; appearance: none; -webkit-appearance: none; }
+  .time-slider input::-moz-range-track { height: 6px; background: transparent; }
+  .time-slider input::-moz-range-thumb { width: 36px; height: 40px; border: 0; background: transparent; opacity: 0; }
+  .time-slider:has(input:focus-visible) .time-thumb { outline: 2px solid white; outline-offset: 3px; }
+  .time-slider:has(input:disabled) { opacity: .45; }
+  .time-marks { display: flex; justify-content: space-between; font: 600 10px/1 var(--latin); color: rgba(255,255,255,.65); }
+  @media (prefers-reduced-motion: reduce) { .time-thumb { transition: none; } }
 
   @media (prefers-reduced-transparency: reduce) {
     .views, .sky-chip, .btn--glass { background: #0c1b25; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -558,8 +655,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .now {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: baseline;
     gap: 4px 12px;
     font-size: 13px;
@@ -573,6 +670,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .moon {
+    grid-column: 1 / -1;
     font-weight: 500;
     opacity: 0.75;
   }
@@ -907,11 +1005,17 @@ const pinTrips = completeSpotPreviews((await getTrips())
       grid-row: 2;
       grid-column: 1;
       grid-template-columns: 1fr;
+      gap: 12px;
       margin-top: -72px;
       padding-bottom: 36px;
     }
 
+    .copy { display: contents; }
+    .copy .eyebrow { order: -3; }
+    .copy h1 { order: -2; }
+
     .sky-chip {
+      order: -1;
       justify-self: stretch;
       max-width: none;
     }
