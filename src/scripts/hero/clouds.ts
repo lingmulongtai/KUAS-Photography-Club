@@ -135,7 +135,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           vec3 w = pos * .00045;
           xz += (vec2(vnoise3(w), vnoise3(w + 17.3)) - .5) * (uTop - uBase) * .22;
         }
-        vec3 f = field(xz * K + uWind + uOffset);
+        vec3 f = field(xz * K - uWind + uOffset);
         float c = cover(f, 0.);
         float d = smoothstep(0., .1, crown(c) * f.z - h) * smoothstep(0., .04, h) * smoothstep(0., .25, c);
         if (isStyle(4.)){
@@ -148,7 +148,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
 
       /** Where the billows are: tall clouds churn in bigger ones. */
       vec3 billowAt(vec3 pos){
-        return (pos + vec3(uWind.x, 0., uWind.y) / K) * (isStyle(4.) ? .0011 : isStyle(3.) ? .0015 : .0021);
+        return (pos - vec3(uWind.x, 0., uWind.y) / K) * (isStyle(4.) ? .0011 : isStyle(3.) ? .0015 : .0021);
       }
 
       /** 3D noise n eats into the edges more than the core. */
@@ -194,7 +194,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         vec3 pos = ro + rd * t;
         float dist = length(pos.xz - ro.xz);
         if (dist > 70000.) return vec4(0.);
-        vec2 p = pos.xz * K * .6 + uWind * 1.6 + uOffset * 1.7;
+        vec2 p = pos.xz * K * .6 - uWind * 1.6 + uOffset * 1.7;
         float a;
         if (cirrus){
           // streaks combed by the jet stream, with hooked ends

@@ -54,8 +54,10 @@ export function buildSkyDome(env: Env) {
           float maria = fbm(nrm.xy * 2.6 + nrm.z * 1.7 + 3.);
           vec3 alb = vec3(.92, .9, .85) * (.62 + .45 * smoothstep(.38, .68, maria));
           float edge = 1. - smoothstep(mr * .97, mr * 1.03, dd);
-          vec3 moonCol = alb * (lit * 1.5 + .012) * uMoonVis;
-          c = mix(c, c * .25 + moonCol, edge * min(uMoonVis * 1.5, 1.));
+          // the dark side only shows faint earthshine, and the sky in front of the moon stays:
+          // a new moon is invisible instead of a dark hole next to the sun
+          float earthshine = .012 * (1. - uMoonIllum) * smoothstep(.3, .9, uMoonVis);
+          c += alb * (lit * 1.5 + earthshine) * uMoonVis * edge;
         }
         c += vec3(.45, .5, .6) * pow(max(along, 0.), 1800.) * .08 * uMoonIllum * uMoonVis;
 
@@ -79,10 +81,13 @@ export function buildSkyDome(env: Env) {
 export function buildCelestial(env: Env, quality: number) {
   const group = new THREE.Group();
   const r = rng(1969);
-  const count = Math.round(2600 * quality + 600);
+  // the bright stars, then a crowd of faint ones that only come out on a dark, moonless night
+  const bright = Math.round(2600 * quality + 600);
+  const count = bright + Math.round(3200 * quality + 400);
   const pos = new Float32Array(count * 3);
   const col = new Float32Array(count * 3);
   const mag = new Float32Array(count);
+  const faint = new Float32Array(count);
   const R = RADIUS * 0.9;
   for (let i = 0; i < count; i++) {
     const u = r() * 2 - 1;
@@ -92,16 +97,19 @@ export function buildCelestial(env: Env, quality: number) {
     const warm = r();
     col.set(warm < 0.2 ? [0.75, 0.85, 1] : warm > 0.85 ? [1, 0.78, 0.55] : [1, 0.96, 0.9], i * 3);
     mag[i] = Math.pow(r(), 7);
+    faint[i] = i < bright ? 0 : 1;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
   geo.setAttribute('aMag', new THREE.BufferAttribute(mag, 1));
+  geo.setAttribute('aFaint', new THREE.BufferAttribute(faint, 1));
   const starMat = new THREE.ShaderMaterial({
     uniforms: { uStars: env.uStars, uTime: env.uTime, uDpr: { value: 1 } },
     vertexShader: /* glsl */ `
       attribute vec3 aColor;
       attribute float aMag;
+      attribute float aFaint;
       uniform float uStars;
       uniform float uTime;
       uniform float uDpr;
@@ -114,9 +122,11 @@ export function buildCelestial(env: Env, quality: number) {
         float tw = .75 + .25 * sin(uTime * (2. + aMag * 3.) + position.x * .37);
         // light pollution hides faint stars first
         float visible = smoothstep(0., .4, uStars - (1. - aMag) * .5);
+        // uStars climbs above 1 only when no moonlight washes the sky out
+        visible *= mix(1., smoothstep(1., 1.25, uStars) * .55, aFaint);
         vA = (.2 + aMag * 2.4) * tw * horizon * uStars * visible;
         vColor = aColor;
-        gl_PointSize = (1.3 + aMag * 2.6) * uDpr;
+        gl_PointSize = (1.3 + aMag * 2.6 * (1. - aFaint)) * uDpr;
         gl_Position = projectionMatrix * viewMatrix * wp;
       }
     `,
@@ -168,7 +178,7 @@ export function buildCelestial(env: Env, quality: number) {
         vec2 q = vec2(atan(vLocal.y, vLocal.x) * 3., vLocal.z * 6.);
         float dust = smoothstep(.35, .75, fbm(q * 2.2));
         float lane = 1. - .7 * exp(-b * b / .0012) * smoothstep(.45, .7, fbm(q * 4. + 7.));
-        float a = band * (.35 + .65 * dust) * lane * (.5 + core) * uStars * smoothstep(.05, .3, vWorldDir.y);
+        float a = band * (.35 + .65 * dust) * lane * (.5 + core) * uStars * uStars * smoothstep(.05, .3, vWorldDir.y);
         gl_FragColor = vec4(vec3(.62, .66, .8) * a * .045, 1.);
       }
     `,

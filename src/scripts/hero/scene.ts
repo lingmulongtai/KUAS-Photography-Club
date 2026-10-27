@@ -434,7 +434,11 @@ export function createHero(
     sky.uniforms.uMoonVis.value = moonUp * (0.3 + 0.7 * dark);
     sky.uniforms.uMoonIllum.value = moon.illumination;
     env.uMoonLight.value.setRGB(0.5, 0.58, 0.78).multiplyScalar(0.07 * moon.illumination * moonUp * dark);
-    env.uStars.value = dark * (1 - 0.35 * moon.illumination * moonUp);
+    // moonlight brightens much faster than the lit fraction grows (a full moon is ~10× a half
+    // moon): under a full moon only the brighter stars show and the Milky Way fades; with the
+    // moon new or down the sky fills with faint stars
+    const moonlight = Math.pow(moon.illumination, 2) * moonUp;
+    env.uStars.value = dark * (1.3 - 0.65 * moonlight);
     celestial.setSidereal(localSiderealAngle(date, KYOTO.lon));
 
     renderer.toneMappingExposure = look.exposure;
@@ -747,7 +751,7 @@ export function createHero(
       camera.getWorldDirection(forward);
       const az = Math.atan2(forward.x, -forward.z);
       const top = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) + camera.fov * RAD / 2;
-      meteors.update(t, dt, camera.position, { az, half, top }, env.uStars.value, pxPerM);
+      meteors.update(t, dt, camera.position, { az, half, top }, Math.min(1, env.uStars.value), pxPerM);
       post.render(t);
       labels?.update(camera, width, height);
       loading.frame();
