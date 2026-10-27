@@ -26,7 +26,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
     <canvas aria-label={en ? 'Explore Kyoto in 3D using real terrain and building data. Drag to look around and select a place to move closer.' : '実際の地形と建物データから作った京都の3D。ドラッグで見回し、地点を選ぶと近づけます。'}></canvas>
     <nav class="views" aria-label={en ? 'Scenic viewpoints' : '展望地点'}>
       <span class="views-label">VIEW</span>
-      {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed={view==='shogunzuka'} disabled>{VIEWS[view][lang]}</button>)}
+      <div class="view-options">
+        <span class="view-lens" aria-hidden="true"></span>
+        {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed={view==='shogunzuka'} disabled>{VIEWS[view][lang]}</button>)}
+      </div>
     </nav>
     <div class="spot-nav">
       <label class="visually-hidden" for="hero-spot">{en ? 'Explore a place in 3D' : '3Dで近づくスポット'}</label>
@@ -149,6 +152,26 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const areaStatus=hero.querySelector<HTMLElement>('[data-area-status]')!;
     const exploreToggle=hero.querySelector<HTMLButtonElement>('.explore-toggle')!;
     const viewButtons = Array.from(hero.querySelectorAll<HTMLButtonElement>('button[data-view]'));
+    const viewBar = hero.querySelector<HTMLElement>('.views')!;
+    const viewOptions = hero.querySelector<HTMLElement>('.view-options')!;
+    const viewLens = hero.querySelector<HTMLElement>('.view-lens')!;
+    const moveLens = (button: HTMLButtonElement | undefined, immediate = false) => {
+      viewLens.hidden = !button;
+      if (!button) return;
+      if (immediate) viewLens.classList.add('no-motion');
+      viewLens.style.width = `${button.offsetWidth}px`;
+      viewLens.style.transform = `translateX(${button.offsetLeft}px)`;
+      if (immediate) requestAnimationFrame(() => viewLens.classList.remove('no-motion'));
+    };
+    const revealView = (button: HTMLButtonElement | undefined) => {
+      if (!button) return;
+      const view = button.getBoundingClientRect(), bar = viewBar.getBoundingClientRect();
+      const offset = view.right > bar.right ? view.right - bar.right + 8 : view.left < bar.left ? view.left - bar.left - 8 : 0;
+      if (offset) viewBar.scrollBy({ left: offset, behavior: motion.matches ? 'instant' : 'smooth' });
+    };
+    viewOptions.classList.add('is-enhanced');
+    moveLens(viewButtons[0], true);
+    new ResizeObserver(() => moveLens(viewButtons.find(b => b.getAttribute('aria-pressed') === 'true'), true)).observe(viewOptions);
     let panorama: HeroView='shogunzuka';
 
     const hhmm = (m: number) => {
@@ -211,6 +234,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
         ? (en ? `Now viewing ${placeName}.` : `${placeName}を表示しています。`)
         : (en ? 'Moving to the selected place.' : '選んだ地点へ移動しています。');
       viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(mode==='city' && b.dataset.view===demo?.view)));
+      const activeView = viewButtons.find(b => b.getAttribute('aria-pressed') === 'true');
+      moveLens(activeView);
+      revealView(activeView);
       cameraHint.textContent = demo?.orbiting && mode==='city'
         ? (en ? 'Drag or swipe to orbit this place.' : 'ドラッグでスポットを中心に360°回れます。スマホは横スワイプ。')
         : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
@@ -291,6 +317,71 @@ const pinTrips = completeSpotPreviews((await getTrips())
         demo.flyTo(b.dataset.view as HeroView);
       }),
     );
+    // Like Glisse's tab bar, the selected lens can be dragged as well as clicked.
+    let viewDrag: { id: number; x: number; moved: boolean; target: HTMLButtonElement } | null = null;
+    let suppressViewClick = false;
+    const nearestView = (x: number) => viewButtons.reduce((nearest, button) => {
+      const r = button.getBoundingClientRect();
+      const distance = Math.abs(x - (r.left + r.width / 2));
+      return distance < nearest.distance ? { button, distance } : nearest;
+    }, { button: viewButtons[0], distance: Infinity }).button;
+    viewOptions.addEventListener('pointerdown', event => {
+      const button = (event.target as Element).closest<HTMLButtonElement>('button[data-view]');
+      if (!button || button.disabled || event.button !== 0) return;
+      viewDrag = { id: event.pointerId, x: event.clientX, moved: false, target: button };
+      viewOptions.classList.add('is-held');
+    });
+    window.addEventListener('pointermove', event => {
+      if (!viewDrag || event.pointerId !== viewDrag.id) return;
+      if (!viewDrag.moved && Math.abs(event.clientX - viewDrag.x) > 6) {
+        viewDrag.moved = true;
+        viewOptions.setPointerCapture(event.pointerId);
+        viewLens.hidden = false;
+        viewOptions.classList.add('is-dragging');
+      }
+      if (!viewDrag.moved) return;
+      const bounds = viewBar.getBoundingClientRect();
+      if (event.clientX > bounds.right - 28) viewBar.scrollLeft += 12;
+      else if (event.clientX < bounds.left + 28) viewBar.scrollLeft -= 12;
+      viewDrag.target = nearestView(event.clientX);
+      const width = viewDrag.target.offsetWidth;
+      const left = Math.max(0, Math.min(viewOptions.scrollWidth - width, event.clientX - viewOptions.getBoundingClientRect().left - width / 2));
+      viewLens.style.width = `${width}px`;
+      viewLens.style.transform = `translateX(${left}px)`;
+    });
+    const finishViewDrag = (event: PointerEvent) => {
+      if (!viewDrag || event.pointerId !== viewDrag.id) return;
+      const { moved, target } = viewDrag;
+      viewDrag = null;
+      viewOptions.classList.remove('is-held', 'is-dragging');
+      if (moved && event.type === 'pointerup') {
+        suppressViewClick = true;
+        target.click();
+        setTimeout(() => { suppressViewClick = false; }, 0);
+      } else if (moved) moveLens(viewButtons.find(b => b.getAttribute('aria-pressed') === 'true'));
+    };
+    window.addEventListener('pointerup', finishViewDrag);
+    window.addEventListener('pointercancel', finishViewDrag);
+    window.addEventListener('blur', () => {
+      if (!viewDrag) return;
+      viewDrag = null;
+      viewOptions.classList.remove('is-held', 'is-dragging');
+      moveLens(viewButtons.find(b => b.getAttribute('aria-pressed') === 'true'));
+    });
+    viewOptions.addEventListener('click', event => {
+      if (suppressViewClick && event.isTrusted && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); }
+    }, true);
+    viewOptions.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      const current = viewButtons.indexOf(event.target as HTMLButtonElement);
+      if (current < 0) return;
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? viewButtons.length - 1
+        : Math.max(0, Math.min(viewButtons.length - 1, current + (event.key === 'ArrowRight' ? 1 : -1)));
+      if (viewButtons[next].disabled) return;
+      event.preventDefault();
+      viewButtons[next].click();
+      viewButtons[next].focus({ preventScroll: true });
+    });
 
     if (!mounted) {
       fallback();
@@ -332,11 +423,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
     gap: 4px;
     padding: 4px;
     border-radius: 999px;
-    background: linear-gradient(155deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.015) 48%, rgba(100, 190, 198, 0.06)), rgba(8, 17, 26, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.23);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.18);
-    -webkit-backdrop-filter: blur(10px) saturate(1.2);
-    backdrop-filter: blur(10px) saturate(1.2);
+    background: rgba(30, 30, 34, .65);
+    border: 1px solid rgba(255, 255, 255, .1);
+    box-shadow: inset 0 0 0 .5px rgba(255,255,255,.08), 0 2px 8px rgba(0,0,0,.15);
+    -webkit-backdrop-filter: blur(3px) saturate(1.5);
+    backdrop-filter: blur(3px) saturate(1.5);
     max-width: calc(100% - var(--gutter) * 2);
     overflow-x: auto;
     scrollbar-width: none;
@@ -353,13 +444,22 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .views-label {
+    flex: none;
     padding: 0 8px 0 10px;
     font: 700 10px/1 var(--latin);
     letter-spacing: 0.2em;
     color: var(--brand);
   }
 
+  .view-options { position: relative; display: flex; flex: none; align-items: center; gap: 4px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .view-lens { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px; pointer-events: none; background: rgba(255,255,255,.2); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.18), 0 1px 3px rgba(0,0,0,.16); transition: transform .35s cubic-bezier(.2,.8,.2,1), width .35s cubic-bezier(.2,.8,.2,1), background-color .15s; }
+  .view-lens[hidden] { display: none; }
+  .view-lens.no-motion, .is-dragging .view-lens { transition: none; }
+  .is-held .view-lens { background: rgba(255,255,255,.32); }
+
   .views button {
+    position: relative;
+    z-index: 1;
     flex: none;
     appearance: none;
     padding: 7px 13px;
@@ -367,8 +467,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
     border: 0;
     background: transparent;
     color: var(--on-dark);
-    font: 700 12px/1.3 var(--body);
-    letter-spacing: 0.06em;
+    font: 600 12px/1.3 var(--body);
+    letter-spacing: 0.02em;
     cursor: pointer;
     transition: background-color 0.25s, color 0.25s;
   }
@@ -382,6 +482,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
     box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.65), 0 2px 8px rgba(0, 0, 0, 0.2);
     color: var(--on-accent);
   }
+  .view-options.is-enhanced button[aria-pressed='true'] { background: transparent; color: var(--on-dark); box-shadow: none; }
+  .views button:focus-visible { outline: 2px solid white; outline-offset: -2px; }
+  @media (prefers-reduced-motion: reduce) { .view-lens { transition: none; } }
 
   .spot-nav {
     position: absolute;
