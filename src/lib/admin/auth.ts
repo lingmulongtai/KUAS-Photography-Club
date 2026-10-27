@@ -4,8 +4,7 @@ import type { AstroCookies } from 'astro';
 /*
  * Admin sign-in. Configure on Vercel (Project → Settings → Environment Variables):
  *   ADMIN_USERNAME   shared sign-in ID (defaults to "admin").
- *   ADMIN_PASSWORD   the password for /admin/. Without it the panel runs in demo mode
- *                    (ID "admin", password "demo") and nothing is published.
+ *   ADMIN_PASSWORD   the password for /admin/. Required for real sign-in and publishing.
  *   GITHUB_TOKEN     a fine-grained token with Contents: read and write on this repository,
  *                    so publishing can commit photos and Markdown (Vercel then redeploys).
  *   SESSION_SECRET   optional; adds a secret to the credential-bound cookie signature.
@@ -16,11 +15,25 @@ const HOURS = 12;
 export const DEFAULT_USERNAME = 'admin';
 export const DEMO_PASSWORD = 'demo';
 
-export const isDemo = () => !process.env.ADMIN_PASSWORD;
-export const canPublish = () => !isDemo() && !!process.env.GITHUB_TOKEN;
+// A missing production setting must never silently turn a real publish into a preview.
+export const isDemo = () => process.env.ADMIN_DEMO === 'true' && process.env.VERCEL !== '1' && process.env.NODE_ENV !== 'production';
+export const isConfigured = () => isDemo() || !!process.env.ADMIN_PASSWORD?.trim();
+export const missingSettings = () => ['ADMIN_PASSWORD', 'GITHUB_TOKEN'].filter((name) => !process.env[name]?.trim());
+export const canPublish = () => !isDemo() && missingSettings().length === 0;
+
+export const configurationError = () => {
+  const missing = missingSettings();
+  return missing.length
+    ? `投稿設定が本番環境に反映されていません（${missing.join('・')}）。Vercel の Production の環境変数を確認し、再デプロイしてください。`
+    : null;
+};
+
+export const publishingGuard = () => !isDemo() && !canPublish()
+  ? json({ error: configurationError(), code: 'PUBLISH_NOT_CONFIGURED' }, 503)
+  : null;
 
 const username = () => isDemo() ? DEFAULT_USERNAME : process.env.ADMIN_USERNAME || DEFAULT_USERNAME;
-const password = () => process.env.ADMIN_PASSWORD || DEMO_PASSWORD;
+const password = () => isDemo() ? DEMO_PASSWORD : process.env.ADMIN_PASSWORD || '';
 
 const secret = () =>
   createHash('sha256')
@@ -32,6 +45,7 @@ const sign = (body: string) => createHmac('sha256', secret()).update(body).diges
 const digest = (s: string) => createHash('sha256').update(s).digest();
 
 export function checkCredentials(id: unknown, inputPassword: unknown) {
+  if (!isConfigured()) return false;
   if (typeof id !== 'string' || typeof inputPassword !== 'string') return false;
   const validId = timingSafeEqual(digest(id), digest(username()));
   const validPassword = timingSafeEqual(digest(inputPassword), digest(password()));
@@ -48,6 +62,7 @@ export function signOut(cookies: AstroCookies) {
 }
 
 export function signedIn(cookies: AstroCookies) {
+  if (!isConfigured()) return false;
   const v = cookies.get(COOKIE)?.value;
   if (!v) return false;
   const [body, mac] = v.split('.');

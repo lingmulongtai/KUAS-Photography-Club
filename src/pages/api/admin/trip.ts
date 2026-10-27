@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { canPublish, guard, json } from '../../../lib/admin/auth';
-import { commit, readText, type CommitFile } from '../../../lib/admin/github';
-import { appendPhotos, checkSlug, cleanSpot, photoEntries, photoPath, tripMarkdown, tripPath, type PhotoIn, type TripIn } from '../../../lib/admin/content';
+import { canPublish, guard, json, publishingGuard } from '../../../lib/admin/auth.ts';
+import { commit, readText, type CommitFile } from '../../../lib/admin/github.ts';
+import { appendPhotos, checkSlug, cleanSpot, photoEntries, photoPath, tripMarkdown, tripPath, type PhotoIn, type TripIn } from '../../../lib/admin/content.ts';
 
 export const prerender = false;
 
@@ -12,11 +12,13 @@ type Body =
 /**
  * Publish a new trip, or add photos to an existing one, as a single commit:
  * the photos under public/photos/<slug>/ and the Markdown in src/content/trips/.
- * In demo mode it returns the Markdown it would have written.
+ * Only an explicitly enabled local demo returns a preview instead of saving.
  */
 export const POST: APIRoute = async ({ request, cookies }) => {
   const denied = guard(request, cookies);
   if (denied) return denied;
+  const unavailable = publishingGuard();
+  if (unavailable) return unavailable;
   let body: Body;
   try {
     body = await request.json();
@@ -52,7 +54,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
     files.push({ path: tripPath(slug), content: md });
     const c = await commit(`${message}\n\nPublished from the site's admin panel.`, files);
-    return json({ ok: true, commit: c.url, page: `/trips/${slug}/` });
+    return json({ ok: true, commit: c.url, sha: c.sha, page: `/trips/${slug}/` });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 400);
   }

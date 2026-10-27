@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canPublish, checkCredentials, isDemo, signIn, signedIn } from '../src/lib/admin/auth.ts';
+import { canPublish, checkCredentials, isDemo, publishingGuard, signIn, signedIn } from '../src/lib/admin/auth.ts';
 import { POST, DELETE } from '../src/pages/api/admin/login.ts';
+import { GET as session } from '../src/pages/api/admin/session.ts';
 
 function configure(t, values = {}) {
-  const names = ['ADMIN_USERNAME', 'ADMIN_PASSWORD', 'GITHUB_TOKEN', 'SESSION_SECRET'];
+  const names = ['ADMIN_USERNAME', 'ADMIN_PASSWORD', 'GITHUB_TOKEN', 'SESSION_SECRET', 'ADMIN_DEMO', 'VERCEL', 'NODE_ENV'];
   const previous = new Map(names.map(name => [name, process.env[name]]));
   for (const name of names) {
     if (values[name] === undefined) delete process.env[name];
@@ -37,13 +38,40 @@ const login = (credentials, cookies) => POST({
   cookies,
 });
 
-test('demo requires the demo ID and password and cannot publish even with a GitHub token', t => {
-  configure(t, { ADMIN_USERNAME: 'club-operators', ADMIN_PASSWORD: '', GITHUB_TOKEN: 'test-only-token' });
+test('explicit local demo requires demo credentials and cannot publish even with a GitHub token', t => {
+  configure(t, { ADMIN_DEMO: 'true', ADMIN_USERNAME: 'club-operators', ADMIN_PASSWORD: '', GITHUB_TOKEN: 'test-only-token' });
   assert.equal(isDemo(), true);
   assert.equal(canPublish(), false);
   assert.equal(checkCredentials('admin', 'demo'), true);
   assert.equal(checkCredentials('club-operators', 'demo'), false);
   assert.equal(checkCredentials(undefined, 'demo'), false);
+});
+
+test('missing production credentials never enable demo access, even if the token exists', async t => {
+  configure(t, { VERCEL: '1', ADMIN_DEMO: 'true', GITHUB_TOKEN: 'test-only-token' });
+  assert.equal(isDemo(), false);
+  assert.equal(canPublish(), false);
+  assert.equal(checkCredentials('admin', 'demo'), false);
+  assert.equal(checkCredentials('admin', ''), false);
+  const cookies = cookieJar();
+  const response = await login({ username: 'admin', password: 'demo' }, cookies);
+  assert.equal(response.status, 503);
+  assert.equal(cookies.values.size, 0);
+  const state = await session({ cookies }).json();
+  assert.deepEqual(state, { signedIn: false, configured: false, demo: false, canPublish: false, missing: ['ADMIN_PASSWORD'] });
+});
+
+test('a missing runtime token is a setup error rather than a successful demo publication', async t => {
+  configure(t, { ADMIN_PASSWORD: 'test-only-password', GITHUB_TOKEN: '  ' });
+  const blocked = publishingGuard();
+  assert.equal(blocked.status, 503);
+  const result = await blocked.json();
+  assert.equal(result.code, 'PUBLISH_NOT_CONFIGURED');
+  assert.match(result.error, /GITHUB_TOKEN/);
+  assert.equal(result.demo, undefined);
+  process.env.GITHUB_TOKEN = 'test-only-token';
+  assert.equal(publishingGuard(), null);
+  assert.equal(canPublish(), true);
 });
 
 test('production requires both configured credentials and rejects demo credentials', t => {
@@ -100,7 +128,7 @@ test('login does not reveal which credential was wrong and rejects password-only
 });
 
 test('invalid login JSON cannot create a session', async t => {
-  configure(t);
+  configure(t, { ADMIN_PASSWORD: 'test-only-password' });
   const cookies = cookieJar();
   const response = await POST({
     request: new Request('https://club.example/api/admin/login', { method: 'POST', body: '{' }),
