@@ -42,6 +42,7 @@ import { buildOcclusion } from './building-occlusion';
 import { buildIslands } from './islands';
 import { islandMask } from './island-mask';
 import { LINE, loadLines } from './lines-data';
+import { withoutTunnels } from './tunnels';
 import {createRegionalLoader,regionAt,type CityRegion} from './regional-loader';
 import {replacesHeianFootprint} from './heian-shrine';
 import {replacesNijoFootprint,replacesNijoBox} from './nijo-castle';
@@ -217,7 +218,7 @@ export function createHero(
     casts(terrain.mesh);
     shadow.invalidate();
     const waterFiles=[...(meta.arashiyama?[meta.arashiyama.water.file]:[]),'water-kamo.json.gz'];
-    const [cityPhoto, buildings, lines, woodlandBytes] = await Promise.all([loading.track(loadTexture(meta.aerialCity.file, aniso)), loading.track(loadBuildings()), loading.track(loadLines(waterFiles)), loading.track(loadBinary('woodland.json.gz'))]);
+    const [cityPhoto, buildings, lines, woodlandBytes] = await Promise.all([loading.track(loadTexture(meta.aerialCity.file, aniso)), loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
     const channel=createKamoChannel(lines,(x,z)=>hf.height(x,z));
     terrain.setChannel(channel,kamoMask(channel));
     const bridges=buildBridges(env,hf,lines,channel);
@@ -326,7 +327,7 @@ export function createHero(
     };
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
       const results=await Promise.allSettled([loadBuildings(r.buildings.meta,r.buildings.file),
-        loadLines(undefined,r.lines.file,r.lines.box,r.lines.q),loadTexture(lite?r.photo.mobile.file:r.photo.file,aniso)] as const);
+        withoutTunnels(loadLines(undefined,r.lines.file,r.lines.box,r.lines.q)),loadTexture(lite?r.photo.mobile.file:r.photo.file,aniso)] as const);
       const [b,l,p]=results;
       if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){
         if(p.status==='fulfilled')p.value.dispose();
