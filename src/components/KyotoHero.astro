@@ -108,8 +108,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
 <script>
   import { mountStage } from '../scripts/gl/stage';
   import { createHero, type HeroMode, type HeroStatus, type HeroView } from '../scripts/hero/scene';
-  import { createLook, lookAt } from '../scripts/hero/palette';
-  import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonTimes, sunPosition } from '../scripts/hero/astro';
+  import { createLook, kelvin, lookAt, phaseName } from '../scripts/hero/palette';
+  import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonPosition, moonTimes, sunPosition } from '../scripts/hero/astro';
   import { createSkyTime, wrapDay } from '../scripts/hero/sky-time';
   import { SPOTS, type SpotId } from '../data/spots';
   import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
@@ -201,13 +201,13 @@ const pinTrips = completeSpotPreviews((await getTrips())
       sky.scrub(value, jstMinutes(new Date()), performance.now());
       nowButton.setAttribute('aria-pressed', 'false');
       updateSlider(value);
-      if (out.clock) out.clock.textContent = hhmm(value);
+      showTimeStatus(value);
     });
     nowButton.addEventListener('click', () => {
       const real = jstMinutes(new Date());
-      sky.select(real, true, real, performance.now(), motion.matches);
+      sky.select(real, true, real, performance.now(), true);
       nowButton.setAttribute('aria-pressed', 'true');
-      if (out.status) out.status.textContent = `${en ? 'Now' : 'いま'} ${hhmm(real)}`;
+      showTimeStatus(real);
     });
 
     const onStatus = (s: HeroStatus) => {
@@ -219,6 +219,18 @@ const pinTrips = completeSpotPreviews((await getTrips())
       if (out.moonTimes) out.moonTimes.textContent = moonTimesText();
       if (out.status) out.status.textContent = `${sky.live ? (en ? 'Now' : 'いま') : (en ? 'Viewing' : '表示中')} ${hhmm(s.minutes)} · ${phase}`;
     };
+    // The canvas pauses when it is offscreen, but its controls can still be visible on a phone.
+    const showTimeStatus = (minutes: number) => {
+      const date = jstDateAt(new Date(), minutes);
+      const altitude = sunPosition(date).altitude * 180 / Math.PI;
+      onStatus({ minutes, altitude, phase: phaseName(altitude, minutes), kelvin: kelvin(altitude), moonAge: moonPosition(date).age });
+    };
+    // Keep the visible clock live even when the scene has paused outside the viewport.
+    window.setInterval(() => {
+      if (!sky.live || sky.transitioning || document.hidden) return;
+      const rect = timeTrack.getBoundingClientRect();
+      if (rect.bottom >= 0 && rect.top <= window.innerHeight) showTimeStatus(jstMinutes(new Date()));
+    }, 30_000);
 
     const setView = (mode: HeroMode, arrived: boolean) => {
       hero.dataset.view = mode;
@@ -245,7 +257,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
         if (arrived) back.focus({ preventScroll: true });
       } else if (!arrived) card.hidden = true;
       if (arrived && !atPanorama && mode==='city') spotSelect.focus({preventScroll:true});
-      if (arrived && atPanorama) viewButtons.find(b=>b.dataset.view===panorama)?.focus({preventScroll:true});
+      if (arrived && atPanorama && !hero.querySelector('.time-control')?.contains(document.activeElement)) viewButtons.find(b=>b.dataset.view===panorama)?.focus({preventScroll:true});
     };
 
     const coarse = matchMedia('(pointer: coarse)').matches;
@@ -287,7 +299,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           avoid: () => {
             const base = stage.getBoundingClientRect();
             // the header and the view bar float over the top of the stage: no pin under them either
-            return [hero.querySelector('.copy'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views'), hero.querySelector('.spot-nav')]
+            return [hero.querySelector('.copy'), hero.querySelector('.copy h1'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views'), hero.querySelector('.spot-nav')]
               .filter((n): n is Element => !!n)
               .map((n) => {
                 const r = n.getBoundingClientRect();
@@ -643,8 +655,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .now {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: baseline;
     gap: 4px 12px;
     font-size: 13px;
@@ -658,6 +670,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .moon {
+    grid-column: 1 / -1;
     font-weight: 500;
     opacity: 0.75;
   }
@@ -992,11 +1005,17 @@ const pinTrips = completeSpotPreviews((await getTrips())
       grid-row: 2;
       grid-column: 1;
       grid-template-columns: 1fr;
+      gap: 12px;
       margin-top: -72px;
       padding-bottom: 36px;
     }
 
+    .copy { display: contents; }
+    .copy .eyebrow { order: -3; }
+    .copy h1 { order: -2; }
+
     .sky-chip {
+      order: -1;
       justify-self: stretch;
       max-width: none;
     }
