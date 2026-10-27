@@ -285,6 +285,10 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 3px 12px rgba(0, 0, 0, 0.18);
   }
 
+  .overlay:not(.scrolled):not(.open) .language-switch:hover {
+    color: var(--on-dark);
+  }
+
   @media (prefers-reduced-transparency: reduce) {
     .language-switch, .menu-btn { background: var(--raise); }
     .overlay:not(.scrolled):not(.open) .language-switch,
