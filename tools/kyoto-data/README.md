@@ -11,6 +11,7 @@ sources once into `cache/` (not committed, about 2 GB) and write compact files t
 | `aerial-wide.webp`, `aerial-city.webp` | Aerial photos draped over the terrain | GSI 全国最新写真（シームレス） |
 | `aerial-arashiyama*.webp`, `aerial-higashiyama*.webp` | Sharper photos of Arashiyama and of the slopes below Shogunzuka and Kiyomizu-dera, PC and mobile sizes | GSI 全国最新写真（シームレス） z16 / z17 |
 | `lines.bin` | Roads (by width), above-ground railways, rivers and ponds | GSI ベクトルタイル |
+| `tunnels.json.gz` | Road tunnel centre lines over the core and every region (8.5 KB); the browser cuts these stretches out of the roads so none is painted over a mountain | GSI ベクトルタイル (ftCode 2704/2714/2724) |
 | `buildings.bin` | Selected building footprints and measured heights; dense detail near viewpoints and KUAS--Arashiyama | PLATEAU 京都市 2025 LOD1 |
 
 The scene uses local metres on a plane tangent at Shijo-Karasuma (+x east, +z south,
@@ -24,6 +25,7 @@ python3 fetch.py gsi          # ~400 map tiles
 python3 fetch.py plateau      # PLATEAU LOD1 tiles, read straight out of the 2.4 GB archive with range requests
 python3 build_terrain.py
 python3 build_lines.py
+python3 build_tunnels.py     # after build_lines / build_regions; never rewrites lines*.bin
 python3 extract_buildings.py  # decodes the tiles into cache/buildings.pkl
 python3 build_buildings.py
 python3 -m unittest discover -s . -p 'test_*.py'
