@@ -39,6 +39,18 @@ const pick=(random:()=>number,weights:number[])=>{
 };
 
 /**
+ * Where the clouds drift, in field units per second along scene x (east) and z (south).
+ * Over Japan the westerlies carry the weather from west to east; the heading wanders a little
+ * either side of due east, and the winter jet stream drives the clouds faster than summer's.
+ */
+const WIND_SPEED:Record<Climate,[number,number]>={spring:[.0006,.001],summer:[.0004,.0007],autumn:[.0006,.001],winter:[.0008,.0012]};
+function westerly(random:()=>number,climate:Climate) {
+  const [lo,hi]=WIND_SPEED[climate],speed=lo+random()*(hi-lo);
+  const heading=(random()-.5)*50*Math.PI/180;
+  return [speed*Math.cos(heading),speed*Math.sin(heading)] as const;
+}
+
+/**
  * One weather character per visit and season; deterministic seeds make it reproducible in QA.
  * The seed also places the clouds, so the same character never lays out the same sky twice.
  */
@@ -51,7 +63,7 @@ export function cloudWeather(seed:number,climate:Climate='spring') {
   const alto=style>=4?0:climate==='autumn'&&random()<.65?.5+random()*.5:random()<.25?.3+random()*.5:0;
   return {style,cover,clear,base,top,cirrus,alto,
     offset:[random()*256,random()*256] as const,
-    wind:[.0005+random()*.0005,(random()-.5)*.0008] as const};
+    wind:westerly(random,climate)};
 }
 
 export type CloudWeather=ReturnType<typeof cloudWeather>;
