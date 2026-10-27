@@ -46,3 +46,12 @@ test('each visit gets a sparse cloud slab with volume and its own mix of high cl
   // most of the sky stays open: scattered characters leave wide gaps between groups of cloud
   for(const name of ['cumulus','fair','congestus','cumulonimbus'])assert.ok(of(name).every(w=>w.clear>=.5));
 });
+test('clouds drift with the westerlies, from west to east',()=>{
+  for(const climate of ['spring','summer','autumn','winter'])for(const w of visits(climate,100)){
+    const [east,south]=w.wind;
+    assert.ok(east>0,'moving east');
+    assert.ok(Math.abs(Math.atan2(south,east))<=26*Math.PI/180,'within ~25° of due east');
+  }
+  const speed=w=>Math.hypot(...w.wind),mean=c=>visits(c,100).reduce((a,w)=>a+speed(w),0)/100;
+  assert.ok(mean('winter')>mean('summer'),'the winter jet stream is faster');
+});
