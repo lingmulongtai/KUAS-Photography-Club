@@ -5,8 +5,20 @@
 
 interface Session {
   signedIn: boolean;
+  configured: boolean;
+  missing: string[];
   demo: boolean;
   canPublish: boolean;
+}
+
+interface PublishResult {
+  ok?: boolean;
+  demo?: boolean;
+  markdown?: string;
+  path?: string;
+  commit?: string;
+  page?: string;
+  sha?: string;
 }
 
 interface TripRef {
@@ -53,8 +65,8 @@ const MAX_SIDE = 2000;
 const QUALITY = 0.86;
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, { credentials: 'same-origin', ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) } });
-  const data = await res.json().catch(() => ({}));
+  const res = await fetch(path, { cache: 'no-store', credentials: 'same-origin', ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) } });
+  const data = await res.json().catch(() => { throw new Error('サーバーの応答を確認できませんでした。入力を残したまま、もう一度お試しください。'); });
   if (!res.ok) throw new Error((data as { error?: string }).error ?? `エラー (${res.status})`);
   return data as T;
 }
@@ -208,14 +220,68 @@ function checkPhotos(photos: PickedPhoto[]) {
   });
 }
 
-function result(el: HTMLElement, pre: HTMLElement, r: { demo?: boolean; markdown?: string; path?: string; commit?: string; page?: string }) {
+const publicationWatchers = new WeakMap<HTMLElement, AbortController>();
+
+function stopPublicationWatch(el: HTMLElement) {
+  publicationWatchers.get(el)?.abort();
+  publicationWatchers.delete(el);
+}
+
+function result(el: HTMLElement, pre: HTMLElement, r: PublishResult) {
+  stopPublicationWatch(el);
   if (r.demo) {
-    el.innerHTML = 'デモなので公開はしていません。本番ではこの内容がサイトに載ります：';
+    el.textContent = 'ローカルデモのため保存・公開していません。内容の確認だけできます：';
     pre.hidden = false;
     pre.textContent = `# ${r.path}\n\n${r.markdown}`;
   } else {
+    if (!r.ok || !r.commit) throw new Error('保存の完了を確認できませんでした。入力を残したまま、変更履歴を確認してください。');
     pre.hidden = true;
-    el.innerHTML = `公開しました。1〜2分でサイトに反映されます。<a href="${esc(r.page ?? '/')}" target="_blank" rel="noopener">ページを開く</a> · <a href="${esc(r.commit ?? '#')}" target="_blank" rel="noopener">変更履歴</a>`;
+    const links = `<a href="${esc(r.page ?? '/')}" target="_blank" rel="noopener">ページを開く</a> · <a href="${esc(r.commit)}" target="_blank" rel="noopener">変更履歴</a>`;
+    el.innerHTML = `保存しました。サイトへの反映を確認しています… ${links}`;
+    if (!r.sha) {
+      el.innerHTML = `保存しました。サイトへの反映はまだ確認できていません。${links}`;
+      return;
+    }
+    const controller = new AbortController();
+    publicationWatchers.set(el, controller);
+    const abortOnLeave = () => controller.abort();
+    const release = () => {
+      window.removeEventListener('pagehide', abortOnLeave);
+      if (publicationWatchers.get(el) === controller) publicationWatchers.delete(el);
+    };
+    window.addEventListener('pagehide', abortOnLeave, { once: true });
+    controller.signal.addEventListener('abort', release, { once: true });
+    const deadline = Date.now() + 120_000;
+    void (async () => {
+      while (!controller.signal.aborted && Date.now() < deadline) {
+        const check = new AbortController();
+        const cancel = () => check.abort();
+        controller.signal.addEventListener('abort', cancel, { once: true });
+        const timeout = window.setTimeout(cancel, Math.min(10_000, deadline - Date.now()));
+        try {
+          const response = await fetch(`/admin-build.json?publication=${encodeURIComponent(r.sha!)}&t=${Date.now()}`, { cache: 'no-store', signal: check.signal });
+          if (response.ok) {
+            const build = await response.json() as { commit?: string | null };
+            if (build.commit === r.sha) {
+              if (controller.signal.aborted || publicationWatchers.get(el) !== controller) return;
+              el.innerHTML = `公開しました。サイトへの反映を確認しました。${links}`;
+              release();
+              return;
+            }
+          }
+        } catch {
+          // A deployment or network interruption can temporarily prevent a status check.
+        } finally {
+          window.clearTimeout(timeout);
+          controller.signal.removeEventListener('abort', cancel);
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 3000));
+      }
+      if (!controller.signal.aborted) {
+        el.innerHTML = `保存済みです。サイトへの反映はまだ確認できていません。時間をおいてページを確認し、反映されない場合は Vercel のデプロイ結果を確認してください。${links}`;
+        release();
+      }
+    })();
   }
 }
 
@@ -225,20 +291,49 @@ export function startAdmin(root: HTMLElement) {
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
   const views = { login: $('[data-view=login]'), app: $('[data-view=app]') };
   const modeNote = $('[data-mode]');
+  let session: Session | null = null;
+  const busyForms = new Set<HTMLFormElement>();
+  const updatePublishButtons = () => {
+    root.querySelectorAll<HTMLFormElement>('[data-panel]').forEach((form) => {
+      const button = form.querySelector<HTMLButtonElement>('button[type=submit]');
+      if (button) button.disabled = busyForms.has(form) || !(session?.canPublish || session?.demo);
+    });
+  };
+  const beginSubmission = (form: HTMLFormElement, status: HTMLElement) => {
+    if (busyForms.has(form)) return false;
+    if (!(session?.canPublish || session?.demo)) {
+      status.textContent = '⚠ 公開の準備ができていません。画面上部の設定案内を確認してください。';
+      return false;
+    }
+    stopPublicationWatch(status);
+    busyForms.add(form);
+    form.setAttribute('aria-busy', 'true');
+    updatePublishButtons();
+    return true;
+  };
+  const endSubmission = (form: HTMLFormElement) => {
+    busyForms.delete(form);
+    form.removeAttribute('aria-busy');
+    updatePublishButtons();
+  };
 
   const show = (s: Session) => {
-    views.login.hidden = s.signedIn;
+    session = s;
+    views.login.hidden = s.signedIn || !s.configured;
     views.app.hidden = !s.signedIn;
     $('[data-demo-hint]').hidden = !s.demo;
     modeNote.hidden = false;
     modeNote.classList.toggle('live', s.canPublish);
-    modeNote.innerHTML = s.canPublish
-      ? '本番モード：公開するとサイトに載ります。'
-      : s.demo
-        ? 'デモモード：試せますが、サイトには公開されません。本番にするには Vercel の環境変数に <code>ADMIN_PASSWORD</code> と <code>GITHUB_TOKEN</code> を設定してください。'
-        : 'パスワードは設定済みですが <code>GITHUB_TOKEN</code> がないため、公開はできません（内容の確認だけできます）。';
+    const missing = (s.missing ?? []).map((name) => `<code>${esc(name)}</code>`).join('、');
+    modeNote.innerHTML = s.demo
+      ? 'ローカルデモ：内容の確認だけできます。保存・公開はしません。'
+      : s.canPublish
+        ? '投稿を公開できます。保存後、サイトへの反映を確認します。'
+        : `公開の設定が完了していません。${missing ? `${missing} を ` : ''}Vercel の Production 環境に設定し、再デプロイしてください。設定済みなら、対象プロジェクトと環境を確認してください。`;
+    updatePublishButtons();
   };
 
+  updatePublishButtons();
   call<Session>('/api/admin/session').then(show, () => {
     modeNote.hidden = false;
     modeNote.textContent = '管理用のサーバーにつながりません。Vercel に公開されたサイトで開いてください。';
@@ -280,6 +375,7 @@ export function startAdmin(root: HTMLElement) {
   const newStatus = $('[data-status=new]');
   newForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!beginSubmission(newForm, newStatus)) return;
     const f = new FormData(newForm);
     const status = (s: string) => (newStatus.textContent = s);
     try {
@@ -289,7 +385,7 @@ export function startAdmin(root: HTMLElement) {
       const names = newPhotos.photos.map((_, i) => `${String(i + 1).padStart(2, '0')}.jpg`);
       const blobs = await upload(newPhotos.photos, names, status);
       status('公開しています…');
-      const r = await call<{ demo?: boolean; markdown?: string; path?: string; commit?: string; page?: string }>('/api/admin/trip', {
+      const r = await call<PublishResult>('/api/admin/trip', {
         method: 'POST',
         body: JSON.stringify({
           mode: 'new',
@@ -314,6 +410,8 @@ export function startAdmin(root: HTMLElement) {
       }
     } catch (x) {
       status(`⚠ ${(x as Error).message}`);
+    } finally {
+      endSubmission(newForm);
     }
   });
 
@@ -329,6 +427,7 @@ export function startAdmin(root: HTMLElement) {
   syncSpot();
   addForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!beginSubmission(addForm, addStatus)) return;
     const status = (s: string) => (addStatus.textContent = s);
     try {
       const slug = select.value;
@@ -340,7 +439,7 @@ export function startAdmin(root: HTMLElement) {
       const names = addPhotos.photos.map((_, i) => `p${stamp}-${String(i + 1).padStart(2, '0')}.jpg`);
       const blobs = await upload(addPhotos.photos, names, status);
       status('公開しています…');
-      const r = await call<{ demo?: boolean; markdown?: string; path?: string; commit?: string; page?: string }>('/api/admin/trip', {
+      const r = await call<PublishResult>('/api/admin/trip', {
         method: 'POST',
         body: JSON.stringify({ mode: 'append', slug, ...(spotChanged ? { spot: requestedSpot } : {}), blobs, photos: photoMeta(addPhotos.photos, names) }),
       });
@@ -352,6 +451,8 @@ export function startAdmin(root: HTMLElement) {
       }
     } catch (x) {
       status(`⚠ ${(x as Error).message}`);
+    } finally {
+      endSubmission(addForm);
     }
   });
 
@@ -423,6 +524,7 @@ export function startAdmin(root: HTMLElement) {
   $('[data-add-event]').addEventListener('click', () => addEvent({ date: `${monthInput.value}-01` }));
   sForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!beginSubmission(sForm, sStatus)) return;
     try {
       const events = Array.from(evList.querySelectorAll<HTMLElement>('.event-row'))
         .map((row) => {
@@ -433,13 +535,15 @@ export function startAdmin(root: HTMLElement) {
         .filter((ev) => ev.title);
       const noMeeting = Array.from(offList.querySelectorAll<HTMLInputElement>('input')).map((i) => i.value).filter(Boolean);
       sStatus.textContent = '公開しています…';
-      const r = await call<{ demo?: boolean; markdown?: string; path?: string; commit?: string; page?: string }>('/api/admin/schedule', {
+      const r = await call<PublishResult>('/api/admin/schedule', {
         method: 'POST',
         body: JSON.stringify({ month: monthInput.value, weeklyMeeting: weekly.checked, noMeeting, events, notes: notes.value }),
       });
       result(sStatus, $('[data-preview=schedule]'), r);
     } catch (x) {
       sStatus.textContent = `⚠ ${(x as Error).message}`;
+    } finally {
+      endSubmission(sForm);
     }
   });
 }

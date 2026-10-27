@@ -1,9 +1,10 @@
 import type { APIRoute } from 'astro';
-import { checkCredentials, json, signIn, signOut } from '../../../lib/admin/auth.ts';
+import { checkCredentials, configurationError, isConfigured, json, signIn, signOut } from '../../../lib/admin/auth.ts';
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request, cookies }) => {
+  if (!isConfigured()) return json({ error: configurationError(), code: 'ADMIN_NOT_CONFIGURED' }, 503);
   let username: unknown;
   let password: unknown;
   try {

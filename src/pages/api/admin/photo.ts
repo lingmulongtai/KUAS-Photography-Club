@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { canPublish, guard, json } from '../../../lib/admin/auth';
-import { createBlob } from '../../../lib/admin/github';
+import { canPublish, guard, json, publishingGuard } from '../../../lib/admin/auth.ts';
+import { createBlob } from '../../../lib/admin/github.ts';
 
 export const prerender = false;
 
@@ -8,11 +8,13 @@ const MAX_BYTES = 3.2 * 1024 * 1024;
 
 /**
  * One photo (a JPEG the browser has already resized and stripped of EXIF), stored on GitHub as
- * a blob so the publish step can commit it. In demo mode nothing is stored.
+ * a blob so the publish step can commit it. Only an explicitly enabled local demo skips storage.
  */
 export const POST: APIRoute = async ({ request, cookies }) => {
   const denied = guard(request, cookies);
   if (denied) return denied;
+  const unavailable = publishingGuard();
+  if (unavailable) return unavailable;
   let data: unknown;
   try {
     ({ data } = await request.json());

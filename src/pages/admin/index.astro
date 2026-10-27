@@ -2,7 +2,8 @@
 /**
  * Admin panel: add a photo trip, add photos to a trip, or write a month's schedule.
  * Publishing commits to GitHub through /api/admin/*, and Vercel redeploys the site.
- * Without ADMIN_PASSWORD and GITHUB_TOKEN set on Vercel it runs as a demo (ID "admin", password "demo").
+ * Production publishing requires ADMIN_PASSWORD and GITHUB_TOKEN; missing settings block publishing.
+ * A demo is available only when explicitly enabled for local development.
  */
 import { getCollection } from 'astro:content';
 import Base from '../../layouts/Base.astro';
@@ -26,7 +27,7 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
     <header class="top">
       <p class="edge">ADMIN</p>
       <h1>管理画面</h1>
-      <p class="mode" data-mode hidden></p>
+      <p class="mode" data-mode role="status" aria-live="polite" hidden></p>
     </header>
 
     <!-- sign in -->
@@ -43,7 +44,7 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
         <label>パスワード<input type="password" name="password" autocomplete="current-password" required /></label>
         <button class="btn btn--primary" type="submit">ログイン</button>
         <p class="error" data-login-error hidden></p>
-        <p class="small muted" data-demo-hint hidden>いまはデモです。ID は <code>admin</code>、パスワードは <code>demo</code>。何を送ってもサイトには公開されません。</p>
+        <p class="small muted" data-demo-hint hidden>ローカルデモです。ID は <code>admin</code>、パスワードは <code>demo</code>。保存・公開はしません。</p>
       </form>
     </section>
 
@@ -76,7 +77,7 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
           <div class="photos" data-photos="new"></div>
         </fieldset>
         <div class="actions">
-          <button class="btn btn--primary" type="submit">公開する</button>
+          <button class="btn btn--primary" type="submit" disabled>公開する</button>
           <p class="status" data-status="new" aria-live="polite"></p>
         </div>
         <pre class="preview" data-preview="new" hidden></pre>
@@ -93,7 +94,7 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
           <div class="photos" data-photos="add"></div>
         </fieldset>
         <div class="actions">
-          <button class="btn btn--primary" type="submit">変更を公開する</button>
+          <button class="btn btn--primary" type="submit" disabled>変更を公開する</button>
           <p class="status" data-status="add" aria-live="polite"></p>
         </div>
         <pre class="preview" data-preview="add" hidden></pre>
@@ -120,7 +121,7 @@ const months = (await getCollection('schedule', isPublicContent)).map((m) => ({
         </fieldset>
         <label>この月のお知らせ（任意・カレンダーの下に出ます）<textarea name="notes" rows="3"></textarea></label>
         <div class="actions">
-          <button class="btn btn--primary" type="submit">公開する</button>
+          <button class="btn btn--primary" type="submit" disabled>公開する</button>
           <p class="status" data-status="schedule" aria-live="polite"></p>
         </div>
         <pre class="preview" data-preview="schedule" hidden></pre>
