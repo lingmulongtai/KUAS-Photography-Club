@@ -298,8 +298,8 @@ export function createHero(
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
     const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, [...campusTreeSpots(hf),...cherries], { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) || replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
     const forestPhoto=(photo:THREE.Texture,i:number)=>{
-      forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal);
-      shadow.invalidate();
+      void forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal)
+        .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
     };
     updateForestPhoto=forestPhoto;
     detailedPhotos.forEach((photo,i)=>photo&&forestPhoto(photo,i));
@@ -395,7 +395,8 @@ export function createHero(
       const mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
       const infrastructure=infrastructureMask(data.lines,r.box);
       outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
-      forest.setOuterPhoto(data.photo.image as HTMLImageElement,r.photo.box);
+      void forest.setOuterPhoto(data.photo.image as HTMLImageElement,r.photo.box)
+        .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
       scene.add(group);casts(city.group);cityLods.add(city);shadow.invalidate();
@@ -409,7 +410,8 @@ export function createHero(
         env.uBuilt.value=coreBuilt;env.uBuiltBox.value.set(...BUILDINGS_BOX);
         env.uBuiltTexel.value=(BUILDINGS_BOX[2]-BUILDINGS_BOX[0])/builtSize;
         outerExcluded=()=>false;
-        forest.setOuterPhoto(null,r.photo.box);
+        void forest.setOuterPhoto(null,r.photo.box)
+          .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
         road.dispose();built.dispose();data.dispose();shadow.invalidate();
         if(campusNormal){terrain.uniforms.uRegionalNormal.value=oldNormal;terrain.uniforms.uRegionalBox.value.copy(oldNormalBox);
           terrain.uniforms.uRegionalOn.value=oldNormalOn;campusNormal.dispose();}
@@ -588,8 +590,6 @@ export function createHero(
 
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
-    cancelTerrainRecenter?.();
-    cancelTreePlanting?.();
     const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
     if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
     zoom.reset();
@@ -603,6 +603,8 @@ export function createHero(
       opts.onMode?.(to,true);
       return;
     }
+    cancelTerrainRecenter?.();
+    cancelTreePlanting?.();
     const blank = () => ({ pos: new THREE.Vector3(), target: new THREE.Vector3() });
     const from = fromExplorer ?? (flight ? { pos: camera.position.clone(), target: lastTarget.clone() } : mode === 'city' ? cityPose(t, blank()) : campusPose(t, blank()));
     resetLook();
