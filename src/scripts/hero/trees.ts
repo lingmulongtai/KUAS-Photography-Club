@@ -243,19 +243,23 @@ export function createForest(
       geo.setAttribute('normal', shape.getAttribute('normal'));
       geo.setAttribute('aBark', shape.getAttribute('aBark'));
       geo.setAttribute('aVox', shape.getAttribute('aVox'));
-      geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => pos.slice(i * 3, i * 3 + 3))), 3));
-      geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => size.slice(i * 2, i * 2 + 2))), 2));
-      geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => tint.slice(i * 3, i * 3 + 3))), 3));
-      geo.setAttribute('iShape', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => shapes.slice(i * 3, i * 3 + 3))), 3));
-      geo.setAttribute('iSeason',new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap(i=>season.slice(i*2,i*2+2))),2));
-      geo.instanceCount = idx.length;
+      const positions=new Float32Array(idx.length*3),sizes=new Float32Array(idx.length*2),
+        tints=new Float32Array(idx.length*3),treeShapes=new Float32Array(idx.length*3),seasons=new Float32Array(idx.length*2);
       const bounds = new THREE.Box3();
-      for (const i of idx) {
-        const radius = size[i * 2] * 1.9;
-        const [x, y, z] = pos.slice(i * 3, i * 3 + 3);
-        bounds.expandByPoint(new THREE.Vector3(x - radius, y, z - radius));
-        bounds.expandByPoint(new THREE.Vector3(x + radius, y + size[i * 2 + 1] * 1.6, z + radius));
+      for (let j=0;j<idx.length;j++) {
+        const i=idx[j],p=i*3,s=i*2,pOut=j*3,sOut=j*2;
+        for(let k=0;k<3;k++){positions[pOut+k]=pos[p+k];tints[pOut+k]=tint[p+k];treeShapes[pOut+k]=shapes[p+k];}
+        sizes[sOut]=size[s];sizes[sOut+1]=size[s+1];seasons[sOut]=season[s];seasons[sOut+1]=season[s+1];
+        const x=pos[p],y=pos[p+1],z=pos[p+2],radius=size[s]*1.9;
+        bounds.min.x=Math.min(bounds.min.x,x-radius);bounds.min.y=Math.min(bounds.min.y,y);bounds.min.z=Math.min(bounds.min.z,z-radius);
+        bounds.max.x=Math.max(bounds.max.x,x+radius);bounds.max.y=Math.max(bounds.max.y,y+size[s+1]*1.6);bounds.max.z=Math.max(bounds.max.z,z+radius);
       }
+      geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(positions, 3));
+      geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(sizes, 2));
+      geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(tints, 3));
+      geo.setAttribute('iShape', new THREE.InstancedBufferAttribute(treeShapes, 3));
+      geo.setAttribute('iSeason',new THREE.InstancedBufferAttribute(seasons,2));
+      geo.instanceCount = idx.length;
       geo.boundingBox = bounds;
       geo.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
       const mesh = new THREE.Mesh(geo, material);
