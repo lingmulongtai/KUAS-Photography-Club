@@ -3,7 +3,7 @@ import { ENV_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { LINE, type LineFeature } from './lines-data';
 import { ROAD_GLSL } from './roads';
-import {refineWaterSurface} from './water-surface';
+import {refineWaterSurfaceSteps} from './water-surface';
 import {toLocal} from './geo';
 import type {KamoChannel} from './kamo-channel';
 
@@ -48,7 +48,7 @@ function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: Wat
       // A bounded fallback retains the complete shoreline if a pathological polygon is huge.
       let refined;
       for(const edge of [regionalEdge,regionalEdge*2,regionalEdge*4]) {
-        try {refined=refineWaterSurface(all,tris,edge,40000,f.attr===1?{x:senkoji.x,y:senkoji.z}:undefined);break;} catch { /* retry coarser, never drop water */ }
+        try {refined=yield* refineWaterSurfaceSteps(all,tris,edge,40000,f.attr===1?{x:senkoji.x,y:senkoji.z}:undefined);break;} catch { /* retry coarser, never drop water */ }
       }
       if(refined) {all=refined.points;tris=refined.triangles;}
     }
