@@ -125,6 +125,35 @@ def line_parts(g):
     return [p for child in getattr(g,'geoms',[]) for p in line_parts(child)]
 
 
+def merge_tennozan_measured(buildings, region):
+    """Keep Kyoto's measured south buildings where its coverage overlaps GSI outlines."""
+    from shapely.geometry import Polygon
+    from shapely.strtree import STRtree
+    south=REGIONS['south']
+    cache=os.path.join(CACHE,'buildings-south.pkl')
+    if not os.path.exists(cache):
+        fetch_sources(south)
+    clip=sbox(*region['box'])
+    measured=[]
+    shapes=[]
+    for b in clipped_buildings('south',south):
+        for poly in polygons(make_valid(Polygon(b['ring'])).intersection(clip)):
+            if poly.area<20:
+                continue
+            measured.append({**b,'ring':np.array(poly.exterior.coords)[:-1]})
+            shapes.append(poly)
+    tree=STRtree(shapes)
+    merged=[]
+    for b in buildings:
+        poly=Polygon(b['ring'])
+        # GSI footprints outside the measured ward stay as illustrative buildings.
+        if not any(poly.intersection(shapes[i]).area >= .3*min(poly.area,shapes[i].area)
+                   for i in tree.query(poly)):
+            merged.append(b)
+    print('tennozan measured',len(measured),'remaining GSI',len(merged),flush=True)
+    return merged+measured
+
+
 def export_lines(key,box):
     feats=[]
     clip=sbox(*box)
@@ -187,8 +216,12 @@ def export_lines(key,box):
 def build(key,region):
     fetch_sources(region)
     buildings=clipped_buildings(key,region)
+    if key=='tennozan':
+        buildings=merge_tennozan_measured(buildings,region)
     lookout=R.to_local(34.897931,135.679798)
     def keep_building(b,area,x,z):
+        if b['ground'] is not None:
+            return area>=20
         if key=='tennozan' and (x-lookout[0])**2+(z-lookout[1])**2>3500**2:
             return area>=120 or b['height']>6
         return area>=20
@@ -205,7 +238,8 @@ def build(key,region):
     mobile=photo.resize(tuple(round(v/2) for v in dims),Image.Resampling.LANCZOS)
     _,mobile_size=save(mobile,f'aerial-{key}-mobile.webp',220_000)
     return {'id':key,'ja':region['ja'],'en':region['en'],'box':region['box'],
-        'heightSource':'PLATEAU measured' if region.get('wards') else 'GSI outlines; illustrative heights (6 m / 10 m)',
+        'heightSource':('PLATEAU measured and GSI outlines; illustrative heights (6 m / 10 m)' if key=='tennozan'
+                        else 'PLATEAU measured' if region.get('wards') else 'GSI outlines; illustrative heights (6 m / 10 m)'),
         'buildings':{'meta':f'buildings-{key}.json','file':f'buildings-{key}.bin','bytes':building_bytes},'lines':lines,
         'photo':{'box':region['box'],'file':f'aerial-{key}.webp','size':dims,'bytes':size,'zoom':13,
                  'mobile':{'file':f'aerial-{key}-mobile.webp','size':mobile.size,'bytes':mobile_size}}}

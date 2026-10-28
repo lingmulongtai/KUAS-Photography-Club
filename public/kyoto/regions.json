@@ -62,11 +62,11 @@
     500,
     23000
    ],
-   "heightSource": "GSI outlines; illustrative heights (6 m / 10 m)",
+   "heightSource": "PLATEAU measured and GSI outlines; illustrative heights (6 m / 10 m)",
    "buildings": {
     "meta": "buildings-tennozan.json",
     "file": "buildings-tennozan.bin",
-    "bytes": 692339
+    "bytes": 740950
    },
    "lines": {
     "file": "lines-tennozan.bin",
