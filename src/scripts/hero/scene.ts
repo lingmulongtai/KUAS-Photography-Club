@@ -365,35 +365,55 @@ export function createHero(
         throw results.find(result=>result.status==='rejected')!.reason;
       }
       return {buildings:b.value,lines:l.value,photo:p.value,dispose:()=>p.value.dispose()};
-    },(r,data)=>{
+    },async(r,data,current)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
+      const step=async()=>{await yieldToBrowser();if(!current())throw new Error('Region superseded');};
+      let campusNormal:THREE.Texture|null=null;
+      let road!:ReturnType<typeof buildRoadField>,built!:THREE.Texture;
+      let city:ReturnType<typeof buildCity>,lamps:ReturnType<typeof buildLamps>,traffic:ReturnType<typeof buildCars>;
+      let mask:ReturnType<typeof createBuildingMask>,infrastructure:ReturnType<typeof infrastructureMask>;
+      try {
       const detailedCampus=r.id==='kameoka-campus';
       const polys=detailedCampus?data.buildings.polys.filter(p=>{
         let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !isKameokaBuilding(x/(p.ring.length/2),z/(p.ring.length/2));
       }):data.buildings.polys;
       const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
-      const city=buildCity(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10),opts.quality);
-      group.add(city.group,buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24,undefined,r.id==='yamashina'),buildIslands(env,hf,data.lines));
-      let campusNormal:THREE.Texture|null=null;
-      const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
+      await step();
+      city=buildCity(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10),opts.quality);
+      group.add(city.group);
+      await step();
+      group.add(buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24,undefined,r.id==='yamashina'));
+      group.add(buildIslands(env,hf,data.lines));
+      await step();
       if(detailedCampus){
         const campus=buildKameokaCampus(env,hf);group.add(campus);casts(campus);
-        if(meta.kameokaCampus){campusNormal=normalTexture(hf,meta.kameokaCampus.elevation);
-          terrain.uniforms.uRegionalNormal.value=campusNormal;terrain.uniforms.uRegionalBox.value.set(...meta.kameokaCampus.box);terrain.uniforms.uRegionalOn.value=1;}
+        if(meta.kameokaCampus)campusNormal=normalTexture(hf,meta.kameokaCampus.elevation);
       }
-      const lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);
-      const traffic=buildCars(env,hf,data.lines,lite ? .25 : .45);
-      group.add(lamps.points,traffic.group);
-      const road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
+      await step();
+      lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);group.add(lamps.points);
+      traffic=buildCars(env,hf,data.lines,lite ? .25 : .45);group.add(traffic.group);
+      await step();
+      road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
+      await step();
+      built=buildOcclusion(data.buildings,r.box,builtSize);
+      await step();
+      mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
+      infrastructure=infrastructureMask(data.lines,r.box);
+      await step();
+      } catch(error) {
+        disposeGroup(group);road?.dispose();built?.dispose();campusNormal?.dispose();
+        throw error;
+      }
+      const detailedCampus=r.id==='kameoka-campus';
+      const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
+      if(campusNormal && meta.kameokaCampus){terrain.uniforms.uRegionalNormal.value=campusNormal;
+        terrain.uniforms.uRegionalBox.value.set(...meta.kameokaCampus.box);terrain.uniforms.uRegionalOn.value=1;}
       terrain.uniforms.uRegionRoads.value=road.texture;
       terrain.uniforms.uRegionRoadBox.value.set(...r.box);
       terrain.uniforms.uRegionRoadsOn.value=1;
       terrain.setPhoto(regions.length,data.photo,r.photo.box);
-      const built=buildOcclusion(data.buildings,r.box,builtSize);
       env.uBuilt.value=built;env.uBuiltBox.value.set(...r.box);
       env.uBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
-      const mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
-      const infrastructure=infrastructureMask(data.lines,r.box);
       outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
       void forest.setOuterPhoto(data.photo.image as HTMLImageElement,r.photo.box)
         .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));

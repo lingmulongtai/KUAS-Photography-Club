@@ -54,3 +54,13 @@ test('a region superseded during asynchronous activation is disposed before the 
   activation.resolve();await done;
   assert.deepEqual(activated,['a','b']);assert.deepEqual(released,['city-a','data-a']);assert.equal(loader.id,'b');
 });
+
+test('superseded preparation can stop early without reporting an error',async()=>{
+  const started=deferred(),resume=deferred(),released=[],errors=[];
+  const loader=createRegionalLoader(async r=>({dispose:()=>released.push(r.id)}),async(r,_data,current)=>{
+    if(r.id==='a'){started.resolve();await resume.promise;if(!current())throw Error('superseded');}
+    return ()=>{};
+  },e=>errors.push(e));
+  const done=loader.request(region('a'));await started.promise;loader.request(region('b'));resume.resolve();await done;
+  assert.deepEqual(released,['a']);assert.deepEqual(errors,[]);assert.equal(loader.id,'b');
+});
