@@ -109,7 +109,7 @@ export function createHero(
   renderer: THREE.WebGLRenderer,
   el: HTMLElement,
   opts: HeroOptions,
-): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void;setSeason(season:Season):void; setExploring(enabled:boolean):void;readonly exploring:boolean; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
+): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void;setSeason(season:Season):void; setExploring(enabled:boolean):void; setTouchMove(forward:number,side:number,up:number):void; readonly exploring:boolean; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
   const env = createEnv();
   const scene = new THREE.Scene();
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
@@ -471,7 +471,8 @@ export function createHero(
   let exploring=false,freeBearing=0,freePitch=0,lastInput=performance.now();
   const freePosition=new THREE.Vector3(),freeCenter=new THREE.Vector3();
   const keys=new Set<string>();
-  const clearKeys=()=>keys.clear();
+  const touchMove={forward:0,side:0,up:0};
+  const clearKeys=()=>{ keys.clear(); touchMove.forward=touchMove.side=touchMove.up=0; };
   window.addEventListener('blur',clearKeys);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)clearKeys();});
   el.addEventListener('keydown',e=>{
@@ -557,7 +558,7 @@ export function createHero(
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
     const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
-    if(exploring){exploring=false;keys.clear();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
+    if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
     zoom.reset();
     updateZoom();
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
@@ -632,8 +633,9 @@ export function createHero(
     const now=performance.now(),inputDt=Math.min(.1,(now-lastInput)/1000);lastInput=now;
     if(exploring){
       const pressed=(...codes:string[])=>codes.some(code=>keys.has(code))?1:0;
-      moveExplorer(freePosition,freeBearing+lookDrag.yaw,pressed('KeyW','ArrowUp')-pressed('KeyS','ArrowDown'),
-        pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft'),pressed('KeyE')-pressed('KeyQ'),inputDt,!!pressed('ShiftLeft','ShiftRight'),groundAt??(()=>40));
+      const axis=(value:number)=>Math.max(-1,Math.min(1,value));
+      moveExplorer(freePosition,freeBearing+lookDrag.yaw,axis(pressed('KeyW','ArrowUp')-pressed('KeyS','ArrowDown')+touchMove.forward),
+        axis(pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft')+touchMove.side),axis(pressed('KeyE')-pressed('KeyQ')+touchMove.up),inputDt,!!pressed('ShiftLeft','ShiftRight'),groundAt??(()=>40));
       camera.position.copy(freePosition);const yaw=(freeBearing+lookDrag.yaw)*RAD,pitch=THREE.MathUtils.clamp(freePitch+lookDrag.pitch,-85,85)*RAD;
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
       if(freeCenter.distanceTo(freePosition)>600){
@@ -710,6 +712,10 @@ export function createHero(
     /** Fly to the campus or back to the view from Shogunzuka. */
     flyTo: (to: 'campus' | HeroView) => flyTo(to, clock),
     setSeason(value){season=value;},
+    setTouchMove(forward,side,up){
+      const axis=(value:number)=>exploring&&Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
+      touchMove.forward=axis(forward);touchMove.side=axis(side);touchMove.up=axis(up);
+    },
     setExploring(enabled){
       if(exploring===enabled)return;
       if(enabled){
