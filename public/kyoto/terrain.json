@@ -127,35 +127,44 @@
    -35000,
    -20000,
    14000,
-   29000
+   36000
   ],
   "step": 100,
   "nx": 491,
-  "nz": 491,
+  "nz": 561,
   "file": "terrain-outer.bin",
-  "bytes": 289999
+  "bytes": 321126,
+  "unmodelledMargin": {
+   "box": [
+    -35000,
+    33000,
+    -30500,
+    36000
+   ],
+   "fallback": "taper from prior data boundary"
+  }
  },
  "aerialOuter": {
   "box": [
    -35000,
    -20000,
    14000,
-   29000
+   36000
   ],
   "file": "aerial-outer.webp",
   "size": [
-   2048,
+   1792,
    2048
   ],
-  "bytes": 597884,
+  "bytes": 586500,
   "zoom": 12,
   "mobile": {
    "file": "aerial-outer-mobile.webp",
    "size": [
-    1024,
+    896,
     1024
    ],
-   "bytes": 217716
+   "bytes": 219702
   }
  },
  "kameokaCampus": {
