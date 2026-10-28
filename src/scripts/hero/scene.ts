@@ -36,6 +36,7 @@ import { buildWoodlandTexture } from './woodland-texture';
 import { infrastructureMask } from './forest-infrastructure';
 import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
+import { createIntroCameraMotion } from './intro-camera';
 import { VIEWS, PANORAMA_VIEWS, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
@@ -535,10 +536,22 @@ export function createHero(
   /* ---------- camera: the view from Shogunzuka, and a flight to the campus ---------- */
 
   const rotation = createLookRotation();
+  const introCamera = createIntroCameraMotion();
   const zoom = createViewZoom();
   let baseFov = camera.fov;
   const updateZoom = () => { camera.fov = zoom.fov(baseFov); camera.updateProjectionMatrix(); updatePointScale(); };
   const lookDrag = rotation.state;
+  const stopIntroCamera = () => {
+    const offset = introCamera.stop();
+    lookDrag.yaw += offset.yaw;
+    lookDrag.pitch += offset.pitch;
+  };
+  // Let manual input take over at the angle the visitor was already seeing.
+  const heroControls = el.closest<HTMLElement>('.hero') ?? el;
+  heroControls.addEventListener('pointerdown', stopIntroCamera, true);
+  heroControls.addEventListener('keydown', event => {
+    if (['Enter', ' ', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'w', 'a', 's', 'd', 'q', 'e'].includes(event.key)) stopIntroCamera();
+  }, true);
   let exploring=false,freeBearing=0,freePitch=0,lastInput=performance.now();
   const freePosition=new THREE.Vector3(),freeCenter=new THREE.Vector3();
   const keys=new Set<string>();
@@ -598,8 +611,8 @@ export function createHero(
     const drift = opts.reducedMotion || opts.drift === false ? 0 : Math.sin(t * 0.05) * 0.8;
     const focus=VIEW.focusBearing??VIEW.bearing;
     const framing=THREE.MathUtils.clamp(camera.aspect/1.35,.35,1);
-    const b = (focus + (VIEW.bearing-focus)*framing + drift + lookDrag.yaw) * RAD;
-    const p = THREE.MathUtils.clamp(VIEW.pitch + lookDrag.pitch, -80, 89) * RAD;
+    const b = (focus + (VIEW.bearing-focus)*framing + drift + lookDrag.yaw + introCamera.offset.yaw) * RAD;
+    const p = THREE.MathUtils.clamp(VIEW.pitch + lookDrag.pitch + introCamera.offset.pitch, -80, 89) * RAD;
     out.pos.copy(eye);
     out.target.set(eye.x + Math.sin(b) * Math.cos(p) * 1000, eye.y + Math.sin(p) * 1000, eye.z - Math.cos(b) * Math.cos(p) * 1000);
     return out;
@@ -628,6 +641,7 @@ export function createHero(
 
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
+    stopIntroCamera();
     const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
     if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
     zoom.reset();
@@ -702,6 +716,8 @@ export function createHero(
   const lastTarget = new THREE.Vector3();
   const bez = new THREE.Vector3();
   function placeCamera(t: number, dt: number) {
+    if (opts.reducedMotion) stopIntroCamera();
+    else introCamera.step(dt, loading.canDraw && !document.documentElement.classList.contains('hero-intro-open') && !flight && !exploring && mode === 'city' && view === 'shogunzuka', false);
     rotation.step(dt, opts.reducedMotion ?? false);
     const now=performance.now(),inputDt=Math.min(.1,(now-lastInput)/1000);lastInput=now;
     if(exploring){
@@ -791,6 +807,7 @@ export function createHero(
     },
     setExploring(enabled){
       if(exploring===enabled)return;
+      stopIntroCamera();
       if(enabled){
         flight=null;resetLook();freePosition.copy(camera.position);freeCenter.copy(freePosition);
         const d=lastTarget.clone().sub(camera.position).normalize();freeBearing=Math.atan2(d.x,-d.z)/RAD;freePitch=Math.asin(d.y)/RAD;
