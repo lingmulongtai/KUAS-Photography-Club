@@ -29,6 +29,8 @@ from extract_buildings import decode_tile
 REGIONS = {
     # Uji precedes overlapping ward data: Kyoto PLATEAU does not cover Uji City.
     'uji': {'box': (0,10000,11000,19000), 'ja':'宇治・平等院', 'en':'Uji / Byodoin'},
+    # Prioritize the confluence over the Kyoto-only south PLATEAU region.
+    'tennozan': {'box': (-14000,8500,500,23000), 'ja':'天王山・三川合流域', 'en':'Tennozan / Three Rivers'},
     'kameoka': {'box': (-24000,-8000,-9000,4000), 'ja':'亀岡・保津峡', 'en':'Kameoka / Hozukyo'},
     'sonobe': {'box': (-33000,-18000,-21000,-8000), 'ja':'園部・八木', 'en':'Sonobe / Yagi'},
     'yamashina': {'box': (4600,-2500,12500,8500), 'ja':'山科', 'en':'Yamashina', 'wards':['26110_yamashina-ku']},
@@ -185,8 +187,13 @@ def export_lines(key,box):
 def build(key,region):
     fetch_sources(region)
     buildings=clipped_buildings(key,region)
+    lookout=R.to_local(34.897931,135.679798)
+    def keep_building(b,area,x,z):
+        if key=='tennozan' and (x-lookout[0])**2+(z-lookout[1])**2>3500**2:
+            return area>=120 or b['height']>6
+        return area>=20
     export_buildings(buildings,box=region['box'],stem=f'buildings-{key}',ground_at=heightfield(),
-                     keep_fn=lambda b,area,x,z:area>=20,close_fn=lambda x,z:True)
+                     keep_fn=keep_building,close_fn=lambda x,z:key!='tennozan' or (x-lookout[0])**2+(z-lookout[1])**2<=3500**2)
     lines=export_lines(key,region['box'])
     building_bytes=os.path.getsize(os.path.join(OUT,f'buildings-{key}.bin'))
     if building_bytes+lines['bytes']>1.5*1024*1024:

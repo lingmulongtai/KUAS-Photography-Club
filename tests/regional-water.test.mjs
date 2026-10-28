@@ -29,5 +29,12 @@ test('regional water follows the Yamashina canal bends without a camera-dependen
     }
     assert.ok(measured>20,'the actual documented canal is sampled');water.geometry.dispose();water.material.dispose();
   }
+  const confluence=regions.find(r=>r.id==='tennozan');assert.ok(confluence);
+  const lines=await loadLines(undefined,confluence.lines.file,confluence.lines.box,confluence.lines.q);
+  const water=buildWater(createEnv(),hf,lines,{},60,undefined,true);
+  const p=water.geometry.getAttribute('position');
+  assert.ok(p.count>0&&p.count<600000,`confluence water has bounded geometry: ${p.count}`);
+  assert.equal(water.material.uniforms.uWaterBias.value,.35);
+  water.geometry.dispose();water.material.dispose();
 });
 function modulePaths(){return require.resolve.paths('three')??[];}

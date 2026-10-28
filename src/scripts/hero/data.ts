@@ -54,6 +54,7 @@ export interface TerrainMeta {
   higashiyama?: RegionalPhotoMeta;
   kameokaCampus?:RegionalPhotoMeta & {elevation:GridMeta};
   byodoin?:RegionalPhotoMeta;
+  tennozan?:RegionalPhotoMeta;
 }
 
 /** An elevation grid in metres, decoded from decimetre deltas (see encode_heights in common.py). */

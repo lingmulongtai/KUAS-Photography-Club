@@ -12,7 +12,8 @@ test('each shipped region decodes within its bounds and bounded download budget'
   globalThis.fetch=async(url)=>new Response(await readFile(new URL(String(url).split('/').pop(),root)));
   t.after(()=>{globalThis.fetch=original;});
   const {regions}=JSON.parse(await readFile(new URL('regions.json',root),'utf8'));
-  assert.deepEqual(regions.map(r=>r.id).sort(),['kameoka','sonobe','south','uji','yamashina']);
+  assert.deepEqual(regions.map(r=>r.id).sort(),['kameoka','sonobe','south','tennozan','uji','yamashina']);
+  assert.equal(regionAt(regions,toLocal(34.897931,135.679798))?.id,'tennozan','the panorama loads confluence data');
   assert.equal(regionAt(regions,toLocal(34.88928359,135.80767787))?.id,'uji','Uji data takes priority over overlapping Kyoto ward data');
   for(const [id,expected] of [['kameoka','kameoka'],['sonobe','sonobe'],['yamashina','yamashina'],['fushimi','south']]){
     const spot=SPOTS.find(s=>s.id===id);assert.ok(spot);
@@ -45,4 +46,14 @@ test('close Uji imagery covers Phoenix Hall without enlarging other regional tra
   assert.ok((await stat(new URL(byodoin.file,root))).size<=600000);
   assert.ok((await stat(new URL(byodoin.mobile.file,root))).size<=200000);
   assert.ok(byodoin.mobile.size[0]<byodoin.size[0]);
+});
+
+test('close Tennozan imagery covers the lookout and confluence within bounded transfers',async()=>{
+  const root=new URL('../public/kyoto/',import.meta.url);
+  const {tennozan}=JSON.parse(await readFile(new URL('terrain.json',root),'utf8'));
+  const p=toLocal(34.897931,135.679798),b=tennozan.box;
+  assert.ok(p.x>b[0]+300&&p.x<b[2]-300&&p.z>b[1]+300&&p.z<b[3]-300);
+  assert.ok((await stat(new URL(tennozan.file,root))).size<=760000);
+  assert.ok((await stat(new URL(tennozan.mobile.file,root))).size<=260000);
+  assert.ok(tennozan.mobile.size[0]<tennozan.size[0]);
 });
