@@ -1,6 +1,7 @@
 /** Time of day and the corresponding accumulated cloud movement, in minutes. */
 export const wrapDay = (minutes: number) => ((minutes % 1440) + 1440) % 1440;
-const ease = (x: number) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+// Slow departure, a decisive middle, then a gentle arrival.
+const ease = (x: number) => x * x * x * (x * (x * 6 - 15) + 10);
 
 export function createSkyTime() {
   let live = true;
@@ -26,7 +27,7 @@ export function createSkyTime() {
       const change = wrapDay(target - before + 720) - 720;
       cloudFrom = beforeClouds; cloudDelta = change;
       live = followLive; from = before; delta = change; start = now;
-      duration = reducedMotion ? 0 : 2800;
+      duration = reducedMotion || !change ? 0 : 4200;
       if (!duration) { from += delta; delta = 0; }
     },
     scrub(target: number, real: number, now: number) {
