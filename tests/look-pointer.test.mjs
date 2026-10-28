@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createLookRotation, mountLookControls } from '../src/scripts/hero/look-controls.ts';
 
-function setup(t, enabled=()=>true, orbiting=()=>false) {
+function setup(t, enabled=()=>true, orbiting=()=>false, fullTouchLook=()=>false) {
   const listeners = new Map(), captured = new Set();
   const oldWindow = globalThis.window, oldDocument = globalThis.document;
   globalThis.window = {addEventListener(){}};
@@ -14,7 +14,7 @@ function setup(t, enabled=()=>true, orbiting=()=>false) {
     classList:{add(){},remove(){}}, getBoundingClientRect(){return {left:0,top:0,width:600,height:400};},
   };
   const look = createLookRotation(); let taps=0; const zooms=[];
-  const reset=mountLookControls(el,look,()=>taps++,enabled,orbiting,ratio=>zooms.push(ratio));
+  const reset=mountLookControls(el,look,()=>taps++,enabled,orbiting,ratio=>zooms.push(ratio),fullTouchLook);
   const send=(type,x,y,extra={})=>listeners.get(type)({type,isPrimary:true,button:0,pointerType:'mouse',pointerId:1,clientX:x,clientY:y,timeStamp:10,target:{closest(){return null;}},...extra});
   return {el,send,look,captured,taps:()=>taps,zooms,reset};
 }
@@ -131,6 +131,17 @@ test('short taps remain taps while horizontal drags and vertical touch scrolls d
   assert.equal(h.taps(),1); assert.ok(h.look.state.yaw<0);
   h.send('pointerdown',100,100,{pointerType:'touch'}); h.send('pointermove',101,130,{pointerType:'touch'}); h.send('pointerup',101,130,{pointerType:'touch'});
   assert.equal(h.taps(),1); assert.equal(h.look.state.dragging,false);
+});
+
+test('exploration permits vertical touch look without changing normal scrolling', (t) => {
+  let exploring=false;
+  const h=setup(t,()=>true,()=>false,()=>exploring);
+  const touch={pointerType:'touch'};
+  h.send('pointerdown',100,100,touch); h.send('pointermove',101,160,{...touch,timeStamp:30}); h.send('pointerup',101,160,touch);
+  assert.equal(h.look.state.pitch,0);
+  exploring=true;
+  h.send('pointerdown',100,100,touch); h.send('pointermove',101,160,{...touch,timeStamp:30}); h.send('pointerup',101,160,touch);
+  assert.ok(h.look.state.pitch>0); assert.equal(h.taps(),0);
 });
 
 test('viewpoint and object orbit follow the hand on mouse and touch', (t)=>{
