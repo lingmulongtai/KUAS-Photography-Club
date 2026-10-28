@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
-import {railwayPath,trainProgress} from '../src/scripts/hero/railway-path.ts';
+import {railwayPath,trainProgress,trainSections,sectionTrainProgress} from '../src/scripts/hero/railway-path.ts';
 
 test('the seven source routes are bounded, continuous and retain hidden tunnel segments',async()=>{
   const data=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/railways.json.gz',import.meta.url))));
@@ -17,6 +17,19 @@ test('the seven source routes are bounded, continuous and retain hidden tunnel s
     for(const s of route.stations){assert.ok(s.distance>=0&&s.distance<=p.length);assert.equal(p.at(s.distance).visible,true);stations++;}
   }
   assert.ok(stations>40);assert.ok(tunnels>100);
+});
+
+test('long routes have multiple complete consists in separate non-overlapping sections',()=>{
+  for(const length of [2600,7200,12000,34000]){
+    const span=84,count=trainSections(length,span),section=length/count;
+    assert.ok(count>=1&&count<=8);
+    if(length>=6000)assert.ok(count>=2);
+    for(let t=0;t<900;t+=7)for(let i=0;i<count;i++){
+      const p=sectionTrainProgress(t+i*43,length,span,20,i,count);
+      assert.ok(p.distance-span/2>=i*section+1.999);
+      assert.ok(p.distance+span/2<=(i+1)*section-1.999);
+    }
+  }
 });
 
 test('a full consist stops and reverses without its centre jumping or its cars leaving the route',()=>{
