@@ -450,6 +450,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .hero-stage.is-dragging { cursor: grabbing; }
+  .is-exploring .hero-stage, .is-exploring .hero-stage > canvas { touch-action: none; }
 
   /* viewpoints */
   .views {
