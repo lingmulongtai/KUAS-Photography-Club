@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
-import {railwayPath,trainProgress,trainSections,sectionTrainProgress} from '../src/scripts/hero/railway-path.ts';
+import {railwayPath,trainSections,serviceTrainProgress} from '../src/scripts/hero/railway-path.ts';
 
 test('the source routes include the Shinkansen, stay continuous and retain hidden tunnel segments',async()=>{
   const data=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/railways.json.gz',import.meta.url))));
@@ -22,24 +22,29 @@ test('the source routes include the Shinkansen, stay continuous and retain hidde
   assert.ok(stations>40);assert.ok(tunnels>100);
 });
 
-test('long routes have multiple complete consists in separate non-overlapping sections',()=>{
+test('long routes have spaced consists travelling through the whole route',()=>{
   for(const length of [2600,7200,12000,34000]){
-    const span=84,count=trainSections(length,span),section=length/count;
+    const span=84,count=trainSections(length,span);
     assert.ok(count>=1&&count<=8);
     if(length>=6000)assert.ok(count>=2);
-    for(let t=0;t<900;t+=7)for(let i=0;i<count;i++){
-      const p=sectionTrainProgress(t+i*43,length,span,20,i,count);
-      assert.ok(p.distance-span/2>=i*section+1.999);
-      assert.ok(p.distance+span/2<=(i+1)*section-1.999);
+    for(let t=0;t<900;t+=7){
+      const trains=Array.from({length:count},(_,i)=>serviceTrainProgress(t,length,span,20,i,count,1));
+      for(const p of trains){assert.ok(p.distance-span/2>=1.999);assert.ok(p.distance+span/2<=length-1.999);}
+      const visible=trains.filter(p=>p.visible).sort((a,b)=>a.distance-b.distance);
+      for(let i=1;i<visible.length;i++)assert.ok(visible[i].distance-visible[i-1].distance>span);
     }
+    const first=serviceTrainProgress(0,length,span,20,0,1,1),later=serviceTrainProgress(30,length,span,20,0,1,1);
+    assert.equal(later.distance-first.distance,600,'no mid-route reversal');
+    assert.equal(first.visible,false,'reset happens outside the visible portion');
   }
 });
 
-test('a full consist stops and reverses without its centre jumping or its cars leaving the route',()=>{
-  const length=3000,span=84,speed=20;let previous=trainProgress(0,length,span,speed);
-  for(let t=.25;t<650;t+=.25){const p=trainProgress(t,length,span,speed);
-    assert.ok(Math.abs(p.distance-previous.distance)<=speed*.25+.00001);
-    assert.ok(p.distance-span/2>=0&&p.distance+span/2<=length);previous=p;
+test('a visible consist advances continuously in either direction',()=>{
+  for(const dir of [-1,1]){
+    let previous=serviceTrainProgress(0,3000,84,20,0,1,dir);
+    for(let t=.25;t<650;t+=.25){const p=serviceTrainProgress(t,3000,84,20,0,1,dir);
+      if(previous.visible&&p.visible)assert.ok(Math.abs(p.distance-previous.distance)<=5.00001);
+      assert.ok(p.distance-42>=0&&p.distance+42<=3000);previous=p;
+    }
   }
-  const travel=(length-span-4)/speed;assert.equal(trainProgress(travel+6,length,span,speed).distance,length-span/2-2);
 });
