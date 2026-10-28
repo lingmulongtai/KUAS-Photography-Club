@@ -42,3 +42,15 @@ test('regional boundaries do not double-select adjoining datasets',()=>{
   assert.equal(regionAt([a,b],{x:10,z:5}),b);
   assert.equal(regionAt([a,b],{x:20,z:5}),null);
 });
+
+test('a region superseded during asynchronous activation is disposed before the next one',async()=>{
+  const started=deferred(),activation=deferred(),released=[],activated=[];
+  const loader=createRegionalLoader(async r=>({dispose:()=>released.push(`data-${r.id}`)}),async(r,data)=>{
+    activated.push(r.id);
+    if(r.id==='a'){started.resolve();await activation.promise;}
+    return ()=>{released.push(`city-${r.id}`);data.dispose();};
+  },()=>assert.fail('unexpected failure'));
+  const done=loader.request(region('a'));await started.promise;loader.request(region('b'));
+  activation.resolve();await done;
+  assert.deepEqual(activated,['a','b']);assert.deepEqual(released,['city-a','data-a']);assert.equal(loader.id,'b');
+});
