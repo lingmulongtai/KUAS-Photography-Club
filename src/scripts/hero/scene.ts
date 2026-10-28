@@ -12,7 +12,7 @@ import { buildCelestial, buildSkyDome } from './sky';
 import { createPost } from './post';
 import { loadBuildings } from './buildings-data';
 import { buildingCutout } from './building-cutout';
-import { buildCity } from './buildings';
+import { buildCity, buildCityAsync } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import { buildLamps } from './lights';
 import { buildCars } from './cars';
@@ -383,7 +383,9 @@ export function createHero(
       }):data.buildings.polys;
       const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
       await step();
-      city=buildCity(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10),opts.quality);
+      const preparedCity=await buildCityAsync(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10),opts.quality,current);
+      if(!preparedCity)throw new Error('Region superseded');
+      city=preparedCity;
       group.add(city.group);
       await step();
       group.add(buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24,undefined,r.id==='yamashina'));
@@ -410,6 +412,25 @@ export function createHero(
       }
       const detailedCampus=r.id==='kameoka-campus';
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
+      let forestPhotoChanged=false;
+      const release=(releaseData=true)=>{
+        detailBox=null;southOverview?.setDetailBox(null);
+        cityLods.delete(city);
+        regionalDrive=null;scene.remove(group);disposeGroup(group);
+        for(const layer of [lamps.uniforms,traffic.uniforms]){const i=pointLayers.indexOf(layer);if(i>=0)pointLayers.splice(i,1);}
+        terrain.uniforms.uRegionRoadsOn.value=0;
+        terrain.uniforms.uRegionRoads.value=wide;
+        terrain.setPhoto(regions.length,null);
+        env.uBuilt.value=coreBuilt;env.uBuiltBox.value.set(...BUILDINGS_BOX);
+        env.uBuiltTexel.value=(BUILDINGS_BOX[2]-BUILDINGS_BOX[0])/builtSize;
+        outerExcluded=()=>false;
+        if(forestPhotoChanged)void forest.setOuterPhoto(null,r.photo.box)
+          .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
+        road.dispose();built.dispose();if(releaseData)data.dispose();shadow.invalidate();
+        if(campusNormal){terrain.uniforms.uRegionalNormal.value=oldNormal;terrain.uniforms.uRegionalBox.value.copy(oldNormalBox);
+          terrain.uniforms.uRegionalOn.value=oldNormalOn;campusNormal.dispose();}
+      };
+      try {
       if(campusNormal && meta.kameokaCampus){terrain.uniforms.uRegionalNormal.value=campusNormal;
         terrain.uniforms.uRegionalBox.value.set(...meta.kameokaCampus.box);terrain.uniforms.uRegionalOn.value=1;}
       terrain.uniforms.uRegionRoads.value=road.texture;
@@ -419,29 +440,15 @@ export function createHero(
       env.uBuilt.value=built;env.uBuiltBox.value.set(...r.box);
       env.uBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
       outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
+      forestPhotoChanged=true;
       void forest.setOuterPhoto(data.photo.image as HTMLImageElement,r.photo.box)
         .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
       scene.add(group);casts(city.group);cityLods.add(city);shadow.invalidate();
       detailBox=r.box;southOverview?.setDetailBox(detailBox);
-      return ()=>{
-        detailBox=null;southOverview?.setDetailBox(null);
-        cityLods.delete(city);
-        regionalDrive=null;scene.remove(group);disposeGroup(group);
-        for(const layer of [lamps.uniforms,traffic.uniforms])pointLayers.splice(pointLayers.indexOf(layer),1);
-        terrain.uniforms.uRegionRoadsOn.value=0;
-        terrain.uniforms.uRegionRoads.value=wide;
-        terrain.setPhoto(regions.length,null);
-        env.uBuilt.value=coreBuilt;env.uBuiltBox.value.set(...BUILDINGS_BOX);
-        env.uBuiltTexel.value=(BUILDINGS_BOX[2]-BUILDINGS_BOX[0])/builtSize;
-        outerExcluded=()=>false;
-        void forest.setOuterPhoto(null,r.photo.box)
-          .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
-        road.dispose();built.dispose();data.dispose();shadow.invalidate();
-        if(campusNormal){terrain.uniforms.uRegionalNormal.value=oldNormal;terrain.uniforms.uRegionalBox.value.copy(oldNormalBox);
-          terrain.uniforms.uRegionalOn.value=oldNormalOn;campusNormal.dispose();}
-      };
+      } catch(error) {release(false);throw error;}
+      return ()=>release();
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
     const regionManifest=await loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
       .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
