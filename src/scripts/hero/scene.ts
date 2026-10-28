@@ -53,6 +53,7 @@ import {gionStreetscape} from './gion-streetscape';
 import {buildKameokaCampus,isKameokaBuilding,KAMEOKA_CENTER} from './kameoka-campus';
 import {kameokaClearing} from './kameoka-grounds';
 import {buildRailways} from './railways';
+import {buildAircraft} from './aircraft';
 import type {RailwayRoute} from './railway-path';
 import {moveExplorer} from './free-explore';
 import {climateOf,seasonWeights,type Season} from './seasons';
@@ -116,6 +117,7 @@ export function createHero(
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
   // away depends on it, and too little of it makes neighbouring rooftops flicker
   const camera = new THREE.PerspectiveCamera(40, 1, 20, 60000);
+  const aircraft=buildAircraft(env);scene.add(aircraft.mesh);
   const sky = buildSkyDome(env);
   const celestial = buildCelestial(env, opts.quality);
   const meteors = buildMeteors(opts.quality);
@@ -813,6 +815,7 @@ export function createHero(
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
       if (dt > 0) driveCars?.(dt);
+      if (dt > 0 && !opts.reducedMotion) aircraft.update(dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);
       camera.getWorldDirection(forward);
       const az = Math.atan2(forward.x, -forward.z);

@@ -13,6 +13,7 @@ import {createForest} from './src/scripts/hero/trees.ts';
 import {buildSnow} from './src/scripts/hero/season-effects.ts';
 import {buildKiyomizuBeam} from './src/scripts/hero/kiyomizu-beam.ts';
 import {buildRailways} from './src/scripts/hero/railways.ts';
+import {buildAircraft} from './src/scripts/hero/aircraft.ts';
 import {buildClouds} from './src/scripts/hero/clouds.ts';
 import {createCloudBlur} from './src/scripts/hero/cloud-blur.ts';
 import {buildTerrain} from './src/scripts/hero/terrain.ts';
@@ -28,6 +29,7 @@ const normal=new THREE.DataTexture(new Uint8Array([128,255,128,255]),1,1);normal
 const terrain=buildTerrain(env,{...hf,bounds:box},{x:0,z:0},{aerialWide:photo,aerialWideBox:box,aerialCity:photo,aerialCityBox:box,normalFar:normal,normalFarBox:box,normalNear:normal,normalNearBox:box,photos:[box]},16);terrain.setPhoto(0,photo);
 const forest=createForest(env,hf,image,[-11000,-11000,11000,11000],.55,[{x:0,y:0,z:0,cherry:true}]);forest.plant({x:0,z:0},0);
 const snow=buildSnow(env,.55),rail=buildRailways(env,()=>0,${JSON.stringify(rails.routes)}),beam=buildKiyomizuBeam(env,()=>0);
+const aircraft=buildAircraft(env);
 const camera=new THREE.PerspectiveCamera(60,4/3,1,60000);camera.position.set(0,80,130);camera.lookAt(0,0,0);
 window.runSceneryChecks=()=>{
  const stats=[];
@@ -44,7 +46,7 @@ window.runSceneryChecks=()=>{
   if(farInstances<100)throw Error('Distant forest was not covered');
   stats.push({name:'block-forest-budget',quality,instances:canopy.count,farInstances,triangles});
  }
- for(const [name,object] of [['terrain',terrain.mesh],['forest',forest.group],['snow',snow.points],['railways',rail.group],['beam',beam]]){
+ for(const [name,object] of [['terrain',terrain.mesh],['forest',forest.group],['snow',snow.points],['railways',rail.group],['aircraft',aircraft.mesh],['beam',beam]]){
   const scene=new THREE.Scene();scene.add(object);renderer.info.reset();renderer.render(scene,camera);
   const error=renderer.getContext().getError();if(error)throw Error(name+' GPU error '+error);
   const info={name,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,points:renderer.info.render.points};
