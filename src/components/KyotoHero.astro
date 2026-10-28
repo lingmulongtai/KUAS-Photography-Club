@@ -111,6 +111,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { createLook, kelvin, lookAt, phaseName } from '../scripts/hero/palette';
   import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonPosition, moonTimes, sunPosition } from '../scripts/hero/astro';
   import { createSkyTime, wrapDay } from '../scripts/hero/sky-time';
+  import { mountGlassRefraction } from '../scripts/hero/glisse-refraction';
   import { SPOTS, type SpotId } from '../data/spots';
   import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
   import type {Season} from '../scripts/hero/seasons';
@@ -265,7 +266,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const quality = coarse || cores < 6 || window.innerWidth < 900 ? 0.55 : 1;
 
     let demo: ReturnType<typeof createHero> | null = null;
+    let stopRefraction: (() => void)[] = [];
+    const removeRefraction = () => { stopRefraction.forEach(stop => stop()); stopRefraction = []; };
+    window.addEventListener('pagehide', event => { if (!event.persisted) removeRefraction(); });
     const fallback = () => {
+      removeRefraction();
       const look = lookAt((sunPosition(new Date()).altitude * 180) / Math.PI, createLook());
       stage.style.setProperty('--fb', `linear-gradient(${look.zenith.getStyle()}, ${look.mid.getStyle()} 55%, ${look.horizon.getStyle()} 85%, #05070c)`);
       hero.classList.add('is-ready', 'no-3d');
@@ -285,7 +290,12 @@ const pinTrips = completeSpotPreviews((await getTrips())
           drift: !coarse,
           onStatus,
           onProgress: progress => document.dispatchEvent(new CustomEvent('hero:progress', {detail:progress})),
-          onReady: () => { hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false;timeSlider.disabled=false; viewButtons.forEach(b=>b.disabled=false); document.dispatchEvent(new Event('hero:ready')); },
+          onReady: () => {
+            hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false;timeSlider.disabled=false;
+            viewButtons.forEach(b=>b.disabled=false);
+            if (!stopRefraction.length) stopRefraction = [mountGlassRefraction(viewBar), mountGlassRefraction(hero.querySelector<HTMLElement>('.time-thumb')!)];
+            document.dispatchEvent(new Event('hero:ready'));
+          },
           onError: fallback,
           onAreaLoading: loading=>{areaStatus.hidden=!loading;},
           onExplore: enabled=>{
@@ -436,10 +446,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
     padding: 4px;
     border-radius: 999px;
     background: rgba(30, 30, 34, .65);
+    background-image: var(--glisse-rim, none);
     border: 1px solid rgba(255, 255, 255, .1);
     box-shadow: inset 0 0 0 .5px rgba(255,255,255,.08), 0 2px 8px rgba(0,0,0,.15);
-    -webkit-backdrop-filter: blur(3px) saturate(1.5);
-    backdrop-filter: blur(3px) saturate(1.5);
+    -webkit-backdrop-filter: blur(3px) var(--glisse-filter, saturate(1.5));
+    backdrop-filter: blur(3px) var(--glisse-filter, saturate(1.5));
     max-width: calc(100% - var(--gutter) * 2);
     overflow-x: auto;
     scrollbar-width: none;
@@ -638,7 +649,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .time-track { position: absolute; inset: 17px 0 auto; height: 6px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.2); pointer-events: none; }
   .time-fill { display: block; height: 100%; background: #0a84ff; transform: scaleX(var(--progress)); transform-origin: left; }
   .time-thumb { position: absolute; top: 8px; left: calc((100% - 36px) * var(--progress)); width: 36px; height: 24px; border-radius: 999px; pointer-events: none; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.28), inset 0 0 0 1px rgba(0,0,0,.07); transition: transform .2s cubic-bezier(.2,.8,.2,1), background-color .2s; }
+  .time-thumb[data-glisse-refraction='ready'] { background-color: rgba(255,255,255,.8); background-image: var(--glisse-rim); -webkit-backdrop-filter: blur(2px) var(--glisse-filter); backdrop-filter: blur(2px) var(--glisse-filter); }
   .time-slider.is-held .time-thumb { transform: scale(1.18); background: rgba(255,255,255,.9); }
+  .time-slider.is-held .time-thumb[data-glisse-refraction='ready'] { background-color: rgba(255,255,255,.3); background-image: var(--glisse-rim); }
   .time-slider input { position: relative; z-index: 1; display: block; width: 100%; height: 40px; margin: 0; background: transparent; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
   .time-slider input::-webkit-slider-runnable-track { height: 6px; background: transparent; }
   .time-slider input::-webkit-slider-thumb { width: 36px; height: 40px; margin-top: -17px; border: 0; background: transparent; opacity: 0; touch-action: none; appearance: none; -webkit-appearance: none; }
@@ -651,6 +664,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
   @media (prefers-reduced-transparency: reduce) {
     .views, .sky-chip, .btn--glass { background: #0c1b25; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .time-thumb[data-glisse-refraction='ready'] { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
     .btn--glass:hover { background: var(--on-dark); }
   }
 
