@@ -125,17 +125,23 @@ export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature
   const prevAlpha = renderer.getClearAlpha();
   const prevAuto = renderer.autoClear;
   const prevTone = renderer.toneMapping;
-  renderer.setRenderTarget(target);
-  renderer.setClearColor(0xffffff, 1);
-  renderer.autoClear = true;
-  renderer.toneMapping = THREE.NoToneMapping;
-  renderer.render(scene, camera);
-  renderer.setRenderTarget(prevTarget);
-  renderer.setClearColor(prevColor, prevAlpha);
-  renderer.autoClear = prevAuto;
-  renderer.toneMapping = prevTone;
-  geo.dispose();
-  material.dispose();
+  try {
+    renderer.setRenderTarget(target);
+    renderer.setClearColor(0xffffff, 1);
+    renderer.autoClear = true;
+    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.render(scene, camera);
+  } catch (error) {
+    target.dispose();
+    throw error;
+  } finally {
+    renderer.setRenderTarget(prevTarget);
+    renderer.setClearColor(prevColor, prevAlpha);
+    renderer.autoClear = prevAuto;
+    renderer.toneMapping = prevTone;
+    geo.dispose();
+    material.dispose();
+  }
   return { texture: target.texture, segments: count, dispose:()=>target.dispose() };
 }
 
