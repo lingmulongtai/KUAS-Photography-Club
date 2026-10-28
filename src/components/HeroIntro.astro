@@ -77,6 +77,8 @@ const city = [
     let last = 0;
     let frame = 0;
     let closing = false;
+    let openedAt = 0;
+    let closeAt = 0, closeFrom = 0, closeDuration = 0;
     const cleanup = () => {
       clearTimeout(timeout);
       if (frame) cancelAnimationFrame(frame);
@@ -119,14 +121,21 @@ const city = [
       if (finished) return;
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
       last = now;
-      // ease toward the reported value, at most 60% a second; four times that once it is ready
-      const want = Math.min((target - shown) * (closing ? 10 : 4), closing ? 2.4 : 0.6);
-      speed += (want - speed) * (1 - Math.exp(-dt * 10));
-      shown = Math.min(target, shown + Math.max(speed, 0) * dt);
-      if (target - shown < 0.002) shown = target;
+      if (motion.matches) {
+        shown = target;
+      } else if (closing) {
+        const p = Math.min(1, Math.max(0, (now - closeAt) / closeDuration));
+        shown = Math.max(shown, closeFrom + (1 - closeFrom) * p * p * (3 - 2 * p));
+      } else {
+        // Ease through real loading milestones without allowing the count to run ahead.
+        const want = Math.min((target - shown) * 4, 0.6);
+        speed += (want - speed) * (1 - Math.exp(-dt * 10));
+        shown = Math.min(target, shown + Math.max(speed, 0) * dt);
+        if (target - shown < 0.002) shown = target;
+      }
       show();
-      if (shown < target) frame = requestAnimationFrame(tick);
-      else if (closing) dismiss();
+      if (closing && (motion.matches || now >= closeAt + closeDuration)) dismiss();
+      else if (closing || shown < target) frame = requestAnimationFrame(tick);
       else last = speed = 0;
     };
     const follow = () => {
@@ -146,11 +155,14 @@ const city = [
       if (finished) return;
       target = 1;
       progress.setAttribute('aria-valuenow', '100');
-      if (motion.matches || shown >= 1) return dismiss();
-      // the count finishes before the scene opens, but never holds it back for long
+      if (motion.matches) return dismiss();
+      // Finish the short opening sequence, even if the scene was ready very quickly.
       closing = true;
+      closeAt = performance.now();
+      closeFrom = shown;
+      closeDuration = Math.max(650, openedAt + 2600 - closeAt);
       clearTimeout(timeout);
-      timeout = setTimeout(dismiss, 900);
+      timeout = setTimeout(dismiss, Math.min(closeDuration + 900, Math.max(0, openedAt + 10000 - closeAt)));
       follow();
     };
     intro.querySelector('button').addEventListener('click', dismiss);
@@ -161,6 +173,7 @@ const city = [
     document.addEventListener('hero:error', dismiss);
     try {
       intro.showModal();
+      openedAt = performance.now();
       root.classList.add('hero-intro-open');
       // A missing bundle or stalled connection must never hold the site behind an intro.
       timeout = setTimeout(dismiss, 10000);
