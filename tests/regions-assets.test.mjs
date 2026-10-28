@@ -57,3 +57,16 @@ test('close Tennozan imagery covers the lookout and confluence within bounded tr
   assert.ok((await stat(new URL(tennozan.mobile.file,root))).size<=260000);
   assert.ok(tennozan.mobile.size[0]<tennozan.size[0]);
 });
+
+test('the overlapping confluence region retains Kyoto measured taller buildings',async(t)=>{
+  const root=new URL('../public/kyoto/',import.meta.url),original=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(await readFile(new URL(String(url).split('/').pop(),root)));
+  t.after(()=>{globalThis.fetch=original;});
+  const south=await loadBuildings('buildings-south.json','buildings-south.bin');
+  const tennozan=await loadBuildings('buildings-tennozan.json','buildings-tennozan.bin');
+  const measured=south.boxes.filter(b=>b.x>=-13990&&b.x<490&&b.z>=8510&&b.z<22990&&b.h>12);
+  const key=b=>`${Math.round(b.x*2)},${Math.round(b.z*2)},${b.h}`;
+  const present=new Set(tennozan.boxes.map(key));
+  assert.ok(measured.length>100,'the overlap contains measured buildings');
+  assert.ok(measured.every(b=>present.has(key(b))),'measured heights are retained');
+});
