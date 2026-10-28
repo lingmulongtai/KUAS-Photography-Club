@@ -216,5 +216,28 @@
    ],
    "bytes": 145044
   }
+ },
+ "tennozan": {
+  "box": [
+   -9000,
+   10500,
+   -4000,
+   15500
+  ],
+  "file": "aerial-tennozan-detail.webp",
+  "size": [
+   2048,
+   2048
+  ],
+  "bytes": 746084,
+  "zoom": 16,
+  "mobile": {
+   "file": "aerial-tennozan-detail-mobile.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 257724
+  }
  }
 }
