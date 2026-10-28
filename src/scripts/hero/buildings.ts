@@ -530,7 +530,7 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
  * `keep` can thin out the boxes (phones leave out small houses far from the viewpoint);
  * `dressed` buildings have facades modelled elsewhere and get no facade or roof details.
  */
-export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, keep: (b: BoxBuilding) => boolean = () => true, quality = 1, dressed: (b: BoxBuilding | PolyBuilding) => boolean = () => false) {
+function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, keep: (b: BoxBuilding) => boolean, quality: number, dressed: (b: BoxBuilding | PolyBuilding) => boolean) {
   const group = new THREE.Group();
   const detailMat = detailMaterial(env, VOXEL);
   // beyond these the parts are thinner than a pixel
@@ -545,6 +545,8 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
   const flat = flatShape();
   const pitched = pitchedShape();
   const stepped = steppedShape();
+  let complete=false;
+  try {
   /** Pairs of the same houses: stepped roofs for chunks near the camera, plain slopes beyond. */
   const roofLods: { near: THREE.Mesh; far: THREE.Mesh; x: number; z: number }[] = [];
 
@@ -556,20 +558,24 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
     if (!c) chunks.set(key, (c = { flat: [], pitched: [], polys: [] }));
     return c;
   };
-  data.boxes.forEach((b, i) => {
-    if (!keep(b)) return;
+  for(let i=0;i<data.boxes.length;i++) {
+    if(i && i%512===0)yield;
+    const b=data.boxes[i];
+    if (!keep(b)) continue;
     const y = hf.height(b.x, b.z) + b.ground;
     const seed = hash1(i * 7 + 3);
     const c = chunkOf(b.x, b.z);
     if (roofFor(b).type > 0) c.pitched.push({ b, y, seed });
     else c.flat.push({ b, y, seed });
-  });
-  data.polys.forEach((p, i) => {
+  }
+  for(let i=0;i<data.polys.length;i++) {
+    if(i && i%512===0)yield;
+    const p=data.polys[i];
     const cx = p.ring[0];
     const cz = p.ring[1];
     const y = hf.height(cx, cz) + p.ground;
     chunkOf(cx, cz).polys.push({ p, y, seed: hash1(i * 13 + 5) });
-  });
+  }
 
   /**
    * Facade and roof details, in tiles modelled the first time the camera comes near them: the
@@ -588,9 +594,10 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
     }
     return t;
   };
+  let tiled=0;
   for (const c of chunks.values()) {
-    for (const e of c.flat) if (!inCampus(e.b.x, e.b.z) && !dressed(e.b)) tileOf(e.b.x, e.b.z).flat.push(e);
-    for (const e of c.polys) if (!inCampus(e.p.ring[0], e.p.ring[1]) && !dressed(e.p)) tileOf(e.p.ring[0], e.p.ring[1]).polys.push(e);
+    for (const e of c.flat) { if(++tiled%512===0)yield; if (!inCampus(e.b.x, e.b.z) && !dressed(e.b)) tileOf(e.b.x, e.b.z).flat.push(e); }
+    for (const e of c.polys) { if(++tiled%512===0)yield; if (!inCampus(e.p.ring[0], e.p.ring[1]) && !dressed(e.p)) tileOf(e.p.ring[0], e.p.ring[1]).polys.push(e); }
   }
   const modelDetails = (t: Tile) => {
     const lists = { near: new DetailList(), mid: new DetailList() };
@@ -612,6 +619,7 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
   };
 
   for (const c of chunks.values()) {
+    yield;
     const meshes: [THREE.BufferGeometry, THREE.ShaderMaterial, THREE.ShaderMaterial][] = [];
     if (c.flat.length) meshes.push([instanced(flat, c.flat, false), instMat, instDepth]);
     if (c.polys.length) meshes.push([extruded(c.polys), polyMat, polyDepth]);
@@ -637,6 +645,7 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
       roofLods.push(pair);
     }
   }
+  complete=true;
   return {
     group,
     /**
@@ -671,4 +680,31 @@ export function buildCity(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[
       return changed;
     },
   };
+  } finally {
+    if(!complete){
+      group.traverse(object=>{const mesh=object as THREE.Mesh;if(mesh.isMesh)mesh.geometry.dispose();});
+      for(const material of [detailMat,instMat,polyMat,instDepth,polyDepth,stepMat,stepDepth])material.dispose();
+      flat.dispose();pitched.dispose();stepped.dispose();
+    }
+  }
+}
+
+type CityData = { boxes: BoxBuilding[]; polys: PolyBuilding[] };
+type CityPredicate = (b: BoxBuilding | PolyBuilding) => boolean;
+export function buildCity(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean=()=>true,quality=1,dressed:CityPredicate=()=>false) {
+  const steps=buildCitySteps(env,hf,data,keep,quality,dressed);
+  for(;;){const step=steps.next();if(step.done)return step.value;}
+}
+
+/** Keep the renderer responsive while a neighbouring region builds its city. */
+export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean) {
+  const steps=buildCitySteps(env,hf,data,keep,quality,()=>false);
+  try {
+    while(current()){
+      const deadline=performance.now()+5;
+      do {const step=steps.next();if(step.done)return step.value;} while(current()&&performance.now()<deadline);
+      await new Promise<void>(resolve=>setTimeout(resolve,0));
+    }
+    return null;
+  } finally {steps.return(undefined as never);}
 }
