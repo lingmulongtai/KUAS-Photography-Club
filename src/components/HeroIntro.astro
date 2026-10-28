@@ -4,8 +4,8 @@ const { lang = 'ja' } = Astro.props;
 const en = lang === 'en';
 
 /*
- * Kyoto in one white line, drawn while the 3D scene loads: a 1200×200 panorama standing on the
- * ground at y = 196. Each line draws over its own stretch of the progress (from, span). The middle,
+ * Kyoto in one white line: a 1200×200 panorama standing on the ground at y = 196. Each line has
+ * its own timing in the opening sequence (from, span). The middle,
  * with Kyoto Tower, the Yasaka pagoda and Daimonji, is what a phone shows. A `hide` shape is filled
  * with the ground colour so the ridge passes behind the landmark drawn over it.
  */
@@ -48,11 +48,12 @@ const city = [
     <p id="intro-title" class:list={['intro-title', { 'is-latin': en }]} tabindex="-1" autofocus>{en ? 'KUAS Photography Club' : '写真部'}</p>
     <p class="intro-name">{en ? '— Kyoto University of Advanced Science —' : '— KUAS Photography Club —'}</p>
   </div>
-  <svg class="intro-city" viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-    <!-- all of it faintly, as the circle's track, then the same lines drawn over it -->
-    <g class="intro-ghost">{city.map((line) => <path class={line.kind} d={line.d} />)}</g>
-    {city.map((line) => <path class={line.kind} d={line.d} pathLength={line.kind === 'hide' ? undefined : 1} style={`--from:${line.from};--span:${line.span}`} />)}
-  </svg>
+  <div class="intro-city" aria-hidden="true">
+    <svg viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice"><g class="intro-ghost">{city.map((line) => <path class={line.kind} d={line.d} />)}</g></svg>
+    <div class="intro-city-drawing"><svg viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice">
+      {city.map((line) => <path class={line.kind} d={line.d} pathLength={line.kind === 'hide' ? undefined : 1} style={`--from:${line.from};--span:${line.span}`} />)}
+    </svg></div>
+  </div>
   <div class="intro-foot">
     <p role="status">{en ? 'Preparing Kyoto’s scenery' : '京都の景色を準備しています'}<span class="intro-percent" aria-hidden="true">00%</span></p>
     <button type="button" class="intro-skip">{en ? 'Enter the site now' : '待たずにサイトを見る'} <span aria-hidden="true">↗</span></button>
@@ -77,6 +78,8 @@ const city = [
     let last = 0;
     let frame = 0;
     let closing = false;
+    let openedAt = 0;
+    let closeAt = 0, closeFrom = 0, closeDuration = 0;
     const cleanup = () => {
       clearTimeout(timeout);
       if (frame) cancelAnimationFrame(frame);
@@ -119,14 +122,21 @@ const city = [
       if (finished) return;
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
       last = now;
-      // ease toward the reported value, at most 60% a second; four times that once it is ready
-      const want = Math.min((target - shown) * (closing ? 10 : 4), closing ? 2.4 : 0.6);
-      speed += (want - speed) * (1 - Math.exp(-dt * 10));
-      shown = Math.min(target, shown + Math.max(speed, 0) * dt);
-      if (target - shown < 0.002) shown = target;
+      if (motion.matches) {
+        shown = target;
+      } else if (closing) {
+        const p = Math.min(1, Math.max(0, (now - closeAt) / closeDuration));
+        shown = Math.max(shown, closeFrom + (1 - closeFrom) * p * p * (3 - 2 * p));
+      } else {
+        // Ease through real loading milestones without allowing the count to run ahead.
+        const want = Math.min((target - shown) * 4, 0.6);
+        speed += (want - speed) * (1 - Math.exp(-dt * 10));
+        shown = Math.min(target, shown + Math.max(speed, 0) * dt);
+        if (target - shown < 0.002) shown = target;
+      }
       show();
-      if (shown < target) frame = requestAnimationFrame(tick);
-      else if (closing) dismiss();
+      if (closing && (motion.matches || now >= closeAt + closeDuration)) dismiss();
+      else if (closing || shown < target) frame = requestAnimationFrame(tick);
       else last = speed = 0;
     };
     const follow = () => {
@@ -146,11 +156,14 @@ const city = [
       if (finished) return;
       target = 1;
       progress.setAttribute('aria-valuenow', '100');
-      if (motion.matches || shown >= 1) return dismiss();
-      // the count finishes before the scene opens, but never holds it back for long
+      if (motion.matches) return dismiss();
+      // Finish the short opening sequence, even if the scene was ready very quickly.
       closing = true;
+      closeAt = performance.now();
+      closeFrom = shown;
+      closeDuration = Math.max(650, openedAt + 2600 - closeAt);
       clearTimeout(timeout);
-      timeout = setTimeout(dismiss, 900);
+      timeout = setTimeout(dismiss, Math.min(closeDuration + 900, Math.max(0, openedAt + 10000 - closeAt)));
       follow();
     };
     intro.querySelector('button').addEventListener('click', dismiss);
@@ -161,6 +174,7 @@ const city = [
     document.addEventListener('hero:error', dismiss);
     try {
       intro.showModal();
+      openedAt = performance.now();
       root.classList.add('hero-intro-open');
       // A missing bundle or stalled connection must never hold the site behind an intro.
       timeout = setTimeout(dismiss, 10000);
@@ -192,6 +206,7 @@ const city = [
   .hero-intro[open], .hero-intro.is-leaving { display: grid; grid-template-rows: minmax(min-content, 1fr) auto auto; }
   .hero-intro:not([open]):not(.is-leaving) { display: none; }
   .hero-intro::backdrop { background: var(--band, #64bec6); }
+  .hero-intro::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .12; background: radial-gradient(ellipse at 50% 45%, #fff, transparent 60%); }
   .is-leaving {
     z-index: 100;
     pointer-events: none;
@@ -238,7 +253,8 @@ const city = [
   .intro-name { margin-top: 10px; font: 600 12px/1.6 var(--latin); letter-spacing: .14em; }
 
   /* at least a sixth of its width tall, so a wide, short screen crops only empty sky */
-  .intro-city { display: block; width: 100%; height: max(var(--city), 13.5vw); }
+  .intro-city { position: relative; display: block; width: 100%; height: max(var(--city), 13.5vw); }
+  .intro-city > svg, .intro-city-drawing, .intro-city-drawing svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .intro-city path {
     --local: clamp(0, (var(--progress) - var(--from)) / var(--span), 1);
     fill: none;
@@ -280,17 +296,28 @@ const city = [
   .intro-skip:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
   .intro-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 
-  @media (max-height: 560px) {
+  @media (max-height: 650px) {
     .hero-intro { --emblem: clamp(84px, 26vh, 140px); --city: clamp(70px, 20vh, 110px); }
     .intro-title { margin-top: 10px; font-size: clamp(24px, 8vh, 34px); }
     .intro-name { display: none; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .hero-intro[open] .intro-emblem { animation: intro-in .9s cubic-bezier(.22, .61, .36, 1) both; }
-    .hero-intro[open] .intro-title, .hero-intro[open] .intro-name { animation: intro-in .9s .15s cubic-bezier(.22, .61, .36, 1) both; }
+    .hero-intro:is([open], .is-leaving)::before { animation: intro-light 2.6s ease-out both; }
+    .hero-intro:is([open], .is-leaving) .intro-emblem { animation: intro-in 1.2s cubic-bezier(.22, .61, .36, 1) both; }
+    .hero-intro:is([open], .is-leaving) .intro-title, .hero-intro:is([open], .is-leaving) .intro-name { animation: intro-in 1.1s .15s cubic-bezier(.22, .61, .36, 1) both; }
+    .hero-intro:is([open], .is-leaving) .intro-foot { animation: intro-in 1s .2s cubic-bezier(.22, .61, .36, 1) both; }
+    .hero-intro:is([open], .is-leaving) .intro-city { animation: intro-city-in 2.6s cubic-bezier(.22, .61, .36, 1) both; transform-origin: 50% 100%; }
+    @supports (clip-path: inset(0)) {
+      .hero-intro:is([open], .is-leaving) .intro-city-drawing { animation: intro-reveal 2.6s cubic-bezier(.4, 0, .2, 1) both; will-change: clip-path; }
+      .hero-intro:is([open], .is-leaving) .intro-city-drawing path:not(.hide) { stroke-dashoffset: 0; }
+      .hero-intro:is([open], .is-leaving) .intro-city-drawing .hide { fill-opacity: 1; }
+    }
     .intro-dot circle { transform-box: fill-box; transform-origin: center; animation: intro-pulse 1.4s ease-in-out infinite alternate; }
   }
   @keyframes intro-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+  @keyframes intro-light { from { opacity: .03; transform: scale(.9); } to { opacity: .12; transform: scale(1); } }
+  @keyframes intro-city-in { from { opacity: .5; transform: translateY(12px) scale(1.02); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes intro-reveal { from { clip-path: inset(0 50%); } to { clip-path: inset(0); } }
   @keyframes intro-pulse { to { transform: scale(1.4); opacity: .65; } }
 </style>
