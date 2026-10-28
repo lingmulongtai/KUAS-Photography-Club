@@ -10,6 +10,8 @@ export function createHeroLoading(callbacks: HeroLoadingCallbacks, jobs: number)
   let built = false;
   let settled = false;
   return {
+    /** A complete scene can be drawn for the first-frame readiness check. */
+    get canDraw() { return built; },
     async track<T>(job: Promise<T>): Promise<T> {
       const value = await job;
       if (!settled) callbacks.onProgress?.(++completed / (jobs + 1));

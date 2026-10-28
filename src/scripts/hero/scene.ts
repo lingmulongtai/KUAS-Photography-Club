@@ -747,6 +747,10 @@ export function createHero(
       setResolution(Math.min(d, pixelRatio < maxDpr && pixelRatio > 0 && lowered ? pixelRatio : d));
     },
     render(t) {
+      // Do not render the unfinished 3D scene behind the opaque opening sequence. Skipping the
+      // intro immediately restores partial rendering, while the completed scene still draws once
+      // before reporting readiness.
+      if (!loading.canDraw && document.documentElement.classList.contains('hero-intro-open')) return;
       const dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
       clock = t;
