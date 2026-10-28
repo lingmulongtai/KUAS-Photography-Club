@@ -23,12 +23,16 @@ export function railwayPath(route:RailwayRoute,ground:(x:number,z:number)=>numbe
   return {length,distances,heights,at};
 }
 
-/** A complete consist reverses only after stopping at an end; no teleporting at wraparound. */
-export function trainProgress(time:number,length:number,span:number,speed:number){
-  const low=span/2+2,high=Math.max(low,length-span/2-2),travel=(high-low)/speed,pause=12;
-  const cycle=2*(travel+pause),t=((time%cycle)+cycle)%cycle;
-  if(t<travel)return {distance:low+t*speed,direction:1};
-  if(t<travel+pause)return {distance:high,direction:1};
-  if(t<2*travel+pause)return {distance:high-(t-travel-pause)*speed,direction:-1};
-  return {distance:low,direction:-1};
+/** Keep a bounded fleet, spaced far enough apart along each route. */
+export function trainSections(length:number,span:number) {
+  return Math.max(1,Math.min(8,Math.floor(length/3000),Math.floor(length/(span+4))));
+}
+
+/** Trains follow the whole route; disappear only near its ends before restarting. */
+export function serviceTrainProgress(time:number,length:number,span:number,speed:number,index:number,count:number,direction:1|-1) {
+  const low=span/2+2,high=Math.max(low,length-span/2-2),range=high-low;
+  if(!range)return {distance:low,direction,visible:false};
+  const phase=((time*speed+index*range/count)%range+range)%range;
+  const margin=span/2+15;
+  return {distance:direction===1?low+phase:high-phase,direction,visible:phase>margin&&phase<range-margin};
 }

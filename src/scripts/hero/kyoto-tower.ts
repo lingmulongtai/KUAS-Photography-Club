@@ -112,5 +112,6 @@ export function kyotoTower(): Part[] {
     for(let z=-13.5;z<=13.5;z+=3) box(.1,1,.1,side*24.9,31.2,z,ivory,.3);
     box(4,2.2,5,side*20,31.8,-12,[.2,.21,.2],.2);
   }
-  return parts;
+  // Keep the white shell and coloured details legible at night without driving bloom.
+  return parts.map(part => ({ ...part, glow: part.glow * .2 }));
 }

@@ -42,3 +42,36 @@ test('regional boundaries do not double-select adjoining datasets',()=>{
   assert.equal(regionAt([a,b],{x:10,z:5}),b);
   assert.equal(regionAt([a,b],{x:20,z:5}),null);
 });
+
+test('a region superseded during asynchronous activation is disposed before the next one',async()=>{
+  const started=deferred(),activation=deferred(),released=[],activated=[];
+  const loader=createRegionalLoader(async r=>({dispose:()=>released.push(`data-${r.id}`)}),async(r,data)=>{
+    activated.push(r.id);
+    if(r.id==='a'){started.resolve();await activation.promise;}
+    return ()=>{released.push(`city-${r.id}`);data.dispose();};
+  },()=>assert.fail('unexpected failure'));
+  const done=loader.request(region('a'));await started.promise;loader.request(region('b'));
+  activation.resolve();await done;
+  assert.deepEqual(activated,['a','b']);assert.deepEqual(released,['city-a','data-a']);assert.equal(loader.id,'b');
+});
+
+test('superseded preparation can stop early without reporting an error',async()=>{
+  const started=deferred(),resume=deferred(),released=[],errors=[];
+  const loader=createRegionalLoader(async r=>({dispose:()=>released.push(r.id)}),async(r,_data,current)=>{
+    if(r.id==='a'){started.resolve();await resume.promise;if(!current())throw Error('superseded');}
+    return ()=>{};
+  },e=>errors.push(e));
+  const done=loader.request(region('a'));await started.promise;loader.request(region('b'));resume.resolve();await done;
+  assert.deepEqual(released,['a']);assert.deepEqual(errors,[]);assert.equal(loader.id,'b');
+});
+
+test('a request arriving between completion and cleanup is not lost',async()=>{
+  const a=region('a'),b=region('b'),events=[];let loader;
+  loader=createRegionalLoader(async()=>({dispose(){}}),(r)=>{
+    events.push(r.id);
+    if(r.id==='a')queueMicrotask(()=>queueMicrotask(()=>loader.request(b)));
+    return ()=>{};
+  },()=>assert.fail('unexpected failure'));
+  await loader.request(a);await new Promise(resolve=>setTimeout(resolve,0));
+  assert.deepEqual(events,['a','b']);assert.equal(loader.id,'b');
+});
