@@ -8,6 +8,7 @@ import { toLocal } from './geo';
 import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
 import type {KamoChannel} from './kamo-channel';
+import { terrainPositions, terrainPositionsAsync } from './terrain-grid';
 
 /**
  * A normal map baked from an elevation grid, so slopes are lit per pixel no matter how coarse
@@ -51,38 +52,6 @@ export interface TerrainTextures {
 }
 
 const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
-
-/** Vertex positions of the warped grid centred on `center` (see buildTerrain). */
-function terrainPositions(hf: Heightfield, center: { x: number; z: number }, segments: number,channel?:KamoChannel) {
-  const [minX, minZ, maxX, maxZ] = hf.bounds;
-  const n = segments + 1;
-  const p = 2.1;
-  const warp = (u: number, c: number, lo: number, hi: number) => {
-    const s = Math.pow(Math.abs(u), p);
-    return u < 0 ? c - (c - lo) * s : c + (hi - c) * s;
-  };
-  const pos = new Float32Array(n * n * 3);
-  for (let j = 0; j < n; j++) {
-    const v = (j / segments) * 2 - 1;
-    let z = warp(v, center.z, minZ, maxZ);
-    if (j === 0) z -= 20000;
-    if (j === segments) z += 20000;
-    for (let i = 0; i < n; i++) {
-      const u = (i / segments) * 2 - 1;
-      let x = warp(u, center.x, minX, maxX);
-      if (i === 0) x -= 20000;
-      if (i === segments) x += 20000;
-      const k = (j * n + i) * 3;
-      const cx = Math.min(Math.max(x, minX), maxX);
-      const cz = Math.min(Math.max(z, minZ), maxZ);
-      pos[k] = x;
-      const ground=hf.height(cx,cz);
-      pos[k + 1] = (channel?channel.bed(cx,cz,ground):ground) - (cx !== x || cz !== z ? 60 : 0);
-      pos[k + 2] = z;
-    }
-  }
-  return pos;
-}
 
 /**
  * One mesh for the whole basin on a warped grid: vertices pack tightly around the viewpoint
@@ -404,6 +373,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   // positions for other viewpoints, worked out ahead of time so switching doesn't stall a frame
   const cache = new Map<string, Float32Array>([[`${center.x},${center.z}`, pos]]);
   const position = geo.getAttribute('position') as THREE.BufferAttribute;
+  let generation = 0;
   const prepare = (c: { x: number; z: number }) => {
     const key = `${c.x},${c.z}`;
     const prepared=cache.get(key)??terrainPositions(hf,c,segments,channel);
@@ -412,11 +382,23 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     return prepared;
   };
   const recenter = (c: { x: number; z: number }) => {
+    generation++;
     activeCenter=c;
     // Keep one GPU attribute while switching equal-sized terrain grids.
     position.array = prepare(c);
     position.needsUpdate = true;
   };
+  const recenterAsync = async (c: { x: number; z: number }, onReady: () => void) => {
+    const request = ++generation, target = { x: c.x, z: c.z }, key = `${target.x},${target.z}`;
+    const prepared = cache.get(key) ?? await terrainPositionsAsync(hf, target, segments, channel,
+      () => request === generation, () => new Promise<void>(resolve => setTimeout(resolve, 0)));
+    if (!prepared || request !== generation) return;
+    activeCenter = target;
+    cache.delete(key);cache.set(key,prepared);
+    if(cache.size>4)cache.delete(cache.keys().next().value!);
+    position.array=prepared;position.needsUpdate=true;onReady();
+  };
+  const cancelRecenter = () => { generation++; };
   /** Show the sharper photo for tex.photos[i]. */
   const setPhoto = (i: number, photo: THREE.Texture|null,box?:Box) => {
     photos[i].map.value = photo??tex.aerialWide;
@@ -427,5 +409,5 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
     cache.clear();recenter(activeCenter);
   };
-  return { mesh, uniforms, recenter, prepare, setPhoto, setChannel };
+  return { mesh, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
 }

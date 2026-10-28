@@ -17,13 +17,15 @@ export function regionAt(regions:readonly CityRegion[],p:{x:number;z:number}) {
  * A stale result is released without constructing its city. Failed loads can be retried. */
 export function createRegionalLoader<T extends {dispose():void}>(
   load:(region:CityRegion)=>Promise<T>,
-  activate:(region:CityRegion,data:T)=>()=>void,
+  activate:(region:CityRegion,data:T,current:()=>boolean)=> (()=>void) | Promise<()=>void>,
   onError:(error:unknown)=>void,
 ) {
   let wanted:CityRegion|null=null;
   let active:{id:string;dispose():void}|null=null;
   let running:Promise<void>|null=null;
+  let revision=0,settledRevision=0;
   async function pump() {
+    try {
     while(wanted?.id!==active?.id) {
       const next=wanted;
       active?.dispose();active=null;
@@ -35,14 +37,27 @@ export function createRegionalLoader<T extends {dispose():void}>(
         return;
       }
       if(wanted?.id!==next.id){data.dispose();continue;}
-      try {active={id:next.id,dispose:activate(next,data)};}
-      catch(error){data.dispose();onError(error);return;}
+      try {
+        const dispose=await activate(next,data,()=>wanted?.id===next.id);
+        if(wanted?.id!==next.id){dispose();continue;}
+        active={id:next.id,dispose};
+      } catch(error){data.dispose();if(wanted?.id!==next.id)continue;onError(error);return;}
     }
+    } finally {settledRevision=revision;}
+  }
+  function start():Promise<void> {
+    running=pump().then(()=>{
+      running=null;
+      // A request can arrive after pump settles but before this continuation runs.
+      if(revision!==settledRevision && wanted?.id!==active?.id)return start();
+    });
+    return running;
   }
   return {
     request(region:CityRegion|null) {
       wanted=region;
-      if(!running)running=pump().finally(()=>{running=null;});
+      revision++;
+      if(!running)return start();
       return running;
     },
     get id(){return active?.id??null;},

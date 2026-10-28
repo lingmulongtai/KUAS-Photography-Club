@@ -54,7 +54,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <a class="spot-records" hidden>{en ? 'Outing records' : '活動記録'}</a>
       <span class="visually-hidden" role="status" data-place-status></span>
       <span class="area-status" role="status" data-area-status hidden>{en ? 'Loading the surrounding area…' : '周辺の景色を読み込んでいます…'}</span>
-      <button type="button" class="explore-toggle" aria-pressed="false" disabled>{en ? 'Free explore' : '自由に散策'}</button>
+      <button type="button" class="explore-toggle" aria-pressed="false" aria-controls="explore-guide" disabled>{en ? 'Explore freely ↗' : '自由散策を始める ↗'}</button>
       <aside class="explore-guide" id="explore-guide" aria-label={en ? 'Free explore controls' : '自由散策の操作方法'} hidden>
         <p class="explore-guide-title">{en ? 'FREE EXPLORE' : '自由散策の操作'}</p>
         <p class="explore-touch-hint">{en ? 'Swipe to look. Hold arrows to move; + / − changes altitude. Pinch to zoom. Scroll from this guide or outside the scenery.' : 'スワイプで見回す。矢印長押しで移動、＋ / −で上下。ピンチでズーム。スクロールはこの説明欄や景色の外から。'}</p>
@@ -107,7 +107,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           <option value="autumn">{en?'Autumn':'秋'}</option><option value="winter">{en?'Winter':'冬'}</option>
         </select>
       </label>
-      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Seasonal snow, bonfires and the blue night beam are illustrative, rather than live weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。季節の雪や夜景の送り火・青い光は演出で、当日の天気や催事を示すものではありません。'}</span></p>
+      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Aircraft, seasonal snow, bonfires and the blue night beam are illustrative, rather than live flight, weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。飛行機や季節の雪、夜景の送り火・青い光は演出で、実際の運航・天気・催事を示すものではありません。'}</span></p>
     </aside>
   </div>
 
@@ -214,6 +214,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const timeTrack = hero.querySelector<HTMLElement>('.time-slider')!;
     const nowButton = hero.querySelector<HTMLButtonElement>('[data-time="now"]')!;
     let adjustingTime = false;
+    let timeAnimation = 0;
     const updateSlider = (minutes: number) => {
       const value = Math.min(1439, Math.floor(wrapDay(minutes)));
       timeSlider.value = String(value);
@@ -226,6 +227,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     window.addEventListener('pointerup', releaseTime);
     window.addEventListener('blur', releaseTime);
     timeSlider.addEventListener('input', () => {
+      cancelAnimationFrame(timeAnimation); timeAnimation = 0;
       const value = Number(timeSlider.value);
       sky.scrub(value, jstMinutes(new Date()), performance.now());
       nowButton.setAttribute('aria-pressed', 'false');
@@ -234,9 +236,17 @@ const pinTrips = completeSpotPreviews((await getTrips())
     });
     nowButton.addEventListener('click', () => {
       const real = jstMinutes(new Date());
-      sky.select(real, true, real, performance.now(), true);
+      cancelAnimationFrame(timeAnimation);
+      sky.select(real, true, real, performance.now(), motion.matches);
       nowButton.setAttribute('aria-pressed', 'true');
-      showTimeStatus(real);
+      let lastMinute = -1;
+      const animateTime = () => {
+        const minutes = sky.shown(jstMinutes(new Date()), performance.now());
+        const minute = Math.floor(wrapDay(minutes));
+        if (minute !== lastMinute) { showTimeStatus(minutes); lastMinute = minute; }
+        timeAnimation = sky.transitioning ? requestAnimationFrame(animateTime) : 0;
+      };
+      animateTime();
     });
 
     const onStatus = (s: HeroStatus) => {
@@ -334,7 +344,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           onAreaLoading: loading=>{areaStatus.hidden=!loading;},
           onExplore: enabled=>{
             hero.classList.toggle('is-exploring',enabled);exploreToggle.setAttribute('aria-pressed',String(enabled));
-            exploreToggle.textContent=enabled?(en?'Exit exploration':'散策を終了'):(en?'Free explore':'自由に散策');
+            exploreToggle.textContent=enabled?(en?'Exit exploration':'散策を終了'):(en?'Explore freely ↗':'自由散策を始める ↗');
             exploreGuide.hidden=!enabled;
             exploreTouch.hidden=!enabled;
             if (!enabled) touchControls.reset();
@@ -564,22 +574,24 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
   .is-ready .spot-nav { opacity: 1; }
   .area-status { position: absolute; top: calc(100% + 8px); left: 0; white-space: nowrap; padding: 7px 12px; border-radius: 16px; background: rgba(11,20,36,.8); color: var(--on-dark); font-size: 11px; }
-  .explore-toggle { border: 0; background: transparent; color: var(--on-dark); font: inherit; font-size: 11px; padding: 8px; opacity: .7; }
-  .explore-guide { position: absolute; z-index: 3; top: calc(100% + 45px); left: 0; max-width: calc(100vw - var(--gutter) * 2); padding: 14px 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; background: rgba(10,18,28,.88); color: var(--on-dark); box-shadow: 0 4px 16px rgba(0,0,0,.18); pointer-events: none; }
+  .explore-toggle { min-height: 36px; padding: 8px 13px; border: 1px solid rgba(190,239,240,.55); border-radius: 999px; background: linear-gradient(150deg,rgba(146,225,227,.24),rgba(255,255,255,.06)),rgba(12,34,43,.62); color: var(--on-dark); font: 700 12px/1.2 var(--body); box-shadow: inset 0 1px rgba(255,255,255,.28),0 4px 14px rgba(0,0,0,.15); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); cursor: pointer; }
+  .explore-toggle[aria-pressed='true'] { border-color: rgba(255,255,255,.35); background-color: rgba(10,18,28,.58); }
+  .explore-toggle:disabled { opacity: .55; cursor: default; }
+  .explore-guide { position: absolute; z-index: 3; top: calc(100% + 45px); left: 0; max-width: calc(100vw - var(--gutter) * 2); padding: 10px 13px; border: 1px solid rgba(255,255,255,.24); border-radius: 16px; background: linear-gradient(145deg,rgba(255,255,255,.15),rgba(255,255,255,.025)),rgba(10,27,37,.62); color: var(--on-dark); box-shadow: inset 0 1px rgba(255,255,255,.22),0 6px 20px rgba(0,0,0,.15); -webkit-backdrop-filter: blur(8px) saturate(1.2); backdrop-filter: blur(8px) saturate(1.2); pointer-events: none; }
   .explore-guide[hidden] { display: none; }
-  .explore-guide-title { margin: 0 0 9px; color: var(--brand); font-size: 12px; font-weight: 700; letter-spacing: .06em; }
-  .explore-guide dl { display: grid; gap: 5px; margin: 0; font-size: 12px; line-height: 1.4; }
-  .explore-guide dl div { display: grid; grid-template-columns: max-content 1fr; gap: 14px; }
+  .explore-guide-title { margin: 0 0 6px; color: var(--brand); font-size: 11px; font-weight: 700; letter-spacing: .06em; }
+  .explore-guide dl { display: grid; grid-template-columns: repeat(2,max-content); gap: 4px 18px; margin: 0; font-size: 11px; line-height: 1.4; }
+  .explore-guide dl div { display: flex; gap: 7px; }
   .explore-guide dt { font-weight: 700; }
   .explore-guide dd { margin: 0; color: var(--hud); }
   .explore-touch, .explore-touch-hint { display: none; }
   .season-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--on-dark); }
   .season-picker select { min-height: 32px; max-width: 145px; padding: 3px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: #15202d; color: var(--on-dark); font: inherit; }
-  .explore-toggle:hover,.explore-toggle:focus-visible { opacity: 1; }
+  .explore-toggle:hover { background-color: rgba(22,67,72,.72); }
+  .explore-toggle:focus-visible { outline: 2px solid white; outline-offset: 3px; }
   .is-exploring .copy,.is-exploring .scrim,.is-exploring .scroll-cue { opacity: 0; visibility: hidden; pointer-events: none; }
   .is-exploring .hint { display: none; }
   @media (pointer: coarse), (max-width: 760px) {
-    .explore-toggle { min-height: 36px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 18px; background: rgba(10,18,28,.7); opacity: 1; }
     .explore-guide:not([hidden]) { position: static; flex-basis: 100%; padding: 8px 11px; pointer-events: auto; touch-action: pan-y; }
     .explore-guide-title { margin-bottom: 3px; }
     .explore-keyboard-hint { display: none !important; }
@@ -726,7 +738,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   @media (prefers-reduced-motion: reduce) { .time-thumb { transition: none; } }
 
   @media (prefers-reduced-transparency: reduce) {
-    .views, .sky-chip, .btn--glass { background: #0c1b25; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .views, .sky-chip, .btn--glass, .explore-toggle, .explore-guide { background: #0c1b25; -webkit-backdrop-filter: none; backdrop-filter: none; }
     .time-thumb[data-glisse-refraction='ready'] { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
     .btn--glass:hover { background: var(--on-dark); }
   }

@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
 import {CampusBuilder,CM} from './campus-architecture';
 import {createCampusMesh} from './campus';
-import {railwayPath,trainProgress,type RailwayRoute} from './railway-path';
+import {railwayPath,trainSections,serviceTrainProgress,type RailwayRoute} from './railway-path';
 import {SHADOW_LAYER} from './shadow';
 
-/** Seven bounded route groups, one static track draw and one instanced vehicle draw.
+/** Bounded route groups, one static track draw and one instanced vehicle draw.
  * Vehicle speeds, station shelters and vertical alignment are illustrative. */
 export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:RailwayRoute[]){
   const group=new THREE.Group();group.name='kyoto-railways';
@@ -58,20 +58,26 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
         gl_FragColor=vec4(applyHaze(shade(alb,vec3(0.,1.,0.),vWorld,sunShadow(vWorld,vec3(0.,1.,0.))),vec3(0.),vWorld),1.);}`});
   const trackMesh=new THREE.Mesh(geometry,trackMaterial),structureMesh=createCampusMesh({...env,uHighlight:{value:1}},structures.geometry());
   trackMesh.layers.enable(SHADOW_LAYER);structureMesh.layers.enable(SHADOW_LAYER);group.add(trackMesh,structureMesh);
-  const count=routes.reduce((n,r)=>n+r.cars,0),base=new THREE.BoxGeometry(1,1,1).toNonIndexed();
+  const services=routes.map((route,r)=>trainSections(paths[r].length,route.cars*(route.carLength+1)));
+  const count=routes.reduce((n,r,i)=>n+r.cars*services[i],0),base=new THREE.BoxGeometry(1,1,1).toNonIndexed();
   const vehicles=new THREE.InstancedBufferGeometry();vehicles.setAttribute('position',base.getAttribute('position'));vehicles.setAttribute('normal',base.getAttribute('normal'));
-  const pos=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),direction=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),colors=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3);
-  vehicles.setAttribute('iPos',pos);vehicles.setAttribute('iDirection',direction);vehicles.setAttribute('iColor',colors);vehicles.instanceCount=count;
-  let index=0;routes.forEach(route=>{const c=new THREE.Color(route.color);for(let i=0;i<route.cars;i++)colors.setXYZ(index++,c.r,c.g,c.b);});
+  const pos=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),direction=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),colors=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),styles=new THREE.InstancedBufferAttribute(new Float32Array(count),1),noses=new THREE.InstancedBufferAttribute(new Float32Array(count),1);
+  vehicles.setAttribute('iPos',pos);vehicles.setAttribute('iDirection',direction);vehicles.setAttribute('iColor',colors);vehicles.setAttribute('iStyle',styles);vehicles.setAttribute('iNose',noses);vehicles.instanceCount=count;
+  let index=0;routes.forEach((route,r)=>{const c=new THREE.Color(route.color),style=route.id==='jr-shinkansen'?3:route.id.startsWith('jr-')?1:route.id==='kintetsu'?2:0;
+    for(let i=0;i<route.cars*services[r];i++){const car=i%route.cars;colors.setXYZ(index,c.r,c.g,c.b);styles.setX(index,style);
+      noses.setX(index++,style===3?(car===0?-1:car===route.cars-1?1:0):0);}});
   const vehicleMaterial=new THREE.ShaderMaterial({uniforms:env,
-    vertexShader:`attribute vec3 iPos;attribute vec3 iDirection;attribute vec3 iColor;varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;
-      void main(){vec3 p=position*vec3(2.7,3.1,iDirection.z);vLocal=p;vColor=iColor;vVisible=step(.01,iDirection.z);vec2 d=iDirection.xy;
+    vertexShader:`attribute vec3 iPos;attribute vec3 iDirection;attribute vec3 iColor;attribute float iStyle;attribute float iNose;varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;flat varying float vStyle;
+      void main(){vec3 p=position*vec3(2.7,3.1,iDirection.z);if(iNose*position.z>.4){p.x*=.45;p.y-=.35;}vLocal=p;vColor=iColor;vStyle=iStyle;vVisible=step(.01,iDirection.z);vec2 d=iDirection.xy;
         vWorld=iPos+vec3(d.y*p.x+d.x*p.z,p.y,-d.x*p.x+d.y*p.z);vNormal=vec3(d.y*normal.x+d.x*normal.z,normal.y,-d.x*normal.x+d.y*normal.z);
         gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`,
     fragmentShader:`${ENV_GLSL}${SHADOW_GLSL}
-      varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;
+      varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;flat varying float vStyle;
       void main(){if(vVisible<.5)discard;vec3 n=normalize(vNormal);float side=step(1.3,abs(vLocal.x));float band=step(-.3,vLocal.y)*step(vLocal.y,1.05)*side;
         float pane=step(.17,fract((vLocal.z+100.)/1.65))*band;vec3 alb=mix(vColor,vec3(.22,.25,.26),step(1.1,vLocal.y));
+        if(vStyle>.5 && vStyle<1.5){alb=mix(vec3(.42,.45,.46),vColor,side*step(-1.1,vLocal.y)*step(vLocal.y,-.65));alb=mix(alb,vec3(.22,.25,.26),step(1.1,vLocal.y));}
+        if(vStyle>1.5){alb=mix(vColor,vec3(.67,.62,.51),step(-.25,vLocal.y));alb=mix(alb,vec3(.22,.25,.26),step(1.1,vLocal.y));}
+        if(vStyle>2.5){alb=mix(vec3(.73,.76,.78),vColor,side*step(-.9,vLocal.y)*step(vLocal.y,-.48));}
         alb=mix(alb,vec3(.035,.06,.075),pane);vec3 emit=vec3(.8,.61,.32)*pane*uCity*.5;
         gl_FragColor=vec4(applyHaze(shade(alb,n,vWorld,sunShadow(vWorld,n)),emit,vWorld),1.);}`});
   const trainMesh=new THREE.Mesh(vehicles,vehicleMaterial);trainMesh.frustumCulled=false;group.add(trainMesh);
@@ -79,12 +85,18 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
   function update(dt:number){
     clock+=dt;let index=0;
     routes.forEach((route,r)=>{
-      const path=paths[r],span=route.cars*(route.carLength+1),progress=trainProgress(clock+r*97,path.length,span,route.id.startsWith('randen')?7:20);
+      const path=paths[r],span=route.cars*(route.carLength+1),sections=services[r],bothWays=route.tracks.every(t=>t===2);
+      for(let service=0;service<sections;service++){
+      const backwards=bothWays&&service%2===1,directionSign=backwards?-1:1;
+      const perDirection=bothWays?(backwards?Math.floor(sections/2):Math.ceil(sections/2)):sections;
+      const order=bothWays?Math.floor(service/2):service;
+      const progress=serviceTrainProgress(clock+r*97,path.length,span,route.id.startsWith('randen')?7:route.id==='jr-shinkansen'?38:20,order,perDirection,directionSign);
       for(let car=0;car<route.cars;car++){
         const d=progress.distance+(car-(route.cars-1)/2)*(route.carLength+1)*progress.direction,p=path.at(d);
-        const side=p.tracks===2?1.45:0;
+        const side=p.tracks===2?1.45*progress.direction:0;
         pos.setXYZ(index,p.x-p.dz*side,p.y+1.65,p.z+p.dx*side);
-        direction.setXYZ(index,p.dx*progress.direction,p.dz*progress.direction,p.visible?route.carLength:0);index++;
+        direction.setXYZ(index,p.dx*progress.direction,p.dz*progress.direction,p.visible&&progress.visible?route.carLength:0);index++;
+      }
       }
     });pos.needsUpdate=direction.needsUpdate=true;
   }

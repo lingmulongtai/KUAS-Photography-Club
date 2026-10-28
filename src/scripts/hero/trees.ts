@@ -58,7 +58,7 @@ export function createForest(
     return !!c && !excluded(x,z) && wooded(c,x,z);
   };
 
-  function trees(eye: { x: number; z: number }) {
+  function* trees(eye: { x: number; z: number }) {
     const r = rng(4242);
     const pos: number[] = [];
     const size: number[] = [];
@@ -68,7 +68,9 @@ export function createForest(
     const shapes: number[] = [];
     const season:number[]=[];
     const detailed=regions.some(r=>inBox(r.box,eye.x,eye.z));
+    let scanned=0;
     for (const { x, z, lod, seed } of forestCells(eye, quality,detailed)) {
+        if (++scanned % 512 === 0) yield;
         const c = sample(x, z);
         if (!c || excluded(x, z) || !wooded(c,x,z)) continue;
         if (lod<2 && seed>standDensity(x,z)) continue;
@@ -76,7 +78,8 @@ export function createForest(
         const profile = treeProfile(x,z);
         const cedar = profile.cedar;
         pos.push(x, y - 0.5, z);
-        const cluster = lod === 3 ? quality>.75 ? 8 : 11 : lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
+        // Broader far clusters fill distant wooded slopes without adding tree instances.
+        const cluster = lod === 3 ? quality>.75 ? 9 : 12 : lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
         size.push((cedar ? 2.6 : 4.2) * profile.width * cluster, (cedar ? 15 : 10.5) * profile.height);
         tint.push(...profile.tint.map((v,i)=>v*.8+Math.min(c[i],.45)*.2));
         kind.push(cedar ? 1 : 0);
@@ -212,29 +215,39 @@ export function createForest(
   const group = new THREE.Group();
   // Repeated visits reuse three recent populations; evicted instance buffers are released.
   const populations=new Map<string,{meshes:THREE.Mesh[];count:number}>();
+  // Invalidated meshes remain visible until their replacement is complete.
+  const retired=new Set<THREE.Mesh>();
+  const replace = (meshes:THREE.Mesh[]) => {
+    group.clear();group.add(...meshes);
+    for(const mesh of retired)mesh.geometry.dispose();
+    retired.clear();
+  };
   let count = 0;
+  let generation = 0;
   let planted:{eye:{x:number;z:number};bearing:number} | undefined;
   /** All directions remain populated when the user turns; chunks outside the frustum are culled. */
-  function plant(eye: { x: number; z: number }, _bearing: number) {
+  function* plantSteps(eye: { x: number; z: number }, _bearing: number):Generator<void,void,void> {
     planted={eye:{x:eye.x,z:eye.z},bearing:_bearing};
     const key=`${Math.round(eye.x)},${Math.round(eye.z)}`;
-    for (const m of [...group.children] as THREE.Mesh[]) {
-      group.remove(m);
-    }
     const cached=populations.get(key);
     if(cached) {
       populations.delete(key);populations.set(key,cached);
-      group.add(...cached.meshes);count=cached.count;return;
+      replace(cached.meshes);count=cached.count;return;
     }
-    const { pos, size, tint, kind, lods, shapes,season } = trees(eye);
-    count = kind.length;
+    const { pos, size, tint, kind, lods, shapes,season } = yield* trees(eye);
     const chunks = new Map<string, number[]>();
-    kind.forEach((k, i) => {
+    for(let i=0;i<kind.length;i++) {
+      if(i && i%2048===0) yield;
+      const k=kind[i];
       const key = `${Math.floor(pos[i * 3] / 768)},${Math.floor(pos[i * 3 + 2] / 768)},${k},${lods[i]}`;
       if (!chunks.has(key)) chunks.set(key, []);
       chunks.get(key)!.push(i);
-    });
+    }
+    const meshes:THREE.Mesh[]=[];
+    let committed=false,chunkCount=0;
+    try {
     for (const idx of chunks.values()) {
+      if(++chunkCount%12===0) yield;
       const first = idx[0];
       const shapesByLod = kind[first] === 1 ? [closeCedar,midCedar,farCedar,farCedar] : [closeCrown,midCrown,farCrown,farCrown];
       const shape = shapesByLod[lods[first]];
@@ -243,53 +256,82 @@ export function createForest(
       geo.setAttribute('normal', shape.getAttribute('normal'));
       geo.setAttribute('aBark', shape.getAttribute('aBark'));
       geo.setAttribute('aVox', shape.getAttribute('aVox'));
-      geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => pos.slice(i * 3, i * 3 + 3))), 3));
-      geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => size.slice(i * 2, i * 2 + 2))), 2));
-      geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => tint.slice(i * 3, i * 3 + 3))), 3));
-      geo.setAttribute('iShape', new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap((i) => shapes.slice(i * 3, i * 3 + 3))), 3));
-      geo.setAttribute('iSeason',new THREE.InstancedBufferAttribute(new Float32Array(idx.flatMap(i=>season.slice(i*2,i*2+2))),2));
-      geo.instanceCount = idx.length;
+      const positions=new Float32Array(idx.length*3),sizes=new Float32Array(idx.length*2),
+        tints=new Float32Array(idx.length*3),treeShapes=new Float32Array(idx.length*3),seasons=new Float32Array(idx.length*2);
       const bounds = new THREE.Box3();
-      for (const i of idx) {
-        const radius = size[i * 2] * 1.9;
-        const [x, y, z] = pos.slice(i * 3, i * 3 + 3);
-        bounds.expandByPoint(new THREE.Vector3(x - radius, y, z - radius));
-        bounds.expandByPoint(new THREE.Vector3(x + radius, y + size[i * 2 + 1] * 1.6, z + radius));
+      for (let j=0;j<idx.length;j++) {
+        const i=idx[j],p=i*3,s=i*2,pOut=j*3,sOut=j*2;
+        for(let k=0;k<3;k++){positions[pOut+k]=pos[p+k];tints[pOut+k]=tint[p+k];treeShapes[pOut+k]=shapes[p+k];}
+        sizes[sOut]=size[s];sizes[sOut+1]=size[s+1];seasons[sOut]=season[s];seasons[sOut+1]=season[s+1];
+        const x=pos[p],y=pos[p+1],z=pos[p+2],radius=size[s]*1.9;
+        bounds.min.x=Math.min(bounds.min.x,x-radius);bounds.min.y=Math.min(bounds.min.y,y);bounds.min.z=Math.min(bounds.min.z,z-radius);
+        bounds.max.x=Math.max(bounds.max.x,x+radius);bounds.max.y=Math.max(bounds.max.y,y+size[s+1]*1.6);bounds.max.z=Math.max(bounds.max.z,z+radius);
       }
+      geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(positions, 3));
+      geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(sizes, 2));
+      geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(tints, 3));
+      geo.setAttribute('iShape', new THREE.InstancedBufferAttribute(treeShapes, 3));
+      geo.setAttribute('iSeason',new THREE.InstancedBufferAttribute(seasons,2));
+      geo.instanceCount = idx.length;
       geo.boundingBox = bounds;
       geo.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
       const mesh = new THREE.Mesh(geo, material);
       mesh.layers.enable(SHADOW_LAYER);
       mesh.userData.depthMaterial = depthMaterial;
-      group.add(mesh);
+      meshes.push(mesh);
     }
-    populations.set(key,{meshes:[...group.children] as THREE.Mesh[],count});
+    replace(meshes);count=kind.length;
+    populations.set(key,{meshes,count});committed=true;
     if(populations.size>3) {
       const oldest=populations.keys().next().value!;
       for(const mesh of populations.get(oldest)!.meshes) mesh.geometry.dispose();
       populations.delete(oldest);
     }
+    } finally {
+      if(!committed)for(const mesh of meshes)mesh.geometry.dispose();
+    }
   }
+  function plant(eye: { x: number; z: number }, bearing: number) {
+    generation++;
+    const steps=plantSteps(eye,bearing);
+    while(!steps.next().done) { /* synchronous initial and viewpoint setup */ }
+  }
+  async function plantAsync(eye: { x: number; z: number }, bearing: number) {
+    const request=++generation,steps=plantSteps({x:eye.x,z:eye.z},bearing);
+    try {
+      while(request===generation) {
+        const deadline=performance.now()+5;
+        do { if(steps.next().done)return; } while(request===generation && performance.now()<deadline);
+        await new Promise<void>(resolve=>setTimeout(resolve,0));
+      }
+    } finally { steps.return(); }
+  }
+  const cancelPlant = () => { generation++; };
+  const invalidatePhotos = () => {
+    cancelPlant();
+    for(const population of populations.values()) for(const mesh of population.meshes) {
+      if(mesh.parent===group)retired.add(mesh);else mesh.geometry.dispose();
+    }
+    populations.clear();
+  };
   /** Use a sharper photo over `box`. `seasonal` imagery (leafless or autumn) also accepts muted
    * canopy on slopes; summer imagery doesn't need that and would catch cemeteries on the hills. */
   const setRegionalPhoto = (photo:HTMLImageElement | ImageBitmap,box:Box,seasonal=false) => {
     const region={box,sample:sampler(photo,box),seasonal};
     const i=regions.findIndex(r=>r.box.every((v,k)=>v===box[k]));
     if(i<0) regions.push(region); else regions[i]=region;
-    for(const population of populations.values()) for(const mesh of population.meshes) mesh.geometry.dispose();
-    populations.clear();
-    if(planted) plant(planted.eye,planted.bearing);
+    invalidatePhotos();
+    return planted ? plantAsync(planted.eye,planted.bearing) : Promise.resolve();
   };
   /** Replace the one outer-city photo, releasing its CPU pixels and cached populations. */
   const setOuterPhoto=(photo:HTMLImageElement|ImageBitmap|null,box:Box)=>{
     const i=regions.findIndex(r=>r.temporary);
     if(i>=0)regions.splice(i,1);
     if(photo)regions.unshift({box,sample:sampler(photo,box),seasonal:false,temporary:true});
-    for(const population of populations.values())for(const mesh of population.meshes)mesh.geometry.dispose();
-    populations.clear();
-    if(planted)plant(planted.eye,planted.bearing);
+    invalidatePhotos();
+    return planted ? plantAsync(planted.eye,planted.bearing) : Promise.resolve();
   };
-  return { group, plant, contains, setRegionalPhoto, setOuterPhoto, get count() { return count; } };
+  return { group, plant, plantAsync, cancelPlant, contains, setRegionalPhoto, setOuterPhoto, get count() { return count; } };
 }
 
 /** An axis-aligned block: centre, size, and a shade (0..1, 0 for none) shared by its faces. */
