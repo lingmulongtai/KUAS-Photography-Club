@@ -31,7 +31,20 @@ const pinTrips = completeSpotPreviews((await getTrips())
         {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed={view==='shogunzuka'} disabled>{VIEWS[view][lang]}</button>)}
       </div>
     </nav>
-    <div class="spot-nav">
+    <div class="explore-touch" role="group" aria-label={en ? 'Move in free explore' : '自由散策の移動操作'} hidden>
+      <div class="explore-directions">
+        <button type="button" data-direction="forward" aria-label={en ? 'Move forward' : '前に移動'}>▲</button>
+        <button type="button" data-direction="left" aria-label={en ? 'Move left' : '左に移動'}>◀</button>
+        <button type="button" data-direction="back" aria-label={en ? 'Move back' : '後ろに移動'}>▼</button>
+        <button type="button" data-direction="right" aria-label={en ? 'Move right' : '右に移動'}>▶</button>
+      </div>
+      <div class="explore-altitude">
+        <button type="button" data-direction="up" aria-label={en ? 'Move up' : '上昇'}>＋</button>
+        <button type="button" data-direction="down" aria-label={en ? 'Move down' : '下降'}>−</button>
+      </div>
+    </div>
+  </div>
+  <div class="spot-nav">
       <label class="visually-hidden" for="hero-spot">{en ? 'Explore a place in 3D' : '3Dで近づくスポット'}</label>
       <select id="hero-spot" class="spot-select" disabled>
         <option value="" selected disabled>{en ? 'Explore a place' : 'スポットへ移動'}</option>
@@ -42,20 +55,20 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <span class="visually-hidden" role="status" data-place-status></span>
       <span class="area-status" role="status" data-area-status hidden>{en ? 'Loading the surrounding area…' : '周辺の景色を読み込んでいます…'}</span>
       <button type="button" class="explore-toggle" aria-pressed="false" disabled>{en ? 'Free explore' : '自由に散策'}</button>
-    </div>
+      <aside class="explore-guide" id="explore-guide" aria-label={en ? 'Free explore controls' : '自由散策の操作方法'} hidden>
+        <p class="explore-guide-title">{en ? 'FREE EXPLORE' : '自由散策の操作'}</p>
+        <p class="explore-touch-hint">{en ? 'Swipe to look. Hold arrows to move; + / − changes altitude. Pinch to zoom. Scroll from this guide or outside the scenery.' : 'スワイプで見回す。矢印長押しで移動、＋ / −で上下。ピンチでズーム。スクロールはこの説明欄や景色の外から。'}</p>
+        <dl class="explore-keyboard-hint">
+          <div><dt>{en ? 'Drag' : 'ドラッグ'}</dt><dd>{en ? 'Look around' : '見回す'}</dd></div>
+          <div><dt>W / A / S / D · ↑ / ← / ↓ / →</dt><dd>{en ? 'Move' : '前後・左右に移動'}</dd></div>
+          <div><dt>Q / E</dt><dd>{en ? 'Down / up' : '下降・上昇'}</dd></div>
+          <div><dt>Shift</dt><dd>{en ? 'Move faster' : '加速'}</dd></div>
+          <div><dt>{en ? 'Wheel' : 'ホイール'}</dt><dd>{en ? 'Move forward / back' : '前後に移動'}</dd></div>
+          <div><dt>Ctrl / ⌘ + {en ? 'wheel' : 'ホイール'}</dt><dd>{en ? 'Zoom' : '画角を調整'}</dd></div>
+          <div><dt>Esc</dt><dd>{en ? 'Exit exploration' : '散策を終了'}</dd></div>
+        </dl>
+      </aside>
   </div>
-  <aside class="explore-guide" id="explore-guide" aria-label={en ? 'Free explore controls' : '自由散策の操作方法'} hidden>
-    <p class="explore-guide-title">{en ? 'FREE EXPLORE' : '自由散策の操作'}</p>
-    <dl>
-      <div><dt>{en ? 'Drag' : 'ドラッグ'}</dt><dd>{en ? 'Look around' : '見回す'}</dd></div>
-      <div><dt>W / A / S / D · ↑ / ← / ↓ / →</dt><dd>{en ? 'Move' : '前後・左右に移動'}</dd></div>
-      <div><dt>Q / E</dt><dd>{en ? 'Down / up' : '下降・上昇'}</dd></div>
-      <div><dt>Shift</dt><dd>{en ? 'Move faster' : '加速'}</dd></div>
-      <div><dt>{en ? 'Wheel' : 'ホイール'}</dt><dd>{en ? 'Move forward / back' : '前後に移動'}</dd></div>
-      <div><dt>Ctrl / ⌘ + {en ? 'wheel' : 'ホイール'}</dt><dd>{en ? 'Zoom' : '画角を調整'}</dd></div>
-      <div><dt>Esc</dt><dd>{en ? 'Exit exploration' : '散策を終了'}</dd></div>
-    </dl>
-  </aside>
   <div class="scrim" aria-hidden="true"></div>
 
   <div class="hero-inner">
@@ -124,6 +137,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { jstDateAt, jstMinutes, jstParts, moonPhaseName, moonPosition, moonTimes, sunPosition } from '../scripts/hero/astro';
   import { createSkyTime, wrapDay } from '../scripts/hero/sky-time';
   import { mountGlassRefraction } from '../scripts/hero/glisse-refraction';
+  import { createExploreButtons } from '../scripts/hero/explore-touch';
   import { SPOTS, type SpotId } from '../data/spots';
   import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
   import type {Season} from '../scripts/hero/seasons';
@@ -159,6 +173,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
     const cameraHint=hero.querySelector('.hint')!.firstChild!;
     const exploreGuide=hero.querySelector<HTMLElement>('.explore-guide')!;
+    const exploreTouch=hero.querySelector<HTMLElement>('.explore-touch')!;
     const spotSelect=hero.querySelector<HTMLSelectElement>('.spot-select')!;
     const spotReturn=hero.querySelector<HTMLButtonElement>('.spot-return')!;
     const spotRecords=hero.querySelector<HTMLAnchorElement>('.spot-records')!;
@@ -279,12 +294,15 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const quality = coarse || cores < 6 || window.innerWidth < 900 ? 0.55 : 1;
 
     let demo: ReturnType<typeof createHero> | null = null;
+    const touchControls = createExploreButtons(exploreTouch, movement => demo?.setTouchMove(movement.forward,movement.side,movement.up));
     let stopRefraction: (() => void)[] = [];
     const removeRefraction = () => { stopRefraction.forEach(stop => stop()); stopRefraction = []; };
     window.addEventListener('pagehide', event => { if (!event.persisted) removeRefraction(); });
     const fallback = () => {
       removeRefraction();
       exploreGuide.hidden = true;
+      exploreTouch.hidden = true;
+      touchControls.reset();
       stage.removeAttribute('aria-describedby');
       hero.classList.remove('is-exploring');
       const look = lookAt((sunPosition(new Date()).altitude * 180) / Math.PI, createLook());
@@ -318,6 +336,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
             hero.classList.toggle('is-exploring',enabled);exploreToggle.setAttribute('aria-pressed',String(enabled));
             exploreToggle.textContent=enabled?(en?'Exit exploration':'散策を終了'):(en?'Free explore':'自由に散策');
             exploreGuide.hidden=!enabled;
+            exploreTouch.hidden=!enabled;
+            if (!enabled) touchControls.reset();
             if (enabled) stage.setAttribute('aria-describedby','explore-guide'); else stage.removeAttribute('aria-describedby');
             card.hidden=enabled||demo?.mode!=='campus';
           },
@@ -326,7 +346,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           avoid: () => {
             const base = stage.getBoundingClientRect();
             // the header and the view bar float over the top of the stage: no pin under them either
-            return [hero.querySelector('.copy'), hero.querySelector('.copy h1'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views'), hero.querySelector('.spot-nav')]
+            return [hero.querySelector('.copy'), hero.querySelector('.copy h1'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views'), hero.querySelector('.spot-nav'), exploreTouch.hidden ? null : exploreTouch]
               .filter((n): n is Element => !!n)
               .map((n) => {
                 const r = n.getBoundingClientRect();
@@ -450,6 +470,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .hero-stage.is-dragging { cursor: grabbing; }
+  .is-exploring .hero-stage, .is-exploring .hero-stage > canvas { touch-action: none; }
 
   /* viewpoints */
   .views {
@@ -544,19 +565,37 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .is-ready .spot-nav { opacity: 1; }
   .area-status { position: absolute; top: calc(100% + 8px); left: 0; white-space: nowrap; padding: 7px 12px; border-radius: 16px; background: rgba(11,20,36,.8); color: var(--on-dark); font-size: 11px; }
   .explore-toggle { border: 0; background: transparent; color: var(--on-dark); font: inherit; font-size: 11px; padding: 8px; opacity: .7; }
-  .explore-guide { position: absolute; z-index: 3; top: calc(var(--header-h) + 145px); left: max(var(--gutter), calc((100% - var(--maxw)) / 2)); max-width: calc(100% - var(--gutter) * 2); padding: 14px 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; background: rgba(10,18,28,.88); color: var(--on-dark); box-shadow: 0 4px 16px rgba(0,0,0,.18); pointer-events: none; }
+  .explore-guide { position: absolute; z-index: 3; top: calc(100% + 45px); left: 0; max-width: calc(100vw - var(--gutter) * 2); padding: 14px 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; background: rgba(10,18,28,.88); color: var(--on-dark); box-shadow: 0 4px 16px rgba(0,0,0,.18); pointer-events: none; }
   .explore-guide[hidden] { display: none; }
   .explore-guide-title { margin: 0 0 9px; color: var(--brand); font-size: 12px; font-weight: 700; letter-spacing: .06em; }
   .explore-guide dl { display: grid; gap: 5px; margin: 0; font-size: 12px; line-height: 1.4; }
   .explore-guide dl div { display: grid; grid-template-columns: max-content 1fr; gap: 14px; }
   .explore-guide dt { font-weight: 700; }
   .explore-guide dd { margin: 0; color: var(--hud); }
+  .explore-touch, .explore-touch-hint { display: none; }
   .season-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--on-dark); }
   .season-picker select { min-height: 32px; max-width: 145px; padding: 3px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: #15202d; color: var(--on-dark); font: inherit; }
   .explore-toggle:hover,.explore-toggle:focus-visible { opacity: 1; }
   .is-exploring .copy,.is-exploring .scrim,.is-exploring .scroll-cue { opacity: 0; visibility: hidden; pointer-events: none; }
   .is-exploring .hint { display: none; }
-  @media (pointer: coarse), (max-width: 760px) { .explore-toggle { display: none; } }
+  @media (pointer: coarse), (max-width: 760px) {
+    .explore-toggle { min-height: 36px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 18px; background: rgba(10,18,28,.7); opacity: 1; }
+    .explore-guide:not([hidden]) { position: static; flex-basis: 100%; padding: 8px 11px; pointer-events: auto; touch-action: pan-y; }
+    .explore-guide-title { margin-bottom: 3px; }
+    .explore-keyboard-hint { display: none !important; }
+    .explore-touch-hint { display: block; margin: 0; max-width: 360px; color: var(--on-dark); font-size: 11px; line-height: 1.4; }
+    .explore-touch:not([hidden]) { position: absolute; z-index: 4; inset: auto 12px 12px; display: flex; justify-content: space-between; align-items: end; pointer-events: none; }
+    .explore-directions { display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; }
+    .explore-directions button:first-child { grid-column: 2; }
+    .explore-directions button:nth-child(2) { grid-column: 1; }
+    .explore-altitude { display: grid; gap: 4px; }
+    .explore-touch button { width: 44px; height: 44px; padding: 0; border: 1px solid rgba(255,255,255,.5); border-radius: 12px; background: rgba(10,18,28,.8); color: white; font: 700 17px/1 var(--body); touch-action: none; user-select: none; -webkit-user-select: none; pointer-events: auto; }
+    .explore-touch button.is-held { background: var(--brand); color: var(--on-accent); }
+    .explore-touch button:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+  }
+  @media (pointer: coarse) and (min-width: 901px) {
+    .explore-touch:not([hidden]) { justify-content: flex-start; gap: 24px; }
+  }
   .no-3d .views, .no-3d .spot-nav { display: none; }
   .spot-select, .spot-return, .spot-records {
     min-height: 36px;
@@ -1023,6 +1062,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
       grid-row: 1;
       grid-column: 1;
     }
+    .is-exploring .hero-stage { min-height: 460px; }
+    .is-exploring .hero-inner { margin-top: 0; }
 
     .scrim {
       grid-row: 1;
@@ -1049,6 +1090,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     }
 
     .copy { display: contents; }
+    .is-exploring .copy { display: none; }
     .copy .eyebrow { order: -3; }
     .copy h1 { order: -2; }
 
