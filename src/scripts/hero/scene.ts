@@ -155,6 +155,8 @@ export function createHero(
   let groundAt: ((x: number, z: number) => number) | null = null;
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
+  let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
+  let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
@@ -217,6 +219,8 @@ export function createHero(
     });
     ensureRegionalPhoto(view);
     terrainRecenter = terrain.recenter;
+    terrainRecenterAsync = center => { void terrain.recenterAsync(center, () => shadow.invalidate()); };
+    cancelTerrainRecenter = terrain.cancelRecenter;
     // Warm only the scenic views. Map destinations are prepared when visited,
     // so adding places does not make phones build every terrain mesh at startup.
     const idle = (cb: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 500));
@@ -580,6 +584,7 @@ export function createHero(
 
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
+    cancelTerrainRecenter?.();
     const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
     if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
     zoom.reset();
@@ -662,7 +667,7 @@ export function createHero(
       camera.position.copy(freePosition);const yaw=(freeBearing+lookDrag.yaw)*RAD,pitch=THREE.MathUtils.clamp(freePitch+lookDrag.pitch,-85,85)*RAD;
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
       if(freeCenter.distanceTo(freePosition)>600){
-        freeCenter.copy(freePosition);terrainRecenter?.(freePosition);plantTrees?.(freePosition,yaw/RAD);ensureCityRegion?.(freePosition);
+        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);plantTrees?.(freePosition,yaw/RAD);ensureCityRegion?.(freePosition);
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }
     }else if (flight) {

@@ -8,7 +8,7 @@ import { toLocal } from './geo';
 import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
 import type {KamoChannel} from './kamo-channel';
-import { terrainPositions } from './terrain-grid';
+import { terrainPositions, terrainPositionsAsync } from './terrain-grid';
 
 /**
  * A normal map baked from an elevation grid, so slopes are lit per pixel no matter how coarse
@@ -373,6 +373,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   // positions for other viewpoints, worked out ahead of time so switching doesn't stall a frame
   const cache = new Map<string, Float32Array>([[`${center.x},${center.z}`, pos]]);
   const position = geo.getAttribute('position') as THREE.BufferAttribute;
+  let generation = 0;
   const prepare = (c: { x: number; z: number }) => {
     const key = `${c.x},${c.z}`;
     const prepared=cache.get(key)??terrainPositions(hf,c,segments,channel);
@@ -381,11 +382,23 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     return prepared;
   };
   const recenter = (c: { x: number; z: number }) => {
+    generation++;
     activeCenter=c;
     // Keep one GPU attribute while switching equal-sized terrain grids.
     position.array = prepare(c);
     position.needsUpdate = true;
   };
+  const recenterAsync = async (c: { x: number; z: number }, onReady: () => void) => {
+    const request = ++generation, target = { x: c.x, z: c.z }, key = `${target.x},${target.z}`;
+    const prepared = cache.get(key) ?? await terrainPositionsAsync(hf, target, segments, channel,
+      () => request === generation, () => new Promise<void>(resolve => setTimeout(resolve, 0)));
+    if (!prepared || request !== generation) return;
+    activeCenter = target;
+    cache.delete(key);cache.set(key,prepared);
+    if(cache.size>4)cache.delete(cache.keys().next().value!);
+    position.array=prepared;position.needsUpdate=true;onReady();
+  };
+  const cancelRecenter = () => { generation++; };
   /** Show the sharper photo for tex.photos[i]. */
   const setPhoto = (i: number, photo: THREE.Texture|null,box?:Box) => {
     photos[i].map.value = photo??tex.aerialWide;
@@ -396,5 +409,5 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
     cache.clear();recenter(activeCenter);
   };
-  return { mesh, uniforms, recenter, prepare, setPhoto, setChannel };
+  return { mesh, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
 }
