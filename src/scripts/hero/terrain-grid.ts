@@ -1,8 +1,8 @@
 import type { Heightfield } from './heightfield';
 import type { KamoChannel } from './kamo-channel';
 
-/** Vertex positions of the warped grid, with each column calculated only once. */
-export function terrainPositions(hf: Heightfield, center: { x: number; z: number }, segments: number, channel?: KamoChannel) {
+/** A grid can be filled in batches without showing a partially updated mesh. */
+function terrainGrid(hf: Heightfield, center: { x: number; z: number }, segments: number, channel?: KamoChannel) {
   const [minX, minZ, maxX, maxZ] = hf.bounds;
   const n = segments + 1;
   const warp = (u: number, c: number, lo: number, hi: number) => {
@@ -18,7 +18,7 @@ export function terrainPositions(hf: Heightfield, center: { x: number; z: number
     clampedX[i] = Math.min(Math.max(x, minX), maxX);
   }
   const pos = new Float32Array(n * n * 3);
-  for (let j = 0; j < n; j++) {
+  const write = (first: number, end: number) => { for (let j = first; j < end; j++) {
     let z = warp((j / segments) * 2 - 1, center.z, minZ, maxZ);
     if (j === 0) z -= 20000;
     if (j === segments) z += 20000;
@@ -30,6 +30,25 @@ export function terrainPositions(hf: Heightfield, center: { x: number; z: number
       pos[k + 1] = (channel ? channel.bed(cx, cz, ground) : ground) - (cx !== x || cz !== z ? 60 : 0);
       pos[k + 2] = z;
     }
+  }};
+  return { pos, n, write };
+}
+
+/** Vertex positions of the warped grid, with each column calculated only once. */
+export function terrainPositions(hf: Heightfield, center: { x: number; z: number }, segments: number, channel?: KamoChannel) {
+  const grid = terrainGrid(hf, center, segments, channel);
+  grid.write(0, grid.n);
+  return grid.pos;
+}
+
+/** Keep the current terrain visible while preparing a replacement in short browser tasks. */
+export async function terrainPositionsAsync(hf: Heightfield, center: { x: number; z: number }, segments: number,
+  channel: KamoChannel | undefined, current: () => boolean, yieldTask: () => Promise<void>) {
+  const grid = terrainGrid(hf, center, segments, channel);
+  for (let row = 0; row < grid.n; row += 12) {
+    if (!current()) return null;
+    grid.write(row, Math.min(row + 12, grid.n));
+    if (row + 12 < grid.n) await yieldTask();
   }
-  return pos;
+  return current() ? grid.pos : null;
 }
