@@ -12,7 +12,7 @@ if (explicit) {
 }
 const current = document.documentElement.lang === 'en' ? 'en' : 'ja';
 const preferred = preferredLanguage(saved, navigator.languages?.length ? navigator.languages : [navigator.language]);
-if (current === 'ja' && preferred === 'en' && supportsLanguagePreference(location.pathname)) {
+if (current === 'ja' && preferred === 'en' && !document.documentElement.classList.contains('screenshot-preview') && supportsLanguagePreference(location.pathname)) {
   location.replace(languagePath(location.pathname, 'en') + location.search + location.hash);
 }
 

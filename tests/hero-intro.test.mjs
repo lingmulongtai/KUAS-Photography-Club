@@ -9,7 +9,7 @@ const classes=()=>{
   const set=new Set();
   return {add:value=>set.add(value),remove:value=>set.delete(value),contains:value=>set.has(value)};
 };
-function mount({unsupported=false,throws=false,reduced=true,userAgent='Mozilla/5.0'}={}) {
+function mount({unsupported=false,throws=false,reduced=true,userAgent='Mozilla/5.0',hostname='kuas-photography-club.vercel.app'}={}) {
   const document=new EventTarget(),button=new EventTarget(),attributes=new Map(),styles=new Map(),percent={textContent:'00%'};
   const progress={setAttribute:(key,value)=>attributes.set(key,value)};
   class Dialog extends EventTarget {
@@ -21,7 +21,7 @@ function mount({unsupported=false,throws=false,reduced=true,userAgent='Mozilla/5
   const intro=new Dialog();if(unsupported)intro.showModal=undefined;
   document.currentScript={previousElementSibling:intro};document.documentElement={classList:classes()};
   let timeout,delay,cleared=false,frames=[],clock=0;
-  runInNewContext(script,{document,navigator:{userAgent},HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
+  runInNewContext(script,{document,navigator:{userAgent},location:{hostname},HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
     performance:{now:()=>clock},
     setTimeout:(callback,ms)=>{timeout=callback;delay=ms;return 1;},clearTimeout:()=>{cleared=true;},
     requestAnimationFrame:callback=>frames.push(callback),cancelAnimationFrame:()=>{frames=[];}});
@@ -31,15 +31,19 @@ function mount({unsupported=false,throws=false,reduced=true,userAgent='Mozilla/5
   return {intro,document,button,attributes,styles,percent,emit,run,get delay(){return delay;},expire:()=>timeout(),get cleared(){return cleared;}};
 }
 
-test('screenshot agents skip the opening dialog while ordinary browsers retain it',()=>{
-  for(const userAgent of ['Vercelbot (+https://vercel.com)', 'vercel-screenshot-bot', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.0 Safari/537.36']) {
-    const state=mount({userAgent});
+test('deployment screenshots use the still scene while normal browsers retain the intro',()=>{
+  const headless='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.0 Safari/537.36';
+  for(const options of [{userAgent:'Vercelbot (+https://vercel.com)'}, {userAgent:'vercel-screenshot-bot'},
+    {userAgent:headless,hostname:'kuas-photography-club-39qmebkmq-lingmulongtais-projects.vercel.app'}]) {
+    const state=mount(options);
     assert.equal(state.intro.open,false);
     assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false);
+    assert.ok(state.document.documentElement.classList.contains('screenshot-preview'));
   }
-  for(const userAgent of ['Mozilla/5.0', 'Googlebot/2.1', 'NotVercelbot/1.0']) {
+  for(const userAgent of ['Mozilla/5.0', 'Googlebot/2.1', 'NotVercelbot/1.0', headless]) {
     assert.equal(mount({userAgent}).intro.open,true,userAgent);
   }
+  assert.equal(mount({userAgent:headless,hostname:'localhost'}).intro.open,true);
 });
 
 test('intro opens immediately, reports real progress, then releases the page on readiness',()=>{
