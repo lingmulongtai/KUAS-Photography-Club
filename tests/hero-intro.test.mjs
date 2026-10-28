@@ -22,6 +22,7 @@ function mount({unsupported=false,throws=false,reduced=true}={}) {
   document.currentScript={previousElementSibling:intro};document.documentElement={classList:classes()};
   let timeout,delay,cleared=false,frames=[],clock=0;
   runInNewContext(script,{document,HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
+    performance:{now:()=>clock},
     setTimeout:(callback,ms)=>{timeout=callback;delay=ms;return 1;},clearTimeout:()=>{cleared=true;},
     requestAnimationFrame:callback=>frames.push(callback),cancelAnimationFrame:()=>{frames=[];}});
   const emit=(type,detail)=>document.dispatchEvent(new CustomEvent(type,{detail}));
@@ -86,11 +87,30 @@ test('readiness lets the count reach 100% before the scene opens, but never hold
   const state=mount({reduced:false});
   state.emit('hero:progress',.6);state.run(3);state.emit('hero:ready');
   assert.equal(state.intro.open,true,'the count finishes first');
-  state.run(.6);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
+  state.run(.7);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
   // frames stop in a background tab: the page still opens soon after readiness
   const stalled=mount({reduced:false});stalled.emit('hero:progress',.3);stalled.emit('hero:ready');
-  assert.equal(stalled.delay,900);stalled.expire();assert.equal(stalled.intro.open,false);
+  assert.equal(stalled.delay,3500);stalled.expire();assert.equal(stalled.intro.open,false);
   // skipping does not wait for the count
   const skipped=mount({reduced:false});skipped.emit('hero:progress',.4);skipped.emit('hero:ready');
   skipped.button.dispatchEvent(new Event('click'));assert.equal(skipped.intro.open,false);
+});
+
+test('a fast load plays a continuous short opening without counting ahead of real work',()=>{
+  const state=mount({reduced:false});
+  state.emit('hero:progress',.2);state.run(.2);
+  assert.ok(parseInt(state.percent.textContent)<=20);
+  state.emit('hero:ready');
+  const seen=[];
+  for(let i=0;i<100;i++){state.run(1/60);seen.push(parseInt(state.percent.textContent));}
+  assert.equal(state.intro.open,true);
+  assert.ok(seen.at(-1)<100,'the count stays in motion during the opening');
+  assert.ok(seen.every((value,i)=>i===0||value>=seen[i-1]));
+  assert.ok(new Set(seen).size>50,'the count advances through the sequence');
+  state.run(1);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
+});
+
+test('a late ready event still respects the ten-second safety limit',()=>{
+  const state=mount({reduced:false});state.run(9.8);state.emit('hero:ready');
+  assert.ok(state.delay<=201);state.expire();assert.equal(state.intro.open,false);
 });

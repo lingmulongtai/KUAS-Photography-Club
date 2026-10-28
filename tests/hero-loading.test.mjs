@@ -5,12 +5,13 @@ import {createHeroLoading} from '../src/scripts/hero/loading.ts';
 test('startup progress follows actual completed work and reserves completion for a scene frame',async()=>{
   const progress=[];let ready=0,resolveSlow;
   const loading=createHeroLoading({onProgress:p=>progress.push(p),onReady:()=>ready++},2);
+  assert.equal(loading.canDraw,false,'an unfinished scene need not render behind the intro');
   const slow=loading.track(new Promise(resolve=>{resolveSlow=resolve;}));
   assert.equal(await loading.track(Promise.resolve('fast')),'fast');
   assert.deepEqual(progress,[1/3]);
   loading.frame();assert.equal(ready,0,'an empty sky frame is not ready');
   resolveSlow('slow');assert.equal(await slow,'slow');
-  loading.built();assert.equal(ready,0,'building the scene alone is not ready');
+  loading.built();assert.equal(loading.canDraw,true);assert.equal(ready,0,'building the scene alone is not ready');
   assert.deepEqual(progress,[1/3,2/3]);
   loading.frame();loading.frame();
   assert.deepEqual(progress,[1/3,2/3,1]);assert.equal(ready,1);

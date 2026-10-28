@@ -165,6 +165,8 @@ export function createHero(
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const loading = createHeroLoading(opts, 9);
+  // A task boundary lets the intro paint and accept input between expensive setup steps.
+  const yieldToBrowser = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
   (async () => {
     const meta = await loading.track(loadJSON<TerrainMeta>('terrain.json'));
@@ -179,17 +181,26 @@ export function createHero(
       const m = meta[r.key];
       return m ? [{ ...r, meta: m }] : [];
     });
+    await yieldToBrowser();
+    const normalFar = normalTexture(hf, meta.far);
+    await yieldToBrowser();
+    const normalNear = normalTexture(hf, meta.near);
+    await yieldToBrowser();
+    const regionalNormal = meta.arashiyama ? normalTexture(hf, meta.arashiyama.elevation) : undefined;
+    await yieldToBrowser();
+    const outerNormal = outer && meta.outer ? normalTexture(hf, meta.outer) : undefined;
+    await yieldToBrowser();
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
       aerialWideBox: meta.aerialWide.box,
       aerialCity: null,
       aerialCityBox: meta.aerialCity.box,
-      normalFar: normalTexture(hf, meta.far),
+      normalFar,
       normalFarBox: meta.far.box,
-      normalNear: normalTexture(hf, meta.near),
+      normalNear,
       normalNearBox: meta.near.box,
-      regional: meta.arashiyama ? {box:meta.arashiyama.box,normal:normalTexture(hf,meta.arashiyama.elevation)} : undefined,
-      outer: outer && meta.outer ? {box:meta.outer.box,normal:normalTexture(hf,meta.outer),photo:outer} : undefined,
+      regional: meta.arashiyama && regionalNormal ? {box:meta.arashiyama.box,normal:regionalNormal} : undefined,
+      outer: outer && meta.outer && outerNormal ? {box:meta.outer.box,normal:outerNormal,photo:outer} : undefined,
       photos: [...regions.map((r) => r.meta.box),meta.far.box],
     }, opts.quality > 0.75 ? 640 : 400);
     const regionalPhotos: (Promise<unknown> | undefined)[] = [];
@@ -211,6 +222,7 @@ export function createHero(
     const idle = (cb: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 500));
     const pending = PANORAMA_VIEWS.map(id=>VIEWS[id]).filter((v) => v !== VIEW);
     const prepNext = () => {
+      if (document.documentElement.classList.contains('hero-intro-open')) { setTimeout(prepNext, 250); return; }
       const v = pending.shift();
       if (!v) return;
       terrain.prepare(landscapeCenter(v));
@@ -220,16 +232,19 @@ export function createHero(
     scene.add(terrain.mesh);
     casts(terrain.mesh);
     shadow.invalidate();
+    await yieldToBrowser();
     const waterFiles=[...(meta.arashiyama?[meta.arashiyama.water.file]:[]),'water-kamo.json.gz'];
     const [cityPhoto, buildings, lines, woodlandBytes] = await Promise.all([loading.track(loadTexture(meta.aerialCity.file, aniso)), loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
     const channel=createKamoChannel(lines,(x,z)=>hf.height(x,z));
     terrain.setChannel(channel,kamoMask(channel));
     const bridges=buildBridges(env,hf,lines,channel);
     scene.add(bridges.mesh);casts(bridges.mesh);shadow.invalidate();
+    await yieldToBrowser();
     const streetGround=Object.create(hf) as Heightfield;
     streetGround.height=bridges.heightAt;
     const woodlandData = JSON.parse(new TextDecoder().decode(woodlandBytes)) as {polygons: Woodland[]};
     const woodlandRaster = buildWoodlandTexture(woodlandData.polygons, meta.aerialWide.box);
+    await yieldToBrowser();
     const forestArea = woodlandRaster.contains;
     terrain.uniforms.uWoodland.value = woodlandRaster.texture;
     terrain.uniforms.uWoodlandOn.value = 1;
@@ -250,11 +265,13 @@ export function createHero(
       let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}
       return !replaced(x/(p.ring.length/2),z/(p.ring.length/2));
     })};
+    await yieldToBrowser();
     const city = buildCity(env, hf, modeledBuildings, (b) =>
       !replaced(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
       opts.quality,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
     );
+    await yieldToBrowser();
     const builtSize = lite ? 1024 : 2048;
     env.uBuilt.value = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
     env.uBuiltBox.value.set(...BUILDINGS_BOX);
@@ -265,6 +282,7 @@ export function createHero(
     const forestMaskBox=regions.reduce<Box>((a,{meta:{box:b}})=>[Math.min(a[0],b[0]),Math.min(a[1],b[1]),
       Math.max(a[2],b[2]),Math.max(a[3],b[3])],BUILDINGS_BOX);
     const roadsAndWater = infrastructureMask(lines, forestMaskBox);
+    await yieldToBrowser();
     scene.add(buildDaimonji(env,hf));
     // the water mask is too coarse for garden islands, so they are tested on their outlines
     const island = islandMask(lines.filter((f) => f.kind === LINE.waterHole).map((f) => f.pts));
@@ -285,6 +303,7 @@ export function createHero(
       return hf.height(x,z)+(canopy?24:4);
     };
     forest.plant(landscapeCenter(VIEW), VIEW.bearing);
+    await yieldToBrowser();
     plantTrees = forest.plant;
     scene.add(forest.group);
     campusModel = buildCampus(env, hf).mesh;
@@ -299,6 +318,7 @@ export function createHero(
     scene.add(buildBeacons(env, tops));
 
     terrain.uniforms.uRoads.value = buildRoadField(renderer, lines, opts.quality > 0.75 ? 4096 : 2048).texture;
+    await yieldToBrowser();
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
     terrain.uniforms.uRoadsOn.value = 1;
     scene.add(buildWater(env, hf, lines, terrain.uniforms,lite?28:18,channel), buildIslands(env, hf, lines));
@@ -747,6 +767,10 @@ export function createHero(
       setResolution(Math.min(d, pixelRatio < maxDpr && pixelRatio > 0 && lowered ? pixelRatio : d));
     },
     render(t) {
+      // Do not render the unfinished 3D scene behind the opaque opening sequence. Skipping the
+      // intro immediately restores partial rendering, while the completed scene still draws once
+      // before reporting readiness.
+      if (!loading.canDraw && document.documentElement.classList.contains('hero-intro-open')) return;
       const dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
       clock = t;
