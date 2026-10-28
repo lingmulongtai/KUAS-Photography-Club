@@ -65,10 +65,13 @@ function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: Wat
       }
     }
   }
+  const position=new THREE.Float32BufferAttribute(pos,3);
+  yield;
+  const stability=new THREE.Float32BufferAttribute(stable,1);
+  yield;
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('aStable',new THREE.Float32BufferAttribute(stable,1));
-  geo.computeBoundingSphere();
+  geo.setAttribute('position',position);
+  geo.setAttribute('aStable',stability);
   const material = new THREE.ShaderMaterial({
     uniforms: { ...env, ...roads,uWaterBias:{value:regionalSurface?.35:30} },
     vertexShader: /* glsl */ `
