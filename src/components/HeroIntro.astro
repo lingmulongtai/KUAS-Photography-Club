@@ -64,6 +64,9 @@ const city = [
   (() => {
     const intro = document.currentScript.previousElementSibling;
     if (!(intro instanceof HTMLDialogElement) || !intro.showModal) return;
+    // Vercel's deployment thumbnail captures the page immediately. Let that preview see
+    // the home page instead of the opening animation used by visitors.
+    if (/\b(?:Vercelbot|vercel-screenshot-bot)\b/i.test(navigator.userAgent)) return;
     const root = document.documentElement;
     const progress = intro.querySelector('[role="progressbar"]');
     const percent = intro.querySelector('.intro-percent');
