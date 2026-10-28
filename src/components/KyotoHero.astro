@@ -144,7 +144,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
   const hero = stage?.closest<HTMLElement>('.hero');
-  if (stage && hero) {
+  if (stage && hero && !document.documentElement.classList.contains('screenshot-preview')) {
     const en = hero.dataset.lang === 'en';
     const out = {
       status: hero.querySelector('[data-status]'),
@@ -480,6 +480,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .hero-stage.is-dragging { cursor: grabbing; }
+  :global(html.screenshot-preview) .hero-stage {
+    background: #172332 url('/brand/kyoto-thumbnail.jpg') center / cover no-repeat;
+  }
+  :global(html.screenshot-preview) .hero-stage > canvas,
+  :global(html.screenshot-preview) .sky-chip { display: none; }
   .is-exploring .hero-stage, .is-exploring .hero-stage > canvas { touch-action: none; }
 
   /* viewpoints */
