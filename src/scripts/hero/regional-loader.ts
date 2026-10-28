@@ -17,7 +17,7 @@ export function regionAt(regions:readonly CityRegion[],p:{x:number;z:number}) {
  * A stale result is released without constructing its city. Failed loads can be retried. */
 export function createRegionalLoader<T extends {dispose():void}>(
   load:(region:CityRegion)=>Promise<T>,
-  activate:(region:CityRegion,data:T)=> (()=>void) | Promise<()=>void>,
+  activate:(region:CityRegion,data:T,current:()=>boolean)=> (()=>void) | Promise<()=>void>,
   onError:(error:unknown)=>void,
 ) {
   let wanted:CityRegion|null=null;
@@ -36,10 +36,10 @@ export function createRegionalLoader<T extends {dispose():void}>(
       }
       if(wanted?.id!==next.id){data.dispose();continue;}
       try {
-        const dispose=await activate(next,data);
+        const dispose=await activate(next,data,()=>wanted?.id===next.id);
         if(wanted?.id!==next.id){dispose();continue;}
         active={id:next.id,dispose};
-      } catch(error){data.dispose();onError(error);if(wanted?.id!==next.id)continue;return;}
+      } catch(error){data.dispose();if(wanted?.id!==next.id)continue;onError(error);return;}
     }
   }
   return {
