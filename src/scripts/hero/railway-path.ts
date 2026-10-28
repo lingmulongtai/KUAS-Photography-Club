@@ -32,3 +32,13 @@ export function trainProgress(time:number,length:number,span:number,speed:number
   if(t<2*travel+pause)return {distance:high-(t-travel-pause)*speed,direction:-1};
   return {distance:low,direction:-1};
 }
+
+/** Divide a long route into bounded sections so illustrative trains never meet on one track. */
+export function trainSections(length:number,span:number) {
+  return Math.max(1,Math.min(8,Math.floor(length/3000),Math.floor(length/(span+4))));
+}
+
+export function sectionTrainProgress(time:number,length:number,span:number,speed:number,index:number,count:number) {
+  const section=length/count,progress=trainProgress(time,section,span,speed);
+  return {...progress,distance:index*section+progress.distance};
+}
