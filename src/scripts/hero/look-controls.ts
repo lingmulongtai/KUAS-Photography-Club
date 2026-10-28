@@ -32,8 +32,8 @@ export function createLookRotation() {
   };
 }
 
-/** Keep vertical touch scrolling native and leave controls and short taps alone. */
-export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true, orbiting:()=>boolean=()=>false, onPinch:(ratio:number)=>void=()=>{}) {
+/** Keep vertical touch scrolling native unless free exploration requests full look. */
+export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof createLookRotation>, onTap: (e: PointerEvent) => void, enabled:()=>boolean=()=>true, orbiting:()=>boolean=()=>false, onPinch:(ratio:number)=>void=()=>{}, fullTouchLook:()=>boolean=()=>false) {
   let drag: { id: number; x: number; y: number; lastX: number; lastY: number; time: number; touch: boolean; pin: boolean; moved: boolean } | null = null;
   let suppressClick = false;
   const touches = new Map<number, {x:number;y:number}>();
@@ -87,7 +87,7 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     const dy = e.clientY - drag.y;
     if (!drag.moved) {
       if (Math.hypot(dx, dy) < 6) return;
-      if (drag.touch && Math.abs(dy) >= Math.abs(dx)) { drag = null; rotation.stop(); return; }
+      if (drag.touch && !fullTouchLook() && Math.abs(dy) >= Math.abs(dx)) { drag = null; rotation.stop(); return; }
       drag.moved = true;
       rotation.state.dragging = true;
       el.setPointerCapture(e.pointerId);
@@ -97,7 +97,7 @@ export function mountLookControls(el: HTMLElement, rotation: ReturnType<typeof c
     const horizontal = e.clientX - drag.lastX;
     // Turning at a viewpoint and moving around an object need opposite yaw to
     // keep the scenery following the hand, on both mouse and touch screens.
-    rotation.move(orbiting() ? -horizontal : horizontal, drag.touch ? 0 : e.clientY - drag.lastY, r.width, r.height, (e.timeStamp - drag.time) / 1000);
+    rotation.move(orbiting() ? -horizontal : horizontal, drag.touch && !fullTouchLook() ? 0 : e.clientY - drag.lastY, r.width, r.height, (e.timeStamp - drag.time) / 1000);
     drag.lastX = e.clientX;
     drag.lastY = e.clientY;
     drag.time = e.timeStamp;
