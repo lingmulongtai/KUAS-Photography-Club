@@ -28,9 +28,10 @@ test('detailed south replaces the overview while partial neighbouring coverage r
     bundle:true,platform:'node',format:'cjs',external:['three'],write:false}).outputFiles[0].text;
   const module={exports:{}},require=createRequire(import.meta.url);
   new Function('require','module','exports',compiled)(id=>id==='three'?THREE:require(id),module,module.exports);
-  const overview=await module.exports.buildSouthOverview({},[[0,7000,20,15,12,0,3]],()=>10);
+  const overview=await module.exports.buildSouthOverview({},[[0,7000,20,15,12,Math.PI/6,3]],()=>10);
   assert.ok(overview.mesh.boundingSphere);assert.equal(overview.mesh.frustumCulled,true);
   const matrix=new THREE.Matrix4();overview.mesh.getMatrixAt(0,matrix);assert.equal(matrix.elements[13],19);
+  assert.ok(Math.abs(matrix.elements[2]-10)<1e-5,'the footprint follows its positive x/z bearing');
   overview.setDetailBox([-9000,6200,4600,19000]);assert.equal(overview.mesh.visible,true);
   overview.setDetailBox([0,10000,11000,19000]);assert.equal(overview.mesh.visible,true);
   overview.setDetailBox(null);assert.equal(overview.mesh.visible,true);
