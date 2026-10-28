@@ -64,3 +64,14 @@ test('superseded preparation can stop early without reporting an error',async()=
   const done=loader.request(region('a'));await started.promise;loader.request(region('b'));resume.resolve();await done;
   assert.deepEqual(released,['a']);assert.deepEqual(errors,[]);assert.equal(loader.id,'b');
 });
+
+test('a request arriving between completion and cleanup is not lost',async()=>{
+  const a=region('a'),b=region('b'),events=[];let loader;
+  loader=createRegionalLoader(async()=>({dispose(){}}),(r)=>{
+    events.push(r.id);
+    if(r.id==='a')queueMicrotask(()=>queueMicrotask(()=>loader.request(b)));
+    return ()=>{};
+  },()=>assert.fail('unexpected failure'));
+  await loader.request(a);await new Promise(resolve=>setTimeout(resolve,0));
+  assert.deepEqual(events,['a','b']);assert.equal(loader.id,'b');
+});
