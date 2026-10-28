@@ -25,7 +25,8 @@ test('shipped outer data decodes through the runtime and stays within mobile dow
   globalThis.fetch=async(url)=>new Response(await readFile(new URL(String(url).split('/').pop(),root)));
   t.after(()=>{globalThis.fetch=original;});
   const hf=await loadHeightfield(meta);
-  for(const [x,z] of [[-18825,1105],[-28000,-11000],[8000,0],[0,18000]]) {
+  assert.ok(meta.outer.box[3]>=29000, 'the Osaka approach remains inside the terrain');
+  for(const [x,z] of [[-18825,1105],[-28000,-11000],[8000,0],[0,18000],[-10000,25000]]) {
     assert.ok(Number.isFinite(hf.height(x,z))&&hf.height(x,z)>0,'new regions have actual elevation');
   }
   for(const [file,budget] of [[meta.outer.file,350000],[meta.aerialOuter.file,600000],[meta.aerialOuter.mobile.file,220000]])

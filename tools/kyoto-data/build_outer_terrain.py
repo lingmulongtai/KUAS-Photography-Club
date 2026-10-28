@@ -15,7 +15,7 @@ from common import CACHE, OUT, bilinear, decode_dem_png, encode_heights, global_
 from build_higashiyama import render, save
 from fetch import GSI, get
 
-B = (-35000, -20000, 14000, 21000)
+B = (-35000, -20000, 14000, 29000)
 STEP = 100
 
 
@@ -39,9 +39,9 @@ def main():
     size = write_gz('terrain-outer.bin', encode_heights(h))
     if size > 350_000:
         raise RuntimeError('Outer terrain exceeds budget')
-    photo = render(B, (2048, 1714), 12, oversample=1)
+    photo = render(B, (2048, 2048), 12, oversample=1)
     _, photo_bytes = save(photo, 'aerial-outer.webp', 600_000)
-    mobile = photo.resize((1024, 857), Image.Resampling.LANCZOS)
+    mobile = photo.resize((1024, 1024), Image.Resampling.LANCZOS)
     _, mobile_bytes = save(mobile, 'aerial-outer-mobile.webp', 220_000)
     path = os.path.join(OUT, 'terrain.json')
     with open(path, encoding='utf-8') as f:

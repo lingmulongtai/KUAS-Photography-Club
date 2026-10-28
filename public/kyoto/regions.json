@@ -53,6 +53,58 @@
    }
   },
   {
+   "id": "tennozan",
+   "ja": "天王山・三川合流域",
+   "en": "Tennozan / Three Rivers",
+   "box": [
+    -14000,
+    8500,
+    500,
+    23000
+   ],
+   "heightSource": "PLATEAU measured and GSI outlines; illustrative heights (6 m / 10 m)",
+   "buildings": {
+    "meta": "buildings-tennozan.json",
+    "file": "buildings-tennozan.bin",
+    "bytes": 740950
+   },
+   "lines": {
+    "file": "lines-tennozan.bin",
+    "box": [
+     -14000,
+     8500,
+     500,
+     23000
+    ],
+    "q": 0.5,
+    "bytes": 445621,
+    "features": 55939
+   },
+   "photo": {
+    "box": [
+     -14000,
+     8500,
+     500,
+     23000
+    ],
+    "file": "aerial-tennozan.webp",
+    "size": [
+     2048,
+     2048
+    ],
+    "bytes": 547974,
+    "zoom": 13,
+    "mobile": {
+     "file": "aerial-tennozan-mobile.webp",
+     "size": [
+      1024,
+      1024
+     ],
+     "bytes": 213318
+    }
+   }
+  },
+  {
    "id": "kameoka",
    "ja": "亀岡・保津峡",
    "en": "Kameoka / Hozukyo",
