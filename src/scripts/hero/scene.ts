@@ -367,7 +367,8 @@ export function createHero(
       scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
     }).catch(error=>console.warn('Railway scenery unavailable',error));
     driveCars=(dt)=>{cars.update(dt);regionalDrive?.(dt);railDrive?.(dt);};
-    let southOverview:Awaited<ReturnType<typeof buildSouthOverview>>|null=null,detailBox:Box|null=null;
+    let southOverview:Awaited<ReturnType<typeof buildSouthOverview>>|null=null;
+    let osakaOverview:Awaited<ReturnType<typeof buildSouthOverview>>|null=null,detailBox:Box|null=null;
     const disposeGroup=(group:THREE.Object3D)=>{
       const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
       group.traverse(o=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;
@@ -434,7 +435,7 @@ export function createHero(
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
       let forestPhotoChanged=false;
       const release=(releaseData=true)=>{
-        detailBox=null;southOverview?.setDetailBox(null);
+        detailBox=null;southOverview?.setDetailBox(null);osakaOverview?.setDetailBox(null);
         cityLods.delete(city);
         regionalDrive=null;scene.remove(group);disposeGroup(group);
         for(const layer of [lamps.uniforms,traffic.uniforms]){const i=pointLayers.indexOf(layer);if(i>=0)pointLayers.splice(i,1);}
@@ -466,7 +467,7 @@ export function createHero(
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
       scene.add(group);casts(city.group);cityLods.add(city);shadow.invalidate();
-      detailBox=r.box;southOverview?.setDetailBox(detailBox);
+      detailBox=r.box;southOverview?.setDetailBox(detailBox);osakaOverview?.setDetailBox(detailBox);
       } catch(error) {release(false);throw error;}
       return ()=>release();
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
@@ -491,6 +492,14 @@ export function createHero(
       southOverview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
       southOverview.setDetailBox(detailBox);scene.add(southOverview.mesh);
     }).catch(error=>console.warn('Southern overview unavailable',error));});
+    idle(()=>{void loadBinary('buildings-osaka-lod.json.gz').then(async bytes=>{
+      const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers:OverviewBuilding[]};
+      osakaOverview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
+      osakaOverview.setDetailBox(detailBox);scene.add(osakaOverview.mesh);
+      // Towers taller than the compact region format are drawn at their measured heights.
+      const skyline=await buildSouthOverview(env,data.towers,(x,z)=>hf.height(x,z));
+      scene.add(skyline.mesh);
+    }).catch(error=>console.warn('Osaka overview unavailable',error));});
   })().catch((err) => { console.error('Kyoto data failed to load', err); loading.fail(err); });
 
   let lastStatus = '';
