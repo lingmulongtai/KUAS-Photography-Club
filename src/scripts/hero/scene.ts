@@ -237,7 +237,7 @@ export function createHero(
     const ensurePhotos=ensureRegionalPhoto;
     ensureRegionalPhoto = v => {
       ensurePhotos(v);
-      sharedSlot?.select(v==='tennozan');
+      sharedSlot?.select(v==='tennozan'||v==='osakaSkyline');
     };
     ensureRegionalPhoto(view);
     terrainRecenter = terrain.recenter;

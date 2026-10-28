@@ -29,7 +29,7 @@ test('panoramas turn at a fixed observation point', () => {
   assert.equal('funaoka' in VIEWS,false);
 });
 
-test('Osaka panorama looks down from Tennozan instead of the low riverside', () => {
+test('Tennozan keeps the confluence view and has a separate view aimed at Osaka', () => {
   const view=VIEWS.tennozan;
   assert.deepEqual(view.ref,toLocal(34.897931,135.679798));
   assert.deepEqual(view.eye,view.ref);
@@ -37,6 +37,12 @@ test('Osaka panorama looks down from Tennozan instead of the low riverside', () 
   assert.ok(view.pitch<=-10,'look down over the plain');
   assert.ok(view.bearing>=145&&view.bearing<=180,'face the confluence and Osaka');
   assert.ok(PANORAMA_VIEWS.includes('tennozan'));
+  const osaka=VIEWS.osakaSkyline;
+  assert.deepEqual(osaka.eye,view.eye);
+  const station=toLocal(34.702911,135.495896);
+  const bearing=(Math.atan2(station.x-osaka.eye.x,osaka.eye.z-station.z)*180/Math.PI+360)%360;
+  assert.ok(Math.abs(osaka.bearing-bearing)<3,'the Osaka skyline is centred even on narrow screens');
+  assert.ok(PANORAMA_VIEWS.includes('osakaSkyline'));
   assert.equal('sewaritei' in VIEWS,false);
 });
 
