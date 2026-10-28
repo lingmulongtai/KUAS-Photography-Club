@@ -113,5 +113,5 @@ export function kyotoTower(): Part[] {
     box(4,2.2,5,side*20,31.8,-12,[.2,.21,.2],.2);
   }
   // Keep the white shell and coloured details legible at night without driving bloom.
-  return parts.map(part => ({ ...part, glow: part.glow * .45 }));
+  return parts.map(part => ({ ...part, glow: part.glow * .2 }));
 }
