@@ -8,6 +8,7 @@ import { toLocal } from './geo';
 import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
 import type {KamoChannel} from './kamo-channel';
+import { terrainPositions } from './terrain-grid';
 
 /**
  * A normal map baked from an elevation grid, so slopes are lit per pixel no matter how coarse
@@ -51,38 +52,6 @@ export interface TerrainTextures {
 }
 
 const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
-
-/** Vertex positions of the warped grid centred on `center` (see buildTerrain). */
-function terrainPositions(hf: Heightfield, center: { x: number; z: number }, segments: number,channel?:KamoChannel) {
-  const [minX, minZ, maxX, maxZ] = hf.bounds;
-  const n = segments + 1;
-  const p = 2.1;
-  const warp = (u: number, c: number, lo: number, hi: number) => {
-    const s = Math.pow(Math.abs(u), p);
-    return u < 0 ? c - (c - lo) * s : c + (hi - c) * s;
-  };
-  const pos = new Float32Array(n * n * 3);
-  for (let j = 0; j < n; j++) {
-    const v = (j / segments) * 2 - 1;
-    let z = warp(v, center.z, minZ, maxZ);
-    if (j === 0) z -= 20000;
-    if (j === segments) z += 20000;
-    for (let i = 0; i < n; i++) {
-      const u = (i / segments) * 2 - 1;
-      let x = warp(u, center.x, minX, maxX);
-      if (i === 0) x -= 20000;
-      if (i === segments) x += 20000;
-      const k = (j * n + i) * 3;
-      const cx = Math.min(Math.max(x, minX), maxX);
-      const cz = Math.min(Math.max(z, minZ), maxZ);
-      pos[k] = x;
-      const ground=hf.height(cx,cz);
-      pos[k + 1] = (channel?channel.bed(cx,cz,ground):ground) - (cx !== x || cz !== z ? 60 : 0);
-      pos[k + 2] = z;
-    }
-  }
-  return pos;
-}
 
 /**
  * One mesh for the whole basin on a warped grid: vertices pack tightly around the viewpoint
