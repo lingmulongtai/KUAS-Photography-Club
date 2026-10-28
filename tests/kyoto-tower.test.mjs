@@ -6,7 +6,7 @@ import {kyotoTower} from '../src/scripts/hero/kyoto-tower.ts';
 test('tower illumination stays restrained without changing its daytime colours', () => {
   const parts=kyotoTower();
   assert.ok(parts.some(({color})=>color[0]>.7&&color[1]>.7));
-  assert.ok(parts.every(({glow})=>glow<=.95));
+  assert.ok(parts.every(({glow})=>glow<=.421));
   for(const {geo} of parts) geo.dispose();
 });
 
