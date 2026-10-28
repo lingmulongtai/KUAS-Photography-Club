@@ -79,3 +79,27 @@ export function createCloudClock() {
     },
   };
 }
+
+/** Follow time changes smoothly and expose a bounded shutter span in weather-map units. */
+export function createCloudMotion() {
+  let position = 0, initialized = false;
+  return {
+    step(target: number, dt: number, wind: readonly [number, number], reducedMotion = false) {
+      if (!Number.isFinite(target)) target = position;
+      if (!initialized || reducedMotion) {
+        initialized = true;
+        position = target;
+        return { seconds: position, blur: [0, 0] as const };
+      }
+      const elapsed = Number.isFinite(dt) ? Math.max(0, Math.min(.1, dt)) : 0;
+      const distance = (target - position) * (1 - Math.exp(-5 * elapsed));
+      position += distance;
+      const x = distance * wind[0], y = distance * wind[1];
+      const length = Math.hypot(x, y);
+      // Ambient drift is intentionally sharp. Never allow a large time jump to smear the sky.
+      const amount = Math.min(.03, Math.max(0, length - .0003));
+      const scale = length > 0 && Number.isFinite(length) ? amount / length : 0;
+      return { seconds: position, blur: amount > 0 ? [x * scale, y * scale] as const : [0, 0] as const };
+    },
+  };
+}
