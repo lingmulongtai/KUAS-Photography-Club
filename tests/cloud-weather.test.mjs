@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CLOUD_STYLES,cloudWeather,createCloudClock} from '../src/scripts/hero/cloud-weather.ts';
+import {CLOUD_STYLES,cloudWeather,createCloudClock,createCloudMotion} from '../src/scripts/hero/cloud-weather.ts';
 const style=name=>CLOUD_STYLES.indexOf(name);
 const visits=(climate,n=300)=>Array.from({length:n},(_,i)=>cloudWeather(i*7919+1,climate));
 test('weather is stable per visit and each season has its own mix of cloud characters',()=>{
@@ -26,6 +26,28 @@ test('normal live cloud drift stays smooth at second boundaries and counts elaps
   const c=createCloudClock();let previous=0;
   for(let frame=0;frame<180;frame++){const next=c.step(0,1/60);assert.ok(Math.abs(next-previous-1/60)<1e-10);previous=next;}
   assert.ok(Math.abs(previous-3)<1e-10);
+});
+test('time travel follows smoothly with bounded directional blur and comes to rest',()=>{
+  const m=createCloudMotion(),wind=[.001,.0005];
+  assert.deepEqual(m.step(0,0,wind),{seconds:0,blur:[0,0]});
+  const first=m.step(7200,.016,wind);
+  assert.ok(first.seconds>0&&first.seconds<7200);
+  assert.ok(first.blur[0]>0&&first.blur[1]>0);
+  assert.ok(Math.hypot(...first.blur)<=.030000001);
+  const reversed=m.step(-7200,.016,wind);
+  assert.ok(reversed.seconds<first.seconds);
+  assert.ok(reversed.blur[0]<0&&reversed.blur[1]<0);
+  let frame=reversed;
+  for(let i=0;i<240;i++)frame=m.step(-7200,1/60,wind);
+  assert.ok(Math.abs(frame.seconds+7200)<.001);
+  assert.deepEqual(frame.blur,[0,0]);
+});
+test('reduced motion snaps to the requested time without blur, including after a pause',()=>{
+  const m=createCloudMotion(),wind=[.001,0];m.step(0,0,wind);
+  assert.deepEqual(m.step(3600,0,wind),{seconds:0,blur:[0,0]});
+  assert.deepEqual(m.step(3600,.016,wind,true),{seconds:3600,blur:[0,0]});
+  const resumed=m.step(3600,.016,wind);
+  assert.deepEqual(resumed,{seconds:3600,blur:[0,0]});
 });
 test('each visit gets a sparse cloud slab with volume and its own mix of high cloud',()=>{
   const all=['spring','summer','autumn','winter'].flatMap(climate=>visits(climate,200));

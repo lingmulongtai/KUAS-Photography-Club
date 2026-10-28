@@ -25,7 +25,8 @@ import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds } from './clouds';
-import {createCloudClock} from './cloud-weather';
+import { createCloudBlur } from './cloud-blur';
+import {createCloudClock,createCloudMotion} from './cloud-weather';
 import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio } from './look-controls';
 import {createKamoChannel,kamoMask} from './kamo-channel';
 import {buildBridges} from './bridges';
@@ -122,6 +123,8 @@ export function createHero(
   const cloudSeed=Number(new URLSearchParams(location.search).get('clouds'));
   const clouds = buildClouds(env, Number.isInteger(cloudSeed)&&cloudSeed>0?cloudSeed:undefined, opts.quality, climateOf('auto',jstParts(opts.now()).month));
   const cloudClock=createCloudClock();
+  const cloudMotion=createCloudMotion();
+  const cloudBlur=createCloudBlur(renderer,camera,clouds.mesh);
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
@@ -750,7 +753,8 @@ export function createHero(
       const date=opts.now();
       applyTime(date, t);
       const cloudSeconds=cloudClock.step(opts.cloudTravelMinutes?.()??0,dt,opts.reducedMotion);
-      clouds.uniforms.uWind.value.set(cloudSeconds*clouds.weather.wind[0],cloudSeconds*clouds.weather.wind[1]);
+      const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
+      clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
       if (dt > 0) driveCars?.(dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);
@@ -758,7 +762,7 @@ export function createHero(
       const az = Math.atan2(forward.x, -forward.z);
       const top = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) + camera.fov * RAD / 2;
       meteors.update(t, dt, camera.position, { az, half, top }, Math.min(1, env.uStars.value), pxPerM);
-      post.render(t);
+      cloudBlur.render(cloudFrame.blur,width,height,pixelRatio,()=>post.render(t));
       labels?.update(camera, width, height);
       loading.frame();
       // keep the frame rate up on slower devices by rendering fewer pixels
