@@ -11,21 +11,22 @@ export function buildAircraft(env:Env) {
   const fin=new THREE.BoxGeometry(.5,5,4);fin.translate(0,3,-14);
   const parts=[fuselage,wings,tail,fin];
   const geometry=mergeGeometries(parts);for(const part of parts)part.dispose();
-  const material=new THREE.ShaderMaterial({uniforms:env,
-    vertexShader:`varying vec3 vWorld;varying vec3 vNormal;
-      void main(){vec4 wp=modelMatrix*instanceMatrix*vec4(position,1.);vWorld=wp.xyz;
+  const opacity=new THREE.InstancedBufferAttribute(new Float32Array(AIRCRAFT_PATHS.length),1);geometry.setAttribute('iOpacity',opacity);
+  const material=new THREE.ShaderMaterial({uniforms:env,transparent:true,depthWrite:false,
+    vertexShader:`attribute float iOpacity;varying vec3 vWorld;varying vec3 vNormal;varying float vOpacity;
+      void main(){vec4 wp=modelMatrix*instanceMatrix*vec4(position,1.);vWorld=wp.xyz;vOpacity=iOpacity;
         vNormal=normalize(mat3(modelMatrix*instanceMatrix)*normal);gl_Position=projectionMatrix*viewMatrix*wp;}`,
-    fragmentShader:`${ENV_GLSL} varying vec3 vWorld;varying vec3 vNormal;
+    fragmentShader:`${ENV_GLSL} varying vec3 vWorld;varying vec3 vNormal;varying float vOpacity;
       void main(){vec3 n=normalize(vNormal);vec3 col=shade(vec3(.55,.59,.62),n,vWorld,1.);
-        gl_FragColor=vec4(applyHaze(col,vec3(.012,.014,.016)*uCity,vWorld),1.);}`});
+        gl_FragColor=vec4(applyHaze(col,vec3(.012,.014,.016)*uCity,vWorld),vOpacity);}`});
   const mesh=new THREE.InstancedMesh(geometry,material,AIRCRAFT_PATHS.length);
   mesh.name='illustrative-aircraft';mesh.frustumCulled=false;
   const dummy=new THREE.Object3D();let elapsed=0;
   const update=(dt:number)=>{
     elapsed+=Math.max(0,dt);
     AIRCRAFT_PATHS.forEach((path,i)=>{const p=aircraftPose(path,elapsed);dummy.position.set(p.x,p.y,p.z);
-      dummy.rotation.set(0,p.yaw,0);dummy.scale.setScalar(p.visible?1:0);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);});
-    mesh.instanceMatrix.needsUpdate=true;
+      dummy.rotation.set(0,p.yaw,0);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);opacity.setX(i,p.opacity);});
+    mesh.instanceMatrix.needsUpdate=opacity.needsUpdate=true;
   };
   update(0);return {mesh,update};
 }

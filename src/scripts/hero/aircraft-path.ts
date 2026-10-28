@@ -8,5 +8,6 @@ export const AIRCRAFT_PATHS = [
 export function aircraftPose(path:typeof AIRCRAFT_PATHS[number],seconds:number) {
   const [x,y,z]=path.from,[tx,ty,tz]=path.to,dx=tx-x,dz=tz-z;
   const length=Math.hypot(dx,ty-y,dz),p=((path.phase+seconds*path.speed/length)%1+1)%1;
-  return {x:x+(tx-x)*p,y:y+(ty-y)*p,z:z+(tz-z)*p,yaw:Math.atan2(dx,dz),visible:p>.025&&p<.975};
+  const opacity=Math.min(1,p/.045,(1-p)/.045);
+  return {x:x+(tx-x)*p,y:y+(ty-y)*p,z:z+(tz-z)*p,yaw:Math.atan2(dx,dz),opacity};
 }
