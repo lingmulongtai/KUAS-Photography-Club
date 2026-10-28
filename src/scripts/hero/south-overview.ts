@@ -4,7 +4,7 @@ import type {Box} from './geo';
 
 export type OverviewBuilding = [number,number,number,number,number,number,number];
 
-/** A compact sample of measured buildings, visible until detailed regional data replaces it. */
+/** A compact sample of buildings, visible until detailed regional data replaces it. */
 export async function buildSouthOverview(env:Env,buildings:OverviewBuilding[],ground:(x:number,z:number)=>number) {
   const geometry=new THREE.BoxGeometry(1,1,1);
   const uniforms={...env,uDetailBox:{value:new THREE.Vector4()},uDetailOn:{value:0}};
@@ -31,6 +31,7 @@ export async function buildSouthOverview(env:Env,buildings:OverviewBuilding[],gr
   mesh.computeBoundingSphere();
   return {mesh,setDetailBox(box:Box|null){
     uniforms.uDetailOn.value=box?1:0;if(box)uniforms.uDetailBox.value.set(...box);
-    mesh.visible=!(box&&box[0]<=-9000&&box[1]<=6200&&box[2]>=4600&&box[3]>=19000);
+    // The overview spans several regions; a partial detail box only hides overlapping blocks.
+    mesh.visible=true;
   }};
 }
