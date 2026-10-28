@@ -78,7 +78,8 @@ export function createForest(
         const profile = treeProfile(x,z);
         const cedar = profile.cedar;
         pos.push(x, y - 0.5, z);
-        const cluster = lod === 3 ? quality>.75 ? 8 : 11 : lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
+        // Broader far clusters fill distant wooded slopes without adding tree instances.
+        const cluster = lod === 3 ? quality>.75 ? 9 : 12 : lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
         size.push((cedar ? 2.6 : 4.2) * profile.width * cluster, (cedar ? 15 : 10.5) * profile.height);
         tint.push(...profile.tint.map((v,i)=>v*.8+Math.min(c[i],.45)*.2));
         kind.push(cedar ? 1 : 0);
