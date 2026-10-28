@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {kyotoTower} from '../src/scripts/hero/kyoto-tower.ts';
 
+test('tower illumination stays restrained without changing its daytime colours', () => {
+  const parts=kyotoTower();
+  assert.ok(parts.some(({color})=>color[0]>.7&&color[1]>.7));
+  assert.ok(parts.every(({glow})=>glow<=.95));
+  for(const {geo} of parts) geo.dispose();
+});
+
 test('tower retains the official overall height with bounded, finite geometry', () => {
   const parts=kyotoTower(), bounds=new THREE.Box3();
   let triangles=0;
