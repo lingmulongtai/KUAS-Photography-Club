@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
 import {CampusBuilder,CM} from './campus-architecture';
 import {createCampusMesh} from './campus';
-import {railwayPath,trainSections,sectionTrainProgress,type RailwayRoute} from './railway-path';
+import {railwayPath,trainSections,serviceTrainProgress,type RailwayRoute} from './railway-path';
 import {SHADOW_LAYER} from './shadow';
 
 /** Bounded route groups, one static track draw and one instanced vehicle draw.
@@ -85,14 +85,17 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
   function update(dt:number){
     clock+=dt;let index=0;
     routes.forEach((route,r)=>{
-      const path=paths[r],span=route.cars*(route.carLength+1),sections=services[r];
+      const path=paths[r],span=route.cars*(route.carLength+1),sections=services[r],bothWays=route.tracks.every(t=>t===2);
       for(let service=0;service<sections;service++){
-      const progress=sectionTrainProgress(clock+r*97+service*43,path.length,span,route.id.startsWith('randen')?7:route.id==='jr-shinkansen'?38:20,service,sections);
+      const backwards=bothWays&&service%2===1,directionSign=backwards?-1:1;
+      const perDirection=bothWays?(backwards?Math.floor(sections/2):Math.ceil(sections/2)):sections;
+      const order=bothWays?Math.floor(service/2):service;
+      const progress=serviceTrainProgress(clock+r*97,path.length,span,route.id.startsWith('randen')?7:route.id==='jr-shinkansen'?38:20,order,perDirection,directionSign);
       for(let car=0;car<route.cars;car++){
         const d=progress.distance+(car-(route.cars-1)/2)*(route.carLength+1)*progress.direction,p=path.at(d);
-        const side=p.tracks===2?1.45:0;
+        const side=p.tracks===2?1.45*progress.direction:0;
         pos.setXYZ(index,p.x-p.dz*side,p.y+1.65,p.z+p.dx*side);
-        direction.setXYZ(index,p.dx*progress.direction,p.dz*progress.direction,p.visible?route.carLength:0);index++;
+        direction.setXYZ(index,p.dx*progress.direction,p.dz*progress.direction,p.visible&&progress.visible?route.carLength:0);index++;
       }
       }
     });pos.needsUpdate=direction.needsUpdate=true;
