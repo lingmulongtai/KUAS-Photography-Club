@@ -14,6 +14,7 @@ import {buildSnow} from './src/scripts/hero/season-effects.ts';
 import {buildKiyomizuBeam} from './src/scripts/hero/kiyomizu-beam.ts';
 import {buildRailways} from './src/scripts/hero/railways.ts';
 import {buildClouds} from './src/scripts/hero/clouds.ts';
+import {createCloudBlur} from './src/scripts/hero/cloud-blur.ts';
 import {buildTerrain} from './src/scripts/hero/terrain.ts';
 const renderer=new THREE.WebGLRenderer({antialias:false});renderer.setSize(320,240);document.body.append(renderer.domElement);
 renderer.debug.onShaderError=(gl,program,vs,fs)=>{throw Error(gl.getProgramInfoLog(program)+' '+gl.getShaderInfoLog(vs)+' '+gl.getShaderInfoLog(fs));};
@@ -77,6 +78,21 @@ window.runSceneryChecks=()=>{
    if(maxJump>.002)throw Error('Cloud detail distance discontinuity: '+maxJump);
    stats.push({name:'winter-cloud-continuity',quality,maxJump,maxDensity});
   }
+  if(climate==='summer'&&seed===79190){
+   const blur=createCloudBlur(renderer,camera,clouds.mesh),out=new THREE.WebGLRenderTarget(128,96,{depthBuffer:true});
+   const sharp=new Uint8Array(128*96*4),moving=new Uint8Array(sharp.length);
+   const oldColor=renderer.getClearColor(new THREE.Color()).clone(),oldAlpha=renderer.getClearAlpha(),oldReset=renderer.info.autoReset;
+   renderer.setRenderTarget(out);renderer.setClearColor(0,0);renderer.info.autoReset=false;
+   renderer.info.reset();blur.render([0,0],128,96,1,()=>renderer.render(scene,camera));
+   const stillCalls=renderer.info.render.calls;renderer.readRenderTargetPixels(out,0,0,128,96,sharp);
+   renderer.info.reset();blur.render([.03,.01],128,96,1,()=>renderer.render(scene,camera));
+   const movingCalls=renderer.info.render.calls;renderer.readRenderTargetPixels(out,0,0,128,96,moving);
+   let changed=0;for(let i=0;i<sharp.length;i++)if(Math.abs(sharp[i]-moving[i])>2)changed++;
+   const gpuError=renderer.getContext().getError();
+   renderer.setRenderTarget(null);renderer.setClearColor(oldColor,oldAlpha);renderer.info.autoReset=oldReset;out.dispose();blur.dispose();
+   if(gpuError||stillCalls!==1||movingCalls!==2||changed<20)throw Error('Cloud blur failed: '+JSON.stringify({gpuError,stillCalls,movingCalls,changed}));
+   stats.push({name:'cloud-motion-blur',quality,stillCalls,movingCalls,changed});
+  }
   clouds.mesh.geometry.dispose();clouds.mesh.material.dispose();
  }
  const result={passed:true,stats};document.querySelector('pre').textContent=JSON.stringify(result,null,2);return result;
@@ -85,5 +101,5 @@ window.runSceneryChecks=()=>{
   http.createServer((req,res)=>{
     res.setHeader('content-type',req.url==='/bundle.js'?'application/javascript':'text/html');
     res.end(req.url==='/bundle.js'?result.outputFiles[0].text:'<!doctype html><title>Scenery shader verification</title><button onclick="runSceneryChecks()">Run scenery checks</button><pre>Ready</pre><script src="/bundle.js"></script>');
-  }).listen(4331,'127.0.0.1',()=>console.log('http://127.0.0.1:4331'));
+  }).listen(Number(process.env.SCENERY_PORT)||4331,'127.0.0.1',()=>console.log(`http://127.0.0.1:${Number(process.env.SCENERY_PORT)||4331}`));
 })().catch(error=>{console.error(error);process.exitCode=1;});
