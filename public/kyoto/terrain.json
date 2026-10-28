@@ -127,35 +127,35 @@
    -35000,
    -20000,
    14000,
-   21000
+   29000
   ],
   "step": 100,
   "nx": 491,
-  "nz": 411,
+  "nz": 491,
   "file": "terrain-outer.bin",
-  "bytes": 251104
+  "bytes": 289999
  },
  "aerialOuter": {
   "box": [
    -35000,
    -20000,
    14000,
-   21000
+   29000
   ],
   "file": "aerial-outer.webp",
   "size": [
    2048,
-   1714
+   2048
   ],
-  "bytes": 593324,
+  "bytes": 597884,
   "zoom": 12,
   "mobile": {
    "file": "aerial-outer-mobile.webp",
    "size": [
     1024,
-    857
+    1024
    ],
-   "bytes": 215244
+   "bytes": 217716
   }
  },
  "kameokaCampus": {
@@ -215,6 +215,29 @@
     768
    ],
    "bytes": 145044
+  }
+ },
+ "tennozan": {
+  "box": [
+   -9000,
+   10500,
+   -4000,
+   15500
+  ],
+  "file": "aerial-tennozan-detail.webp",
+  "size": [
+   2048,
+   2048
+  ],
+  "bytes": 746084,
+  "zoom": 16,
+  "mobile": {
+   "file": "aerial-tennozan-detail-mobile.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 257724
   }
  }
 }

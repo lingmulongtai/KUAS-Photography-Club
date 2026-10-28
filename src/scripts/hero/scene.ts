@@ -19,7 +19,7 @@ import { buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
-import { buildWater } from './water';
+import { buildWater, buildWaterAsync } from './water';
 import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
@@ -37,6 +37,7 @@ import { infrastructureMask } from './forest-infrastructure';
 import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
 import { createIntroCameraMotion } from './intro-camera';
+import { createSharedPhotoSlot } from './shared-photo';
 import { VIEWS, PANORAMA_VIEWS, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
@@ -209,20 +210,35 @@ export function createHero(
       normalNearBox: meta.near.box,
       regional: meta.arashiyama && regionalNormal ? {box:meta.arashiyama.box,normal:regionalNormal} : undefined,
       outer: outer && meta.outer && outerNormal ? {box:meta.outer.box,normal:outerNormal,photo:outer} : undefined,
-      photos: [...regions.map((r) => r.meta.box),meta.far.box],
+      // The regional base is composited first; local imagery stays sharper on top.
+      photos: [meta.far.box,...regions.map((r) => r.meta.box)],
     }, opts.quality > 0.75 ? 640 : 400);
     const regionalPhotos: (Promise<unknown> | undefined)[] = [];
     const detailedPhotos: (THREE.Texture | undefined)[] = [];
     let updateForestPhoto:((photo:THREE.Texture,i:number)=>void) | undefined;
+    // Tennozan and Arashiyama are disjoint, so reuse one sampler to stay within
+    // WebGL's minimum texture-unit limit rather than adding a fourth photo slot.
+    const sharedPhoto=regions.findIndex(r=>r.key==='arashiyama');
+    const sharedSlot=meta.tennozan&&sharedPhoto>=0?createSharedPhotoSlot(
+      async()=>({photo:await loadTexture(opts.quality<.75?meta.tennozan!.mobile.file:meta.tennozan!.file,aniso),box:meta.tennozan!.box}),
+      value=>terrain.setPhoto(sharedPhoto+1,value?.photo??null,value?.box),
+      error=>console.warn('Tennozan imagery unavailable',error),
+    ):null;
     ensureRegionalPhoto = (v) => regions.forEach((r, i) => {
       if (!r.views.includes(v) || regionalPhotos[i]) return;
       const file=opts.quality<.75?r.meta.mobile.file:r.meta.file;
       regionalPhotos[i]=loadTexture(file,aniso).then(photo=>{
         detailedPhotos[i]=photo;
-        terrain.setPhoto(i,photo);
+        if(i===sharedPhoto&&sharedSlot)sharedSlot.setFallback({photo,box:r.meta.box});
+        else terrain.setPhoto(i+1,photo,r.meta.box);
         updateForestPhoto?.(photo,i);
       }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
     });
+    const ensurePhotos=ensureRegionalPhoto;
+    ensureRegionalPhoto = v => {
+      ensurePhotos(v);
+      sharedSlot?.select(v==='tennozan');
+    };
     ensureRegionalPhoto(view);
     terrainRecenter = terrain.recenter;
     terrainRecenterAsync = center => { void terrain.recenterAsync(center, () => shadow.invalidate()); };
@@ -389,7 +405,10 @@ export function createHero(
       city=preparedCity;
       group.add(city.group);
       await step();
-      group.add(buildWater(env,hf,data.lines,terrain.uniforms,lite?36:24,undefined,r.id==='yamashina'));
+      const waterEdge=r.id==='tennozan'?(lite?80:60):(lite?36:24);
+      const water=await buildWaterAsync(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||r.id==='tennozan',current);
+      if(!water)throw new Error('Region superseded');
+      group.add(water);
       group.add(buildIslands(env,hf,data.lines));
       await step();
       if(detailedCampus){
@@ -421,7 +440,7 @@ export function createHero(
         for(const layer of [lamps.uniforms,traffic.uniforms]){const i=pointLayers.indexOf(layer);if(i>=0)pointLayers.splice(i,1);}
         terrain.uniforms.uRegionRoadsOn.value=0;
         terrain.uniforms.uRegionRoads.value=wide;
-        terrain.setPhoto(regions.length,null);
+        terrain.setPhoto(0,null);
         env.uBuilt.value=coreBuilt;env.uBuiltBox.value.set(...BUILDINGS_BOX);
         env.uBuiltTexel.value=(BUILDINGS_BOX[2]-BUILDINGS_BOX[0])/builtSize;
         outerExcluded=()=>false;
@@ -437,7 +456,7 @@ export function createHero(
       terrain.uniforms.uRegionRoads.value=road.texture;
       terrain.uniforms.uRegionRoadBox.value.set(...r.box);
       terrain.uniforms.uRegionRoadsOn.value=1;
-      terrain.setPhoto(regions.length,data.photo,r.photo.box);
+      terrain.setPhoto(0,data.photo,r.photo.box);
       env.uBuilt.value=built;env.uBuiltBox.value.set(...r.box);
       env.uBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
       outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
@@ -456,6 +475,7 @@ export function createHero(
     let areaRequest=0;
     ensureCityRegion=center=>{
       let region=regionAt(regionManifest.regions,center);
+      sharedSlot?.select(region?.id==='tennozan');
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
       if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)

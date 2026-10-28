@@ -24,7 +24,8 @@ TUNNEL_CODES = (2704, 2714, 2724)
 
 
 def tiles():
-    regions = json.load(open(os.path.join(OUT, 'regions.json')))['regions']
+    with open(os.path.join(OUT, 'regions.json'), encoding='utf-8') as f:
+        regions = json.load(f)['regions']
     out = set()
     for b in [R.LINES] + [r['lines']['box'] for r in regions]:
         out.update(R.tiles_for(b, 14))
