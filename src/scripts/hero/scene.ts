@@ -160,6 +160,8 @@ export function createHero(
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
+  let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
+  let cancelTreePlanting: (() => void) | null = null;
   let driveCars: ((dt: number) => void) | null = null;
   /** Cities whose roofs switch to stepped blocks near the camera. */
   const cityLods = new Set<ReturnType<typeof buildCity>>();
@@ -309,6 +311,8 @@ export function createHero(
     forest.plant(landscapeCenter(VIEW), VIEW.bearing);
     await yieldToBrowser();
     plantTrees = forest.plant;
+    plantTreesAsync = (eye,bearing) => { void forest.plantAsync(eye,bearing).then(() => shadow.invalidate()); };
+    cancelTreePlanting = forest.cancelPlant;
     scene.add(forest.group);
     campusModel = buildCampus(env, hf).mesh;
     scene.add(campusModel);
@@ -585,6 +589,7 @@ export function createHero(
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
     cancelTerrainRecenter?.();
+    cancelTreePlanting?.();
     const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
     if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
     zoom.reset();
@@ -667,7 +672,7 @@ export function createHero(
       camera.position.copy(freePosition);const yaw=(freeBearing+lookDrag.yaw)*RAD,pitch=THREE.MathUtils.clamp(freePitch+lookDrag.pitch,-85,85)*RAD;
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
       if(freeCenter.distanceTo(freePosition)>600){
-        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);plantTrees?.(freePosition,yaw/RAD);ensureCityRegion?.(freePosition);
+        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);plantTreesAsync?.(freePosition,yaw/RAD);ensureCityRegion?.(freePosition);
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }
     }else if (flight) {
