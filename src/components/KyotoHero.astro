@@ -214,6 +214,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const timeTrack = hero.querySelector<HTMLElement>('.time-slider')!;
     const nowButton = hero.querySelector<HTMLButtonElement>('[data-time="now"]')!;
     let adjustingTime = false;
+    let timeAnimation = 0;
     const updateSlider = (minutes: number) => {
       const value = Math.min(1439, Math.floor(wrapDay(minutes)));
       timeSlider.value = String(value);
@@ -226,6 +227,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     window.addEventListener('pointerup', releaseTime);
     window.addEventListener('blur', releaseTime);
     timeSlider.addEventListener('input', () => {
+      cancelAnimationFrame(timeAnimation); timeAnimation = 0;
       const value = Number(timeSlider.value);
       sky.scrub(value, jstMinutes(new Date()), performance.now());
       nowButton.setAttribute('aria-pressed', 'false');
@@ -234,9 +236,17 @@ const pinTrips = completeSpotPreviews((await getTrips())
     });
     nowButton.addEventListener('click', () => {
       const real = jstMinutes(new Date());
-      sky.select(real, true, real, performance.now(), true);
+      cancelAnimationFrame(timeAnimation);
+      sky.select(real, true, real, performance.now(), motion.matches);
       nowButton.setAttribute('aria-pressed', 'true');
-      showTimeStatus(real);
+      let lastMinute = -1;
+      const animateTime = () => {
+        const minutes = sky.shown(jstMinutes(new Date()), performance.now());
+        const minute = Math.floor(wrapDay(minutes));
+        if (minute !== lastMinute) { showTimeStatus(minutes); lastMinute = minute; }
+        timeAnimation = sky.transitioning ? requestAnimationFrame(animateTime) : 0;
+      };
+      animateTime();
     });
 
     const onStatus = (s: HeroStatus) => {
