@@ -15,17 +15,22 @@ const senkoji=toLocal(35.0157751,135.6655983);
  * Vertices are pulled a few metres toward the camera so the coarse terrain mesh, which
  * smooths over narrow channels, never hides them; buildings still do.
  */
-export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], roads: {
+type WaterRoads = {
   uRoads: { value: THREE.Texture | null };
   uRoadBox: { value: THREE.Vector4 };
   uRoadsOn: { value: number };
   uRegionRoads:{value:THREE.Texture};
   uRegionRoadBox:{value:THREE.Vector4};
   uRegionRoadsOn:{value:number};
-}, regionalEdge=18,channel?:KamoChannel,regionalSurface=false) {
+};
+
+function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: WaterRoads,
+  regionalEdge=18,channel?:KamoChannel,regionalSurface=false) {
   const pos: number[] = [];
   const stable:number[]=[];
+  let trianglesBuilt=0;
   for (let i = 0; i < lines.length; i++) {
+    if(i && i%128===0)yield;
     const f = lines[i];
     if (f.kind !== LINE.water) continue;
     const ring = toVec(f.pts);
@@ -48,6 +53,7 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
       if(refined) {all=refined.points;tris=refined.triangles;}
     }
     for (const t of tris) {
+      if(++trianglesBuilt%512===0)yield;
       // face up
       const [a, b, c] = t.map((k) => all[k]);
       const up = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) < 0;
@@ -118,6 +124,26 @@ export function buildWater(env: Env, hf: Heightfield, lines: LineFeature[], road
   const mesh = new THREE.Mesh(geo, material);
   mesh.frustumCulled = false;
   return mesh;
+}
+
+export function buildWater(env:Env,hf:Heightfield,lines:LineFeature[],roads:WaterRoads,
+  regionalEdge=18,channel?:KamoChannel,regionalSurface=false) {
+  const steps=waterSteps(env,hf,lines,roads,regionalEdge,channel,regionalSurface);
+  for(;;){const step=steps.next();if(step.done)return step.value;}
+}
+
+/** Prepare regional water in short tasks and discard superseded work before making a mesh. */
+export async function buildWaterAsync(env:Env,hf:Heightfield,lines:LineFeature[],roads:WaterRoads,
+  regionalEdge:number,channel:KamoChannel|undefined,regionalSurface:boolean,current:()=>boolean) {
+  const steps=waterSteps(env,hf,lines,roads,regionalEdge,channel,regionalSurface);
+  try {
+    while(current()){
+      const deadline=performance.now()+5;
+      do {const step=steps.next();if(step.done)return step.value;} while(current()&&performance.now()<deadline);
+      await new Promise<void>(resolve=>setTimeout(resolve,0));
+    }
+    return null;
+  } finally {steps.return(undefined as never);}
 }
 
 function toVec(p: Float32Array) {

@@ -19,7 +19,7 @@ import { buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
-import { buildWater } from './water';
+import { buildWater, buildWaterAsync } from './water';
 import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
@@ -406,7 +406,9 @@ export function createHero(
       group.add(city.group);
       await step();
       const waterEdge=r.id==='tennozan'?(lite?80:60):(lite?36:24);
-      group.add(buildWater(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||r.id==='tennozan'));
+      const water=await buildWaterAsync(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||r.id==='tennozan',current);
+      if(!water)throw new Error('Region superseded');
+      group.add(water);
       group.add(buildIslands(env,hf,data.lines));
       await step();
       if(detailedCampus){

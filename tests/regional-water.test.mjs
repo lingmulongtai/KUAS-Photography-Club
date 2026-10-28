@@ -7,13 +7,13 @@ const {build}=require('esbuild'),Module=require('node:module');
 
 test('regional water follows the Yamashina canal bends without a camera-dependent floating bank',async(t)=>{
   const result=await build({stdin:{resolveDir:process.cwd(),contents:`
-    export {buildWater} from './src/scripts/hero/water.ts';
+    export {buildWater,buildWaterAsync} from './src/scripts/hero/water.ts';
     export {loadLines} from './src/scripts/hero/lines-data.ts';
     export {loadHeightfield} from './src/scripts/hero/heightfield.ts';
     export {createEnv} from './src/scripts/hero/env.ts';
   `},bundle:true,platform:'node',format:'cjs',write:false,logLevel:'silent'});
   const mod=new Module(import.meta.url);mod.filename=import.meta.filename;mod.paths=modulePaths();mod._compile(result.outputFiles[0].text,import.meta.filename);
-  const {buildWater,loadLines,loadHeightfield,createEnv}=mod.exports;
+  const {buildWater,buildWaterAsync,loadLines,loadHeightfield,createEnv}=mod.exports;
   const original=globalThis.fetch;globalThis.fetch=async path=>new Response(await readFile(new URL('../public'+path,import.meta.url)));t.after(()=>{globalThis.fetch=original;});
   const meta=JSON.parse(await readFile(new URL('../public/kyoto/terrain.json',import.meta.url))),hf=await loadHeightfield(meta);
   const regions=JSON.parse(await readFile(new URL('../public/kyoto/regions.json',import.meta.url))).regions;
@@ -35,6 +35,12 @@ test('regional water follows the Yamashina canal bends without a camera-dependen
   const p=water.geometry.getAttribute('position');
   assert.ok(p.count>0&&p.count<600000,`confluence water has bounded geometry: ${p.count}`);
   assert.equal(water.material.uniforms.uWaterBias.value,.35);
+  const batched=await buildWaterAsync(createEnv(),hf,lines,{},60,undefined,true,()=>true);
+  const bp=batched.geometry.getAttribute('position');assert.equal(bp.count,p.count);
+  for(let i=0;i<p.count;i+=997)assert.equal(bp.getY(i),p.getY(i),'batched water matches the original');
+  let current=true;setTimeout(()=>{current=false;},0);
+  assert.equal(await buildWaterAsync(createEnv(),hf,lines,{},60,undefined,true,()=>current),null,'stale water preparation stops');
+  batched.geometry.dispose();batched.material.dispose();
   water.geometry.dispose();water.material.dispose();
 });
 function modulePaths(){return require.resolve.paths('three')??[];}
