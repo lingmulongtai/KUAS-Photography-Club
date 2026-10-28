@@ -5,6 +5,7 @@ import { LINE, type LineFeature } from './lines-data';
 import { ROAD_WIDTH } from './roads';
 import { rng } from './util';
 import { trafficSegments, trafficLaneFraction } from './traffic-access';
+import {trafficJunctions,chooseConnection} from './traffic-junctions';
 import { lightSpriteGeometry, LIGHT_SPRITE_VERTEX, LIGHT_SPRITE_FRAGMENT } from './light-sprites';
 
 /*
@@ -77,6 +78,7 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
     }
   }
   const total = weight.reduce((a, b) => a + b, 0);
+  const junctions=trafficJunctions(paths);
   const count = Math.round(Math.min(total, quality > 0.75 ? 12000 : 4000) * Math.min(1, quality * 1.1));
   // pick roads in proportion to how many cars they carry
   const cumW = new Float64Array(weight.length);
@@ -245,7 +247,17 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
       let n = path.cum.length;
       dist[i] += dir[i] * speed[i] * dt;
       if (dist[i] < 0 || dist[i] > path.cum[n - 1]) {
-        place(i, false);
+        const end=dir[i]>0?1:0,pts=path.pts,a=end?pts.length-4:2,b=end?pts.length-2:0;
+        const dx=pts[b]-pts[a],dz=pts[b+1]-pts[a+1],len=Math.hypot(dx,dz)||1;
+        const next=chooseConnection(junctions[pathOf[i]][end],dx/len,dz/len,r());
+        if(next){
+          const overflow=end?dist[i]-path.cum[n-1]:-dist[i];
+          pathOf[i]=next.path;path=paths[next.path];n=path.cum.length;dir[i]=next.end?-1:1;
+          dist[i]=next.end?Math.max(0,path.cum[n-1]-overflow):Math.min(path.cum[n-1],overflow);
+          segOf[i]=next.end?n-2:0;
+          const lanes=LANES[path.rank].map(f=>f*ROAD_WIDTH[path.rank]);
+          lane[i]=lanes.reduce((best,value)=>Math.abs(value-lane[i])<Math.abs(best-lane[i])?value:best,lanes[0]);
+        }else place(i, false);
         path = paths[pathOf[i]];
         n = path.cum.length;
       }
