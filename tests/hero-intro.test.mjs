@@ -31,8 +31,8 @@ function mount({unsupported=false,throws=false,reduced=true,userAgent='Mozilla/5
   return {intro,document,button,attributes,styles,percent,emit,run,get delay(){return delay;},expire:()=>timeout(),get cleared(){return cleared;}};
 }
 
-test('only Vercel screenshot agents skip the opening dialog',()=>{
-  for(const userAgent of ['Vercelbot (+https://vercel.com)', 'vercel-screenshot-bot']) {
+test('screenshot agents skip the opening dialog while ordinary browsers retain it',()=>{
+  for(const userAgent of ['Vercelbot (+https://vercel.com)', 'vercel-screenshot-bot', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.0 Safari/537.36']) {
     const state=mount({userAgent});
     assert.equal(state.intro.open,false);
     assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false);
