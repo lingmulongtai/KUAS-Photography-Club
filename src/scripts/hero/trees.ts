@@ -58,7 +58,7 @@ export function createForest(
     return !!c && !excluded(x,z) && wooded(c,x,z);
   };
 
-  function trees(eye: { x: number; z: number }) {
+  function* trees(eye: { x: number; z: number }) {
     const r = rng(4242);
     const pos: number[] = [];
     const size: number[] = [];
@@ -68,7 +68,9 @@ export function createForest(
     const shapes: number[] = [];
     const season:number[]=[];
     const detailed=regions.some(r=>inBox(r.box,eye.x,eye.z));
+    let scanned=0;
     for (const { x, z, lod, seed } of forestCells(eye, quality,detailed)) {
+        if (++scanned % 512 === 0) yield;
         const c = sample(x, z);
         if (!c || excluded(x, z) || !wooded(c,x,z)) continue;
         if (lod<2 && seed>standDensity(x,z)) continue;
@@ -213,28 +215,32 @@ export function createForest(
   // Repeated visits reuse three recent populations; evicted instance buffers are released.
   const populations=new Map<string,{meshes:THREE.Mesh[];count:number}>();
   let count = 0;
+  let generation = 0;
   let planted:{eye:{x:number;z:number};bearing:number} | undefined;
   /** All directions remain populated when the user turns; chunks outside the frustum are culled. */
-  function plant(eye: { x: number; z: number }, _bearing: number) {
+  function* plantSteps(eye: { x: number; z: number }, _bearing: number):Generator<void,void,void> {
     planted={eye:{x:eye.x,z:eye.z},bearing:_bearing};
     const key=`${Math.round(eye.x)},${Math.round(eye.z)}`;
-    for (const m of [...group.children] as THREE.Mesh[]) {
-      group.remove(m);
-    }
     const cached=populations.get(key);
     if(cached) {
       populations.delete(key);populations.set(key,cached);
+      group.clear();
       group.add(...cached.meshes);count=cached.count;return;
     }
-    const { pos, size, tint, kind, lods, shapes,season } = trees(eye);
-    count = kind.length;
+    const { pos, size, tint, kind, lods, shapes,season } = yield* trees(eye);
     const chunks = new Map<string, number[]>();
-    kind.forEach((k, i) => {
+    for(let i=0;i<kind.length;i++) {
+      if(i && i%2048===0) yield;
+      const k=kind[i];
       const key = `${Math.floor(pos[i * 3] / 768)},${Math.floor(pos[i * 3 + 2] / 768)},${k},${lods[i]}`;
       if (!chunks.has(key)) chunks.set(key, []);
       chunks.get(key)!.push(i);
-    });
+    }
+    const meshes:THREE.Mesh[]=[];
+    let committed=false,chunkCount=0;
+    try {
     for (const idx of chunks.values()) {
+      if(++chunkCount%12===0) yield;
       const first = idx[0];
       const shapesByLod = kind[first] === 1 ? [closeCedar,midCedar,farCedar,farCedar] : [closeCrown,midCrown,farCrown,farCrown];
       const shape = shapesByLod[lods[first]];
@@ -265,15 +271,35 @@ export function createForest(
       const mesh = new THREE.Mesh(geo, material);
       mesh.layers.enable(SHADOW_LAYER);
       mesh.userData.depthMaterial = depthMaterial;
-      group.add(mesh);
+      meshes.push(mesh);
     }
-    populations.set(key,{meshes:[...group.children] as THREE.Mesh[],count});
+    group.clear();group.add(...meshes);count=kind.length;
+    populations.set(key,{meshes,count});committed=true;
     if(populations.size>3) {
       const oldest=populations.keys().next().value!;
       for(const mesh of populations.get(oldest)!.meshes) mesh.geometry.dispose();
       populations.delete(oldest);
     }
+    } finally {
+      if(!committed)for(const mesh of meshes)mesh.geometry.dispose();
+    }
   }
+  function plant(eye: { x: number; z: number }, bearing: number) {
+    generation++;
+    const steps=plantSteps(eye,bearing);
+    while(!steps.next().done) { /* synchronous initial and viewpoint setup */ }
+  }
+  async function plantAsync(eye: { x: number; z: number }, bearing: number) {
+    const request=++generation,steps=plantSteps({x:eye.x,z:eye.z},bearing);
+    try {
+      while(request===generation) {
+        const deadline=performance.now()+5;
+        do { if(steps.next().done)return; } while(request===generation && performance.now()<deadline);
+        await new Promise<void>(resolve=>setTimeout(resolve,0));
+      }
+    } finally { steps.return(); }
+  }
+  const cancelPlant = () => { generation++; };
   /** Use a sharper photo over `box`. `seasonal` imagery (leafless or autumn) also accepts muted
    * canopy on slopes; summer imagery doesn't need that and would catch cemeteries on the hills. */
   const setRegionalPhoto = (photo:HTMLImageElement | ImageBitmap,box:Box,seasonal=false) => {
@@ -293,7 +319,7 @@ export function createForest(
     populations.clear();
     if(planted)plant(planted.eye,planted.bearing);
   };
-  return { group, plant, contains, setRegionalPhoto, setOuterPhoto, get count() { return count; } };
+  return { group, plant, plantAsync, cancelPlant, contains, setRegionalPhoto, setOuterPhoto, get count() { return count; } };
 }
 
 /** An axis-aligned block: centre, size, and a shade (0..1, 0 for none) shared by its faces. */
