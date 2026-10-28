@@ -148,7 +148,9 @@ float hazeTransmittance(vec3 wp){
   float k = uFogFalloff * d.y;
   float shape = abs(k) > 1e-4 ? (1. - exp(-k)) / k : 1.;
   float tau = uFogDensity * exp(-uFogFalloff * h0) * dist * shape;
-  return exp(-tau);
+  // Leave nearby streets clear; very distant, less detailed mountains fade into the sky.
+  float farHaze = smoothstep(16000., 40000., dist) * .2;
+  return exp(-tau) * (1. - farHaze);
 }
 
 /* Slow atmospheric scintillation: nearby lights stay quiet, distant neighbourhoods breathe.
