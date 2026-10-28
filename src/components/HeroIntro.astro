@@ -48,11 +48,12 @@ const city = [
     <p id="intro-title" class:list={['intro-title', { 'is-latin': en }]} tabindex="-1" autofocus>{en ? 'KUAS Photography Club' : '写真部'}</p>
     <p class="intro-name">{en ? '— Kyoto University of Advanced Science —' : '— KUAS Photography Club —'}</p>
   </div>
-  <svg class="intro-city" viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-    <!-- all of it faintly, as the circle's track, then the same lines drawn over it -->
-    <g class="intro-ghost">{city.map((line) => <path class={line.kind} d={line.d} />)}</g>
-    {city.map((line) => <path class={line.kind} d={line.d} pathLength={line.kind === 'hide' ? undefined : 1} style={`--from:${line.from};--span:${line.span}`} />)}
-  </svg>
+  <div class="intro-city" aria-hidden="true">
+    <svg viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice"><g class="intro-ghost">{city.map((line) => <path class={line.kind} d={line.d} />)}</g></svg>
+    <div class="intro-city-drawing"><svg viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice">
+      {city.map((line) => <path class={line.kind} d={line.d} pathLength={line.kind === 'hide' ? undefined : 1} style={`--from:${line.from};--span:${line.span}`} />)}
+    </svg></div>
+  </div>
   <div class="intro-foot">
     <p role="status">{en ? 'Preparing Kyoto’s scenery' : '京都の景色を準備しています'}<span class="intro-percent" aria-hidden="true">00%</span></p>
     <button type="button" class="intro-skip">{en ? 'Enter the site now' : '待たずにサイトを見る'} <span aria-hidden="true">↗</span></button>
@@ -205,7 +206,7 @@ const city = [
   .hero-intro[open], .hero-intro.is-leaving { display: grid; grid-template-rows: minmax(min-content, 1fr) auto auto; }
   .hero-intro:not([open]):not(.is-leaving) { display: none; }
   .hero-intro::backdrop { background: var(--band, #64bec6); }
-  .hero-intro::before { content: ''; position: absolute; inset: -20%; pointer-events: none; opacity: .12; background: radial-gradient(ellipse at 50% 45%, #fff, transparent 60%); }
+  .hero-intro::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .12; background: radial-gradient(ellipse at 50% 45%, #fff, transparent 60%); }
   .is-leaving {
     z-index: 100;
     pointer-events: none;
@@ -252,7 +253,8 @@ const city = [
   .intro-name { margin-top: 10px; font: 600 12px/1.6 var(--latin); letter-spacing: .14em; }
 
   /* at least a sixth of its width tall, so a wide, short screen crops only empty sky */
-  .intro-city { display: block; width: 100%; height: max(var(--city), 13.5vw); }
+  .intro-city { position: relative; display: block; width: 100%; height: max(var(--city), 13.5vw); }
+  .intro-city > svg, .intro-city-drawing, .intro-city-drawing svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .intro-city path {
     --local: clamp(0, (var(--progress) - var(--from)) / var(--span), 1);
     fill: none;
@@ -294,7 +296,7 @@ const city = [
   .intro-skip:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
   .intro-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 
-  @media (max-height: 560px) {
+  @media (max-height: 650px) {
     .hero-intro { --emblem: clamp(84px, 26vh, 140px); --city: clamp(70px, 20vh, 110px); }
     .intro-title { margin-top: 10px; font-size: clamp(24px, 8vh, 34px); }
     .intro-name { display: none; }
@@ -306,14 +308,16 @@ const city = [
     .hero-intro:is([open], .is-leaving) .intro-title, .hero-intro:is([open], .is-leaving) .intro-name { animation: intro-in 1.1s .15s cubic-bezier(.22, .61, .36, 1) both; }
     .hero-intro:is([open], .is-leaving) .intro-foot { animation: intro-in 1s .2s cubic-bezier(.22, .61, .36, 1) both; }
     .hero-intro:is([open], .is-leaving) .intro-city { animation: intro-city-in 2.6s cubic-bezier(.22, .61, .36, 1) both; transform-origin: 50% 100%; }
-    .hero-intro:is([open], .is-leaving) .intro-city > path:not(.hide) { animation: intro-trace 1.9s cubic-bezier(.4, 0, .2, 1) both; animation-delay: calc(var(--from) * 1s); }
-    .hero-intro:is([open], .is-leaving) .intro-city > path.hide { animation: intro-matte .35s ease-out both; animation-delay: calc(.2s + var(--from) * 1s); }
+    @supports (clip-path: inset(0)) {
+      .hero-intro:is([open], .is-leaving) .intro-city-drawing { animation: intro-reveal 2.6s cubic-bezier(.4, 0, .2, 1) both; will-change: clip-path; }
+      .hero-intro:is([open], .is-leaving) .intro-city-drawing path:not(.hide) { stroke-dashoffset: 0; }
+      .hero-intro:is([open], .is-leaving) .intro-city-drawing .hide { fill-opacity: 1; }
+    }
     .intro-dot circle { transform-box: fill-box; transform-origin: center; animation: intro-pulse 1.4s ease-in-out infinite alternate; }
   }
   @keyframes intro-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
-  @keyframes intro-light { from { opacity: .03; transform: translateX(-12%) scale(.96); } to { opacity: .12; transform: translateX(8%) scale(1.04); } }
+  @keyframes intro-light { from { opacity: .03; transform: scale(.9); } to { opacity: .12; transform: scale(1); } }
   @keyframes intro-city-in { from { opacity: .5; transform: translateY(12px) scale(1.02); } to { opacity: 1; transform: translateY(0) scale(1); } }
-  @keyframes intro-trace { from { stroke-dashoffset: 1.02; } to { stroke-dashoffset: 0; } }
-  @keyframes intro-matte { from { fill-opacity: 0; } to { fill-opacity: 1; } }
+  @keyframes intro-reveal { from { clip-path: inset(0 50%); } to { clip-path: inset(0); } }
   @keyframes intro-pulse { to { transform: scale(1.4); opacity: .65; } }
 </style>
