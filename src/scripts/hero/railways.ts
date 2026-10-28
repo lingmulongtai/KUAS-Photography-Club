@@ -61,13 +61,14 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
   const services=routes.map((route,r)=>trainSections(paths[r].length,route.cars*(route.carLength+1)));
   const count=routes.reduce((n,r,i)=>n+r.cars*services[i],0),base=new THREE.BoxGeometry(1,1,1).toNonIndexed();
   const vehicles=new THREE.InstancedBufferGeometry();vehicles.setAttribute('position',base.getAttribute('position'));vehicles.setAttribute('normal',base.getAttribute('normal'));
-  const pos=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),direction=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),colors=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),styles=new THREE.InstancedBufferAttribute(new Float32Array(count),1);
-  vehicles.setAttribute('iPos',pos);vehicles.setAttribute('iDirection',direction);vehicles.setAttribute('iColor',colors);vehicles.setAttribute('iStyle',styles);vehicles.instanceCount=count;
-  let index=0;routes.forEach((route,r)=>{const c=new THREE.Color(route.color),style=route.id.startsWith('jr-')?1:route.id==='kintetsu'?2:0;
-    for(let i=0;i<route.cars*services[r];i++){colors.setXYZ(index,c.r,c.g,c.b);styles.setX(index++,style);}});
+  const pos=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),direction=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),colors=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3),styles=new THREE.InstancedBufferAttribute(new Float32Array(count),1),noses=new THREE.InstancedBufferAttribute(new Float32Array(count),1);
+  vehicles.setAttribute('iPos',pos);vehicles.setAttribute('iDirection',direction);vehicles.setAttribute('iColor',colors);vehicles.setAttribute('iStyle',styles);vehicles.setAttribute('iNose',noses);vehicles.instanceCount=count;
+  let index=0;routes.forEach((route,r)=>{const c=new THREE.Color(route.color),style=route.id==='jr-shinkansen'?3:route.id.startsWith('jr-')?1:route.id==='kintetsu'?2:0;
+    for(let i=0;i<route.cars*services[r];i++){const car=i%route.cars;colors.setXYZ(index,c.r,c.g,c.b);styles.setX(index,style);
+      noses.setX(index++,style===3?(car===0?-1:car===route.cars-1?1:0):0);}});
   const vehicleMaterial=new THREE.ShaderMaterial({uniforms:env,
-    vertexShader:`attribute vec3 iPos;attribute vec3 iDirection;attribute vec3 iColor;attribute float iStyle;varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;flat varying float vStyle;
-      void main(){vec3 p=position*vec3(2.7,3.1,iDirection.z);vLocal=p;vColor=iColor;vStyle=iStyle;vVisible=step(.01,iDirection.z);vec2 d=iDirection.xy;
+    vertexShader:`attribute vec3 iPos;attribute vec3 iDirection;attribute vec3 iColor;attribute float iStyle;attribute float iNose;varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;flat varying float vStyle;
+      void main(){vec3 p=position*vec3(2.7,3.1,iDirection.z);if(iNose*position.z>.4){p.x*=.45;p.y-=.35;}vLocal=p;vColor=iColor;vStyle=iStyle;vVisible=step(.01,iDirection.z);vec2 d=iDirection.xy;
         vWorld=iPos+vec3(d.y*p.x+d.x*p.z,p.y,-d.x*p.x+d.y*p.z);vNormal=vec3(d.y*normal.x+d.x*normal.z,normal.y,-d.x*normal.x+d.y*normal.z);
         gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`,
     fragmentShader:`${ENV_GLSL}${SHADOW_GLSL}
@@ -76,6 +77,7 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
         float pane=step(.17,fract((vLocal.z+100.)/1.65))*band;vec3 alb=mix(vColor,vec3(.22,.25,.26),step(1.1,vLocal.y));
         if(vStyle>.5 && vStyle<1.5){alb=mix(vec3(.42,.45,.46),vColor,side*step(-1.1,vLocal.y)*step(vLocal.y,-.65));alb=mix(alb,vec3(.22,.25,.26),step(1.1,vLocal.y));}
         if(vStyle>1.5){alb=mix(vColor,vec3(.67,.62,.51),step(-.25,vLocal.y));alb=mix(alb,vec3(.22,.25,.26),step(1.1,vLocal.y));}
+        if(vStyle>2.5){alb=mix(vec3(.73,.76,.78),vColor,side*step(-.9,vLocal.y)*step(vLocal.y,-.48));}
         alb=mix(alb,vec3(.035,.06,.075),pane);vec3 emit=vec3(.8,.61,.32)*pane*uCity*.5;
         gl_FragColor=vec4(applyHaze(shade(alb,n,vWorld,sunShadow(vWorld,n)),emit,vWorld),1.);}`});
   const trainMesh=new THREE.Mesh(vehicles,vehicleMaterial);trainMesh.frustumCulled=false;group.add(trainMesh);
@@ -85,7 +87,7 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
     routes.forEach((route,r)=>{
       const path=paths[r],span=route.cars*(route.carLength+1),sections=services[r];
       for(let service=0;service<sections;service++){
-      const progress=sectionTrainProgress(clock+r*97+service*43,path.length,span,route.id.startsWith('randen')?7:20,service,sections);
+      const progress=sectionTrainProgress(clock+r*97+service*43,path.length,span,route.id.startsWith('randen')?7:route.id==='jr-shinkansen'?38:20,service,sections);
       for(let car=0;car<route.cars;car++){
         const d=progress.distance+(car-(route.cars-1)/2)*(route.carLength+1)*progress.direction,p=path.at(d);
         const side=p.tracks===2?1.45:0;

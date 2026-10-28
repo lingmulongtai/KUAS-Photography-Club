@@ -4,9 +4,12 @@ import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
 import {railwayPath,trainProgress,trainSections,sectionTrainProgress} from '../src/scripts/hero/railway-path.ts';
 
-test('the seven source routes are bounded, continuous and retain hidden tunnel segments',async()=>{
+test('the source routes include the Shinkansen, stay continuous and retain hidden tunnel segments',async()=>{
   const data=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/railways.json.gz',import.meta.url))));
-  assert.equal(data.routes.length,7);let stations=0,tunnels=0;
+  assert.equal(data.routes.length,8);let stations=0,tunnels=0;
+  const shinkansen=data.routes.find(r=>r.id==='jr-shinkansen');
+  assert.ok(shinkansen);assert.equal(shinkansen.cars,8);assert.ok(shinkansen.states.includes(2));
+  assert.ok(shinkansen.stations.length>=1);
   for(const route of data.routes){
     assert.equal(route.states.length,route.points.length-1);assert.equal(route.tracks.length,route.states.length);
     const p=railwayPath(route,()=>50);assert.ok(p.length>2500&&p.length<42000,route.id);
