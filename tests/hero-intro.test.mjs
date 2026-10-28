@@ -55,7 +55,7 @@ test('skip, Escape and a required-data error each dismiss without waiting for a 
   }
 });
 
-test('a missing main bundle or stalled connection cannot block the site beyond ten seconds',()=>{
+test('a missing main bundle cannot block the site beyond ten seconds',()=>{
   const state=mount();assert.equal(state.delay,10000);state.expire();
   assert.equal(state.intro.open,false);assert.ok(state.cleared);
   state.emit('hero:ready');assert.equal(state.intro.closed,1);
@@ -110,7 +110,15 @@ test('a fast load plays a continuous short opening without counting ahead of rea
   state.run(1);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
 });
 
-test('a late ready event still respects the ten-second safety limit',()=>{
-  const state=mount({reduced:false});state.run(9.8);state.emit('hero:ready');
+test('progress extends the wait for an active load without hiding a stalled site indefinitely',()=>{
+  const state=mount({reduced:false});state.run(9);state.emit('hero:progress',.2);
+  assert.equal(state.delay,15000);
+  state.run(10);state.emit('hero:progress',.6);assert.ok(state.delay<=11001);
+  state.emit('hero:progress',.6);assert.ok(state.delay<=11001,'duplicate progress does not restart the timer');
+  state.expire();assert.equal(state.intro.open,false);
+});
+
+test('a late ready event still respects the thirty-second safety limit',()=>{
+  const state=mount({reduced:false});state.run(29.8);state.emit('hero:ready');
   assert.ok(state.delay<=201);state.expire();assert.equal(state.intro.open,false);
 });
