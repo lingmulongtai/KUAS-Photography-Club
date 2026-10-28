@@ -9,7 +9,7 @@ const classes=()=>{
   const set=new Set();
   return {add:value=>set.add(value),remove:value=>set.delete(value),contains:value=>set.has(value)};
 };
-function mount({unsupported=false,throws=false,reduced=true}={}) {
+function mount({unsupported=false,throws=false,reduced=true,userAgent='Mozilla/5.0'}={}) {
   const document=new EventTarget(),button=new EventTarget(),attributes=new Map(),styles=new Map(),percent={textContent:'00%'};
   const progress={setAttribute:(key,value)=>attributes.set(key,value)};
   class Dialog extends EventTarget {
@@ -21,7 +21,7 @@ function mount({unsupported=false,throws=false,reduced=true}={}) {
   const intro=new Dialog();if(unsupported)intro.showModal=undefined;
   document.currentScript={previousElementSibling:intro};document.documentElement={classList:classes()};
   let timeout,delay,cleared=false,frames=[],clock=0;
-  runInNewContext(script,{document,HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
+  runInNewContext(script,{document,navigator:{userAgent},HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
     performance:{now:()=>clock},
     setTimeout:(callback,ms)=>{timeout=callback;delay=ms;return 1;},clearTimeout:()=>{cleared=true;},
     requestAnimationFrame:callback=>frames.push(callback),cancelAnimationFrame:()=>{frames=[];}});
@@ -30,6 +30,17 @@ function mount({unsupported=false,throws=false,reduced=true}={}) {
   const run=seconds=>{for(let i=0;i<Math.round(seconds*60);i++){const due=frames;frames=[];clock+=1000/60;due.forEach(frame=>frame(clock));}};
   return {intro,document,button,attributes,styles,percent,emit,run,get delay(){return delay;},expire:()=>timeout(),get cleared(){return cleared;}};
 }
+
+test('only Vercel screenshot agents skip the opening dialog',()=>{
+  for(const userAgent of ['Vercelbot (+https://vercel.com)', 'vercel-screenshot-bot']) {
+    const state=mount({userAgent});
+    assert.equal(state.intro.open,false);
+    assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false);
+  }
+  for(const userAgent of ['Mozilla/5.0', 'Googlebot/2.1', 'NotVercelbot/1.0']) {
+    assert.equal(mount({userAgent}).intro.open,true,userAgent);
+  }
+});
 
 test('intro opens immediately, reports real progress, then releases the page on readiness',()=>{
   const state=mount();assert.equal(state.intro.open,true);
