@@ -9,7 +9,9 @@ test('illustrative aircraft travel smoothly at bounded altitude and wrap out of 
     for(let t=.1;t<600;t+=.1){
       const p=aircraftPose(path,t);
       assert.ok([p.x,p.y,p.z,p.yaw].every(Number.isFinite));assert.ok(p.y>=2500&&p.y<=7000);
-      if(p.visible&&previous.visible)assert.ok(Math.hypot(p.x-previous.x,p.y-previous.y,p.z-previous.z)<path.speed*.11);
+      assert.ok(p.opacity>=0&&p.opacity<=1);
+      const moved=Math.hypot(p.x-previous.x,p.y-previous.y,p.z-previous.z);
+      if(moved>path.speed*.11)assert.ok(p.opacity<.02&&previous.opacity<.02,'wrap is hidden by the fade');
       previous=p;
     }
   }
