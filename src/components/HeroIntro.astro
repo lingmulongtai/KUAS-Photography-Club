@@ -64,8 +64,15 @@ const city = [
   (() => {
     const intro = document.currentScript.previousElementSibling;
     if (!(intro instanceof HTMLDialogElement) || !intro.showModal) return;
-    // Automated screenshot browsers need the page immediately; ordinary visitors retain the intro.
-    if (/\b(?:Vercelbot|vercel-screenshot-bot|HeadlessChrome)\b/i.test(navigator.userAgent)) return;
+    // The dashboard captures the unique deployment hostname in a headless browser. Render a
+    // lightweight still there; ordinary visitors and local browser tests keep the live scene.
+    const vercelBot = /\b(?:Vercelbot|vercel-screenshot-bot)\b/i.test(navigator.userAgent);
+    const deploymentCapture = /\bHeadlessChrome\b/i.test(navigator.userAgent) &&
+      /^kuas-photography-club-[a-z0-9]{9}-lingmulongtais-projects\.vercel\.app$/i.test(location.hostname);
+    if (vercelBot || deploymentCapture) {
+      document.documentElement.classList.add('screenshot-preview');
+      return;
+    }
     const root = document.documentElement;
     const progress = intro.querySelector('[role="progressbar"]');
     const percent = intro.querySelector('.intro-percent');
