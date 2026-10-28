@@ -214,6 +214,13 @@ export function createForest(
   const group = new THREE.Group();
   // Repeated visits reuse three recent populations; evicted instance buffers are released.
   const populations=new Map<string,{meshes:THREE.Mesh[];count:number}>();
+  // Invalidated meshes remain visible until their replacement is complete.
+  const retired=new Set<THREE.Mesh>();
+  const replace = (meshes:THREE.Mesh[]) => {
+    group.clear();group.add(...meshes);
+    for(const mesh of retired)mesh.geometry.dispose();
+    retired.clear();
+  };
   let count = 0;
   let generation = 0;
   let planted:{eye:{x:number;z:number};bearing:number} | undefined;
@@ -224,8 +231,7 @@ export function createForest(
     const cached=populations.get(key);
     if(cached) {
       populations.delete(key);populations.set(key,cached);
-      group.clear();
-      group.add(...cached.meshes);count=cached.count;return;
+      replace(cached.meshes);count=cached.count;return;
     }
     const { pos, size, tint, kind, lods, shapes,season } = yield* trees(eye);
     const chunks = new Map<string, number[]>();
@@ -273,7 +279,7 @@ export function createForest(
       mesh.userData.depthMaterial = depthMaterial;
       meshes.push(mesh);
     }
-    group.clear();group.add(...meshes);count=kind.length;
+    replace(meshes);count=kind.length;
     populations.set(key,{meshes,count});committed=true;
     if(populations.size>3) {
       const oldest=populations.keys().next().value!;
@@ -300,24 +306,29 @@ export function createForest(
     } finally { steps.return(); }
   }
   const cancelPlant = () => { generation++; };
+  const invalidatePhotos = () => {
+    cancelPlant();
+    for(const population of populations.values()) for(const mesh of population.meshes) {
+      if(mesh.parent===group)retired.add(mesh);else mesh.geometry.dispose();
+    }
+    populations.clear();
+  };
   /** Use a sharper photo over `box`. `seasonal` imagery (leafless or autumn) also accepts muted
    * canopy on slopes; summer imagery doesn't need that and would catch cemeteries on the hills. */
   const setRegionalPhoto = (photo:HTMLImageElement | ImageBitmap,box:Box,seasonal=false) => {
     const region={box,sample:sampler(photo,box),seasonal};
     const i=regions.findIndex(r=>r.box.every((v,k)=>v===box[k]));
     if(i<0) regions.push(region); else regions[i]=region;
-    for(const population of populations.values()) for(const mesh of population.meshes) mesh.geometry.dispose();
-    populations.clear();
-    if(planted) plant(planted.eye,planted.bearing);
+    invalidatePhotos();
+    return planted ? plantAsync(planted.eye,planted.bearing) : Promise.resolve();
   };
   /** Replace the one outer-city photo, releasing its CPU pixels and cached populations. */
   const setOuterPhoto=(photo:HTMLImageElement|ImageBitmap|null,box:Box)=>{
     const i=regions.findIndex(r=>r.temporary);
     if(i>=0)regions.splice(i,1);
     if(photo)regions.unshift({box,sample:sampler(photo,box),seasonal:false,temporary:true});
-    for(const population of populations.values())for(const mesh of population.meshes)mesh.geometry.dispose();
-    populations.clear();
-    if(planted)plant(planted.eye,planted.bearing);
+    invalidatePhotos();
+    return planted ? plantAsync(planted.eye,planted.bearing) : Promise.resolve();
   };
   return { group, plant, plantAsync, cancelPlant, contains, setRegionalPhoto, setOuterPhoto, get count() { return count; } };
 }

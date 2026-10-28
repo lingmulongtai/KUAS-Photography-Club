@@ -26,5 +26,14 @@ test('incremental forest matches synchronous trees and leaves the old forest vis
     const current=[...asyncForest.group.children],stale=asyncForest.plantAsync({x:1600,z:400},0);
     asyncForest.cancelPlant();await stale;
     assert.deepEqual(asyncForest.group.children,current,'cancelled work never replaces the current forest');
+    let disposed=0;
+    for(const mesh of current)mesh.geometry.addEventListener('dispose',()=>disposed++);
+    const photoChange=asyncForest.setOuterPhoto({width:32,height:32},[-20000,-20000,20000,20000]);
+    assert.deepEqual(asyncForest.group.children,current);
+    assert.equal(disposed,0,'visible trees are not disposed while a photo replacement is prepared');
+    const newer=asyncForest.setOuterPhoto(null,[-20000,-20000,20000,20000]);
+    await Promise.all([photoChange,newer]);
+    assert.equal(disposed,current.length,'old trees are disposed only after the latest replacement');
+    assert.notDeepEqual(asyncForest.group.children,current);
   } finally {globalThis.document=original;}
 });
