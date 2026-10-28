@@ -12,7 +12,7 @@ export function createIntroCameraMotion() {
       const p = elapsed / duration;
       const eased = p * p * (3 - 2 * p);
       const envelope = Math.sin(Math.PI * p);
-      offset.yaw = 5 * Math.sin(Math.PI * eased) + envelope * .045 * Math.sin(elapsed * 1.8);
+      offset.yaw = 15 * Math.sin(Math.PI * eased) + envelope * .045 * Math.sin(elapsed * 1.8);
       offset.pitch = envelope * .035 * (Math.sin(elapsed * 1.3) + .35 * Math.sin(elapsed * 2.4));
       if (elapsed === duration) { offset.yaw = offset.pitch = 0; stopped = true; }
     },
