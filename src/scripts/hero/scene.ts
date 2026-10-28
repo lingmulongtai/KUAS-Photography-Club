@@ -54,6 +54,7 @@ import {buildKameokaCampus,isKameokaBuilding,KAMEOKA_CENTER} from './kameoka-cam
 import {kameokaClearing} from './kameoka-grounds';
 import {buildRailways} from './railways';
 import {buildAircraft} from './aircraft';
+import {buildSouthOverview,type OverviewBuilding} from './south-overview';
 import type {RailwayRoute} from './railway-path';
 import {moveExplorer} from './free-explore';
 import {climateOf,seasonWeights,type Season} from './seasons';
@@ -349,6 +350,7 @@ export function createHero(
       scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
     }).catch(error=>console.warn('Railway scenery unavailable',error));
     driveCars=(dt)=>{cars.update(dt);regionalDrive?.(dt);railDrive?.(dt);};
+    let southOverview:Awaited<ReturnType<typeof buildSouthOverview>>|null=null,detailBox:Box|null=null;
     const disposeGroup=(group:THREE.Object3D)=>{
       const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
       group.traverse(o=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;
@@ -422,7 +424,9 @@ export function createHero(
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
       scene.add(group);casts(city.group);cityLods.add(city);shadow.invalidate();
+      detailBox=r.box;southOverview?.setDetailBox(detailBox);
       return ()=>{
+        detailBox=null;southOverview?.setDetailBox(null);
         cityLods.delete(city);
         regionalDrive=null;scene.remove(group);disposeGroup(group);
         for(const layer of [lamps.uniforms,traffic.uniforms])pointLayers.splice(pointLayers.indexOf(layer),1);
@@ -454,6 +458,11 @@ export function createHero(
     };
     ensureCityRegion(landscapeCenter(VIEW));
     loading.built();
+    idle(()=>{void loadBinary('buildings-south-lod.json.gz').then(async bytes=>{
+      const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[]};
+      southOverview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
+      southOverview.setDetailBox(detailBox);scene.add(southOverview.mesh);
+    }).catch(error=>console.warn('Southern overview unavailable',error));});
   })().catch((err) => { console.error('Kyoto data failed to load', err); loading.fail(err); });
 
   let lastStatus = '';

@@ -14,6 +14,7 @@ import {buildSnow} from './src/scripts/hero/season-effects.ts';
 import {buildKiyomizuBeam} from './src/scripts/hero/kiyomizu-beam.ts';
 import {buildRailways} from './src/scripts/hero/railways.ts';
 import {buildAircraft} from './src/scripts/hero/aircraft.ts';
+import {buildSouthOverview} from './src/scripts/hero/south-overview.ts';
 import {buildClouds} from './src/scripts/hero/clouds.ts';
 import {createCloudBlur} from './src/scripts/hero/cloud-blur.ts';
 import {buildTerrain} from './src/scripts/hero/terrain.ts';
@@ -31,8 +32,9 @@ const forest=createForest(env,hf,image,[-11000,-11000,11000,11000],.55,[{x:0,y:0
 const snow=buildSnow(env,.55),rail=buildRailways(env,()=>0,${JSON.stringify(rails.routes)}),beam=buildKiyomizuBeam(env,()=>0);
 const aircraft=buildAircraft(env);
 const camera=new THREE.PerspectiveCamera(60,4/3,1,60000);camera.position.set(0,80,130);camera.lookAt(0,0,0);
-window.runSceneryChecks=()=>{
+window.runSceneryChecks=async()=>{
  const stats=[];
+ const south=await buildSouthOverview(env,[[0,0,20,15,14,.3,0]],()=>0);
  for(const quality of [.55,1]){
   const canopy=createForest(env,hf,image,[-11000,-11000,11000,11000],quality);canopy.plant({x:0,z:0},0);
   let farInstances=0,triangles=0;
@@ -46,7 +48,7 @@ window.runSceneryChecks=()=>{
   if(farInstances<100)throw Error('Distant forest was not covered');
   stats.push({name:'block-forest-budget',quality,instances:canopy.count,farInstances,triangles});
  }
- for(const [name,object] of [['terrain',terrain.mesh],['forest',forest.group],['snow',snow.points],['railways',rail.group],['aircraft',aircraft.mesh],['beam',beam]]){
+ for(const [name,object] of [['terrain',terrain.mesh],['south-overview',south.mesh],['forest',forest.group],['snow',snow.points],['railways',rail.group],['aircraft',aircraft.mesh],['beam',beam]]){
   const scene=new THREE.Scene();scene.add(object);renderer.info.reset();renderer.render(scene,camera);
   const error=renderer.getContext().getError();if(error)throw Error(name+' GPU error '+error);
   const info={name,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,points:renderer.info.render.points};
