@@ -148,6 +148,11 @@ const city = [
     const update = (event) => {
       const value = Math.min(1, Math.max(0, event.detail));
       if (!Number.isFinite(value) || finished || closing) return;
+      if (value > target) {
+        // Active loading gets more time, but a stalled scene still releases the page.
+        clearTimeout(timeout);
+        timeout = setTimeout(dismiss, Math.min(15000, Math.max(0, openedAt + 30000 - performance.now())));
+      }
       target = Math.max(target, value);
       progress.setAttribute('aria-valuenow', String(Math.round(target * 100)));
       follow();
@@ -163,7 +168,7 @@ const city = [
       closeFrom = shown;
       closeDuration = Math.max(650, openedAt + 2600 - closeAt);
       clearTimeout(timeout);
-      timeout = setTimeout(dismiss, Math.min(closeDuration + 900, Math.max(0, openedAt + 10000 - closeAt)));
+      timeout = setTimeout(dismiss, Math.min(closeDuration + 900, Math.max(0, openedAt + 30000 - closeAt)));
       follow();
     };
     intro.querySelector('button').addEventListener('click', dismiss);
