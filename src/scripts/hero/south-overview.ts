@@ -24,7 +24,7 @@ export async function buildSouthOverview(env:Env,buildings:OverviewBuilding[],gr
   const dummy=new THREE.Object3D();
   for(let i=0;i<buildings.length;i++){
     const [x,z,w,d,h,angle,offset]=buildings[i];dummy.position.set(x,ground(x,z)+offset+h/2,z);
-    dummy.rotation.set(0,angle,0);dummy.scale.set(w,h,d);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);
+    dummy.rotation.set(0,-angle,0);dummy.scale.set(w,h,d);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);
     if(i && i%500===0)await new Promise<void>(resolve=>setTimeout(resolve,0));
   }
   mesh.instanceMatrix.needsUpdate=true;

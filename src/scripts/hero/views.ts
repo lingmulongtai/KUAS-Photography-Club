@@ -72,7 +72,8 @@ export const VIEWS = {
   togetsukyo: spotOrbit('arashiyama',330,160,180,8),
   kameoka:spotOrbit('kameoka',820,540,240,15),
   kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:KIRI_TERRACE,ref:KIRI_TERRACE,above:35,bearing:278,pitch:-9},
-  tennozan:{ja:'天王山・大阪方面',en:'Tennozan / Osaka',eye:TENNOZAN,ref:TENNOZAN,above:60,bearing:160,pitch:-12},
+  tennozan:{ja:'天王山・三川合流',en:'Tennozan / Three Rivers',eye:TENNOZAN,ref:TENNOZAN,above:60,bearing:160,pitch:-12},
+  osakaSkyline:{ja:'天王山・大阪遠景',en:'Tennozan / Osaka skyline',eye:TENNOZAN,ref:TENNOZAN,above:60,bearing:218,pitch:-6},
   sonobe:spotOrbit('sonobe',1100,650,180,8),
   yamashina:spotOrbit('yamashina',1000,650,180,8),
   fushimi:spotOrbit('fushimi',1100,650,180,8),
@@ -83,7 +84,7 @@ export const VIEWS = {
 
 export type HeroView = keyof typeof VIEWS;
 export type HeroDestination = 'campus' | HeroView;
-export const PANORAMA_VIEWS = ['shogunzuka','daimonji','arashiyama','atago','kameokaTerrace','tennozan'] as const satisfies readonly HeroView[];
+export const PANORAMA_VIEWS = ['shogunzuka','daimonji','arashiyama','atago','kameokaTerrace','tennozan','osakaSkyline'] as const satisfies readonly HeroView[];
 
 export function spotDestination(id: SpotId): HeroDestination {
   if (id==='kuas') return 'campus';
