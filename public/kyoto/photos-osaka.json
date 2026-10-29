@@ -1,0 +1,373 @@
+{
+ "source": "GSI seamlessphoto z16",
+ "photos": [
+  {
+   "box": [
+    -30000,
+    20000,
+    -26000,
+    24000
+   ],
+   "file": "aerial-osaka-0-0.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 755504,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-0-0-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 235140
+   }
+  },
+  {
+   "box": [
+    -26000,
+    20000,
+    -22000,
+    24000
+   ],
+   "file": "aerial-osaka-0-1.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 730392,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-0-1-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 241270
+   }
+  },
+  {
+   "box": [
+    -22000,
+    20000,
+    -18000,
+    24000
+   ],
+   "file": "aerial-osaka-0-2.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 698146,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-0-2-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 197046
+   }
+  },
+  {
+   "box": [
+    -18000,
+    20000,
+    -14000,
+    24000
+   ],
+   "file": "aerial-osaka-0-3.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 684962,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-0-3-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 190894
+   }
+  },
+  {
+   "box": [
+    -30000,
+    24000,
+    -26000,
+    28000
+   ],
+   "file": "aerial-osaka-1-0.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 704454,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-1-0-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 201106
+   }
+  },
+  {
+   "box": [
+    -26000,
+    24000,
+    -22000,
+    28000
+   ],
+   "file": "aerial-osaka-1-1.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 738422,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-1-1-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 231604
+   }
+  },
+  {
+   "box": [
+    -22000,
+    24000,
+    -18000,
+    28000
+   ],
+   "file": "aerial-osaka-1-2.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 753428,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-1-2-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 223866
+   }
+  },
+  {
+   "box": [
+    -18000,
+    24000,
+    -14000,
+    28000
+   ],
+   "file": "aerial-osaka-1-3.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 632812,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-1-3-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 175606
+   }
+  },
+  {
+   "box": [
+    -30000,
+    28000,
+    -26000,
+    32000
+   ],
+   "file": "aerial-osaka-2-0.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 722700,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-2-0-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 220434
+   }
+  },
+  {
+   "box": [
+    -26000,
+    28000,
+    -22000,
+    32000
+   ],
+   "file": "aerial-osaka-2-1.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 735010,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-2-1-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 209696
+   }
+  },
+  {
+   "box": [
+    -22000,
+    28000,
+    -18000,
+    32000
+   ],
+   "file": "aerial-osaka-2-2.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 747168,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-2-2-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 211146
+   }
+  },
+  {
+   "box": [
+    -18000,
+    28000,
+    -14000,
+    32000
+   ],
+   "file": "aerial-osaka-2-3.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 741850,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-2-3-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 206916
+   }
+  },
+  {
+   "box": [
+    -30000,
+    32000,
+    -26000,
+    36000
+   ],
+   "file": "aerial-osaka-3-0.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 664538,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-3-0-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 186532
+   }
+  },
+  {
+   "box": [
+    -26000,
+    32000,
+    -22000,
+    36000
+   ],
+   "file": "aerial-osaka-3-1.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 733332,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-3-1-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 224070
+   }
+  },
+  {
+   "box": [
+    -22000,
+    32000,
+    -18000,
+    36000
+   ],
+   "file": "aerial-osaka-3-2.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 718112,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-3-2-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 221894
+   }
+  },
+  {
+   "box": [
+    -18000,
+    32000,
+    -14000,
+    36000
+   ],
+   "file": "aerial-osaka-3-3.webp",
+   "size": [
+    1536,
+    1536
+   ],
+   "bytes": 694728,
+   "zoom": 16,
+   "mobile": {
+    "file": "aerial-osaka-3-3-mobile.webp",
+    "size": [
+     768,
+     768
+    ],
+    "bytes": 197336
+   }
+  }
+ ]
+}

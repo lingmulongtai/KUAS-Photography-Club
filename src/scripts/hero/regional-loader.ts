@@ -24,6 +24,18 @@ export function createRegionalLoader<T extends {dispose():void}>(
   let active:{id:string;dispose():void}|null=null;
   let running:Promise<void>|null=null;
   let revision=0,settledRevision=0;
+  // One speculative dataset at most, and no parallel regional downloads/decodes.
+  let downloading:Promise<unknown>=Promise.resolve();
+  let warm:{id:string;promise:Promise<T>;claimed:boolean;released:boolean}|null=null;
+  const serialLoad=(region:CityRegion)=>{
+    const next=downloading.then(()=>load(region));
+    downloading=next.catch(()=>{});
+    return next;
+  };
+  const take=(region:CityRegion)=>{
+    if(warm?.id===region.id){const entry=warm;warm=null;entry.claimed=true;return entry.promise;}
+    return serialLoad(region);
+  };
   async function pump() {
     try {
     while(wanted?.id!==active?.id) {
@@ -31,7 +43,7 @@ export function createRegionalLoader<T extends {dispose():void}>(
       active?.dispose();active=null;
       if(!next) return;
       let data:T;
-      try {data=await load(next);} catch(error) {
+      try {data=await take(next);} catch(error) {
         onError(error);
         if(wanted?.id!==next.id)continue;
         return;
@@ -54,6 +66,14 @@ export function createRegionalLoader<T extends {dispose():void}>(
     return running;
   }
   return {
+    prefetch(region:CityRegion) {
+      if(region.id===active?.id||region.id===wanted?.id||region.id===warm?.id)return;
+      const entry={id:region.id,promise:serialLoad(region),claimed:false,released:false};
+      const previous=warm;warm=entry;
+      if(previous)previous.promise.then(data=>{if(!previous.claimed&&!previous.released){previous.released=true;data.dispose();}},()=>{});
+      void entry.promise.then(data=>{if(warm!==entry&&!entry.claimed&&!entry.released){entry.released=true;data.dispose();}})
+        .catch(error=>{if(warm===entry)warm=null;if(!entry.claimed)onError(error);});
+    },
     request(region:CityRegion|null) {
       wanted=region;
       revision++;

@@ -11,9 +11,10 @@ test('rapid travel serializes downloads and discards stale data before GPU activ
     (r,data)=>{activated.push(r.id);return ()=>{released.push(`city-${r.id}`);data.dispose();};},e=>errors.push(e));
   const a=region('a'),b=region('b'),c=region('c');
   const done=loader.request(a);loader.request(b);loader.request(c);
+  await Promise.resolve();
   assert.deepEqual(pending.map(p=>p.id),['a']);
   pending[0].resolve({dispose:()=>released.push('data-a')});
-  await Promise.resolve();await Promise.resolve();
+  await new Promise(resolve=>setTimeout(resolve,0));
   assert.deepEqual(pending.map(p=>p.id),['a','c']);
   pending[1].resolve({dispose:()=>released.push('data-c')});await done;
   assert.deepEqual(activated,['c']);assert.deepEqual(released,['data-a']);
@@ -74,4 +75,30 @@ test('a request arriving between completion and cleanup is not lost',async()=>{
   },()=>assert.fail('unexpected failure'));
   await loader.request(a);await new Promise(resolve=>setTimeout(resolve,0));
   assert.deepEqual(events,['a','b']);assert.equal(loader.id,'b');
+});
+
+
+test('view prefetch downloads once without activating or replacing the current region',async()=>{
+  const loads=[],activated=[],released=[];
+  const loader=createRegionalLoader(async r=>{loads.push(r.id);return {dispose:()=>released.push(r.id)};},
+    (r,data)=>{activated.push(r.id);return data.dispose;},()=>assert.fail('unexpected failure'));
+  const a=region('tennozan'),b=region('osaka');
+  await loader.request(a);loader.prefetch(b);loader.prefetch(b);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.deepEqual(loads,['tennozan','osaka']);assert.deepEqual(activated,['tennozan']);
+  await loader.request(b);
+  assert.deepEqual(loads,['tennozan','osaka']);assert.deepEqual(activated,['tennozan','osaka']);
+  assert.deepEqual(released,['tennozan']);
+});
+
+test('prefetch replacement releases its data once and serializes a subsequent destination',async()=>{
+  const first=deferred(),loads=[],released=[];
+  const loader=createRegionalLoader(async r=>{loads.push(r.id);if(r.id==='a')await first.promise;
+    return {dispose:()=>released.push(r.id)};},(_r,data)=>data.dispose,()=>{});
+  loader.prefetch(region('a'));loader.prefetch(region('b'));
+  const done=loader.request(region('c'));await Promise.resolve();assert.deepEqual(loads,['a']);
+  first.resolve();await done;assert.deepEqual(loads,['a','b','c']);
+  assert.deepEqual(released,['a']);
+  loader.prefetch(region('d'));await new Promise(resolve=>setTimeout(resolve,0));
+  assert.deepEqual(released,['a','b']);
 });
