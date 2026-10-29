@@ -200,6 +200,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec2 uw = boxUv(uAerialWideBox, p);
         vec3 photo = blockPhoto(uAerialWide,uAerialWideBox,p,fp);
         vec3 outerPhoto=blockPhoto(uOuterPhoto,uOuterBox,p,fp);
+        // Do not stretch the outermost photo pixels beyond the mapped area.
+        outerPhoto=mix(vec3(.22,.25,.22),outerPhoto,inside(uOuterBox,p,1000.));
         photo=mix(photo,mix(outerPhoto,photo,inside(uAerialWideBox,p,300.)),uOuterOn);
         vec3 city = blockPhoto(uAerialCity,uAerialCityBox,p,fp);
         float mappedForest = texture2D(uWoodland, uw).a * uWoodlandOn * inside(uAerialWideBox,p,5.);
