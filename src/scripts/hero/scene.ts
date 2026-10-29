@@ -161,7 +161,7 @@ export function createHero(
   let groundAt: ((x: number, z: number) => number) | null = null;
   let travelBounds:Box=[-34000,-19000,13000,20000];
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
-  let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
+  let terrainRecenter: ((c: { x: number; z: number },anchored?:boolean) => void) | null = null;
   let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
@@ -860,6 +860,7 @@ export function createHero(
       stopIntroCamera();
       if(enabled){
         flight=null;resetLook();freePosition.copy(camera.position);freeCenter.copy(freePosition);
+        terrainRecenter?.(freePosition,true);shadow.invalidate();
         const d=lastTarget.clone().sub(camera.position).normalize();freeBearing=Math.atan2(d.x,-d.z)/RAD;freePitch=Math.asin(d.y)/RAD;
         exploring=true;env.uHighlight.value=1;el.tabIndex=0;el.focus({preventScroll:true});opts.onExplore?.(true);
       }else flyTo(mode==='campus'?'campus':view,clock);
