@@ -41,3 +41,13 @@ test('a failed download can be retried while the area remains selected',async()=
   await Promise.resolve();
   assert.deepEqual(applied,['tennozan']);
 });
+
+
+test('a nearby Osaka sheet survives late fallback loads and releases the slot when leaving',async()=>{
+  let resolve;const applied=[];
+  const slot=createSharedPhotoSlot(()=>new Promise(r=>resolve=r),p=>applied.push(p),()=>assert.fail('unexpected error'));
+  slot.select(true);slot.setOverride('osaka-close');slot.setFallback('arashiyama');resolve('tennozan');
+  await Promise.resolve();assert.equal(applied.at(-1),'osaka-close');
+  slot.select(false);assert.equal(applied.at(-1),'osaka-close');
+  slot.setOverride(null);assert.equal(applied.at(-1),'arashiyama');
+});
