@@ -42,7 +42,7 @@ See [the model/night quality audit](../../docs/model-night-quality-2026-10-17.md
 
 - 国土地理院（地理院タイル：標高タイル、全国最新写真（シームレス）、ベクトルタイル提供実験）を加工して作成。
   [地理院タイル利用規約](https://maps.gsi.go.jp/development/ichiran.html)
-- 「3D都市モデル（Project PLATEAU）京都市（2025年度）」（国土交通省）を加工して作成。
+- 「3D都市モデル（Project PLATEAU）京都市・大阪市（2025年度）」（国土交通省）を加工して作成。
   [PLATEAU Policy](https://www.mlit.go.jp/plateau/site-policy/)（CC BY 4.0 互換）
 - Place coordinates checked with OpenStreetMap / Nominatim (© OpenStreetMap contributors, ODbL).
 
@@ -57,6 +57,14 @@ Both credits are shown in the site footer.
 `python build_tennozan_photo.py` は展望地点と合流部周辺の5km四方に、国土地理院のシームレス写真 z16を使ったより鮮明な写真を作ります。PC用760,000 bytes、スマホ用260,000 bytesが上限で、天王山への移動時に読み込みます。遠景の建物は `node --experimental-strip-types tools/kyoto-data/build-south-lod.mjs` で京都南部と三川地域から少数の代表建物を選び、詳細地域と重なる部分を隠します。
 
 `python build_outer_terrain.py` は100m格子と広域写真を大阪方面まで延ばします。地図タイルの取得は生成時のみで、公開ページは地理院に直接アクセスしません。地域追加後は `python build_tunnels.py` で道路トンネルも更新します。
+
+## 大阪方面の街並み
+
+`python build_osaka_lod.py` は国土地理院の建物輪郭から250mごとの代表建物を選び、天王山から大阪中心部までの遠景を軽量に表示します。通常の建物の高さは6mまたは10mの概略値です。大阪市北区のPLATEAU 2025 LOD1のルートタイルから取得した高層建物13棟は実測高さを使い、重なる概略建物を除きます。ルートタイルのみを使い、子タイルと混在させません。遠景データはgzipで約64 KBです。
+
+`python build_regions.py osaka` は大阪北部から梅田周辺の建物・道路・鉄道・水域と広域写真を生成します。大阪駅周辺は20m²以上の建物を保持し、駅から2kmより外は160m²未満の概略建物を間引いて形状を簡素化します。細い道路は駅から2.5km以内に残し、それより外は幅の広い道路を優先します。PLATEAUの実測建物が重なる場所では実測の輪郭を優先し、127.5mを超える高層建物は高さを保持できる遠景レイヤーで描画します。詳細地域は近づいた時だけロードし、重なる遠景の概略建物を隠します。地域の追加後は `python build_tunnels.py` を実行します。
+
+大阪方面へ延長した100m標高格子の南西端には、取得元に標高がない範囲があります。その端だけは既存の標高からゼロへ補間しており、実測地形ではありません。地図・写真・都市モデルは生成時に取得し、公開ページから元のタイルサービスへ直接アクセスしません。
 
 ## Mountain imagery only
 
