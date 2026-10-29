@@ -60,7 +60,7 @@ const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
  */
 export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: number }, tex: TerrainTextures, segments = 640) {
   let channel:KamoChannel|undefined;
-  let activeCenter=center;
+  let activeCenter={...center},activeAnchored=false;
   const kinkaku = toLocal(35.0395092, 135.7284548), kiyomizu = toLocal(34.9946668, 135.7849382);
   const n = segments + 1;
   const pos = terrainPositions(hf, center, segments);
@@ -376,18 +376,18 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   const cache = new Map<string, Float32Array>([[`${center.x},${center.z}`, pos]]);
   const position = geo.getAttribute('position') as THREE.BufferAttribute;
   let generation = 0;
-  const prepare = (c: { x: number; z: number }) => {
-    const key = `${c.x},${c.z}`;
-    const prepared=cache.get(key)??terrainPositions(hf,c,segments,channel);
+  const prepare = (c: { x: number; z: number },anchored=false) => {
+    const key = `${anchored?'travel:':''}${c.x},${c.z}`;
+    const prepared=cache.get(key)??terrainPositions(hf,c,segments,channel,anchored);
     cache.delete(key);cache.set(key,prepared);
     if(cache.size>4)cache.delete(cache.keys().next().value!);
     return prepared;
   };
-  const recenter = (c: { x: number; z: number }) => {
+  const recenter = (c: { x: number; z: number },anchored=false) => {
     generation++;
-    activeCenter=c;
+    activeCenter={...c};activeAnchored=anchored;
     // Keep one GPU attribute while switching equal-sized terrain grids.
-    position.array = prepare(c);
+    position.array = prepare(c,anchored);
     position.needsUpdate = true;
   };
   const recenterAsync = async (c: { x: number; z: number }, onReady: () => void) => {
@@ -395,7 +395,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     const prepared = cache.get(key) ?? await terrainPositionsAsync(hf, target, segments, channel,
       () => request === generation, () => new Promise<void>(resolve => setTimeout(resolve, 0)));
     if (!prepared || request !== generation) return;
-    activeCenter = target;
+    activeCenter = target;activeAnchored=true;
     cache.delete(key);cache.set(key,prepared);
     if(cache.size>4)cache.delete(cache.keys().next().value!);
     position.array=prepared;position.needsUpdate=true;onReady();
@@ -409,7 +409,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   };
   const setChannel=(next:KamoChannel,mask:THREE.Texture)=>{
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
-    cache.clear();recenter(activeCenter);
+    cache.clear();recenter(activeCenter,activeAnchored);
   };
   return { mesh, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
 }
