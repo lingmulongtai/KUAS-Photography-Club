@@ -406,8 +406,9 @@ export function createHero(
       city=preparedCity;
       group.add(city.group);
       await step();
-      const waterEdge=r.id==='tennozan'?(lite?80:60):(lite?36:24);
-      const water=await buildWaterAsync(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||r.id==='tennozan',current);
+      const wideWater=r.id==='tennozan'||r.id==='osaka';
+      const waterEdge=wideWater?(lite?80:60):(lite?36:24);
+      const water=await buildWaterAsync(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||wideWater,current);
       if(!water)throw new Error('Region superseded');
       group.add(water);
       group.add(buildIslands(env,hf,data.lines));

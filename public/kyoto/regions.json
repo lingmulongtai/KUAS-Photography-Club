@@ -53,6 +53,58 @@
    }
   },
   {
+   "id": "osaka",
+   "ja": "大阪北部・梅田",
+   "en": "North Osaka / Umeda",
+   "box": [
+    -30000,
+    20000,
+    -14000,
+    36000
+   ],
+   "heightSource": "PLATEAU measured and GSI outlines; illustrative heights (6 m / 10 m)",
+   "buildings": {
+    "meta": "buildings-osaka.json",
+    "file": "buildings-osaka.bin",
+    "bytes": 1083273
+   },
+   "lines": {
+    "file": "lines-osaka.bin",
+    "box": [
+     -30000,
+     20000,
+     -14000,
+     36000
+    ],
+    "q": 0.5,
+    "bytes": 372039,
+    "features": 46909
+   },
+   "photo": {
+    "box": [
+     -30000,
+     20000,
+     -14000,
+     36000
+    ],
+    "file": "aerial-osaka.webp",
+    "size": [
+     2048,
+     2048
+    ],
+    "bytes": 594838,
+    "zoom": 13,
+    "mobile": {
+     "file": "aerial-osaka-mobile.webp",
+     "size": [
+      1024,
+      1024
+     ],
+     "bytes": 218056
+    }
+   }
+  },
+  {
    "id": "tennozan",
    "ja": "天王山・三川合流域",
    "en": "Tennozan / Three Rivers",

@@ -42,5 +42,12 @@ test('regional water follows the Yamashina canal bends without a camera-dependen
   assert.equal(await buildWaterAsync(createEnv(),hf,lines,{},60,undefined,true,()=>current),null,'stale water preparation stops');
   batched.geometry.dispose();batched.material.dispose();
   water.geometry.dispose();water.material.dispose();
+  const osaka=regions.find(r=>r.id==='osaka');assert.ok(osaka);
+  const osakaLines=await loadLines(undefined,osaka.lines.file,osaka.lines.box,osaka.lines.q);
+  const osakaWater=buildWater(createEnv(),hf,osakaLines,{},60,undefined,true);
+  const op=osakaWater.geometry.getAttribute('position');
+  assert.ok(op.count>0&&op.count<600000,`Osaka water has bounded geometry: ${op.count}`);
+  assert.equal(osakaWater.material.uniforms.uWaterBias.value,.35);
+  osakaWater.geometry.dispose();osakaWater.material.dispose();
 });
 function modulePaths(){return require.resolve.paths('three')??[];}
