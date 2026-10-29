@@ -391,7 +391,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     position.needsUpdate = true;
   };
   const recenterAsync = async (c: { x: number; z: number }, onReady: () => void) => {
-    const request = ++generation, target = { x: c.x, z: c.z }, key = `${target.x},${target.z}`;
+    const request = ++generation, target = { x: c.x, z: c.z }, key = `travel:${target.x},${target.z}`;
     const prepared = cache.get(key) ?? await terrainPositionsAsync(hf, target, segments, channel,
       () => request === generation, () => new Promise<void>(resolve => setTimeout(resolve, 0)));
     if (!prepared || request !== generation) return;

@@ -33,11 +33,11 @@ test('batched terrain matches the synchronous grid and cancels stale work',async
 test('nearby terrain triangles stay fixed in world space when streaming recentres',()=>{
   const hf={bounds:[-35000,-20000,14000,36000],height:(x,z)=>100+40*Math.sin(x/30)*Math.cos(z/60)};
   for(const segments of [400,640]) {
-    const n=segments+1,a=terrainPositions(hf,{x:-7300,z:11700},segments);
-    const b=terrainPositions(hf,{x:-7300,z:12350},segments);
+    const n=segments+1,a=terrainPositions(hf,{x:-7300,z:11700},segments,undefined,true);
+    const b=terrainPositions(hf,{x:-7300,z:12350},segments,undefined,true);
     const vertices=grid=>{const map=new Map();for(let k=0;k<grid.length;k+=3){
       const x=grid[k],z=grid[k+2];
-      if(Math.abs(x+7300)<600&&Math.abs(z-12350)<600)map.set(`${x},${z}`,grid[k+1]);
+      if(Math.abs(x+7300)<120&&Math.abs(z-12350)<120)map.set(`${x},${z}`,grid[k+1]);
     }return map;};
     const before=vertices(a),after=vertices(b);
     assert.ok(before.size>400);
@@ -49,7 +49,14 @@ test('nearby terrain triangles stay fixed in world space when streaming recentre
 
 test('ongoing travel cannot change an in-flight terrain grid',async()=>{
   const hf={bounds:[-35000,-20000,14000,36000],height:(x,z)=>x*.03+z*.07};
-  const center={x:-7300,z:11700},expected=terrainPositions(hf,center,400);
+  const center={x:-7300,z:11700},expected=terrainPositions(hf,center,400,undefined,true);
   const actual=await terrainPositionsAsync(hf,center,400,undefined,()=>true,async()=>{center.z+=25;});
   assert.deepEqual(actual,expected);
+});
+
+
+test('anchored grids remain ordered when the bounds cannot fit a lattice anchor',()=>{
+  const hf={bounds:[-.5,-.5,1599.6,1599.6],height:()=>10};
+  const segments=400,n=segments+1,grid=terrainPositions(hf,{x:800,z:800},segments,undefined,true);
+  for(let i=1;i<n;i++)assert.ok(grid[i*3]>grid[(i-1)*3]);
 });
