@@ -28,3 +28,28 @@ test('batched terrain matches the synchronous grid and cancels stale work',async
   const cancelled=await terrainPositionsAsync(hf,center,64,channel,()=>current,async()=>{cancelYields++;current=false;});
   assert.equal(cancelled,null);assert.equal(cancelYields,1);
 });
+
+
+test('nearby terrain triangles stay fixed in world space when streaming recentres',()=>{
+  const hf={bounds:[-35000,-20000,14000,36000],height:(x,z)=>100+40*Math.sin(x/30)*Math.cos(z/60)};
+  for(const segments of [400,640]) {
+    const n=segments+1,a=terrainPositions(hf,{x:-7300,z:11700},segments);
+    const b=terrainPositions(hf,{x:-7300,z:12350},segments);
+    const vertices=grid=>{const map=new Map();for(let k=0;k<grid.length;k+=3){
+      const x=grid[k],z=grid[k+2];
+      if(Math.abs(x+7300)<600&&Math.abs(z-12350)<600)map.set(`${x},${z}`,grid[k+1]);
+    }return map;};
+    const before=vertices(a),after=vertices(b);
+    assert.ok(before.size>400);
+    assert.deepEqual(after,before,'the surface under and ahead of the moving camera does not shift');
+    assert.equal(b.length,n*n*3,'fixed detail keeps the same vertex budget');
+  }
+});
+
+
+test('ongoing travel cannot change an in-flight terrain grid',async()=>{
+  const hf={bounds:[-35000,-20000,14000,36000],height:(x,z)=>x*.03+z*.07};
+  const center={x:-7300,z:11700},expected=terrainPositions(hf,center,400);
+  const actual=await terrainPositionsAsync(hf,center,400,undefined,()=>true,async()=>{center.z+=25;});
+  assert.deepEqual(actual,expected);
+});
