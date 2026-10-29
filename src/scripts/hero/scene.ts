@@ -165,6 +165,7 @@ export function createHero(
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
+  let prefetchCityRegion:((center:{x:number;z:number},target?:HeroView)=>void)|null=null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let cancelTreePlanting: (() => void) | null = null;
@@ -488,7 +489,13 @@ export function createHero(
       opts.onAreaLoading?.(!!region&&region.id!==regionLoader.id);
       void regionLoader.request(region).finally(()=>{if(request===areaRequest)opts.onAreaLoading?.(false);});
     };
+    prefetchCityRegion=(center,target)=>{
+      const next=target==='tennozan'||target==='osakaSkyline'
+        ?regionManifest.regions.find(r=>r.id==='osaka'):regionAt(regionManifest.regions,center);
+      if(next)regionLoader.prefetch(next);
+    };
     ensureCityRegion(landscapeCenter(VIEW));
+    prefetchCityRegion(landscapeCenter(VIEW),view);
     loading.built();
     idle(()=>{void loadBinary('buildings-south-lod.json.gz').then(async bytes=>{
       const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[]};
@@ -681,6 +688,7 @@ export function createHero(
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
     ensureCityRegion?.(target==='campus'?CAMPUS_CENTER:landscapeCenter(VIEWS[nextView]));
+    if(target!=='campus')prefetchCityRegion?.(landscapeCenter(VIEWS[nextView]),nextView);
     if (!fromExplorer && !flight && mode === to && (to === 'campus' || nextView === view)) {
       resetLook();
       opts.onMode?.(to,false);
@@ -761,6 +769,7 @@ export function createHero(
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
       if(freeCenter.distanceTo(freePosition)>600){
         freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);plantTreesAsync?.(freePosition,yaw/RAD);ensureCityRegion?.(freePosition);
+        prefetchCityRegion?.({x:freePosition.x+Math.sin(yaw)*1200,z:freePosition.z-Math.cos(yaw)*1200});
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }
     }else if (flight) {
