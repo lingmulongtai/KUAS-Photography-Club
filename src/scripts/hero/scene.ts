@@ -58,6 +58,7 @@ import {buildRailways} from './railways';
 import {buildAircraft} from './aircraft';
 import {buildSouthOverview,type OverviewBuilding} from './south-overview';
 import type {RailwayRoute} from './railway-path';
+import {createNearbyPhotos,type PhotoSheet} from './nearby-photos';
 import {moveExplorer} from './free-explore';
 import {climateOf,seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
@@ -237,6 +238,12 @@ export function createHero(
         updateForestPhoto?.(photo,i);
       }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
     });
+    const osakaPhotos=createNearbyPhotos(
+      async()=> (await loadJSON<{photos:PhotoSheet[]}>('photos-osaka.json')).photos,
+      async sheet=>({photo:await loadTexture(opts.quality<.75?sheet.mobile.file:sheet.file,aniso),box:sheet.box}),
+      photo=>sharedSlot?.setOverride(photo),value=>value.photo.dispose(),
+      error=>console.warn('Close Osaka imagery unavailable; retaining regional photo',error),
+    );
     const ensurePhotos=ensureRegionalPhoto;
     ensureRegionalPhoto = v => {
       ensurePhotos(v);
@@ -481,6 +488,7 @@ export function createHero(
     ensureCityRegion=center=>{
       let region=regionAt(regionManifest.regions,center);
       sharedSlot?.select(region?.id==='tennozan');
+      void osakaPhotos.update(region?.id==='osaka'?center:null);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
       if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)
@@ -493,6 +501,7 @@ export function createHero(
       const next=target==='tennozan'||target==='osakaSkyline'
         ?regionManifest.regions.find(r=>r.id==='osaka'):regionAt(regionManifest.regions,center);
       if(next)regionLoader.prefetch(next);
+      if(next?.id==='osaka')void osakaPhotos.prefetch(center);
     };
     ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
