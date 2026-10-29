@@ -158,6 +158,7 @@ export function createHero(
   let VIEW: ViewDef = VIEWS.shogunzuka;
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   let groundAt: ((x: number, z: number) => number) | null = null;
+  let travelBounds:Box=[-34000,-19000,13000,20000];
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
   let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
@@ -183,6 +184,7 @@ export function createHero(
     const [hf, wide, outer] = await Promise.all([loading.track(loadHeightfield(meta)), loading.track(loadTexture(wideFile, aniso)),
       loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
         .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : Promise.resolve(null))]);
+    travelBounds=hf.bounds;
     groundAt = (x, z) => hf.height(x, z);
     eye.copy(eyeOf(VIEW));
     campus.y = hf.height(campus.x, campus.z) + 14;
@@ -604,7 +606,7 @@ export function createHero(
     }
     if((e.target as Element).closest('button,a,input,select,textarea'))return;
     e.preventDefault();const amount=Math.max(-1,Math.min(1,-e.deltaY/160));
-    moveExplorer(freePosition,freeBearing+lookDrag.yaw,amount,0,amount*.35,.1,true,groundAt??(()=>40));
+    moveExplorer(freePosition,freeBearing+lookDrag.yaw,amount,0,amount*.35,.1,true,groundAt??(()=>40),travelBounds);
   },{passive:false});
   const ray = new THREE.Raycaster();
   const resetLook = mountLookControls(el, rotation, (e) => {
@@ -754,7 +756,7 @@ export function createHero(
       const pressed=(...codes:string[])=>codes.some(code=>keys.has(code))?1:0;
       const axis=(value:number)=>Math.max(-1,Math.min(1,value));
       moveExplorer(freePosition,freeBearing+lookDrag.yaw,axis(pressed('KeyW','ArrowUp')-pressed('KeyS','ArrowDown')+touchMove.forward),
-        axis(pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft')+touchMove.side),axis(pressed('KeyE')-pressed('KeyQ')+touchMove.up),inputDt,!!pressed('ShiftLeft','ShiftRight'),groundAt??(()=>40));
+        axis(pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft')+touchMove.side),axis(pressed('KeyE')-pressed('KeyQ')+touchMove.up),inputDt,!!pressed('ShiftLeft','ShiftRight'),groundAt??(()=>40),travelBounds);
       camera.position.copy(freePosition);const yaw=(freeBearing+lookDrag.yaw)*RAD,pitch=THREE.MathUtils.clamp(freePitch+lookDrag.pitch,-85,85)*RAD;
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
       if(freeCenter.distanceTo(freePosition)>600){
