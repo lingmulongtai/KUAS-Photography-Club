@@ -3,17 +3,20 @@ export function createSharedPhotoSlot<T>(load:()=>Promise<T>,apply:(photo:T|null
   let selected=false;
   let fallback:T|null=null;
   let pending:Promise<T>|undefined;
+  let chosen:T|null=null,override:T|null=null;
+  const applyCurrent=()=>apply(override??(selected?chosen??fallback:fallback));
   return {
     setFallback(photo:T) {
       fallback=photo;
-      if(!selected)apply(fallback);
+      if(!selected)applyCurrent();
     },
+    setOverride(photo:T|null) {override=photo;applyCurrent();},
     select(next:boolean) {
       if(selected===next&&(!next||pending))return;
       selected=next;
-      if(!selected){apply(fallback);return;}
+      if(!selected){applyCurrent();return;}
       const request=pending??=load();
-      void request.then(photo=>{if(selected&&pending===request)apply(photo);})
+      void request.then(photo=>{if(pending===request){chosen=photo;if(selected)applyCurrent();}})
         .catch(error=>{if(pending===request)pending=undefined;onError(error);});
     },
   };

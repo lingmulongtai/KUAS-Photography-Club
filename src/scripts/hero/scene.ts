@@ -58,6 +58,7 @@ import {buildRailways} from './railways';
 import {buildAircraft} from './aircraft';
 import {buildSouthOverview,type OverviewBuilding} from './south-overview';
 import type {RailwayRoute} from './railway-path';
+import {createNearbyPhotos,type PhotoSheet} from './nearby-photos';
 import {moveExplorer} from './free-explore';
 import {climateOf,seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
@@ -158,12 +159,14 @@ export function createHero(
   let VIEW: ViewDef = VIEWS.shogunzuka;
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   let groundAt: ((x: number, z: number) => number) | null = null;
+  let travelBounds:Box=[-34000,-19000,13000,20000];
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
-  let terrainRecenter: ((c: { x: number; z: number }) => void) | null = null;
+  let terrainRecenter: ((c: { x: number; z: number },anchored?:boolean) => void) | null = null;
   let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
+  let prefetchCityRegion:((center:{x:number;z:number},target?:HeroView)=>void)|null=null;
   let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let cancelTreePlanting: (() => void) | null = null;
@@ -183,6 +186,7 @@ export function createHero(
     const [hf, wide, outer] = await Promise.all([loading.track(loadHeightfield(meta)), loading.track(loadTexture(wideFile, aniso)),
       loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
         .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : Promise.resolve(null))]);
+    travelBounds=hf.bounds;
     groundAt = (x, z) => hf.height(x, z);
     eye.copy(eyeOf(VIEW));
     campus.y = hf.height(campus.x, campus.z) + 14;
@@ -234,6 +238,12 @@ export function createHero(
         updateForestPhoto?.(photo,i);
       }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
     });
+    const osakaPhotos=createNearbyPhotos(
+      async()=> (await loadJSON<{photos:PhotoSheet[]}>('photos-osaka.json')).photos,
+      async sheet=>({photo:await loadTexture(opts.quality<.75?sheet.mobile.file:sheet.file,aniso),box:sheet.box}),
+      photo=>sharedSlot?.setOverride(photo),value=>value.photo.dispose(),
+      error=>console.warn('Close Osaka imagery unavailable; retaining regional photo',error),
+    );
     const ensurePhotos=ensureRegionalPhoto;
     ensureRegionalPhoto = v => {
       ensurePhotos(v);
@@ -478,6 +488,7 @@ export function createHero(
     ensureCityRegion=center=>{
       let region=regionAt(regionManifest.regions,center);
       sharedSlot?.select(region?.id==='tennozan');
+      void osakaPhotos.update(region?.id==='osaka'?center:null);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
       if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)
@@ -486,7 +497,14 @@ export function createHero(
       opts.onAreaLoading?.(!!region&&region.id!==regionLoader.id);
       void regionLoader.request(region).finally(()=>{if(request===areaRequest)opts.onAreaLoading?.(false);});
     };
+    prefetchCityRegion=(center,target)=>{
+      const next=target==='tennozan'||target==='osakaSkyline'
+        ?regionManifest.regions.find(r=>r.id==='osaka'):regionAt(regionManifest.regions,center);
+      if(next)regionLoader.prefetch(next);
+      if(next?.id==='osaka')void osakaPhotos.prefetch(center);
+    };
     ensureCityRegion(landscapeCenter(VIEW));
+    prefetchCityRegion(landscapeCenter(VIEW),view);
     loading.built();
     idle(()=>{void loadBinary('buildings-south-lod.json.gz').then(async bytes=>{
       const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[]};
@@ -604,7 +622,7 @@ export function createHero(
     }
     if((e.target as Element).closest('button,a,input,select,textarea'))return;
     e.preventDefault();const amount=Math.max(-1,Math.min(1,-e.deltaY/160));
-    moveExplorer(freePosition,freeBearing+lookDrag.yaw,amount,0,amount*.35,.1,true,groundAt??(()=>40));
+    moveExplorer(freePosition,freeBearing+lookDrag.yaw,amount,0,amount*.35,.1,true,groundAt??(()=>40),travelBounds);
   },{passive:false});
   const ray = new THREE.Raycaster();
   const resetLook = mountLookControls(el, rotation, (e) => {
@@ -679,6 +697,7 @@ export function createHero(
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
     ensureCityRegion?.(target==='campus'?CAMPUS_CENTER:landscapeCenter(VIEWS[nextView]));
+    if(target!=='campus')prefetchCityRegion?.(landscapeCenter(VIEWS[nextView]),nextView);
     if (!fromExplorer && !flight && mode === to && (to === 'campus' || nextView === view)) {
       resetLook();
       opts.onMode?.(to,false);
@@ -754,11 +773,12 @@ export function createHero(
       const pressed=(...codes:string[])=>codes.some(code=>keys.has(code))?1:0;
       const axis=(value:number)=>Math.max(-1,Math.min(1,value));
       moveExplorer(freePosition,freeBearing+lookDrag.yaw,axis(pressed('KeyW','ArrowUp')-pressed('KeyS','ArrowDown')+touchMove.forward),
-        axis(pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft')+touchMove.side),axis(pressed('KeyE')-pressed('KeyQ')+touchMove.up),inputDt,!!pressed('ShiftLeft','ShiftRight'),groundAt??(()=>40));
+        axis(pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft')+touchMove.side),axis(pressed('KeyE')-pressed('KeyQ')+touchMove.up),inputDt,!!pressed('ShiftLeft','ShiftRight'),groundAt??(()=>40),travelBounds);
       camera.position.copy(freePosition);const yaw=(freeBearing+lookDrag.yaw)*RAD,pitch=THREE.MathUtils.clamp(freePitch+lookDrag.pitch,-85,85)*RAD;
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
       if(freeCenter.distanceTo(freePosition)>600){
         freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);plantTreesAsync?.(freePosition,yaw/RAD);ensureCityRegion?.(freePosition);
+        prefetchCityRegion?.({x:freePosition.x+Math.sin(yaw)*1200,z:freePosition.z-Math.cos(yaw)*1200});
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }
     }else if (flight) {
@@ -840,6 +860,7 @@ export function createHero(
       stopIntroCamera();
       if(enabled){
         flight=null;resetLook();freePosition.copy(camera.position);freeCenter.copy(freePosition);
+        terrainRecenter?.(freePosition,true);shadow.invalidate();
         const d=lastTarget.clone().sub(camera.position).normalize();freeBearing=Math.atan2(d.x,-d.z)/RAD;freePitch=Math.asin(d.y)/RAD;
         exploring=true;env.uHighlight.value=1;el.tabIndex=0;el.focus({preventScroll:true});opts.onExplore?.(true);
       }else flyTo(mode==='campus'?'campus':view,clock);
