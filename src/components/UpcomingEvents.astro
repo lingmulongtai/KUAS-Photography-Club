@@ -1,5 +1,6 @@
 ---
 /** The next few events from the schedule. Past ones are hidden in the browser, so the list stays current between deploys. */
+import {scheduleText} from '../lib/schedule-display';
 import CalendarFeed from './CalendarFeed.astro';
 import { formatDay, getSchedule, kindLabel, kindLabelEn } from '../lib/schedule';
 
@@ -19,7 +20,7 @@ const events = (await getSchedule()).flatMap((m) => m.events);
         <span class="date"><span class="num">{en ? e.date : formatDay(e.date)}</span></span>
         <span class="body">
           <span class="kind">{(en ? kindLabelEn : kindLabel)[e.kind]}</span>
-          <b lang={en && !e.titleEn ? 'ja' : lang}>{en ? (e.titleEn ?? `${e.title} (Japanese)`) : e.title}</b>
+          <b lang={en && !e.titleEn ? 'ja' : lang}>{scheduleText(e.title,e.titleEn,lang)}</b>
           {(e.time || e.place) && <span class="meta">{[e.time, e.place].filter(Boolean).join(' · ')}</span>}
         </span>
       </li>
