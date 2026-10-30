@@ -20,3 +20,12 @@ test('travel can enter Osaka using the shipped outer terrain instead of the old 
   for(let i=0;i<500;i++)moveExplorer(p,180,1,0,0,.1,true,()=>10,meta.outer.box);
   assert.equal(p.z,meta.outer.box[3]-500,'travel still stops before the actual terrain edge');
 });
+
+
+test('acceleration increases movement speed while retaining the frame bound',()=>{
+  const normal={x:0,y:100,z:0},fast={...normal};
+  moveExplorer(normal,0,1,0,0,.1,false,()=>0);
+  moveExplorer(fast,0,1,0,0,.1,true,()=>0);
+  assert.equal(normal.z,-18);
+  assert.equal(fast.z,-65);
+});
