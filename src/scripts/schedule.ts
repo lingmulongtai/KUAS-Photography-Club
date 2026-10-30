@@ -60,11 +60,11 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
   async function refresh() {
     if(busy||document.hidden)return;busy=true;
     try {
-      const response=await fetch('/api/schedule.json',{signal:AbortSignal.timeout(15000)});
+      const response=await fetch(en?'/api/schedule.json?lang=en':'/api/schedule.json',{signal:AbortSignal.timeout(16000)});
       if(!response.ok)throw new Error('unavailable');
       const data=await response.json() as LiveSchedule;render(data);
       const time=new Intl.DateTimeFormat(en?'en-GB':'ja-JP',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tokyo'}).format(new Date(data.updatedAt));
-      status.textContent=en?'Google Calendar · checked '+time+' JST':'Googleカレンダー連携 · '+time+' 更新';
+      status.textContent=en?'Google Calendar · checked '+time+' JST · '+(data.translationStatus==='partial'?'Some titles could not be translated; original text is shown.':'Event titles may be automatically translated.'):'Googleカレンダー連携 · '+time+' 更新';
     }catch{status.textContent=en?'Calendar could not be refreshed. Check Google Calendar for the latest dates.':'カレンダーを更新できませんでした。最新の予定はGoogleカレンダーでご確認ください。';}
     finally{busy=false;}
   }
