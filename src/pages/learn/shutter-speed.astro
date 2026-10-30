@@ -1,13 +1,13 @@
 ---
 import LearnPage from '../../layouts/LearnPage.astro';
-import DemoExposure from '../../components/learn/DemoExposure.astro';
+import StudioTry from '../../components/learn/StudioTry.astro';
 ---
 <LearnPage
   slug="shutter-speed"
   lead="シャッターが開いている時間が、写真に写る「時間の長さ」になります。速くすれば動きを止めやすくなり、遅くすれば光や動きが線になって流れます。"
-  description="シャッタースピードの基本。動きを止める・流す、手ブレの目安、花火や光跡の撮り方を、花火の長時間露光デモで体験できます。"
+  description="シャッタースピードの基本。動きを止める・流す、手ブレの目安、花火や光跡の撮り方。風車・星の軌跡・流れ星を、3Dの撮影スタジオのお題で体験できます。"
 >
-  <DemoExposure slot="demo" />
+  <StudioTry slot="demo" slug="shutter-speed" />
 
   <h2>シャッタースピードとは</h2>
   <p>
@@ -20,7 +20,7 @@ import DemoExposure from '../../components/learn/DemoExposure.astro';
 
   <h2>止めるか、流すか</h2>
   <p>
-    速いシャッターは動いているものを止めて写し、遅いシャッターは動きを線やぼかしとして写します。どちらが正解ということはなく、何を見せたいかで選びます。上のデモで <code>1/60</code> と <code>8″</code> を切り替えると、同じ花火がまったく違う写真になるのがわかります。
+    速いシャッターは動いているものを止めて写し、遅いシャッターは動きを線やぼかしとして写します。どちらが正解ということはなく、何を見せたいかで選びます。上のお題「昼間に風車を流して写す」で <code>1/250</code> と <code>1/4</code> を比べると、同じ風車がまったく違う写真になるのがわかります。
   </p>
   <div class="table-wrap">
     <table class="data">

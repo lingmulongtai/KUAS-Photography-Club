@@ -1,18 +1,18 @@
 ---
 import Base from '../../../layouts/Base.astro';
 import PageHero from '../../../components/PageHero.astro';
-import ExposureSim from '../../../components/learn/ExposureSim.astro';
+import Studio from '../../../components/learn/Studio.astro';
 import LearnCards from '../../../components/learn/LearnCards.astro';
 ---
-<Base lang="en" title="Learn photography" description="Shutter speed, aperture, ISO, focal length and developing: the basics of photography, with demos you can try in your browser. Put together by the KUAS Photography Club for beginners.">
+<Base lang="en" title="Learn photography" description="One 3D photo studio where you can try aperture, shutter speed, ISO, lenses, filters and flash in your browser, with a starry sky, a flower field and challenges. Put together by the KUAS Photography Club for beginners.">
   <PageHero
-    edge="LEARN ▸ 4 TOPICS ▸ FOR BEGINNERS"
+    edge="LEARN ▸ ONE STUDIO ▸ FOR BEGINNERS"
     title="Photography, hands-on."
-    lead="Camera settings make more sense when you move them than when you read about them. These are the basics we share with new members, made into demos you can try in your browser. No camera needed: they help with smartphone photos too."
+    lead="Camera settings make more sense when you move them than when you read about them. In one 3D studio you can try aperture, shutter speed, ISO, lenses, filters, flash and lights. Pick a place and a subject, then press the shutter. No camera needed: it helps with smartphone photos too."
   />
 
-  <section class="wrap topics">
-    <LearnCards lang="en" />
+  <section class="wrap studio-wrap" id="studio" aria-label="Photo studio">
+    <Studio lang="en" />
   </section>
 
   <section class="section" aria-labelledby="triangle">
@@ -24,7 +24,6 @@ import LearnCards from '../../../components/learn/LearnCards.astro';
           Shutter speed, aperture and ISO together decide how bright a photo is. Make one of them a stop brighter and another a stop darker, and the brightness stays the same while the look of the picture changes.
         </p>
       </div>
-      <ExposureSim lang="en" />
       <div class="notes">
         <div>
           <h3>Shutter speed</h3>
@@ -40,16 +39,27 @@ import LearnCards from '../../../components/learn/LearnCards.astro';
         </div>
         <div>
           <h3>Sunny days: “f/16 · 1/ISO”</h3>
-          <p>Outdoors in sunshine, about f/16, ISO 100 and 1/125 s gives a good exposure (the sunny 16 rule). It is where the simulator starts.</p>
+          <p>Outdoors in sunshine, about f/16, ISO 100 and 1/125 s gives a good exposure (the sunny 16 rule). Try it in the studio’s Japanese garden.</p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="topics">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="edge">WHY IT WORKS</p>
+        <h2 id="topics">How it works</h2>
+        <p class="lead">The reasons behind what you try in the studio, one topic at a time. Each page can open the studio on that topic’s challenges.</p>
+      </div>
+      <LearnCards lang="en" />
     </div>
   </section>
 </Base>
 
 <style>
-  .topics {
-    padding-bottom: clamp(56px, 8vw, 96px);
+  .studio-wrap {
+    padding-bottom: clamp(16px, 3vw, 32px);
   }
 
   .notes {
