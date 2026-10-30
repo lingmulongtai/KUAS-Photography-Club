@@ -126,6 +126,18 @@ const pinTrips = completeSpotPreviews((await getTrips())
     </div>
   </div>
 
+  <div class="swipe-hint" aria-hidden="true" hidden>
+    <div class="swipe-card">
+      <svg viewBox="0 0 64 50">
+        <path class="track" d="M8 13 Q32 3 56 13" />
+        <path d="M11 6.5 L6.5 13.5 L14.5 15.5 M53 6.5 L57.5 13.5 L49.5 15.5" />
+        <path class="finger" d="M28 38 V22.5 a3 3 0 0 1 6 0 V33 M34 31.5 a3 3 0 0 1 6 0 V35 M40 33.5 a3 3 0 0 1 6 0 V38.5 M46 37 v2.5 c0 5.5 -3.8 9 -9 9 h-4.5 c-3 0 -5.2 -1.4 -6.8 -3.9 L21.8 38.4 a2.7 2.7 0 0 1 4.3 -3.2 L28 37.5" />
+      </svg>
+      <p>{en ? 'Swipe to look around Kyoto' : 'スワイプで京都を見渡せます'}</p>
+      <small>{en ? 'Tap a place to move closer' : '地点をタップすると近づけます'}</small>
+    </div>
+  </div>
+
   <p class="credit">地形・航空写真：国土地理院　建物：国土地理院・PLATEAU（国土交通省）　森林：© OpenStreetMap contributors</p>
   <a class="scroll-cue" href="#intro"><span>SCROLL</span></a>
 </section>
@@ -300,6 +312,37 @@ const pinTrips = completeSpotPreviews((await getTrips())
     };
 
     const coarse = matchMedia('(pointer: coarse)').matches;
+
+    /* the first time on a touch screen, once the intro has gone: show that the view can be swiped */
+    const swipeHint = hero.querySelector<HTMLElement>('.swipe-hint')!;
+    const intro = document.querySelector<HTMLDialogElement>('dialog.hero-intro');
+    let introGone = !intro || (!intro.open && !intro.classList.contains('is-leaving'));
+    let sceneReady = false;
+    let hinted = false;
+    const offerSwipeHint = () => {
+      if (hinted || !coarse || !introGone || !sceneReady || hero.classList.contains('no-3d') || scrollY > hero.offsetHeight / 3) return;
+      hinted = true;
+      try {
+        if (localStorage.getItem('kuas-swipe-hint') === '1') return;
+        localStorage.setItem('kuas-swipe-hint', '1');
+      } catch {
+        // storage blocked: show it this once
+      }
+      const hide = () => {
+        clearTimeout(timer);
+        hero.removeEventListener('pointerdown', hide);
+        removeEventListener('scroll', hide);
+        swipeHint.classList.remove('is-shown');
+        setTimeout(() => (swipeHint.hidden = true), 500);
+      };
+      // the first touch, a scroll or a few seconds put it away; it never blocks the swipe it describes
+      const timer = setTimeout(hide, 7000);
+      hero.addEventListener('pointerdown', hide);
+      addEventListener('scroll', hide, { passive: true });
+      swipeHint.hidden = false;
+      requestAnimationFrame(() => requestAnimationFrame(() => swipeHint.classList.add('is-shown')));
+    };
+    document.addEventListener('hero:intro-done', () => { introGone = true; offerSwipeHint(); }, { once: true });
     const cores = navigator.hardwareConcurrency || 4;
     const quality = coarse || cores < 6 || window.innerWidth < 900 ? 0.55 : 1;
 
@@ -339,6 +382,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
             viewButtons.forEach(b=>b.disabled=false);
             if (!stopRefraction.length) stopRefraction = [mountGlassRefraction(viewBar), mountGlassRefraction(hero.querySelector<HTMLElement>('.time-thumb')!)];
             document.dispatchEvent(new Event('hero:ready'));
+            sceneReady=true; offerSwipeHint();
           },
           onError: fallback,
           onAreaLoading: loading=>{areaStatus.hidden=!loading;},
@@ -916,6 +960,51 @@ const pinTrips = completeSpotPreviews((await getTrips())
       opacity: 1;
     }
   }
+
+  /* first visit on a touch screen: a light veil and a card showing that the view swipes */
+  .swipe-hint {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+    background: radial-gradient(ellipse 85% 55% at 50% 38%, rgba(4, 9, 16, 0.5), rgba(4, 9, 16, 0.22) 70%, rgba(4, 9, 16, 0.1));
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+
+  .swipe-hint.is-shown { opacity: 1; }
+
+  .swipe-card {
+    position: absolute;
+    left: 50%;
+    /* over the open view: a phone's hero runs below the screen, so place by the screen */
+    top: min(38%, 38vh);
+    top: min(38%, 38svh);
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    width: max-content;
+    max-width: calc(100% - 2 * var(--gutter));
+    padding: 18px 26px 16px;
+    border-radius: 22px;
+    background: rgba(10, 18, 28, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: var(--hud);
+    text-align: center;
+    transform: translate(-50%, -50%) scale(0.96);
+    transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .is-shown .swipe-card { transform: translate(-50%, -50%); }
+  .swipe-card svg { width: 96px; height: 75px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .swipe-card .track { stroke-opacity: 0.55; stroke-dasharray: 2 5; }
+  .swipe-card .finger { fill: rgba(10, 18, 28, 0.6); transform-box: fill-box; transform-origin: 50% 100%; animation: swipe-hand 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
+  .swipe-card p { font: 700 15px/1.5 var(--display); letter-spacing: 0.06em; }
+  .swipe-card small { font-size: 11.5px; letter-spacing: 0.04em; opacity: 0.8; }
+  @keyframes swipe-hand { from { transform: translateX(-20px) rotate(-7deg); } to { transform: translateX(20px) rotate(7deg); } }
+  @media (prefers-reduced-motion: reduce) { .swipe-card .finger { animation: none; } }
 
   /* pins placed by the scene (created in script, so styled globally) */
   .hero :global(.hero-labels) {
