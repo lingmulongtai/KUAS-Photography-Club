@@ -21,7 +21,7 @@ function mount({unsupported=false,throws=false,reduced=true,userAgent='Mozilla/5
   const intro=new Dialog();if(unsupported)intro.showModal=undefined;
   document.currentScript={previousElementSibling:intro};document.documentElement={classList:classes()};
   let timeout,delay,cleared=false,frames=[],clock=0;
-  runInNewContext(script,{document,navigator:{userAgent},location:{hostname},HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
+  runInNewContext(script,{document,Event,navigator:{userAgent},location:{hostname},HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
     performance:{now:()=>clock},
     setTimeout:(callback,ms)=>{timeout=callback;delay=ms;return 1;},clearTimeout:()=>{cleared=true;},
     requestAnimationFrame:callback=>frames.push(callback),cancelAnimationFrame:()=>{frames=[];}});
@@ -55,6 +55,12 @@ test('intro opens immediately, reports real progress, then releases the page on 
   assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false);
   state.emit('hero:progress',.8);state.emit('hero:error');assert.equal(state.percent.textContent,'60%');
   assert.equal(state.intro.closed,1,'late events cannot reopen or close the intro twice');
+});
+
+test('the page hears once the intro is gone',()=>{
+  const state=mount();let heard=0;state.document.addEventListener('hero:intro-done',()=>heard++);
+  state.emit('hero:progress',.5);assert.equal(heard,0);
+  state.emit('hero:ready');assert.equal(heard,1);state.emit('hero:error');assert.equal(heard,1);
 });
 
 test('skip, Escape and a required-data error each dismiss without waiting for a download',()=>{
