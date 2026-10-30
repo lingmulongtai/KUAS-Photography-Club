@@ -2,7 +2,7 @@ import ical from 'node-ical';
 import { PUBLIC_CALENDAR_ICS } from '../data/public-calendar.ts';
 import type { ScheduleEvent } from './schedule.ts';
 
-export interface LiveSchedule { events:ScheduleEvent[]; updatedAt:string; from:string; to:string; }
+export interface LiveSchedule { events:ScheduleEvent[]; updatedAt:string; from:string; to:string; translationStatus?:'complete'|'partial'; }
 const jstDate = (date:Date) => new Date(+date+9*3600000).toISOString().slice(0,10);
 const jstTime = (date:Date) => new Date(+date+9*3600000).toISOString().slice(11,16);
 // node-ical represents floating DATE values at midnight in the host timezone.
