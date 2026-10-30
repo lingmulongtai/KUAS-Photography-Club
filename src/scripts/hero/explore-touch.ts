@@ -1,5 +1,5 @@
-export type ExploreDirection = 'forward' | 'back' | 'left' | 'right' | 'up' | 'down';
-export type ExploreMovement = { forward: number; side: number; up: number };
+export type ExploreDirection = 'forward' | 'back' | 'left' | 'right' | 'up' | 'down' | 'fast';
+export type ExploreMovement = { forward: number; side: number; up: number; fast: boolean };
 
 /** Independent pointers can hold different directions without releasing one another. */
 export function createExploreButtons(root: HTMLElement, onMove: (movement: ExploreMovement) => void) {
@@ -10,7 +10,7 @@ export function createExploreButtons(root: HTMLElement, onMove: (movement: Explo
     const directions = new Set([...held.values()].map(value => value.direction));
     buttons.forEach(button => button.classList.toggle('is-held', [...held.values()].some(value => value.button === button)));
     const value = (direction: ExploreDirection) => Number(directions.has(direction));
-    onMove({ forward: value('forward') - value('back'), side: value('right') - value('left'), up: value('up') - value('down') });
+    onMove({ forward: value('forward') - value('back'), side: value('right') - value('left'), up: value('up') - value('down'), fast: directions.has('fast') });
   };
   const reset = () => { clearTimeout(activationTimer); activationTimer = 0; held.clear(); update(); };
   buttons.forEach(button => {
