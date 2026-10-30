@@ -31,18 +31,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
         {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed={view==='shogunzuka'} disabled>{VIEWS[view][lang]}</button>)}
       </div>
     </nav>
-    <div class="explore-touch" role="group" aria-label={en ? 'Move in free explore' : '自由散策の移動操作'} hidden>
-      <div class="explore-directions">
-        <button type="button" data-direction="forward" aria-label={en ? 'Move forward' : '前に移動'}>▲</button>
-        <button type="button" data-direction="left" aria-label={en ? 'Move left' : '左に移動'}>◀</button>
-        <button type="button" data-direction="back" aria-label={en ? 'Move back' : '後ろに移動'}>▼</button>
-        <button type="button" data-direction="right" aria-label={en ? 'Move right' : '右に移動'}>▶</button>
-      </div>
-      <div class="explore-altitude">
-        <button type="button" data-direction="up" aria-label={en ? 'Move up' : '上昇'}>＋</button>
-        <button type="button" data-direction="down" aria-label={en ? 'Move down' : '下降'}>−</button>
-      </div>
-    </div>
   </div>
   <div class="spot-nav">
       <label class="visually-hidden" for="hero-spot">{en ? 'Explore a place in 3D' : '3Dで近づくスポット'}</label>
@@ -70,6 +58,19 @@ const pinTrips = completeSpotPreviews((await getTrips())
       </aside>
   </div>
   <div class="scrim" aria-hidden="true"></div>
+
+  <div class="explore-touch" role="group" aria-label={en ? 'Move in free explore' : '自由散策の移動操作'} hidden>
+    <div class="explore-directions">
+      <button type="button" data-direction="forward" aria-label={en ? 'Move forward' : '前に移動'}>▲</button>
+      <button type="button" data-direction="left" aria-label={en ? 'Move left' : '左に移動'}>◀</button>
+      <button type="button" data-direction="back" aria-label={en ? 'Move back' : '後ろに移動'}>▼</button>
+      <button type="button" data-direction="right" aria-label={en ? 'Move right' : '右に移動'}>▶</button>
+    </div>
+    <div class="explore-altitude">
+      <button type="button" data-direction="up" aria-label={en ? 'Move up' : '上昇'}>＋</button>
+      <button type="button" data-direction="down" aria-label={en ? 'Move down' : '下降'}>−</button>
+    </div>
+  </div>
 
   <div class="hero-inner">
     <div class="copy">
@@ -1169,7 +1170,15 @@ const pinTrips = completeSpotPreviews((await getTrips())
       grid-column: 1;
     }
     .is-exploring .hero-stage { min-height: 460px; }
-    .is-exploring .hero-inner { margin-top: 0; }
+    .hero.is-exploring { grid-template-rows: minmax(62svh, 1fr) auto auto; }
+    .is-exploring .hero-inner { grid-row: 3; margin-top: 0; }
+    .explore-touch:not([hidden]) {
+      position: relative;
+      inset: auto;
+      grid-row: 2;
+      grid-column: 1;
+      padding: 16px var(--gutter) 8px;
+    }
 
     .scrim {
       grid-row: 1;
