@@ -1,3 +1,4 @@
+import {scheduleText} from '../lib/schedule-display';
 import type {LiveSchedule} from '../lib/google-schedule';
 import type {ScheduleEvent} from '../lib/schedule';
 
@@ -16,7 +17,7 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
       const li=element('li','calendar-event k-'+event.kind+(event.date<today?' past':''));li.dataset.date=event.date;
       const date=new Date(event.date+'T00:00:00Z');
       li.append(element('span','calendar-date',new Intl.DateTimeFormat(en?'en-GB':'ja-JP',{month:'numeric',day:'numeric',weekday:'short',timeZone:'UTC'}).format(date)),element('span','calendar-kind',kinds[lang][event.kind]));
-      const title=element('b','',en?(event.titleEn??event.title+' (Japanese)'):event.title);
+      const title=element('b','',scheduleText(event.title,event.titleEn,lang));
       title.lang=en&&event.titleEn?'en':'ja';li.append(title);
       if(event.time||event.place)li.append(element('span','calendar-meta',[event.time,event.place].filter(Boolean).join(' · ')));
       list.append(li);
