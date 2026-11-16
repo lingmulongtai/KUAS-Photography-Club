@@ -42,7 +42,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <a class="spot-records" hidden>{en ? 'Outing records' : '活動記録'}</a>
       <span class="visually-hidden" role="status" data-place-status></span>
       <span class="area-status" role="status" data-area-status hidden>{en ? 'Loading the surrounding area…' : '周辺の景色を読み込んでいます…'}</span>
-      <button type="button" class="explore-toggle" aria-pressed="false" aria-controls="explore-guide" disabled>{en ? 'Explore freely ↗' : '自由散策を始める ↗'}</button>
+      <button type="button" class="explore-toggle" aria-pressed="false" disabled>{en ? 'Explore freely ↗' : '自由散策を始める ↗'}</button>
+      <button type="button" class="explore-help" aria-expanded="false" aria-controls="explore-guide" hidden>{en ? 'Help' : '操作説明'}</button>
       <aside class="explore-guide" id="explore-guide" aria-label={en ? 'Free explore controls' : '自由散策の操作方法'} hidden>
         <p class="explore-guide-title">{en ? 'FREE EXPLORE' : '自由散策の操作'}</p>
         <p class="explore-touch-hint">{en ? 'Swipe to look. Hold arrows to move; hold Faster to speed up, and + / − to change altitude. Pinch to zoom. Scroll from this guide or outside the scenery.' : 'スワイプで見回す。矢印長押しで移動、加速を押しながら速く移動、＋ / −で上下。ピンチでズーム。スクロールはこの説明欄や景色の外から。'}</p>
@@ -187,6 +188,26 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
     const cameraHint=hero.querySelector('.hint')!.firstChild!;
     const exploreGuide=hero.querySelector<HTMLElement>('.explore-guide')!;
+    const exploreHelp=hero.querySelector<HTMLButtonElement>('.explore-help')!;
+    const mobileExplore=matchMedia('(max-width: 900px)');
+    let mobileGuideOpen=false;
+    const updateExploreGuide = () => {
+      const exploring=hero.classList.contains('is-exploring');
+      const visible=exploring && (!mobileExplore.matches || mobileGuideOpen);
+      exploreGuide.hidden=!visible;
+      exploreHelp.hidden=!exploring;
+      exploreHelp.setAttribute('aria-expanded',String(visible));
+      if (visible) stage.setAttribute('aria-describedby','explore-guide');
+      else stage.removeAttribute('aria-describedby');
+    };
+    exploreHelp.addEventListener('click',()=>{
+      mobileGuideOpen=!mobileGuideOpen;
+      updateExploreGuide();
+    });
+    mobileExplore.addEventListener('change',updateExploreGuide);
+    new IntersectionObserver(([entry])=>{
+      hero.classList.toggle('explore-stage-visible',entry.isIntersecting);
+    },{rootMargin:'-64px 0px'}).observe(stage);
     const exploreTouch=hero.querySelector<HTMLElement>('.explore-touch')!;
     const spotSelect=hero.querySelector<HTMLSelectElement>('.spot-select')!;
     const spotReturn=hero.querySelector<HTMLButtonElement>('.spot-return')!;
@@ -355,11 +376,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
     window.addEventListener('pagehide', event => { if (!event.persisted) removeRefraction(); });
     const fallback = () => {
       removeRefraction();
-      exploreGuide.hidden = true;
+      hero.classList.remove('is-exploring');
+      updateExploreGuide();
       exploreTouch.hidden = true;
       touchControls.reset();
-      stage.removeAttribute('aria-describedby');
-      hero.classList.remove('is-exploring');
       const look = lookAt((sunPosition(new Date()).altitude * 180) / Math.PI, createLook());
       stage.style.setProperty('--fb', `linear-gradient(${look.zenith.getStyle()}, ${look.mid.getStyle()} 55%, ${look.horizon.getStyle()} 85%, #05070c)`);
       hero.classList.add('is-ready', 'no-3d');
@@ -391,10 +411,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
           onExplore: enabled=>{
             hero.classList.toggle('is-exploring',enabled);exploreToggle.setAttribute('aria-pressed',String(enabled));
             exploreToggle.textContent=enabled?(en?'Exit exploration':'散策を終了'):(en?'Explore freely ↗':'自由散策を始める ↗');
-            exploreGuide.hidden=!enabled;
+            mobileGuideOpen=false;
+            updateExploreGuide();
             exploreTouch.hidden=!enabled;
             if (!enabled) touchControls.reset();
-            if (enabled) stage.setAttribute('aria-describedby','explore-guide'); else stage.removeAttribute('aria-describedby');
             card.hidden=enabled||demo?.mode!=='campus';
           },
           onAction: (id) => demo?.flyTo(spotDestination(id)),
@@ -625,8 +645,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
   .is-ready .spot-nav { opacity: 1; }
   .area-status { position: absolute; top: calc(100% + 8px); left: 0; white-space: nowrap; padding: 7px 12px; border-radius: 16px; background: rgba(11,20,36,.8); color: var(--on-dark); font-size: 11px; }
-  .explore-toggle { min-height: 36px; padding: 8px 13px; border: 1px solid rgba(190,239,240,.55); border-radius: 999px; background: linear-gradient(150deg,rgba(146,225,227,.24),rgba(255,255,255,.06)),rgba(12,34,43,.62); color: var(--on-dark); font: 700 12px/1.2 var(--body); box-shadow: inset 0 1px rgba(255,255,255,.28),0 4px 14px rgba(0,0,0,.15); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); cursor: pointer; }
-  .explore-toggle[aria-pressed='true'] { border-color: rgba(255,255,255,.35); background-color: rgba(10,18,28,.58); }
+  .explore-toggle, .explore-help { min-height: 36px; padding: 8px 13px; border: 1px solid rgba(190,239,240,.55); border-radius: 999px; background: linear-gradient(150deg,rgba(146,225,227,.24),rgba(255,255,255,.06)),rgba(12,34,43,.62); color: var(--on-dark); font: 700 12px/1.2 var(--body); box-shadow: inset 0 1px rgba(255,255,255,.28),0 4px 14px rgba(0,0,0,.15); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); cursor: pointer; }
+  .explore-toggle[aria-pressed='true'], .explore-help[aria-expanded='true'] { border-color: rgba(255,255,255,.35); background-color: rgba(10,18,28,.58); }
   .explore-toggle:disabled { opacity: .55; cursor: default; }
   .explore-guide { position: absolute; z-index: 3; top: calc(100% + 45px); left: 0; max-width: calc(100vw - var(--gutter) * 2); padding: 10px 13px; border: 1px solid rgba(255,255,255,.24); border-radius: 16px; background: linear-gradient(145deg,rgba(255,255,255,.15),rgba(255,255,255,.025)),rgba(10,27,37,.62); color: var(--on-dark); box-shadow: inset 0 1px rgba(255,255,255,.22),0 6px 20px rgba(0,0,0,.15); -webkit-backdrop-filter: blur(8px) saturate(1.2); backdrop-filter: blur(8px) saturate(1.2); pointer-events: none; }
   .explore-guide[hidden] { display: none; }
@@ -635,14 +655,14 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .explore-guide dl div { display: flex; gap: 7px; }
   .explore-guide dt { font-weight: 700; }
   .explore-guide dd { margin: 0; color: var(--hud); }
-  .explore-touch, .explore-touch-hint { display: none; }
+  .explore-touch, .explore-touch-hint, .explore-help { display: none; }
   .season-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--on-dark); }
   .season-picker select { min-height: 32px; max-width: 145px; padding: 3px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: #15202d; color: var(--on-dark); font: inherit; }
-  .explore-toggle:hover { background-color: rgba(22,67,72,.72); }
-  .explore-toggle:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+  .explore-toggle:hover, .explore-help:hover { background-color: rgba(22,67,72,.72); }
+  .explore-toggle:focus-visible, .explore-help:focus-visible { outline: 2px solid white; outline-offset: 3px; }
   .is-exploring .copy,.is-exploring .scrim,.is-exploring .scroll-cue { opacity: 0; visibility: hidden; pointer-events: none; }
   .is-exploring .hint { display: none; }
-  @media (pointer: coarse), (max-width: 760px) {
+  @media (pointer: coarse), (max-width: 900px) {
     .explore-guide:not([hidden]) { position: static; flex-basis: 100%; padding: 8px 11px; pointer-events: auto; touch-action: pan-y; }
     .explore-guide-title { margin-bottom: 3px; }
     .explore-keyboard-hint { display: none !important; }
@@ -790,7 +810,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   @media (prefers-reduced-motion: reduce) { .time-thumb { transition: none; } }
 
   @media (prefers-reduced-transparency: reduce) {
-    .views, .sky-chip, .btn--glass, .explore-toggle, .explore-guide { background: #0c1b25; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .views, .sky-chip, .btn--glass, .explore-toggle, .explore-help, .explore-guide { background: #0c1b25; -webkit-backdrop-filter: none; backdrop-filter: none; }
     .time-thumb[data-glisse-refraction='ready'] { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
     .btn--glass:hover { background: var(--on-dark); }
   }
@@ -1157,6 +1177,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   @media (max-width: 900px) {
+    :global(body:has(.hero.is-exploring.explore-stage-visible) .site-header.overlay:not(.open)) {
+      display: none;
+    }
+
     .hero {
       height: auto;
       min-height: 100svh;
@@ -1171,6 +1195,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
       grid-row: 1;
       grid-column: 1;
     }
+    .is-exploring .views { top: calc(env(safe-area-inset-top, 0px) + 8px); }
+    .is-exploring .spot-nav { top: calc(env(safe-area-inset-top, 0px) + 55px); }
+    .is-exploring .spot-select { width: clamp(105px, 34vw, 190px); }
+    .explore-help:not([hidden]) { display: inline-block; }
     .is-exploring .hero-stage { min-height: 460px; }
     .hero.is-exploring { grid-template-rows: minmax(62svh, 1fr) auto auto; }
     .is-exploring .hero-inner { grid-row: 3; margin-top: 0; }
