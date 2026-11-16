@@ -14,8 +14,11 @@ const embedUrl = new URL('embed/', `${club.instagram.url.replace(/\/$/, '')}/`);
       <p class="edge">INSTAGRAM ▸ @{club.instagram.handle}</p>
       <h2 id="insta-title">{en ? 'A glimpse of our photography.' : '写真部の Instagram を、のぞいてみませんか。'}</h2>
       <p class="muted">{en ? 'Explore the club’s posts in the official Instagram preview. You can also contact us by DM from our profile.' : '公式の埋め込みから、写真部の投稿をご覧いただけます。プロフィールから DM でのお問い合わせもできます。'}</p>
-      <a class="btn instagram-button" href={club.instagram.url} target="_blank" rel="noopener">{en ? 'Open Instagram' : 'Instagram を見る'} <span class="arrow" aria-hidden="true">↗</span></a>
-      <p class="small muted">{en ? 'If the preview does not load, open our profile using the button above.' : '埋め込みが表示されない場合は、上のボタンからプロフィールをご覧ください。'}</p>
+      <div class="actions">
+        <a class="btn instagram-button" href={club.instagram.url} target="_blank" rel="noopener">{en ? 'Open Instagram' : 'Instagram を見る'} <span class="arrow" aria-hidden="true">↗</span></a>
+        <a class="btn" href="https://lingmulongtai.github.io/InstaFrame/" target="_blank" rel="noopener">{en ? 'Open InstaFrame' : 'InstaFrame を開く'} <span class="arrow" aria-hidden="true">↗</span></a>
+      </div>
+      <p class="small muted">{en ? 'If the preview does not load, open the club profile with the Instagram button.' : '埋め込みが表示されない場合は、「Instagram を見る」からプロフィールをご覧ください。'}</p>
     </div>
     <div class="embed">
       <iframe
@@ -41,6 +44,12 @@ const embedUrl = new URL('embed/', `${club.instagram.url.replace(/\/$/, '')}/`);
     display: grid;
     gap: 16px;
     justify-items: start;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   h2 {
