@@ -187,9 +187,27 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         return (1. - g * g) / (d * sqrt(d));
       }
 
+      // High cloud cells share their exact corner values, even when a GPU optimizes
+      // the arithmetic differently across the two sides of a distant cell boundary.
+      float puffHash(ivec2 cell){
+        uint h = uint(cell.x) * 0x9e3779b9u ^ uint(cell.y) * 0x85ebca6bu;
+        h = (h ^ (h >> 16u)) * 0x7feb352du;
+        h = (h ^ (h >> 15u)) * 0x846ca68bu;
+        return float((h ^ (h >> 16u)) >> 8u) * (1. / 16777216.);
+      }
+
+      float puffNoise(vec2 p){
+        ivec2 cell = ivec2(floor(p));
+        vec2 f = fract(p);
+        f = f * f * (3. - 2. * f);
+        return mix(
+          mix(puffHash(cell), puffHash(cell + ivec2(1, 0)), f.x),
+          mix(puffHash(cell + ivec2(0, 1)), puffHash(cell + ivec2(1, 1)), f.x), f.y);
+      }
+
       /** One of the thin high layers at height y, premultiplied colour + alpha. */
       vec4 highLayer(vec3 ro, vec3 rd, float y, bool cirrus){
-        if (rd.y < .002 || ro.y > y) return vec4(0.);
+        if (rd.y < .002 || ro.y > y || (cirrus ? uCirrus : uAlto) <= 0.) return vec4(0.);
         float t = (y - ro.y) / rd.y;
         vec3 pos = ro + rd * t;
         float dist = length(pos.xz - ro.xz);
@@ -207,7 +225,9 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           // mackerel sky: rows of small puffs, thinning out at the edges of the field
           vec2 s = mat2(.8, -.6, .6, .8) * p;
           float field = smoothstep(.35, .75, vnoise(p * 1.7 + 4.));
-          float puffs = vnoise(s * vec2(48., 30.)) * .7 + vnoise(s * 110.) * .3;
+          // Rotate the finer detail so its cell edges do not align with the larger puffs.
+          vec2 detail = mat2(.8, .6, -.6, .8) * s;
+          float puffs = puffNoise(s * vec2(48., 30.)) * .7 + puffNoise(detail * 110.) * .3;
           a = smoothstep(.62 - .25 * field, .9 - .2 * field, puffs) * field * uAlto * .8;
         }
         // seen edge-on far away, a sheet thins to nothing in the haze
