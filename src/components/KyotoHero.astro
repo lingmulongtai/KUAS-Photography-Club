@@ -46,7 +46,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <button type="button" class="explore-help" aria-expanded="false" aria-controls="explore-guide" hidden>{en ? 'Help' : '操作説明'}</button>
       <aside class="explore-guide" id="explore-guide" aria-label={en ? 'Free explore controls' : '自由散策の操作方法'} hidden>
         <p class="explore-guide-title">{en ? 'FREE EXPLORE' : '自由散策の操作'}</p>
-        <p class="explore-touch-hint">{en ? 'Swipe to look. Hold arrows to move; hold Faster to speed up, and + / − to change altitude. Pinch to zoom. Scroll from this guide or outside the scenery.' : 'スワイプで見回す。矢印長押しで移動、加速を押しながら速く移動、＋ / −で上下。ピンチでズーム。スクロールはこの説明欄や景色の外から。'}</p>
+        <p class="explore-touch-hint">{en ? 'Swipe to look. Hold arrows to move; hold Faster to speed up, and + / − to change altitude. Pinch to zoom. ' : 'スワイプで見回す。矢印長押しで移動、加速を押しながら速く移動、＋ / −で上下。ピンチでズーム。'}<span class="explore-time-hint">{en ? 'Use Time ↓ for time and seasons.' : '時間や季節は「時間 ↓」から。'}</span></p>
         <dl class="explore-keyboard-hint">
           <div><dt>{en ? 'Drag' : 'ドラッグ'}</dt><dd>{en ? 'Look around' : '見回す'}</dd></div>
           <div><dt>W / A / S / D · ↑ / ← / ↓ / →</dt><dd>{en ? 'Move' : '前後・左右に移動'}</dd></div>
@@ -67,6 +67,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <button type="button" data-direction="back" aria-label={en ? 'Move back' : '後ろに移動'}>▼</button>
       <button type="button" data-direction="right" aria-label={en ? 'Move right' : '右に移動'}>▶</button>
     </div>
+    <button type="button" class="explore-time" aria-label={en ? 'Go to time and season settings' : '時間と季節の設定へ'}>{en ? 'Time ↓' : '時間 ↓'}</button>
     <div class="explore-altitude">
       <button type="button" class="explore-fast" data-direction="fast" aria-label={en ? 'Hold to move faster' : '押している間は移動を加速'}>{en ? 'Faster' : '加速'}</button>
       <button type="button" data-direction="up" aria-label={en ? 'Move up' : '上昇'}>＋</button>
@@ -87,7 +88,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       </div>
     </div>
 
-    <aside class="sky-chip" aria-label={en ? 'Kyoto sky' : '京都の空'}>
+    <aside class="sky-chip" tabindex="-1" aria-label={en ? 'Kyoto sky' : '京都の空'}>
       <p class="now">
         <span class="clock num" data-clock>--:--</span>
         <span data-phase>—</span>
@@ -110,6 +111,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           <option value="autumn">{en?'Autumn':'秋'}</option><option value="winter">{en?'Winter':'冬'}</option>
         </select>
       </label>
+      <button type="button" class="explore-sky-back">{en ? 'Back to scenery ↑' : '景色へ戻る ↑'}</button>
       <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Aircraft, seasonal snow, bonfires and the blue night beam are illustrative, rather than live flight, weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。飛行機や季節の雪、夜景の送り火・青い光は演出で、実際の運航・天気・催事を示すものではありません。'}</span></p>
     </aside>
   </div>
@@ -209,6 +211,17 @@ const pinTrips = completeSpotPreviews((await getTrips())
       hero.classList.toggle('explore-stage-visible',entry.isIntersecting);
     },{rootMargin:'-64px 0px'}).observe(stage);
     const exploreTouch=hero.querySelector<HTMLElement>('.explore-touch')!;
+    const exploreTime=hero.querySelector<HTMLButtonElement>('.explore-time')!;
+    const skyChip=hero.querySelector<HTMLElement>('.sky-chip')!;
+    const skyBack=hero.querySelector<HTMLButtonElement>('.explore-sky-back')!;
+    exploreTime.addEventListener('click',()=>{
+      skyChip.focus({preventScroll:true});
+      skyChip.scrollIntoView({block:'start',behavior:'instant'});
+    });
+    skyBack.addEventListener('click',()=>{
+      exploreTime.focus({preventScroll:true});
+      hero.scrollIntoView({block:'start',behavior:'instant'});
+    });
     const spotSelect=hero.querySelector<HTMLSelectElement>('.spot-select')!;
     const spotReturn=hero.querySelector<HTMLButtonElement>('.spot-return')!;
     const spotRecords=hero.querySelector<HTMLAnchorElement>('.spot-records')!;
@@ -415,6 +428,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
             updateExploreGuide();
             exploreTouch.hidden=!enabled;
             if (!enabled) touchControls.reset();
+            else if (mobileExplore.matches) hero.scrollIntoView({block:'start',behavior:'instant'});
             card.hidden=enabled||demo?.mode!=='campus';
           },
           onAction: (id) => demo?.flyTo(spotDestination(id)),
@@ -655,7 +669,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .explore-guide dl div { display: flex; gap: 7px; }
   .explore-guide dt { font-weight: 700; }
   .explore-guide dd { margin: 0; color: var(--hud); }
-  .explore-touch, .explore-touch-hint, .explore-help { display: none; }
+  .explore-touch, .explore-touch-hint, .explore-help,
+  .explore-touch .explore-time, .explore-sky-back, .explore-time-hint { display: none; }
   .season-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--on-dark); }
   .season-picker select { min-height: 32px; max-width: 145px; padding: 3px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: #15202d; color: var(--on-dark); font: inherit; }
   .explore-toggle:hover, .explore-help:hover { background-color: rgba(22,67,72,.72); }
@@ -924,13 +939,13 @@ const pinTrips = completeSpotPreviews((await getTrips())
     color: var(--on-ink);
   }
 
-  .hero[data-view='campus'] .hero-inner {
+  .hero[data-view='campus']:not(.is-exploring) .hero-inner {
     opacity: 0;
     transform: translateY(12px);
     pointer-events: none;
   }
 
-  .hero[data-view='campus'] .hero-inner * {
+  .hero[data-view='campus']:not(.is-exploring) .hero-inner * {
     pointer-events: none;
   }
 
@@ -1198,16 +1213,41 @@ const pinTrips = completeSpotPreviews((await getTrips())
     .is-exploring .views { top: calc(env(safe-area-inset-top, 0px) + 8px); }
     .is-exploring .spot-nav { top: calc(env(safe-area-inset-top, 0px) + 55px); }
     .is-exploring .spot-select { width: clamp(105px, 34vw, 190px); }
-    .explore-help:not([hidden]) { display: inline-block; }
-    .is-exploring .hero-stage { min-height: 460px; }
-    .hero.is-exploring { grid-template-rows: minmax(62svh, 1fr) auto auto; }
-    .is-exploring .hero-inner { grid-row: 3; margin-top: 0; }
-    .explore-touch:not([hidden]) {
+    .explore-help:not([hidden]), .explore-time-hint { display: inline; }
+    .hero.is-exploring {
+      grid-template-rows: max(300px, 100svh) auto;
+      grid-template-rows: max(300px, 100dvh) auto;
+    }
+    .is-exploring .hero-inner { margin-top: 0; padding-top: 20px; }
+    .is-exploring .explore-touch:not([hidden]) {
+      grid-row: 1;
+      grid-column: 1;
       position: relative;
       inset: auto;
-      grid-row: 2;
-      grid-column: 1;
-      padding: 16px var(--gutter) 8px;
+      align-self: end;
+      gap: 4px;
+      padding: 0 max(8px, env(safe-area-inset-right, 0px))
+        max(10px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+    }
+    .is-exploring .explore-touch .explore-time {
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 44px;
+      font-size: 11px;
+      touch-action: manipulation;
+    }
+    .is-exploring .explore-sky-back {
+      display: inline-block;
+      justify-self: start;
+      min-height: 44px;
+      margin-top: 4px;
+      padding: 6px 12px;
+      color: inherit;
+      font: 600 12px var(--body);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      cursor: pointer;
     }
 
     .scrim {
@@ -1253,7 +1293,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       width: auto;
     }
 
-    .hero[data-view='campus'] .hero-inner {
+    .hero[data-view='campus']:not(.is-exploring) .hero-inner {
       opacity: 0.15;
     }
 
