@@ -30,17 +30,20 @@ test('language pairs round trip and guidelines retain their existing English URL
   assert.equal(languagePath('/trips/spots/gion/', 'en'), '/en/trips/');
 });
 
-test('the deployment thumbnail keeps the Japanese home while regular browsers use their language', () => {
+test('first visits keep the requested locale; only an explicit preference redirects', () => {
   const source=readFileSync(new URL('../src/scripts/language.ts',import.meta.url),'utf8').replace(/^import .*?;\s*/,'');
   const script=stripTypeScriptTypes(source);
-  const redirectFor=(preview)=>{
+  const redirectFor=(preview, saved=null)=>{
     let redirected=null;
     const document={documentElement:{lang:'ja',classList:{contains:name=>preview && name==='screenshot-preview'}},querySelectorAll:()=>[]};
     const location={search:'',hash:'',pathname:'/',replace:url=>{redirected=url;}};
-    runInNewContext(script,{document,location,navigator:{languages:['en-US'],language:'en-US'},localStorage:{getItem:()=>null},
+    runInNewContext(script,{document,location,navigator:{languages:['en-US'],language:'en-US'},localStorage:{getItem:()=>saved},
       URLSearchParams,LANGUAGE_KEY,languagePath,preferredLanguage,supportsLanguagePreference});
     return redirected;
   };
   assert.equal(redirectFor(true),null);
-  assert.equal(redirectFor(false),'/en/');
+  assert.equal(redirectFor(false),null);
+  assert.equal(redirectFor(false, 'en'),'/en/');
+  assert.equal(redirectFor(false, 'ja'),null);
+  assert.equal(redirectFor(true, 'en'),null);
 });
