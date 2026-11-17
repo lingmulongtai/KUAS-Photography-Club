@@ -44,7 +44,6 @@ const year = new Date().getFullYear();
     <div>
       <p class="label">PAGES</p>
       <ul class="links small">
-        <li><a href={local('/campus-guide/')}>{en ? 'Campus photography guide' : 'キャンパス撮影ガイド'}</a></li>
         {nav.map((item) => <li><a href={local(item.href)}>{en ? item.en : item.ja}</a></li>)}
       </ul>
     </div>
