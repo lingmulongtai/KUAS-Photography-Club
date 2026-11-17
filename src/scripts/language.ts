@@ -1,4 +1,4 @@
-import { LANGUAGE_KEY, languagePath, preferredLanguage, supportsLanguagePreference } from '../lib/i18n';
+import { LANGUAGE_KEY, languagePath, supportsLanguagePreference } from '../lib/i18n';
 
 // Browser language stays on the device. An explicit choice takes precedence.
 let saved: string | null = null;
@@ -11,7 +11,9 @@ if (explicit) {
   try { localStorage.setItem(LANGUAGE_KEY, explicit); } catch { storageAvailable = false; }
 }
 const current = document.documentElement.lang === 'en' ? 'en' : 'ja';
-const preferred = preferredLanguage(saved, navigator.languages?.length ? navigator.languages : [navigator.language]);
+// Keep each locale URL stable on first visit, including search-engine rendering.
+// Only an explicit, saved visitor choice may redirect the Japanese page.
+const preferred = saved === 'en' ? 'en' : 'ja';
 if (current === 'ja' && preferred === 'en' && !document.documentElement.classList.contains('screenshot-preview') && supportsLanguagePreference(location.pathname)) {
   location.replace(languagePath(location.pathname, 'en') + location.search + location.hash);
 }
