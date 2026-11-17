@@ -72,3 +72,6 @@ for (const path of ['index.html', 'about/index.html', 'en/index.html', 'en/about
   assert.match(section.replace(/<iframe\b[\s\S]*?<\/iframe>/g, ''), /<a\b[^>]*href="https:\/\/www\.instagram\.com\/kuas_photographyclub"/);
 }
 console.log(`Public output verified: ${html.length} HTML files, ${sampleSlugs.length} sample trip routes excluded, local links intact.`);
+
+// SEO checks run with the existing public-content verification gate.
+await import('./verify-seo-build.mjs');
