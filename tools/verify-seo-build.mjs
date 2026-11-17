@@ -48,3 +48,15 @@ const mainHeading = home.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>
 assert.equal(mainHeading, '京都先端科学大学写真部', 'Homepage must clearly identify the club in its main heading');
 assert.match(home, /<meta name="description" content="京都先端科学大学写真部（KUAS Photography Club）/);
 assert.match(home, /name="google-site-verification"/);
+
+// The campus guide remains discoverable, bilingual and clearly student-run.
+for (const route of ['campus-guide/index.html', 'en/campus-guide/index.html']) {
+  const guide = readFileSync(join(root, route), 'utf8');
+  assert.match(guide, /hreflang="ja" href="https:\/\/kuas-photography-club.vercel.app\/campus-guide\/"/);
+  assert.match(guide, /hreflang="en" href="https:\/\/kuas-photography-club.vercel.app\/en\/campus-guide\/"/);
+  assert.equal([...guide.matchAll(/<input[^>]+type="checkbox"/g)].length, 5);
+  assert.match(guide, /type="reset"/);
+  assert.ok(!guide.includes('type="submit"'));
+  assert.equal([...guide.matchAll(/<h1\b/g)].length, 1);
+  assert.ok(guide.includes(route.startsWith('en/') ? 'not the university administration' : '大学当局の公式案内ではありません'));
+}
