@@ -1,0 +1,90 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from './PageHero.astro';
+import { club } from '../data/club';
+interface Props { lang?: 'ja' | 'en'; }
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+const local = (path: string) => en ? `/en${path}` : path;
+const title = en ? 'KUAS campus photography guide' : '京都先端科学大学のキャンパス撮影ガイド';
+const missions = en ? [
+  { title: 'One scene, three frames', time: '5 MIN', steps: ['Choose a subject from a place where photography is allowed.', 'Take a wide view, a medium view and a detail. Keep your feet clear of paths and doors.', 'Compare the three photos. Which one tells a viewer where you are, and which shows what caught your attention?'], lesson: 'focal-length', label: 'Learn framing and focal length' },
+  { title: 'Find the light, not the filter', time: '5 MIN', steps: ['Choose a stationary subject in a safe, permitted spot.', 'Photograph it from two directions, without pointing your camera directly at the sun.', 'Compare bright areas, shadows and texture. Tap the subject to focus on a phone, then adjust brightness if your camera app allows it.'], lesson: 'aperture', label: 'Explore focus and background blur' },
+  { title: 'Tell a story in three photos', time: '10 MIN', steps: ['Choose a simple theme: lines, a colour, or a change of scale.', 'Take an establishing view, a detail and a closing image. Avoid identifiable people unless they agree.', 'Select only three images and give them a short caption. Explain what you noticed rather than inventing a story about the people around you.'], lesson: 'darkroom', label: 'Learn about editing' },
+  { title: 'A portrait with permission', time: '10 MIN', steps: ['Ask a friend whether you may photograph them, and separately whether you may share the result.', 'Use a quiet, permitted location with an uncluttered background. Avoid blocking circulation or including other people.', 'Review the photo together. Let your subject choose what may be shared and remove images they do not want you to keep.'], lesson: 'shutter-speed', label: 'Learn to avoid motion blur' },
+] : [
+  { title: '同じ景色を、引き・中・寄りで', time: '5 MIN', steps: ['撮影してよい場所で、ひとつの被写体を選びます。', '全体がわかる「引き」、主役がわかる「中」、細部を見せる「寄り」を1枚ずつ。通路や出入口をふさがない位置で撮りましょう。', '3枚を比べて、場所が伝わる写真と、自分が気になった部分が伝わる写真の違いを見つけます。'], lesson: 'focal-length', label: '画角・焦点距離を学ぶ' },
+  { title: 'フィルターの前に、光を探す', time: '5 MIN', steps: ['安全に立ち止まれる、撮影可能な場所で動かない被写体を選びます。', '太陽にカメラを直接向けず、撮る向きを変えて2枚撮影します。', '明るい部分・影・質感を比較します。スマホなら主役をタップしてピントを合わせ、対応するカメラアプリでは明るさも調整してみましょう。'], lesson: 'aperture', label: 'ピントと背景のぼけを学ぶ' },
+  { title: '3枚で、小さな物語をつくる', time: '10 MIN', steps: ['「線」「同じ色」「大きさの違い」など、ひとつのテーマを決めます。', '場所を伝える1枚、細部の1枚、締めくくりの1枚を撮ります。人が特定できる写真は、本人の了承なしに撮らないようにしましょう。', '3枚だけを選び、短いキャプションを付けます。周りの人について想像で説明するのではなく、自分が何に気づいたかを書いてみます。'], lesson: 'darkroom', label: '写真の仕上げ・現像を学ぶ' },
+  { title: '友だちを、了承を得て撮る', time: '10 MIN', steps: ['撮ってよいかと、公開してよいかは別々に確認します。', '通行や授業の妨げにならない撮影可能な場所で、背景を整理します。ほかの人が写り込まない向きも探しましょう。', '撮った写真を一緒に確認し、公開できるものを本人に選んでもらいます。残してほしくない写真があれば削除します。'], lesson: 'shutter-speed', label: '動きと手ぶれを学ぶ' },
+];
+const checks = en ? [
+  'I have checked whether I may enter and photograph this location today.',
+  'My camera/phone is charged, and I have enough storage.',
+  'I will not block paths, doors or teaching activities.',
+  'I will check faces, name tags, screens and documents before sharing.',
+  'I will confirm permission from the photographer and anyone identifiable before publication.',
+] : [
+  '今日、その場所に入れるか・撮影できるかを確認した',
+  'スマホやカメラの充電と、空き容量を確認した',
+  '通路・出入口・授業の妨げにならない場所を選ぶ',
+  '公開前に、顔・名札・画面・書類の写り込みを確認する',
+  '公開前に、撮影者と写真で特定できる人の了承を確認する',
+];
+---
+<Base lang={lang} title={title} description={en ? 'A student-run guide from KUAS Photography Club: find official information for Uzumasa and Kameoka campuses, try four phone-friendly photography exercises and prepare for a club visit.' : '京都先端科学大学写真部がつくる学生向けガイド。太秦・亀岡キャンパスの確認先、スマホでできる4つの撮影練習、撮影前チェックと写真部の見学方法をまとめました。大学公式の案内ではありません。'}>
+  <PageHero edge="KUAS PHOTOGRAPHY CLUB ▸ FIELD GUIDE" title={en ? 'Campus life,<br />through your lens.' : '京都先端科学大学の<br />キャンパス撮影ガイド'} lead={en ? 'A phone is enough to start noticing light, shapes and everyday scenes. Use this guide to plan a small practice session, then bring your questions to the Photography Club.' : 'いつものキャンパスも、光や形に目を向けると違って見えます。スマホから始められる練習と、写真部に見学するまでの入口をまとめました。'} />
+  <div class="wrap guide">
+    <aside class="notice" aria-label={en ? 'About this guide' : 'このガイドについて'}>
+      <p><strong>{en ? 'Written by KUAS Photography Club, not the university administration.' : 'このページは京都先端科学大学写真部が制作しています。大学当局の公式案内ではありません。'}</strong></p>
+      <p>{en ? 'These are suggested exercises, not announced club events or permission to enter or photograph university facilities. Follow current campus rules and staff instructions. For admissions, access and facility information, use the university links below.' : '以下は練習の提案であり、開催予定の撮影会や、施設への入構・撮影許可を示すものではありません。学内のルールと現場の案内を優先してください。入試・アクセス・施設の最新情報は、下の大学公式ページをご確認ください。'}</p>
+      <p class="small muted">{en ? 'Published 17 November 2026 · Campus source links checked on the same date.' : '公開：2026年11月17日 ／ キャンパス情報の参照先確認日：同日'}</p>
+    </aside>
+    <nav class="toc" aria-label={en ? 'On this page' : 'このページの目次'}>
+      <a href="#campuses">{en ? '01 Campuses' : '01 キャンパスを確認'}</a><a href="#practice">{en ? '02 Photo exercises' : '02 撮影を練習'}</a><a href="#checklist">{en ? '03 Before you go' : '03 持ち物・配慮'}</a><a href="#visit">{en ? '04 Visit the club' : '04 写真部を見学'}</a>
+    </nav>
+    <section id="campuses" aria-labelledby="campuses-title">
+      <p class="edge">01 ▸ KNOW YOUR CAMPUS</p><h2 id="campuses-title">{en ? 'Uzumasa and Kameoka are different campuses.' : '太秦と亀岡。まずは行き先を確認。'}</h2>
+      <p>{en ? 'Check your destination before planning a visit. An illustration or a spot on our 3D map is not a campus access guide. Opening times, event access and photography conditions need their own confirmation.' : '見学や撮影の計画を立てる前に、どちらのキャンパスへ行くのか確認しましょう。このサイトの3D地図やイラストは入構案内ではありません。開館時間・イベント時の入構条件・撮影条件は別途確認が必要です。'}</p>
+      <div class="cards">
+        <article><p class="edge">UZUMASA</p><h3>{en ? 'Kyoto Uzumasa Campus' : '京都太秦キャンパス'}</h3><p>{en ? `The university has a campus in Ukyo-ku, Kyoto. Our regular club meeting location is usually ${club.meetings.room} at Uzumasa; check the schedule and contact us before visiting.` : `京都市右京区にあるキャンパスです。写真部の通常のミーティングは${club.campus}の${club.meetings.room}ですが、休会や教室変更があるため、参加前にスケジュールと運営への確認をお願いします。`}</p><ul><li><a href="https://www.kuas.ac.jp/campus/uzumasa/">{en ? 'University: Uzumasa campus information (Japanese)' : '大学公式：京都太秦キャンパス'}</a></li><li><a href={local('/schedule/')}>{en ? 'Club schedule' : '写真部のスケジュール'}</a></li><li><a href="/trips/spots/kuas/">{en ? 'Our Uzumasa map spot and records (Japanese)' : '写真部サイト：太秦の地図スポットと記録'}</a></li></ul></article>
+        <article><p class="edge">KAMEOKA</p><h3>{en ? 'Kyoto Kameoka Campus' : '京都亀岡キャンパス'}</h3><p>{en ? 'This is a separate campus in Kameoka. Use the university campus information and access guide to plan your journey. A place appearing on our map does not mean that a club meeting or photo outing is scheduled there.' : '亀岡市にある、太秦とは別のキャンパスです。訪問先や交通手段は大学公式のキャンパス情報・アクセス案内で確認してください。地図に掲載されていることと、そこで写真部の活動が予定されていることは別です。'}</p><ul><li><a href="https://www.kuas.ac.jp/campus/kameoka/">{en ? 'University: Kameoka campus information (Japanese)' : '大学公式：京都亀岡キャンパス'}</a></li><li><a href="https://www.kuas.ac.jp/campus/access/">{en ? 'University: access information (Japanese)' : '大学公式：交通アクセス'}</a></li><li><a href="/trips/spots/kameoka/">{en ? 'Our Kameoka map spot and records (Japanese)' : '写真部サイト：亀岡の地図スポットと記録'}</a></li></ul></article>
+      </div>
+    </section>
+    <section id="practice" aria-labelledby="practice-title">
+      <p class="edge">02 ▸ TRY ONE THING</p><h2 id="practice-title">{en ? 'Four exercises, no special camera required.' : '特別なカメラがなくてもできる、4つの練習。'}</h2>
+      <p>{en ? 'The times below are rough practice budgets, not a timetable. Pick one exercise in a permitted location, or try it at home. You do not need to complete them all.' : '所要時間は練習の目安です。撮影可能な場所や自宅で、気になるお題をひとつ選んでみてください。すべてを終わらせる必要はありません。'}</p>
+      <div class="cards missions">{missions.map((mission, i) => <article><p class="edge">{String(i+1).padStart(2,'0')} ▸ {mission.time}</p><h3>{mission.title}</h3><ol>{mission.steps.map(step => <li>{step}</li>)}</ol><a href={local(`/learn/${mission.lesson}/`)}>{mission.label} →</a></article>)}</div>
+      <p><a class="btn" href={local('/learn/')}>{en ? 'Try the interactive photography studio' : 'カメラの設定を、ブラウザの撮影スタジオで試す'} →</a></p>
+    </section>
+    <section id="checklist" aria-labelledby="checklist-title">
+      <p class="edge">03 ▸ READY TO SHOOT</p><h2 id="checklist-title">{en ? 'A quick pre-shoot checklist.' : '撮影前の、小さなチェックリスト。'}</h2>
+      <p>{en ? 'Bring your phone or camera, a charged battery, available storage and weather-appropriate clothing. You do not need to buy equipment to try these exercises.' : 'スマホまたはカメラ、充電、空き容量、天候に合った服装を確認します。この練習のために機材を購入する必要はありません。'}</p>
+      <form class="checklist"><fieldset><legend>{en ? 'Check for yourself; nothing is submitted.' : '自分用の確認欄です。送信されません。'}</legend>{checks.map((text, i) => <label><input type="checkbox" name={`ready-${i}`} /><span>{text}</span></label>)}</fieldset><button class="btn" type="reset">{en ? 'Clear checks' : 'チェックをリセット'}</button></form>
+      <p class="small muted">{en ? 'Do not enter restricted rooms, step into traffic, climb structures or use drones for these exercises. For a planned shoot or publication, ask the relevant organizer or facility about the conditions.' : '立入禁止の部屋への入室、車道への進入、構造物に登ること、ドローンの使用は、この練習では行いません。企画撮影や公開を伴う場合は、主催者・施設にも条件を確認しましょう。'}</p>
+    </section>
+    <section id="visit" aria-labelledby="visit-title" class="notice">
+      <p class="edge">04 ▸ MEET OTHER PHOTOGRAPHERS</p><h2 id="visit-title">{en ? 'Bring one photo and one question.' : '写真1枚と、聞いてみたいことを持って。'}</h2>
+      <p>{en ? 'Interested in a club or circle at Kyoto University of Advanced Science? Our Photography Club welcomes beginners and international students. A smartphone is enough. Check our visit information and contact the organizers before coming; a chat invitation or visit is not formal membership.' : '京都先端科学大学で部活・サークルを探している方へ。写真部は初心者や留学生の見学も歓迎しています。スマホだけでも大丈夫。見学案内を読み、運営に連絡してからお越しください。チャットへの参加や見学だけで正式な入部になるわけではありません。'}</p>
+      <div class="actions"><a class="btn btn--primary" href={local('/join/')}>{en ? 'How to visit / join' : '見学・入部方法を読む'} →</a><a class="btn" href={local('/about/')}>{en ? 'About the club' : '写真部について'}</a><a class="link-arrow" href={local('/contact/')}>{en ? 'Ask the organizers' : '運営に相談する'}</a></div>
+    </section>
+  </div>
+</Base>
+<style>
+.guide { display:grid; gap:56px; padding-bottom:72px; }
+.guide section { scroll-margin-top:100px; display:grid; gap:20px; }
+.guide h2 { font-size:var(--step-3); } .guide h3 { font-size:var(--step-2); }
+.guide p,.guide li { line-height:1.9; } .guide a { overflow-wrap:anywhere; }
+.notice { border:1px solid var(--line); border-radius:var(--radius); background:var(--brand-pale); padding:clamp(20px,4vw,36px); display:grid; gap:12px; }
+.toc,.actions { display:flex; flex-wrap:wrap; gap:16px 24px; align-items:center; }
+.toc { padding-block:12px; border-block:1px solid var(--line); }
+.cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.cards article { border:1px solid var(--line); border-radius:var(--radius); padding:clamp(20px,3vw,32px); background:var(--raise); display:grid; align-content:start; gap:16px; }
+.cards ol,.cards ul { padding-left:1.3em; } .cards li+li { margin-top:12px; }
+.checklist fieldset { margin:0 0 20px; border:1px solid var(--line); border-radius:var(--radius); padding:20px; }
+.checklist legend { padding-inline:8px; font-weight:700; }
+.checklist label { display:flex; align-items:flex-start; gap:12px; padding:12px 0; cursor:pointer; }
+.checklist input { flex:none; width:20px; height:20px; margin-top:5px; accent-color:var(--brand); }
+@media(max-width:700px) { .cards { grid-template-columns:1fr; } .guide { gap:36px; } }
+@media print { .toc,.actions,.checklist button { display:none; } .cards article,.notice { break-inside:avoid; } }
+</style>
