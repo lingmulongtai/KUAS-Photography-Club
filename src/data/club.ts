@@ -4,7 +4,7 @@
  */
 export const club = {
   name: 'KUAS Photography Club',
-  nameJa: '京都先端科学大学 写真部',
+  nameJa: '京都先端科学大学写真部',
   shortJa: 'KUAS 写真部',
   university: '京都先端科学大学',
   campus: '太秦キャンパス',
