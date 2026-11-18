@@ -4,7 +4,6 @@
 
 - 部員数：74名（2026年10月現在）
 - 定例ミーティング：毎週金曜18:00から、通常は太秦キャンパスS306
-- 2026年10月23日は龍尾祭準備のため、通常の定例ミーティングは休会
 - 部費：半期1,000円。撮影会の交通費・入場料等は別途各自負担
 - 運営の役職：部長、副部長、会計
 - 共有カメラ等の機材は整備中。利用できる機材は運営に確認してください
@@ -80,7 +79,6 @@ This website is operated by the Kyoto University of Advanced Science Photography
 
 - 74 members as of October 2026
 - Regular meetings: Fridays from 18:00, usually S306 at Uzumasa Campus; check cancellations and room changes before visiting
-- The regular meeting on October 23, 2026 is cancelled for campus festival preparations
 - Dues: JPY 1,000 per semester; transport, admission and other outing expenses are paid separately by each participant
 - A smartphone is enough. Shared equipment is still being prepared. Members plan outings together
 - Staff, alumni and people outside KUAS should ask about participation and eligibility for formal membership

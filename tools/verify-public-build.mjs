@@ -20,6 +20,8 @@ const byPath = new Map(html);
 for (const spot of SPOTS) assert.ok(byPath.has(`trips/spots/${spot.id}/index.html`), `Missing map spot record page: ${spot.id}`);
 for (const path of ['index.html','en/index.html']) {
   const source=byPath.get(path);
+  assert.ok(source.includes('data-calendar-root')&&source.includes('data-compact="true"'), `Missing live upcoming calendar: ${path}`);
+  assert.ok(!source.includes('2026-10-23'), `Historical cancellation in upcoming homepage HTML: ${path}`);
   assert.deepEqual([...source.matchAll(/<button\b[^>]*data-view="([^"]+)"/g)].map(m=>m[1]),PANORAMA_VIEWS, `Scenic view menu: ${path}`);
   const select=source.match(/<select\b[^>]*id="hero-spot"[^>]*>([\s\S]*?)<\/select>/)?.[1];
   assert.ok(select, `Missing map spot selector: ${path}`);
