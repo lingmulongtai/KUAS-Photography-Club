@@ -10,6 +10,7 @@ test('recurrences honor excluded dates and individually moved instances in JST',
     ['UID:weekly','DTSTAMP:20261001T000000Z','RECURRENCE-ID:20261120T090000Z','SUMMARY:Moved meeting','DTSTART:20261120T110000Z','DTEND:20261120T120000Z'],
   ),now);
   assert.deepEqual(s.events.map(e=>[e.date,e.time]),[['2026-11-06','18:00–19:00'],['2026-11-20','20:00–21:00']]);
+  assert.deepEqual(s.events.map(e=>e.endsAt),['2026-11-06T10:00:00.000Z','2026-11-20T12:00:00.000Z']);
 });
 test('all-day end dates are exclusive and UTC timestamps roll into the JST date',async()=>{
   const s=await parseGoogleSchedule(calendar(
@@ -18,6 +19,8 @@ test('all-day end dates are exclusive and UTC timestamps roll into the JST date'
   ),now);
   assert.deepEqual(s.events.map(e=>e.date),['2026-11-02','2026-11-03','2026-11-04']);
   assert.equal(s.events[0].time,undefined);assert.equal(s.events[2].time,'03:00–04:00');
+  assert.equal(s.events[0].endsAt,'2026-11-03T15:00:00.000Z');
+  assert.equal(s.events[1].endsAt,s.events[0].endsAt);
 });
 test('private and cancelled events and attendee details never enter the public response',async()=>{
   const base=['DTSTAMP:20261001T000000Z','DTSTART:20261106T090000Z','DTEND:20261106T100000Z'];

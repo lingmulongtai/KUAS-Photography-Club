@@ -9,6 +9,8 @@ export interface ScheduleEvent {
   titleEn?: string;
   kind: EventKind;
   time?: string;
+  /** Exclusive end instant from the live calendar, used to expire upcoming entries. */
+  endsAt?: string;
   place?: string;
   note?: string;
   noteEn?: string;

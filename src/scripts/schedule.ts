@@ -1,4 +1,4 @@
-import {scheduleText} from '../lib/schedule-display';
+import {scheduleText,upcomingEvents} from '../lib/schedule-display';
 import type {LiveSchedule} from '../lib/google-schedule';
 import type {ScheduleEvent} from '../lib/schedule';
 
@@ -11,6 +11,7 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
   const lang=root.dataset.lang==='en'?'en':'ja',en=lang==='en',compact=root.dataset.compact==='true';
   const content=root.querySelector<HTMLElement>('[data-calendar-content]')!,status=root.querySelector<HTMLElement>('[data-calendar-status]')!;
   let last='',busy=false;
+  let latest:LiveSchedule|null=null;
   function eventList(events:ScheduleEvent[],today:string) {
     const list=element('ol','calendar-list');
     for(const event of events) {
@@ -25,9 +26,10 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
     return list;
   }
   function render(data:LiveSchedule) {
-    const today=dayString(new Date()),key=today+JSON.stringify(data.events);
+    const now=new Date(),today=dayString(now);
+    const events=compact?upcomingEvents(data.events,now,Number(root.dataset.count)||4):data.events;
+    const key=today+JSON.stringify(events);
     if(key===last)return;last=key;
-    const events=compact?data.events.filter(e=>e.date>=today).slice(0,Number(root.dataset.count)||4):data.events;
     const fragment=document.createDocumentFragment();
     if(compact)fragment.append(eventList(events,today));
     else {
@@ -59,10 +61,11 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
   }
   async function refresh() {
     if(busy||document.hidden)return;busy=true;
+    if(latest)render(latest);
     try {
       const response=await fetch(en?'/api/schedule.json?lang=en':'/api/schedule.json',{signal:AbortSignal.timeout(16000)});
       if(!response.ok)throw new Error('unavailable');
-      const data=await response.json() as LiveSchedule;render(data);
+      const data=await response.json() as LiveSchedule;latest=data;render(data);
       const time=new Intl.DateTimeFormat(en?'en-GB':'ja-JP',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tokyo'}).format(new Date(data.updatedAt));
       status.textContent=en?'Google Calendar · checked '+time+' JST · '+(data.translationStatus==='partial'?'Some titles could not be translated; original text is shown.':'Event titles may be automatically translated.'):'Googleカレンダー連携 · '+time+' 更新';
     }catch{status.textContent=en?'Calendar could not be refreshed. Check Google Calendar for the latest dates.':'カレンダーを更新できませんでした。最新の予定はGoogleカレンダーでご確認ください。';}
