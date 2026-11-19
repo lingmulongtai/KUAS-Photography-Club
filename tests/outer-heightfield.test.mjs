@@ -18,6 +18,23 @@ test('outer terrain extends the bounds while preserving the original basin and l
   assert.deepEqual(old.bounds,far.meta.box);
 });
 
+test('height sampling keeps both outer and basin results while sampling the far grid only once',()=>{
+  let samples=0;
+  const far=grid([-1000,-1000,1000,1000],40),sample=far.sample;
+  far.sample=(x,z)=>{samples++;return sample(x,z);};
+  const near=grid([-400,-400,400,400],80),outer=grid([-3000,-3000,3000,3000],260);
+  const extended=new Heightfield(far,near,undefined,outer),basin=new Heightfield(far,near);
+  assert.equal(extended.height(0,0),80);assert.equal(samples,1);
+  samples=0;
+  assert.equal(extended.height(-850,0),150);assert.equal(samples,1);
+  samples=0;
+  assert.equal(extended.height(-2000,0),260);assert.equal(samples,0,'outside the far grid, blending needs no sample');
+  samples=0;
+  assert.equal(basin.height(0,0),80);assert.equal(samples,1);
+  samples=0;
+  assert.equal(basin.height(-2000,0),0);assert.equal(samples,1);
+});
+
 test('shipped outer data decodes through the runtime and stays within mobile download budgets',async(t)=>{
   const root=new URL('../public/kyoto/',import.meta.url);
   const meta=JSON.parse(await readFile(new URL('terrain.json',root),'utf8'));

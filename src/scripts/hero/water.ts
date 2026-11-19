@@ -5,6 +5,7 @@ import { LINE, type LineFeature } from './lines-data';
 import { ROAD_GLSL } from './roads';
 import {refineWaterSurfaceSteps} from './water-surface';
 import {toLocal} from './geo';
+import {yieldTask} from './task-yield';
 import type {KamoChannel} from './kamo-channel';
 
 const senkoji=toLocal(35.0157751,135.6655983);
@@ -143,7 +144,7 @@ export async function buildWaterAsync(env:Env,hf:Heightfield,lines:LineFeature[]
     while(current()){
       const deadline=performance.now()+5;
       do {const step=steps.next();if(step.done)return step.value;} while(current()&&performance.now()<deadline);
-      await new Promise<void>(resolve=>setTimeout(resolve,0));
+      await yieldTask();
     }
     return null;
   } finally {steps.return(undefined as never);}

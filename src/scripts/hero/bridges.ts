@@ -103,20 +103,30 @@ export function buildBridges(env:Env,hf:Heightfield,lines:LineFeature[],channel:
       void main(){vec3 n=normalize(vNormal);vec3 col=shade(vColor,n,vWorld,sunShadow(vWorld,n));
         gl_FragColor=vec4(applyHaze(col,vec3(.015,.01,.004)*uCity,vWorld),1.);}`});
   const mesh=new THREE.Mesh(geometry,material);
-  // Cars query this every frame, so index the spans instead of searching all bridges.
-  const cells=new Map<string,Bridge[]>();
+  // Cars query this every frame. Sparse numeric rows avoid per-query string keys
+  // without allocating a huge rectangle when distant bridges share an index.
+  type Span={bridge:Bridge;cos:number;sin:number;halfLength:number;halfWidth:number};
+  const cells=new Map<number,Map<number,Span[]>>();
+  let minCellX=Infinity,maxCellX=-Infinity,minCellZ=Infinity,maxCellZ=-Infinity;
   for(const b of bridges) {
+    const angle=b.angle*Math.PI/180;
+    const span={bridge:b,cos:Math.cos(angle),sin:Math.sin(angle),halfLength:b.length/2,halfWidth:b.width/2};
     const r=(b.length+b.width)/2+10;
     for(let x=Math.floor((b.x-r)/100);x<=Math.floor((b.x+r)/100);x++)for(let z=Math.floor((b.z-r)/100);z<=Math.floor((b.z+r)/100);z++) {
-      const key=x+','+z,list=cells.get(key)??[];list.push(b);cells.set(key,list);
+      let row=cells.get(x);if(!row){row=new Map();cells.set(x,row);}
+      const list=row.get(z)??[];list.push(span);row.set(z,list);
+      minCellX=Math.min(minCellX,x);maxCellX=Math.max(maxCellX,x);
+      minCellZ=Math.min(minCellZ,z);maxCellZ=Math.max(maxCellZ,z);
     }
   }
+  const minX=minCellX*100,maxX=(maxCellX+1)*100,minZ=minCellZ*100,maxZ=(maxCellZ+1)*100;
   const heightAt=(x:number,z:number)=>{
-    for(const b of cells.get(Math.floor(x/100)+','+Math.floor(z/100))??[]) {
-      const p=bridgeFrame(b,x,z);
-      if(Math.abs(p.across)>b.width/2||Math.abs(p.along)>b.length/2+8)continue;
-      const t=THREE.MathUtils.clamp((Math.abs(p.along)-b.length/2)/8,0,1);
-      return b.deck+(b.ramps[p.along<0?0:1]-b.deck)*t;
+    if(x<minX||x>=maxX||z<minZ||z>=maxZ)return hf.height(x,z);
+    for(const {bridge:b,cos,sin,halfLength,halfWidth} of cells.get(Math.floor(x/100))?.get(Math.floor(z/100))??[]) {
+      const dx=x-b.x,dz=z-b.z,along=dx*cos+dz*sin,across=-dx*sin+dz*cos;
+      if(Math.abs(across)>halfWidth||Math.abs(along)>halfLength+8)continue;
+      const t=THREE.MathUtils.clamp((Math.abs(along)-halfLength)/8,0,1);
+      return b.deck+(b.ramps[along<0?0:1]-b.deck)*t;
     }
     return hf.height(x,z);
   };
