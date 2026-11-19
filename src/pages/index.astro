@@ -8,12 +8,13 @@ import InstagramSection from '../components/InstagramSection.astro';
 import UpcomingEvents from '../components/UpcomingEvents.astro';
 import { getTrips, reelPhotos } from '../lib/trips';
 import { club } from '../data/club';
+import { homeJa } from '../data/home-ja';
 
 const trips = await getTrips();
 const latest = trips.slice(0, 3);
 const reel = await reelPhotos('ja');
 ---
-<Base overlayHeader description="京都先端科学大学写真部（KUAS Photography Club）が運営する公式サイト。太秦キャンパスでの活動、撮影会、見学・入部方法をご案内します。初心者・留学生歓迎、スマートフォンでも参加できます。">
+<Base overlayHeader documentTitle={homeJa.title} description={homeJa.description}>
   <KyotoHero />
 
   <section id="intro" class="section intro">
