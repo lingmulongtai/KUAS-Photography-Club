@@ -195,13 +195,13 @@ export function createHero(
       return m ? [{ ...r, meta: m }] : [];
     });
     await yieldToBrowser();
-    const normalFar = normalTexture(hf, meta.far);
+    const normalFar = await normalTexture(hf, meta.far);
     await yieldToBrowser();
-    const normalNear = normalTexture(hf, meta.near);
+    const normalNear = await normalTexture(hf, meta.near);
     await yieldToBrowser();
-    const regionalNormal = meta.arashiyama ? normalTexture(hf, meta.arashiyama.elevation) : undefined;
+    const regionalNormal = meta.arashiyama ? await normalTexture(hf, meta.arashiyama.elevation) : undefined;
     await yieldToBrowser();
-    const outerNormal = outer && meta.outer ? normalTexture(hf, meta.outer) : undefined;
+    const outerNormal = outer && meta.outer ? await normalTexture(hf, meta.outer) : undefined;
     await yieldToBrowser();
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
@@ -425,7 +425,7 @@ export function createHero(
       await step();
       if(detailedCampus){
         const campus=buildKameokaCampus(env,hf);group.add(campus);casts(campus);
-        if(meta.kameokaCampus)campusNormal=normalTexture(hf,meta.kameokaCampus.elevation);
+        if(meta.kameokaCampus)campusNormal=await normalTexture(hf,meta.kameokaCampus.elevation);
       }
       await step();
       lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);group.add(lamps.points);
