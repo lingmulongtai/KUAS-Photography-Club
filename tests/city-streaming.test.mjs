@@ -10,6 +10,9 @@ const module={exports:{}},require=createRequire(import.meta.url);
 new Function('require','module','exports',compiled)(id=>id==='three'?THREE:require(id),module,module.exports);
 const {buildCity,buildCityAsync}=module.exports;
 
+// Compare raw bytes: deepEqual walks large typed arrays element by element and exhausts memory on small runners.
+const same=(a,b)=>assert.ok(a.length===b.length&&Buffer.from(a.buffer,a.byteOffset,a.byteLength).equals(Buffer.from(b.buffer,b.byteOffset,b.byteLength)),'geometry attributes match');
+
 test('incremental regional city matches synchronous geometry and releases cancelled work',async()=>{
   const data={boxes:Array.from({length:4000},(_,i)=>({x:(i%100)*18,z:Math.floor(i/100)*20,w:10,d:8,h:6+i%5,angle:0,ground:0,kind:0})),
     polys:Array.from({length:20},(_,i)=>({ring:new Float32Array([i*30,1000,i*30+12,1000,i*30+12,1012,i*30,1012]),h:12,ground:0,kind:1}))};
@@ -18,7 +21,7 @@ test('incremental regional city matches synchronous geometry and releases cancel
   for(let i=0;i<sync.group.children.length;i++){
     const a=sync.group.children[i].geometry,b=slow.group.children[i].geometry;
     assert.equal(a.instanceCount,b.instanceCount);
-    for(const name of Object.keys(a.attributes))assert.deepEqual(b.getAttribute(name).array,a.getAttribute(name).array);
+    for(const name of Object.keys(a.attributes))same(b.getAttribute(name).array,a.getAttribute(name).array);
   }
   // Startup retains the custom facades already supplied by the landmark models.
   const dressed=b=>b.x<180;
@@ -33,11 +36,11 @@ test('incremental regional city matches synchronous geometry and releases cancel
   for(let i=0;i<dressedSync.group.children.length;i++){
     const a=dressedSync.group.children[i].geometry,b=dressedAsync.group.children[i].geometry;
     assert.equal(a.instanceCount,b.instanceCount);
-    for(const name of Object.keys(a.attributes))assert.deepEqual(b.getAttribute(name).array,a.getAttribute(name).array);
+    for(const name of Object.keys(a.attributes))same(b.getAttribute(name).array,a.getAttribute(name).array);
   }
-  let current=true,disposed=0;const dispose=THREE.Material.prototype.dispose;
+  let calls=0,disposed=0;const dispose=THREE.Material.prototype.dispose;
   THREE.Material.prototype.dispose=function(){disposed++;return dispose.call(this);};
-  try {const pending=buildCityAsync({},hf,data,()=>true,.55,()=>current);current=false;
-    assert.equal(await pending,null);assert.ok(disposed>0,'abandoned preparation releases materials');
+  try {const pending=buildCityAsync({},hf,data,()=>true,.55,()=>calls++<1);
+    assert.ok((await pending)===null,'a cancelled build returns nothing');assert.ok(disposed>0,'abandoned preparation releases materials');
   } finally {THREE.Material.prototype.dispose=dispose;}
 });
