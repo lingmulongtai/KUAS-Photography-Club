@@ -63,6 +63,7 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
     let leaveTimer: ReturnType<typeof setTimeout>;
     const close = () => {
       clearTimeout(leaveTimer);
+      if (popup.hidden) return;
       popup.hidden = true;
       node.classList.remove('is-open');
     };
@@ -160,13 +161,12 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
           if (clash) show = false;
           else placed.push(box);
         }
+        // Move focus before inert can remove the disappearing pin from navigation.
+        if (!show && it.node.contains(document.activeElement)) el.querySelector<HTMLElement>('.spot-select, .views [aria-pressed="true"]')?.focus({ preventScroll: true });
         if (show !== it.shown) {
           it.shown = show;
           it.node.classList.toggle('is-shown', show);
-        }
-        if (!show && it.node.contains(document.activeElement)) el.querySelector<HTMLElement>('.spot-select, .views [aria-pressed="true"]')?.focus({ preventScroll: true });
-        it.node.inert = !show;
-        if (it.trigger instanceof HTMLButtonElement) {
+          it.node.inert = !show;
           it.trigger.tabIndex = show ? 0 : -1;
           it.node.setAttribute('aria-hidden', String(!show));
         }
