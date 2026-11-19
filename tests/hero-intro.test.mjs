@@ -9,26 +9,42 @@ const classes=()=>{
   const set=new Set();
   return {add:value=>set.add(value),remove:value=>set.delete(value),contains:value=>set.has(value)};
 };
-function mount({unsupported=false,throws=false,reduced=true,userAgent='Mozilla/5.0',hostname='kuas-photography-club.vercel.app'}={}) {
+function mount({unsupported=false,throws=false,reduced=true,animated=false,userAgent='Mozilla/5.0',hostname='kuas-photography-club.vercel.app'}={}) {
   const document=new EventTarget(),button=new EventTarget(),attributes=new Map(),styles=new Map(),percent={textContent:'00%'};
-  const progress={setAttribute:(key,value)=>attributes.set(key,value)};
+  const animations=[];
+  const animate=(_frames,options)=>{animations.push(options);return {finished:new Promise(()=>{})};};
+  const flash={animate};
+  const progress={setAttribute:(key,value)=>attributes.set(key,value),getBoundingClientRect:()=>({left:100,top:100,width:120,height:120})};
   class Dialog extends EventTarget {
     open=false;closed=0;classList=classes();style={setProperty:(key,value)=>styles.set(key,value)};
+    animate=animated?animate:undefined;
     showModal(){if(throws)throw Error('unsupported state');this.open=true;}
     close(){this.open=false;this.closed++;this.dispatchEvent(new Event('close'));}
-    querySelector(selector){return selector==='button'?button:selector==='.intro-percent'?percent:progress;}
+    querySelector(selector){return selector==='button'?button:selector==='.intro-percent'?percent:selector==='.intro-flash'?flash:progress;}
   }
   const intro=new Dialog();if(unsupported)intro.showModal=undefined;
   document.currentScript={previousElementSibling:intro};document.documentElement={classList:classes()};
-  let timeout,delay,cleared=false,frames=[],clock=0;
+  let delay,cleared=false,frames=[],clock=0,nextTimer=0;
+  const timers=new Map();
+  const advance=ms=>{
+    const end=clock+ms;
+    for(;;){
+      const due=[...timers].sort((a,b)=>a[1].at-b[1].at)[0];
+      if(!due||due[1].at>end+1e-8)break;
+      clock=due[1].at;timers.delete(due[0]);due[1].callback();
+    }
+    clock=end;
+  };
   runInNewContext(script,{document,Event,navigator:{userAgent},location:{hostname},HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
-    performance:{now:()=>clock},
-    setTimeout:(callback,ms)=>{timeout=callback;delay=ms;return 1;},clearTimeout:()=>{cleared=true;},
+    performance:{now:()=>clock},innerWidth:1280,innerHeight:720,
+    setTimeout:(callback,ms)=>{delay=ms;const id=++nextTimer;timers.set(id,{callback,at:clock+ms});return id;},
+    clearTimeout:id=>{cleared=true;timers.delete(id);},
     requestAnimationFrame:callback=>frames.push(callback),cancelAnimationFrame:()=>{frames=[];}});
   const emit=(type,detail)=>document.dispatchEvent(new CustomEvent(type,{detail}));
   // play display frames at 60 fps
-  const run=seconds=>{for(let i=0;i<Math.round(seconds*60);i++){const due=frames;frames=[];clock+=1000/60;due.forEach(frame=>frame(clock));}};
-  return {intro,document,button,attributes,styles,percent,emit,run,get delay(){return delay;},expire:()=>timeout(),get cleared(){return cleared;}};
+  const run=seconds=>{for(let i=0;i<Math.round(seconds*60);i++){const due=frames;frames=[];advance(1000/60);due.forEach(frame=>frame(clock));}};
+  const expire=()=>{const due=[...timers.values()].sort((a,b)=>a.at-b.at)[0];if(due)advance(due.at-clock);};
+  return {intro,document,button,attributes,styles,percent,animations,emit,run,advance,get delay(){return delay;},get scheduledTimers(){return nextTimer;},expire,get cleared(){return cleared;}};
 }
 
 test('deployment screenshots use the still scene while normal browsers retain the intro',()=>{
@@ -76,8 +92,9 @@ test('skip, Escape and a required-data error each dismiss without waiting for a 
   }
 });
 
-test('a missing main bundle cannot block the site beyond ten seconds',()=>{
-  const state=mount();assert.equal(state.delay,10000);state.expire();
+test('a missing main bundle cannot block the site beyond four seconds, even without animation frames',()=>{
+  const state=mount();assert.equal(state.delay,4000);
+  state.advance(3999);assert.equal(state.intro.open,true);state.advance(1);
   assert.equal(state.intro.open,false);assert.ok(state.cleared);
   state.emit('hero:ready');assert.equal(state.intro.closed,1);
 });
@@ -111,7 +128,7 @@ test('readiness lets the count reach 100% before the scene opens, but never hold
   state.run(.7);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
   // frames stop in a background tab: the page still opens soon after readiness
   const stalled=mount({reduced:false});stalled.emit('hero:progress',.3);stalled.emit('hero:ready');
-  assert.equal(stalled.delay,3500);stalled.expire();assert.equal(stalled.intro.open,false);
+  assert.equal(stalled.delay,4000);stalled.expire();assert.equal(stalled.intro.open,false);
   // skipping does not wait for the count
   const skipped=mount({reduced:false});skipped.emit('hero:progress',.4);skipped.emit('hero:ready');
   skipped.button.dispatchEvent(new Event('click'));assert.equal(skipped.intro.open,false);
@@ -131,15 +148,39 @@ test('a fast load plays a continuous short opening without counting ahead of rea
   state.run(1);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
 });
 
-test('progress extends the wait for an active load without hiding a stalled site indefinitely',()=>{
-  const state=mount({reduced:false});state.run(9);state.emit('hero:progress',.2);
-  assert.equal(state.delay,15000);
-  state.run(10);state.emit('hero:progress',.6);assert.ok(state.delay<=11001);
-  state.emit('hero:progress',.6);assert.ok(state.delay<=11001,'duplicate progress does not restart the timer');
-  state.expire();assert.equal(state.intro.open,false);
+test('ongoing progress cannot extend the fixed four-second deadline',()=>{
+  const state=mount({reduced:false});
+  state.advance(1000);state.emit('hero:progress',.2);
+  state.advance(1500);state.emit('hero:progress',.6);
+  state.advance(1499);state.emit('hero:progress',.9);
+  assert.equal(state.intro.open,true);
+  assert.equal(state.scheduledTimers,1,'progress never replaces or extends the original timer');
+  state.advance(1);assert.equal(state.intro.open,false);
+  const percent=state.percent.textContent;
+  state.emit('hero:progress',1);state.emit('hero:ready');state.emit('hero:error');
+  assert.equal(state.intro.closed,1);assert.equal(state.percent.textContent,percent);
 });
 
-test('a late ready event still respects the thirty-second safety limit',()=>{
-  const state=mount({reduced:false});state.run(29.8);state.emit('hero:ready');
-  assert.ok(state.delay<=201);state.expire();assert.equal(state.intro.open,false);
+test('late readiness and duplicate ready events cannot push the count animation past the deadline',()=>{
+  const state=mount({reduced:false});state.run(3.8);state.emit('hero:ready');
+  assert.equal(state.scheduledTimers,1);
+  state.run(.1);state.emit('hero:ready');assert.equal(state.intro.open,true);
+  state.run(.1);assert.equal(state.intro.open,false);assert.equal(state.intro.closed,1);
+});
+
+test('the deadline immediately releases an animated modal without a leaving overlay',()=>{
+  const state=mount({reduced:false,animated:true});
+  state.advance(4000);
+  assert.equal(state.intro.open,false);assert.equal(state.intro.closed,1);
+  assert.equal(state.animations.length,0);
+  assert.equal(state.intro.classList.contains('is-leaving'),false);
+});
+
+test('an early exit closes the modal before its animation and bounds the remaining visual transition',()=>{
+  const state=mount({reduced:false,animated:true});
+  state.advance(3500);state.button.dispatchEvent(new Event('click'));
+  assert.equal(state.intro.open,false);
+  assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false);
+  assert.equal(state.animations.length,2);
+  assert.ok(state.animations.every(({duration,delay=0})=>duration+delay<=500));
 });
