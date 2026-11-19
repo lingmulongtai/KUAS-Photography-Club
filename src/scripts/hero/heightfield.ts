@@ -51,8 +51,11 @@ export class Heightfield {
   height(x: number, z: number) {
     const outer=this.outer?.sample(x,z) ?? NaN;
     const base=Number.isNaN(outer)?0:outer;
-    const f = this.far.sample(x, z);
-    const far = this.outer ? this.blend(this.far,x,z,base,300) : Number.isNaN(f) ? 0 : f;
+    // With an outer grid, blend samples the far grid itself. Do not sample it
+    // once more before discarding that duplicate value on every car/frame.
+    let far:number;
+    if(this.outer) far=this.blend(this.far,x,z,base,300);
+    else { const f=this.far.sample(x,z);far=Number.isNaN(f)?0:f; }
     const near = this.blend(this.near,x,z,far,300);
     const regional=this.regional ? this.blend(this.regional,x,z,near,120) : near;
     return this.campus?this.blend(this.campus,x,z,regional,80):regional;

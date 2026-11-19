@@ -9,25 +9,15 @@ import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
 import type {KamoChannel} from './kamo-channel';
 import { terrainPositions, terrainPositionsAsync } from './terrain-grid';
+import { normalMapBytes } from './normal-map';
 
 /**
  * A normal map baked from an elevation grid, so slopes are lit per pixel no matter how coarse
  * the mesh is out at the far mountains. RGB = normal * 0.5 + 0.5 with y up.
  */
-export function normalTexture(hf: Heightfield, meta: GridMeta) {
-  const { box, step, nx, nz } = meta;
-  const data = new Uint8Array(nx * nz * 4);
-  const n = { x: 0, y: 1, z: 0 };
-  for (let j = 0; j < nz; j++) {
-    for (let i = 0; i < nx; i++) {
-      hf.normal(box[0] + i * step, box[1] + j * step, step, n);
-      const o = (j * nx + i) * 4;
-      data[o] = Math.round((n.x * 0.5 + 0.5) * 255);
-      data[o + 1] = Math.round((n.y * 0.5 + 0.5) * 255);
-      data[o + 2] = Math.round((n.z * 0.5 + 0.5) * 255);
-      data[o + 3] = 255;
-    }
-  }
+export async function normalTexture(hf: Heightfield, meta: GridMeta) {
+  const { nx, nz } = meta;
+  const data = await normalMapBytes(hf, meta);
   const tex = new THREE.DataTexture(data, nx, nz, THREE.RGBAFormat);
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;

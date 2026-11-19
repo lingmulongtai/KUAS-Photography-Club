@@ -20,6 +20,21 @@ test('incremental regional city matches synchronous geometry and releases cancel
     assert.equal(a.instanceCount,b.instanceCount);
     for(const name of Object.keys(a.attributes))assert.deepEqual(b.getAttribute(name).array,a.getAttribute(name).array);
   }
+  // Startup retains the custom facades already supplied by the landmark models.
+  const dressed=b=>b.x<180;
+  const dressedSync=buildCity({},hf,data,()=>true,1,dressed);
+  const dressedAsync=await buildCityAsync({},hf,data,()=>true,1,()=>true,dressed);
+  assert.ok(dressedAsync);
+  for(let frame=0;frame<12;frame++){
+    dressedSync.updateLod({x:50,y:30,z:50});
+    dressedAsync.updateLod({x:50,y:30,z:50});
+  }
+  assert.equal(dressedAsync.group.children.length,dressedSync.group.children.length);
+  for(let i=0;i<dressedSync.group.children.length;i++){
+    const a=dressedSync.group.children[i].geometry,b=dressedAsync.group.children[i].geometry;
+    assert.equal(a.instanceCount,b.instanceCount);
+    for(const name of Object.keys(a.attributes))assert.deepEqual(b.getAttribute(name).array,a.getAttribute(name).array);
+  }
   let current=true,disposed=0;const dispose=THREE.Material.prototype.dispose;
   THREE.Material.prototype.dispose=function(){disposed++;return dispose.call(this);};
   try {const pending=buildCityAsync({},hf,data,()=>true,.55,()=>current);current=false;

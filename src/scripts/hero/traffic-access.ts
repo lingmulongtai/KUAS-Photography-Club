@@ -13,14 +13,36 @@ function inside(x:number,z:number,boundary:readonly Point[]) {
 }
 const xs=GYOEN_OUTLINE.map(p=>p.x),zs=GYOEN_OUTLINE.map(p=>p.z);
 const parkBounds=[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)];
+// The outline is fixed. Only edges spanning the query's z can cross its ray.
+// Padding also retains the original boundary epsilon: a point satisfying the
+// cross/dot boundary test is within sqrt(epsilon) of an endpoint, or epsilon /
+// edge length of its interior. Keep the edges in their original traversal order.
+const bucketSize=32,boundaryEpsilon=1e-5;
+const parkEdges=new Map<number,{a:Point;b:Point;dx:number;dz:number}[]>();
+for(let i=0,j=GYOEN_OUTLINE.length-1;i<GYOEN_OUTLINE.length;j=i++) {
+  const a=GYOEN_OUTLINE[j],b=GYOEN_OUTLINE[i],dx=b.x-a.x,dz=b.z-a.z;
+  const length=Math.hypot(dx,dz),pad=Math.max(Math.sqrt(boundaryEpsilon),length?boundaryEpsilon/length:0);
+  const edge={a,b,dx,dz};
+  for(let bucket=Math.floor((Math.min(a.z,b.z)-pad)/bucketSize);bucket<=Math.floor((Math.max(a.z,b.z)+pad)/bucketSize);bucket++) {
+    const edges=parkEdges.get(bucket)??[];edges.push(edge);parkEdges.set(bucket,edges);
+  }
+}
+function insidePark(x:number,z:number) {
+  let hit=false;
+  for(const {a,b,dx,dz} of parkEdges.get(Math.floor(z/bucketSize))??[]) {
+    if(Math.abs(cross(x-a.x,z-a.z,dx,dz))<1e-5 && (x-a.x)*(x-b.x)+(z-a.z)*(z-b.z)<=1e-5)return false;
+    if((a.z>z)!==(b.z>z)&&x<(b.x-a.x)*(z-a.z)/(b.z-a.z)+a.x)hit=!hit;
+  }
+  return hit;
+}
 /** Limit lane offsets at the park's street corners, smoothly retaining the available lane width. */
 export function trafficLaneFraction(x:number,z:number,dx:number,dz:number) {
   const tx=x+dx,tz=z+dz;
-  if(tx<parkBounds[0]||tx>parkBounds[2]||tz<parkBounds[1]||tz>parkBounds[3]||!inside(tx,tz,GYOEN_OUTLINE))return 1;
+  if(tx<parkBounds[0]||tx>parkBounds[2]||tz<parkBounds[1]||tz>parkBounds[3]||!insidePark(tx,tz))return 1;
   let lo=0,hi=1;
   for(let i=0;i<10;i++) {
     const mid=(lo+hi)/2;
-    if(inside(x+dx*mid,z+dz*mid,GYOEN_OUTLINE))hi=mid;else lo=mid;
+    if(insidePark(x+dx*mid,z+dz*mid))hi=mid;else lo=mid;
   }
   return lo;
 }

@@ -6,14 +6,21 @@ type Point = {x:number;y:number};
 export function* refineWaterSurfaceSteps(input:Point[],faces:number[][],maxEdge:number,maxTriangles=40000,focus?:Point) {
   const points=input.map(p=>({x:p.x,y:p.y}));
   let triangles=faces;
-  const key=(a:number,b:number)=>a<b?`${a},${b}`:`${b},${a}`;
   for(let pass=0;pass<12;pass++) {
-    const mid=new Map<string,number>();
+    // This pass only reads the vertices that existed at its start. Packing their
+    // indices avoids allocating a string for every shared edge; huge inputs retain
+    // the original key so no pair can collide through integer precision loss.
+    const stride=points.length;
+    const key:(a:number,b:number)=>number|string=stride<=94_906_265
+      ? (a,b)=>a<b?a*stride+b:b*stride+a
+      : (a,b)=>a<b?`${a},${b}`:`${b},${a}`;
+    const mid=new Map<number|string,number>();
     let visited=0;
     for(const triangle of triangles) {
       if(++visited%256===0)yield;
       for(let i=0;i<3;i++) {
       const a=triangle[i],b=triangle[(i+1)%3],pa=points[a],pb=points[b],edge=key(a,b);
+      if(mid.has(edge))continue;
       let limit=maxEdge;
       if(focus) {
         const dx=pb.x-pa.x,dy=pb.y-pa.y;
@@ -21,7 +28,7 @@ export function* refineWaterSurfaceSteps(input:Point[],faces:number[][],maxEdge:
         const distance=Math.hypot(pa.x+dx*t-focus.x,pa.y+dy*t-focus.y);
         limit*=1+3*Math.max(0,Math.min(1,(distance-600)/1200));
       }
-      if(!mid.has(edge)&&Math.hypot(pa.x-pb.x,pa.y-pb.y)>limit) {
+      if(Math.hypot(pa.x-pb.x,pa.y-pb.y)>limit) {
         mid.set(edge,points.length);points.push({x:(pa.x+pb.x)/2,y:(pa.y+pb.y)/2});
       }
       }

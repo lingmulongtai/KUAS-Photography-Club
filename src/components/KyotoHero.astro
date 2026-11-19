@@ -23,6 +23,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
 <HeroIntro lang={lang} />
 <section class="hero" aria-labelledby="hero-title" data-view="city" data-lang={lang}>
   <div class="stage hero-stage" data-demo="hero" data-trips={JSON.stringify(pinTrips)}>
+    <picture>
+      <source type="image/webp" srcset="/brand/kyoto-preview-640.webp 640w, /brand/kyoto-preview-960.webp 960w, /brand/kyoto-preview-1250.webp 1250w" sizes="100vw" />
+      <img class="hero-poster" src="/brand/kyoto-thumbnail.jpg" width="1250" height="710" alt="" fetchpriority="high" decoding="async" />
+    </picture>
     <canvas aria-label={en ? 'Explore Kyoto in 3D using real terrain and building data. Drag to look around and select a place to move closer.' : '実際の地形と建物データから作った京都の3D。ドラッグで見回し、地点を選ぶと近づけます。'}></canvas>
     <nav class="views" aria-label={en ? 'Scenic viewpoints' : '展望地点'}>
       <span class="views-label">VIEW</span>
@@ -444,7 +448,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
               });
           },
         })),
-      { maxDpr: quality < 1 ? 1.5 : 2, alwaysOn: false },
+      // The scene already uses a multisampled HDR target. Its final full-screen quad
+      // needs no second antialiasing buffer on the default framebuffer.
+      { maxDpr: quality < 1 ? 1.5 : 2, alwaysOn: false, antialias: false },
     ); } catch (error) { console.warn('Kyoto scene unavailable', error); }
 
     const returnToPanorama=()=>demo?.flyTo(panorama);
@@ -560,6 +566,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
   }
 
   .hero-stage.is-dragging { cursor: grabbing; }
+  .hero-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .hero-stage > canvas { opacity: 0; }
+  .is-ready:not(.no-3d) .hero-stage > canvas { opacity: 1; }
+  .is-ready:not(.no-3d) .hero-poster { opacity: 0; }
   :global(html.screenshot-preview) .hero-stage {
     background: #172332 url('/brand/kyoto-thumbnail.jpg') center / cover no-repeat;
   }

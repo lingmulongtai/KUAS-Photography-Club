@@ -1,8 +1,26 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import * as THREE from 'three';
 import {refineWaterSurface} from '../src/scripts/hero/water-surface.ts';
 import {applyWaterDetail,waterChecksum} from '../src/scripts/hero/water-detail.ts';
+
+test('edge deduplication preserves the original vertices, face order and focus-dependent refinement',()=>{
+  // Digests of the complete pre-optimization result, including every coordinate
+  // and triangle index. Geometry, winding and boundary checks follow below.
+  const cases=[
+    {points:[{x:0,y:0},{x:93,y:0},{x:93,y:71},{x:0,y:71}],faces:[[0,1,2],[0,2,3]],edge:12,
+      sha256:'e7bbf810f82070dc74c0718c51bd46957019e5cd080b118e09eb373e96d9dc50'},
+    {points:[{x:-500,y:-300},{x:2100,y:-300},{x:2100,y:1800},{x:-500,y:1800}],faces:[[0,1,2],[0,2,3]],edge:160,focus:{x:50,y:25},
+      sha256:'eca98aeb4b7a33deb6d6689f955d3a320707a926dfe54c74b4d2e3ecfc85bcca'},
+    {points:[{x:5,y:7},{x:-7,y:-20},{x:88,y:60},{x:999,y:999},{x:88,y:-20},{x:-7,y:60}],faces:[[5,1,4],[5,4,2]],edge:15,
+      sha256:'68974cbc1e5f383cc42d48feaa8d138f6bdcbc24ca0416029d73f1e94abc1f0b'},
+  ];
+  for(const c of cases) {
+    const result=refineWaterSurface(c.points,c.faces,c.edge,40000,c.focus);
+    assert.equal(createHash('sha256').update(JSON.stringify(result)).digest('hex'),c.sha256);
+  }
+});
 
 test('refinement keeps banks and an island hole while bounding every triangle edge',()=>{
   const outer=[[0,0],[80,0],[80,60],[0,60]].map(p=>new THREE.Vector2(...p));

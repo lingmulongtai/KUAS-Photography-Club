@@ -19,7 +19,7 @@ import { buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
-import { buildWater, buildWaterAsync } from './water';
+import { buildWaterAsync } from './water';
 import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
@@ -38,7 +38,7 @@ import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
 import { createIntroCameraMotion } from './intro-camera';
 import { createSharedPhotoSlot } from './shared-photo';
-import { VIEWS, PANORAMA_VIEWS, type ViewDef, type HeroView } from './views';
+import { VIEWS, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
 import { buildOcclusion } from './building-occlusion';
@@ -186,6 +186,12 @@ export function createHero(
     const [hf, wide, outer] = await Promise.all([loading.track(loadHeightfield(meta)), loading.track(loadTexture(wideFile, aniso)),
       loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
         .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : Promise.resolve(null))]);
+    // Download the city while normals and terrain are prepared, rather than
+    // starting a second network waterfall after that CPU work.
+    const waterFiles=[...(meta.arashiyama?[meta.arashiyama.water.file]:[]),'water-kamo.json.gz'];
+    const cityData=Promise.all([loading.track(loadTexture(meta.aerialCity.file, aniso)), loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
+    // Join the original promise below; attach a handler now for an early failure.
+    void cityData.catch(()=>{});
     travelBounds=hf.bounds;
     groundAt = (x, z) => hf.height(x, z);
     eye.copy(eyeOf(VIEW));
@@ -195,13 +201,13 @@ export function createHero(
       return m ? [{ ...r, meta: m }] : [];
     });
     await yieldToBrowser();
-    const normalFar = normalTexture(hf, meta.far);
+    const normalFar = await normalTexture(hf, meta.far);
     await yieldToBrowser();
-    const normalNear = normalTexture(hf, meta.near);
+    const normalNear = await normalTexture(hf, meta.near);
     await yieldToBrowser();
-    const regionalNormal = meta.arashiyama ? normalTexture(hf, meta.arashiyama.elevation) : undefined;
+    const regionalNormal = meta.arashiyama ? await normalTexture(hf, meta.arashiyama.elevation) : undefined;
     await yieldToBrowser();
-    const outerNormal = outer && meta.outer ? normalTexture(hf, meta.outer) : undefined;
+    const outerNormal = outer && meta.outer ? await normalTexture(hf, meta.outer) : undefined;
     await yieldToBrowser();
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
@@ -253,24 +259,14 @@ export function createHero(
     terrainRecenter = terrain.recenter;
     terrainRecenterAsync = center => { void terrain.recenterAsync(center, () => shadow.invalidate()); };
     cancelTerrainRecenter = terrain.cancelRecenter;
-    // Warm only the scenic views. Map destinations are prepared when visited,
-    // so adding places does not make phones build every terrain mesh at startup.
+    // Prepare other viewpoints only when visited. Warming all six after startup
+    // blocks scrolling and evicts earlier meshes from the four-entry terrain cache.
     const idle = (cb: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(cb, { timeout: 4000 }) : setTimeout(cb, 500));
-    const pending = PANORAMA_VIEWS.map(id=>VIEWS[id]).filter((v) => v !== VIEW);
-    const prepNext = () => {
-      if (document.documentElement.classList.contains('hero-intro-open')) { setTimeout(prepNext, 250); return; }
-      const v = pending.shift();
-      if (!v) return;
-      terrain.prepare(landscapeCenter(v));
-      idle(prepNext);
-    };
-    idle(prepNext);
     scene.add(terrain.mesh);
     casts(terrain.mesh);
     shadow.invalidate();
     await yieldToBrowser();
-    const waterFiles=[...(meta.arashiyama?[meta.arashiyama.water.file]:[]),'water-kamo.json.gz'];
-    const [cityPhoto, buildings, lines, woodlandBytes] = await Promise.all([loading.track(loadTexture(meta.aerialCity.file, aniso)), loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
+    const [cityPhoto, buildings, lines, woodlandBytes] = await cityData;
     const channel=createKamoChannel(lines,(x,z)=>hf.height(x,z));
     terrain.setChannel(channel,kamoMask(channel));
     const bridges=buildBridges(env,hf,lines,channel);
@@ -302,11 +298,13 @@ export function createHero(
       return !replaced(x/(p.ring.length/2),z/(p.ring.length/2));
     })};
     await yieldToBrowser();
-    const city = buildCity(env, hf, modeledBuildings, (b) =>
+    const city = await buildCityAsync(env, hf, modeledBuildings, (b) =>
       !replaced(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
       opts.quality,
+      () => true,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
     );
+    if (!city) throw new Error('Initial city preparation cancelled');
     await yieldToBrowser();
     const builtSize = lite ? 1024 : 2048;
     env.uBuilt.value = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
@@ -359,7 +357,9 @@ export function createHero(
     await yieldToBrowser();
     terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
     terrain.uniforms.uRoadsOn.value = 1;
-    scene.add(buildWater(env, hf, lines, terrain.uniforms,lite?28:18,channel), buildIslands(env, hf, lines));
+    const water = await buildWaterAsync(env, hf, lines, terrain.uniforms,lite?28:18,channel,false,()=>true);
+    if (water) scene.add(water);
+    scene.add(buildIslands(env, hf, lines));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, opts.lang);
     const lamps = buildLamps(env, streetGround, lines, opts.quality);
     const cars = buildCars(env, streetGround, lines, opts.quality);
@@ -425,7 +425,7 @@ export function createHero(
       await step();
       if(detailedCampus){
         const campus=buildKameokaCampus(env,hf);group.add(campus);casts(campus);
-        if(meta.kameokaCampus)campusNormal=normalTexture(hf,meta.kameokaCampus.elevation);
+        if(meta.kameokaCampus)campusNormal=await normalTexture(hf,meta.kameokaCampus.elevation);
       }
       await step();
       lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);group.add(lamps.points);
@@ -885,10 +885,9 @@ export function createHero(
       setResolution(Math.min(d, pixelRatio < maxDpr && pixelRatio > 0 && lowered ? pixelRatio : d));
     },
     render(t) {
-      // Do not render the unfinished 3D scene behind the opaque opening sequence. Skipping the
-      // intro immediately restores partial rendering, while the completed scene still draws once
-      // before reporting readiness.
-      if (!loading.canDraw && document.documentElement.classList.contains('hero-intro-open')) return;
+      // The poster covers startup. Avoid rendering an invisible, incomplete scene
+      // while the page is already usable; draw once after the complete scene is built.
+      if (!loading.canDraw) return;
       const dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
       clock = t;

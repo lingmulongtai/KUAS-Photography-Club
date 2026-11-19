@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {yieldTask} from './task-yield';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
@@ -697,13 +698,13 @@ export function buildCity(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuildi
 }
 
 /** Keep the renderer responsive while a neighbouring region builds its city. */
-export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean) {
-  const steps=buildCitySteps(env,hf,data,keep,quality,()=>false);
+export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false) {
+  const steps=buildCitySteps(env,hf,data,keep,quality,dressed);
   try {
     while(current()){
       const deadline=performance.now()+5;
       do {const step=steps.next();if(step.done)return step.value;} while(current()&&performance.now()<deadline);
-      await new Promise<void>(resolve=>setTimeout(resolve,0));
+      await yieldTask();
     }
     return null;
   } finally {steps.return(undefined as never);}
