@@ -77,6 +77,7 @@ const city = [
     const progress = intro.querySelector('[role="progressbar"]');
     const percent = intro.querySelector('.intro-percent');
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    const MAX_MODAL_MS = 4000;
     let finished = false;
     let timeout;
     // The picture trails the reported progress. Loading arrives in jumps (15% to 60% at once), and
@@ -102,7 +103,9 @@ const city = [
       if (finished) return;
       finished = true;
       cleanup();
-      const animate = !motion.matches && typeof intro.animate === 'function';
+      // At the deadline release the page immediately, including the visual overlay.
+      const remaining = Math.max(0, openedAt + MAX_MODAL_MS - performance.now());
+      const animate = remaining > 0 && !motion.matches && typeof intro.animate === 'function';
       // measured while the dialog is still laid out
       const box = animate && progress.getBoundingClientRect();
       // Release the modal and scroll immediately; its non-interactive snapshot leaves on its own.
@@ -118,9 +121,11 @@ const city = [
         intro.style.setProperty('--iris-x', `${x}px`);
         intro.style.setProperty('--iris-y', `${y}px`);
         intro.classList.add('is-leaving');
-        intro.querySelector('.intro-flash').animate([{opacity:0},{opacity:.7,offset:.25},{opacity:0}], {duration:420,easing:'ease-out'});
+        const delay = Math.min(90, Math.max(0, remaining - 1000));
+        const duration = Math.min(1000, remaining - delay);
+        intro.querySelector('.intro-flash').animate([{opacity:0},{opacity:.7,offset:.25},{opacity:0}], {duration:Math.min(420,duration),easing:'ease-out'});
         // Without registered custom properties the iris cannot grow; the closing fade still runs.
-        intro.animate([{'--iris':'0px',opacity:1},{opacity:1,offset:.8},{'--iris':`${reach}px`,opacity:0}], {duration:1000,delay:90,easing:'cubic-bezier(.6,0,.3,1)'})
+        intro.animate([{'--iris':'0px',opacity:1},{opacity:1,offset:.8},{'--iris':`${reach}px`,opacity:0}], {duration,delay,easing:'cubic-bezier(.6,0,.3,1)'})
           .finished.catch(() => {}).finally(() => { intro.classList.remove('is-leaving'); gone(); });
       }
     };
@@ -132,6 +137,7 @@ const city = [
     const tick = (now) => {
       frame = 0;
       if (finished) return;
+      if (now >= openedAt + MAX_MODAL_MS) return dismiss();
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
       last = now;
       if (motion.matches) {
@@ -160,17 +166,15 @@ const city = [
     const update = (event) => {
       const value = Math.min(1, Math.max(0, event.detail));
       if (!Number.isFinite(value) || finished || closing) return;
-      if (value > target) {
-        // Active loading gets more time, but a stalled scene still releases the page.
-        clearTimeout(timeout);
-        timeout = setTimeout(dismiss, Math.min(15000, Math.max(0, openedAt + 30000 - performance.now())));
-      }
+      if (performance.now() >= openedAt + MAX_MODAL_MS) return dismiss();
       target = Math.max(target, value);
       progress.setAttribute('aria-valuenow', String(Math.round(target * 100)));
       follow();
     };
     const ready = () => {
-      if (finished) return;
+      if (finished || closing) return;
+      const remaining = openedAt + MAX_MODAL_MS - performance.now();
+      if (remaining <= 0) return dismiss();
       target = 1;
       progress.setAttribute('aria-valuenow', '100');
       if (motion.matches) return dismiss();
@@ -178,9 +182,7 @@ const city = [
       closing = true;
       closeAt = performance.now();
       closeFrom = shown;
-      closeDuration = Math.max(650, openedAt + 2600 - closeAt);
-      clearTimeout(timeout);
-      timeout = setTimeout(dismiss, Math.min(closeDuration + 900, Math.max(0, openedAt + 30000 - closeAt)));
+      closeDuration = Math.min(remaining, Math.max(650, openedAt + 2600 - closeAt));
       follow();
     };
     intro.querySelector('button').addEventListener('click', dismiss);
@@ -193,8 +195,8 @@ const city = [
       intro.showModal();
       openedAt = performance.now();
       root.classList.add('hero-intro-open');
-      // A missing bundle or stalled connection must never hold the site behind an intro.
-      timeout = setTimeout(dismiss, 10000);
+      // One fixed deadline: progress and readiness never extend the modal's lifetime.
+      timeout = setTimeout(dismiss, MAX_MODAL_MS);
     } catch { cleanup(); }
   })();
 </script>

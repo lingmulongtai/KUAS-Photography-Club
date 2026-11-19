@@ -1,20 +1,6 @@
 import type { GridMeta } from './data.ts';
 import type { Heightfield } from './heightfield.ts';
-
-/** Yield a browser task without nested setTimeout's minimum-delay clamp. */
-function yieldTask(): Promise<void> {
-  const scheduler = (globalThis as typeof globalThis & { scheduler?: { yield?: () => Promise<void> } }).scheduler;
-  if (scheduler?.yield) return scheduler.yield();
-  return new Promise(resolve => {
-    const channel = new MessageChannel();
-    channel.port1.onmessage = () => {
-      channel.port1.close();
-      channel.port2.close();
-      resolve();
-    };
-    channel.port2.postMessage(null);
-  });
-}
+import { yieldTask } from './task-yield.ts';
 
 /** Bake the original central-difference normals, sharing heights without rounding them to Float32. */
 export async function normalMapBytes(
