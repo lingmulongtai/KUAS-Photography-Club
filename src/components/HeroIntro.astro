@@ -105,7 +105,10 @@ const city = [
       cleanup();
       // At the deadline release the page immediately, including the visual overlay.
       const remaining = Math.max(0, openedAt + MAX_MODAL_MS - performance.now());
-      const animate = remaining > 0 && !motion.matches && typeof intro.animate === 'function';
+      // Once the scene is ready the page is released at once (the modal closes below), so the opening
+      // may always play out in full, even when loading ran up against the deadline.
+      const full = closing;
+      const animate = (full || remaining > 0) && !motion.matches && typeof intro.animate === 'function';
       // measured while the dialog is still laid out
       const box = animate && progress.getBoundingClientRect();
       // Release the modal and scroll immediately; its non-interactive snapshot leaves on its own.
@@ -121,8 +124,8 @@ const city = [
         intro.style.setProperty('--iris-x', `${x}px`);
         intro.style.setProperty('--iris-y', `${y}px`);
         intro.classList.add('is-leaving');
-        const delay = Math.min(90, Math.max(0, remaining - 1000));
-        const duration = Math.min(1000, remaining - delay);
+        const delay = full ? 0 : Math.min(90, Math.max(0, remaining - 1000));
+        const duration = full ? 900 : Math.min(1000, remaining - delay);
         intro.querySelector('.intro-flash').animate([{opacity:0},{opacity:.7,offset:.25},{opacity:0}], {duration:Math.min(420,duration),easing:'ease-out'});
         // Without registered custom properties the iris cannot grow; the closing fade still runs.
         intro.animate([{'--iris':'0px',opacity:1},{opacity:1,offset:.8},{'--iris':`${reach}px`,opacity:0}], {duration,delay,easing:'cubic-bezier(.6,0,.3,1)'})
@@ -147,10 +150,11 @@ const city = [
         shown = Math.max(shown, closeFrom + (1 - closeFrom) * p * p * (3 - 2 * p));
       } else {
         // Ease through real loading milestones without allowing the count to run ahead.
-        const want = Math.min((target - shown) * 4, 0.6);
-        speed += (want - speed) * (1 - Math.exp(-dt * 10));
+        // Slow and soft: a low speed ceiling and a gentle spring read as a steady glide, not steps.
+        const want = Math.min((target - shown) * 3, 0.35);
+        speed += (want - speed) * (1 - Math.exp(-dt * 5));
         shown = Math.min(target, shown + Math.max(speed, 0) * dt);
-        if (target - shown < 0.002) shown = target;
+        if (target - shown < 0.004) shown = target;
       }
       show();
       if (closing && (motion.matches || now >= closeAt + closeDuration)) dismiss();
@@ -221,6 +225,9 @@ const city = [
     overflow: hidden auto;
     color: var(--ink);
     background: var(--band);
+    /* its own layer from the start, so the iris only moves a mask over finished pixels */
+    will-change: mask-image, opacity;
+    backface-visibility: hidden;
   }
   .hero-intro[open], .hero-intro.is-leaving { display: grid; grid-template-rows: minmax(min-content, 1fr) auto auto; }
   .hero-intro:not([open]):not(.is-leaving) { display: none; }
@@ -246,6 +253,7 @@ const city = [
   .intro-emblem img { position: absolute; inset: 0; width: 100%; height: 100%; clip-path: circle(43.5%); }
   .intro-emblem svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .intro-track { fill: none; stroke: #fff; stroke-opacity: .28; stroke-width: 1; stroke-dasharray: 92.8 200; }
+  .intro-emblem, .intro-city-drawing { contain: layout paint; }
   .intro-arc {
     fill: none;
     stroke: #fff;
@@ -256,7 +264,7 @@ const city = [
     stroke-dashoffset: calc(101 - 93.8 * var(--progress));
   }
   /* the logo's dot leads the line and settles in the gap */
-  .intro-dot { transform-box: view-box; transform-origin: 50% 50%; transform: rotate(calc(-26deg + 342deg * var(--progress))); }
+  .intro-dot { transform-box: view-box; transform-origin: 50% 50%; transform: rotate(calc(-26deg + 342deg * var(--progress))); will-change: transform; }
   .intro-dot circle { fill: #fff; }
   .intro-title {
     margin-top: clamp(14px, 2.8vh, 28px);
