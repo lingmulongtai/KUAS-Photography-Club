@@ -448,7 +448,9 @@ const pinTrips = completeSpotPreviews((await getTrips())
               });
           },
         })),
-      { maxDpr: quality < 1 ? 1.5 : 2, alwaysOn: false },
+      // The scene already uses a multisampled HDR target. Its final full-screen quad
+      // needs no second antialiasing buffer on the default framebuffer.
+      { maxDpr: quality < 1 ? 1.5 : 2, alwaysOn: false, antialias: false },
     ); } catch (error) { console.warn('Kyoto scene unavailable', error); }
 
     const returnToPanorama=()=>demo?.flyTo(panorama);
