@@ -184,3 +184,11 @@ test('an early exit closes the modal before its animation and bounds the remaini
   assert.equal(state.animations.length,2);
   assert.ok(state.animations.every(({duration,delay=0})=>duration+delay<=500));
 });
+
+test('a late but successful load still plays the whole opening instead of skipping it',()=>{
+  const state=mount({reduced:false,animated:true});
+  state.run(3.8);state.emit('hero:ready');state.run(.4);
+  assert.equal(state.intro.open,false);
+  assert.equal(state.animations.length,2);
+  assert.ok(state.animations.some(({duration})=>duration===900),'the iris keeps its full length');
+});
