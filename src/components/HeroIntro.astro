@@ -41,9 +41,17 @@ const city = [
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <!-- the logo's open circle: it starts below its gap and stops short of it -->
         <circle class="intro-track" cx="50" cy="50" r="47" pathLength="100" transform="rotate(-26 50 50)" />
-        <circle class="intro-arc" cx="50" cy="50" r="47" pathLength="100" transform="rotate(-26 50 50)" />
-        <g class="intro-dot"><circle cx="97" cy="50" r="2.3" /></g>
       </svg>
+      <!--
+        The bright line is two half rings, each turning into view inside its own half of the circle.
+        Only transforms move, so the browser's compositor keeps drawing them while the scenery is
+        being built on the main thread.
+      -->
+      <div class="intro-ring" aria-hidden="true">
+        <div class="intro-half is-low"><div class="intro-turn"><svg viewBox="0 0 100 100"><path d="M97 50 A47 47 0 0 1 3 50" /></svg></div></div>
+        <div class="intro-half is-high"><div class="intro-turn"><svg viewBox="0 0 100 100"><path d="M3 50 A47 47 0 0 1 97 50" /></svg></div></div>
+        <div class="intro-turn intro-ring-dot"><span></span></div>
+      </div>
     </div>
     <p id="intro-title" class:list={['intro-title', { 'is-latin': en }]} tabindex="-1" autofocus>{en ? 'KUAS Photography Club' : '写真部'}</p>
     <p class="intro-name">{en ? '— Kyoto University of Advanced Science —' : '— KUAS Photography Club —'}</p>
@@ -58,6 +66,7 @@ const city = [
     <p role="status">{en ? 'Preparing Kyoto’s scenery' : '京都の景色を準備しています'}<span class="intro-percent" aria-hidden="true">00%</span></p>
     <button type="button" class="intro-skip">{en ? 'Enter the site now' : '待たずにサイトを見る'} <span aria-hidden="true">↗</span></button>
   </div>
+  <span class="intro-iris" aria-hidden="true"></span>
   <span class="intro-flash" aria-hidden="true"></span>
 </dialog>
 <script is:inline>
@@ -76,20 +85,64 @@ const city = [
     const root = document.documentElement;
     const progress = intro.querySelector('[role="progressbar"]');
     const percent = intro.querySelector('.intro-percent');
+    const iris = intro.querySelector('.intro-iris');
+    const flash = intro.querySelector('.intro-flash');
+    const turns = [intro.querySelector('.is-low .intro-turn'), intro.querySelector('.is-high .intro-turn'), intro.querySelector('.intro-ring-dot')];
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
     const MAX_MODAL_MS = 4000;
+    const animates = el => !!el && typeof el.animate === 'function';
+    const ringOnCompositor = turns.every(animates);
     let finished = false;
     let timeout;
-    // The picture trails the reported progress. Loading arrives in jumps (15% to 60% at once), and
-    // the circle, the city and the count should draw through them rather than snap.
+    // Loading arrives in jumps (15% to 60% at once). The picture glides through them along a
+    // curve fixed in time, so the ring can be handed to the compositor and keep moving even
+    // while the scenery is built on the main thread.
     let target = 0;
     let shown = 0;
-    let speed = 0;
-    let last = 0;
     let frame = 0;
     let closing = false;
     let openedAt = 0;
-    let closeAt = 0, closeFrom = 0, closeDuration = 0;
+    let closeAt = 0, closeDuration = 0;
+    const easeOut = t => 1 - (1 - t) ** 3;
+    const smooth = t => t * t * (3 - 2 * t);
+    let glide = {from: 0, to: 0, start: 0, duration: 1, ease: easeOut};
+    const at = now => {
+      const t = Math.min(1, Math.max(0, (now - glide.start) / glide.duration));
+      return glide.from + (glide.to - glide.from) * glide.ease(t);
+    };
+    // The bright line runs about 94% of the way round, the length of the logo's; the dot leads it
+    // and settles in the gap.
+    const SWEEP = 337.7, LEAD = 3.6, HALF = (180 + LEAD) / SWEEP;
+    const pose = p => {
+      const sweep = Math.max(0, SWEEP * p - LEAD);
+      return [`rotate(${Math.min(sweep, 180) - 180}deg)`, `rotate(${Math.max(0, sweep - 180) - 180}deg)`, `rotate(${342 * p}deg)`];
+    };
+    const place = p => pose(p).forEach((transform, i) => { if (turns[i]?.style) turns[i].style.transform = transform; });
+    let ring = [];
+    const glideTo = (to, duration, ease) => {
+      const now = performance.now();
+      const from = at(now);
+      glide = {from, to, start: now, duration, ease};
+      if (motion.matches || !ringOnCompositor) return;
+      ring.forEach(animation => animation.cancel());
+      // The eased path is sampled finely, with an exact stop where the line passes halfway, so the
+      // two half rings hand over without a gap.
+      const offsets = Array.from({length: 25}, (_, i) => i / 24);
+      if (from < HALF && to > HALF) {
+        let lo = 0, hi = 1;
+        for (let k = 0; k < 24; k++) { const mid = (lo + hi) / 2; if (from + (to - from) * ease(mid) < HALF) lo = mid; else hi = mid; }
+        offsets.push(hi);
+        offsets.sort((a, b) => a - b);
+      }
+      const frames = turns.map(() => []);
+      for (const offset of offsets) pose(from + (to - from) * ease(offset)).forEach((transform, i) => frames[i].push({transform, offset}));
+      ring = turns.map((el, i) => {
+        const animation = el.animate(frames[i], {duration, fill: 'both'});
+        // Pin the start to the same clock as the count, even if the main thread is busy now.
+        try { animation.startTime = now; } catch {}
+        return animation;
+      });
+    };
     const cleanup = () => {
       clearTimeout(timeout);
       if (frame) cancelAnimationFrame(frame);
@@ -97,65 +150,58 @@ const city = [
       root.classList.remove('hero-intro-open');
       document.removeEventListener('hero:progress', update);
       document.removeEventListener('hero:ready', ready);
-      document.removeEventListener('hero:error', dismiss);
+      document.removeEventListener('hero:error', fail);
     };
-    const dismiss = () => {
+    // Every way out releases the page at once. Unless motion is reduced, the logo's circle then
+    // opens like an iris onto Kyoto: a full opening once the wait is over (the scene is ready or
+    // the four seconds have run out), a brisk one when the visitor chose to skip.
+    const dismiss = (brisk = false) => {
       if (finished) return;
       finished = true;
       cleanup();
-      // At the deadline release the page immediately, including the visual overlay.
-      const remaining = Math.max(0, openedAt + MAX_MODAL_MS - performance.now());
-      const animate = remaining > 0 && !motion.matches && typeof intro.animate === 'function';
+      const animate = !motion.matches && animates(iris);
       // measured while the dialog is still laid out
       const box = animate && progress.getBoundingClientRect();
-      // Release the modal and scroll immediately; its non-interactive snapshot leaves on its own.
       intro.close();
       // the page can greet the visitor once the intro is out of the way
       const gone = () => document.dispatchEvent(new Event('hero:intro-done'));
-      if (!animate) gone();
-      else {
-        // A shutter flash, then the logo's circle opens like an iris onto Kyoto.
-        const x = box.left + box.width / 2;
-        const y = box.top + box.height / 2;
-        const reach = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-        intro.style.setProperty('--iris-x', `${x}px`);
-        intro.style.setProperty('--iris-y', `${y}px`);
-        intro.classList.add('is-leaving');
-        const delay = Math.min(90, Math.max(0, remaining - 1000));
-        const duration = Math.min(1000, remaining - delay);
-        intro.querySelector('.intro-flash').animate([{opacity:0},{opacity:.7,offset:.25},{opacity:0}], {duration:Math.min(420,duration),easing:'ease-out'});
-        // Without registered custom properties the iris cannot grow; the closing fade still runs.
-        intro.animate([{'--iris':'0px',opacity:1},{opacity:1,offset:.8},{'--iris':`${reach}px`,opacity:0}], {duration,delay,easing:'cubic-bezier(.6,0,.3,1)'})
-          .finished.catch(() => {}).finally(() => { intro.classList.remove('is-leaving'); gone(); });
+      if (!animate) return gone();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const w = innerWidth, h = innerHeight;
+      // The hole starts just inside the logo, under the picture, and grows by scaling alone.
+      const hole = Math.max(8, box.width / 2 * .86);
+      const half = Math.ceil(Math.max(x, w - x, y, h - y)) + 2;
+      const reach = Math.hypot(Math.max(x, w - x), Math.max(y, h - y)) + 4;
+      const style = iris.style;
+      style.left = `${x - half}px`;
+      style.top = `${y - half}px`;
+      style.width = style.height = `${2 * half}px`;
+      style.setProperty('--hole', `${hole}px`);
+      intro.classList.add('is-leaving');
+      const duration = brisk ? 550 : 900;
+      if (animates(flash)) flash.animate([{opacity: 0}, {opacity: .7, offset: .25}, {opacity: 0}], {duration: Math.min(420, duration / 2), easing: 'ease-out'});
+      for (const part of ['.intro-head', '.intro-city', '.intro-foot'].map(selector => intro.querySelector(selector))) {
+        if (animates(part)) part.animate([{opacity: 1, transform: 'scale(1)'}, {opacity: 0, transform: 'scale(1.05)'}], {duration: duration * .45, easing: 'ease-in', fill: 'forwards'});
       }
+      iris.animate([{transform: 'scale(1)'}, {transform: `scale(${reach / hole})`}], {duration, easing: 'cubic-bezier(.55,0,.25,1)', fill: 'forwards'})
+        .finished.catch(() => {}).finally(() => { intro.classList.remove('is-leaving'); gone(); });
     };
+    const fail = () => dismiss(true);
     const show = () => {
-      // The circle and the city both draw from this.
+      // The city draws from this; the ring follows the same curve on the compositor.
       intro.style.setProperty('--progress', String(Math.round(shown * 1000) / 1000));
       percent.textContent = `${String(Math.round(shown * 100)).padStart(2, '0')}%`;
+      if (motion.matches || !ringOnCompositor) place(shown);
     };
     const tick = (now) => {
       frame = 0;
       if (finished) return;
       if (now >= openedAt + MAX_MODAL_MS) return dismiss();
-      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
-      last = now;
-      if (motion.matches) {
-        shown = target;
-      } else if (closing) {
-        const p = Math.min(1, Math.max(0, (now - closeAt) / closeDuration));
-        shown = Math.max(shown, closeFrom + (1 - closeFrom) * p * p * (3 - 2 * p));
-      } else {
-        // Ease through real loading milestones without allowing the count to run ahead.
-        const want = Math.min((target - shown) * 4, 0.6);
-        speed += (want - speed) * (1 - Math.exp(-dt * 10));
-        shown = Math.min(target, shown + Math.max(speed, 0) * dt);
-        if (target - shown < 0.002) shown = target;
-      }
+      shown = motion.matches ? target : Math.min(target, at(now));
       show();
       if (closing && (motion.matches || now >= closeAt + closeDuration)) dismiss();
       else if (closing || shown < target) frame = requestAnimationFrame(tick);
-      else last = speed = 0;
     };
     const follow = () => {
       if (motion.matches) {
@@ -167,8 +213,12 @@ const city = [
       const value = Math.min(1, Math.max(0, event.detail));
       if (!Number.isFinite(value) || finished || closing) return;
       if (performance.now() >= openedAt + MAX_MODAL_MS) return dismiss();
-      target = Math.max(target, value);
+      if (value <= target) return;
+      target = value;
       progress.setAttribute('aria-valuenow', String(Math.round(target * 100)));
+      // slow and soft: about two seconds for the whole circle
+      const gap = target - at(performance.now());
+      glideTo(target, Math.min(1600, Math.max(450, gap * 2200)), easeOut);
       follow();
     };
     const ready = () => {
@@ -181,27 +231,26 @@ const city = [
       // Finish the short opening sequence, even if the scene was ready very quickly.
       closing = true;
       closeAt = performance.now();
-      closeFrom = shown;
       closeDuration = Math.min(remaining, Math.max(650, openedAt + 2600 - closeAt));
+      glideTo(1, closeDuration, smooth);
       follow();
     };
-    intro.querySelector('button').addEventListener('click', dismiss);
-    intro.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
+    intro.querySelector('button').addEventListener('click', () => dismiss(true));
+    intro.addEventListener('cancel', event => { event.preventDefault(); dismiss(true); });
     intro.addEventListener('close', cleanup);
     document.addEventListener('hero:progress', update);
     document.addEventListener('hero:ready', ready);
-    document.addEventListener('hero:error', dismiss);
+    document.addEventListener('hero:error', fail);
     try {
       intro.showModal();
       openedAt = performance.now();
       root.classList.add('hero-intro-open');
       // One fixed deadline: progress and readiness never extend the modal's lifetime.
-      timeout = setTimeout(dismiss, MAX_MODAL_MS);
+      timeout = setTimeout(() => dismiss(), MAX_MODAL_MS);
     } catch { cleanup(); }
   })();
 </script>
 <style>
-  @property --iris { syntax: '<length>'; inherits: false; initial-value: 0px; }
   :global(html.hero-intro-open) { overflow: hidden; }
 
   /* the logo: a white open circle round the photographer, 写真部 beneath, all on the club's teal */
@@ -226,12 +275,12 @@ const city = [
   .hero-intro:not([open]):not(.is-leaving) { display: none; }
   .hero-intro::backdrop { background: var(--band, #64bec6); }
   .hero-intro::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .12; background: radial-gradient(ellipse at 50% 45%, #fff, transparent 60%); }
-  .is-leaving {
-    z-index: 100;
-    pointer-events: none;
-    -webkit-mask-image: radial-gradient(circle at var(--iris-x) var(--iris-y), transparent var(--iris), #000 calc(var(--iris) + 1px));
-    mask-image: radial-gradient(circle at var(--iris-x) var(--iris-y), transparent var(--iris), #000 calc(var(--iris) + 1px));
-  }
+  /* Leaving, the teal comes from the iris alone: a ring of colour round a hole, only ever scaled. */
+  .is-leaving { z-index: 100; pointer-events: none; background: transparent; }
+  .is-leaving::before { display: none; }
+  .intro-iris { display: none; position: fixed; z-index: -1; border-radius: 50%; pointer-events: none; will-change: transform; background: radial-gradient(circle at center, transparent var(--hole, 0px), var(--band) calc(var(--hole, 0px) + .75px)); }
+  .is-leaving .intro-iris { display: block; }
+  .is-leaving .intro-head, .is-leaving .intro-city, .is-leaving .intro-foot { will-change: opacity, transform; }
 
   .intro-head {
     display: grid;
@@ -246,18 +295,16 @@ const city = [
   .intro-emblem img { position: absolute; inset: 0; width: 100%; height: 100%; clip-path: circle(43.5%); }
   .intro-emblem svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .intro-track { fill: none; stroke: #fff; stroke-opacity: .28; stroke-width: 1; stroke-dasharray: 92.8 200; }
-  .intro-arc {
-    fill: none;
-    stroke: #fff;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-dasharray: 100 200;
-    /* about 93% of the circle, the length of the logo's */
-    stroke-dashoffset: calc(101 - 93.8 * var(--progress));
-  }
-  /* the logo's dot leads the line and settles in the gap */
-  .intro-dot { transform-box: view-box; transform-origin: 50% 50%; transform: rotate(calc(-26deg + 342deg * var(--progress))); }
-  .intro-dot circle { fill: #fff; }
+  .intro-city-drawing { contain: layout paint; }
+  /* turned so the line starts below the logo's gap */
+  .intro-ring { position: absolute; inset: 0; transform: rotate(-26deg); pointer-events: none; }
+  .intro-half { position: absolute; inset: 0; }
+  .intro-half.is-low { clip-path: inset(50% 0 0 0); }
+  .intro-half.is-high { clip-path: inset(0 0 50% 0); }
+  .intro-turn { position: absolute; inset: 0; will-change: transform; }
+  .intro-half .intro-turn { transform: rotate(-180deg); }
+  .intro-turn path { fill: none; stroke: #fff; stroke-width: 1.5; stroke-linecap: round; }
+  .intro-ring-dot span { position: absolute; left: 94.7%; top: 47.7%; width: 4.6%; height: 4.6%; border-radius: 50%; background: #fff; }
   .intro-title {
     margin-top: clamp(14px, 2.8vh, 28px);
     font: 400 clamp(30px, 5.6vw, 44px)/1.2 var(--display);
@@ -332,7 +379,7 @@ const city = [
       .hero-intro:is([open], .is-leaving) .intro-city-drawing path:not(.hide) { stroke-dashoffset: 0; }
       .hero-intro:is([open], .is-leaving) .intro-city-drawing .hide { fill-opacity: 1; }
     }
-    .intro-dot circle { transform-box: fill-box; transform-origin: center; animation: intro-pulse 1.4s ease-in-out infinite alternate; }
+    .intro-ring-dot span { animation: intro-pulse 1.4s ease-in-out infinite alternate; }
   }
   @keyframes intro-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
   @keyframes intro-light { from { opacity: .03; transform: scale(.9); } to { opacity: .12; transform: scale(1); } }
