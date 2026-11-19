@@ -10,6 +10,8 @@ import SpeedInsights from '@vercel/speed-insights/astro';
 interface Props {
   /** Page name. The club name is appended automatically. */
   title?: string;
+  /** Complete document title when a page needs an exact brand spelling. */
+  documentTitle?: string;
   description?: string;
   /** Let the header float over a full-bleed hero (top page). */
   overlayHeader?: boolean;
@@ -21,6 +23,7 @@ interface Props {
 
 const {
   title,
+  documentTitle,
   description = '京都先端科学大学の写真部「KUAS Photography Club」。写真部が運営するサイトです。活動・入部のご案内と、シャッタースピード・絞り・焦点距離・現像など写真の基礎を、触って学べるページを公開しています。',
   overlayHeader = false,
   lang = 'ja',
@@ -29,7 +32,7 @@ const {
 } = Astro.props;
 
 const siteName = lang === 'en' ? club.name : club.nameJa;
-const fullTitle = title ? `${title} | ${siteName}` : `${siteName} | ${lang === 'en' ? club.nameJa : club.name}`;
+const fullTitle = documentTitle ?? (title ? `${title} | ${siteName}` : `${siteName} | ${lang === 'en' ? club.nameJa : club.name}`);
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const japanesePath = languagePath(Astro.url.pathname, 'ja');
 const englishPath = languagePath(Astro.url.pathname, 'en');
@@ -51,7 +54,7 @@ const structuredData = {
       '@id': `${homeUrl}#website`,
       url: homeUrl,
       name: club.nameJa,
-      alternateName: club.name,
+      alternateName: [club.shortJa, club.name],
       inLanguage: ['ja', 'en'],
       publisher: { '@id': `${homeUrl}#organization` },
     },
@@ -89,7 +92,7 @@ const hasLanguagePair = languagePath(englishPath, 'ja') === japanesePath;
     </script>
 
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content={siteName} />
+    <meta property="og:site_name" content={club.nameJa} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />

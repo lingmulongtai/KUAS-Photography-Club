@@ -36,15 +36,18 @@ function verify(dir) {
     assert.equal(graph[0]['@type'], 'Organization');
     assert.equal(graph[1]['@type'], 'WebSite');
     assert.equal(graph[1].url, origin + '/');
+    assert.equal(graph[1].name, '京都先端科学大学写真部');
+    assert.deepEqual(graph[1].alternateName, ['KUAS 写真部', 'KUAS Photography Club']);
+    assert.match(html, /<meta property="og:site_name" content="京都先端科学大学写真部"/);
   }
 }
 verify(root);
 assert.ok(readFileSync(join(root, 'robots.txt'), 'utf8').includes(`Sitemap: ${origin}/sitemap-index.xml`));
-assert.match(readFileSync(join(root, 'index.html'), 'utf8'), /<title>京都先端科学大学写真部 \| KUAS Photography Club<\/title>/);
+assert.match(readFileSync(join(root, 'index.html'), 'utf8'), /<title>京都先端科学大学写真部📸\(KUAS Photography Club\)<\/title>/);
 console.log(`SEO build verified: ${urls.size} public sitemap URLs, canonical/hreflang targets and JSON-LD.`);
 
 const home = readFileSync(join(root, 'index.html'), 'utf8');
 const mainHeading = home.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, '');
 assert.equal(mainHeading, '京都先端科学大学写真部', 'Homepage must clearly identify the club in its main heading');
-assert.match(home, /<meta name="description" content="京都先端科学大学写真部（KUAS Photography Club）/);
+assert.match(home, /<meta name="description" content="京都先端科学大学 写真部 カメラを持ってなくても大丈夫！/);
 assert.match(home, /name="google-site-verification"/);
