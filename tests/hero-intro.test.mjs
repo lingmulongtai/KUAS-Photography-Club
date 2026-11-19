@@ -11,16 +11,22 @@ const classes=()=>{
 };
 function mount({unsupported=false,throws=false,reduced=true,animated=false,userAgent='Mozilla/5.0',hostname='kuas-photography-club.vercel.app'}={}) {
   const document=new EventTarget(),button=new EventTarget(),attributes=new Map(),styles=new Map(),percent={textContent:'00%'};
-  const animations=[];
-  const animate=(_frames,options)=>{animations.push(options);return {finished:new Promise(()=>{})};};
+  const animations=[],ring=[];
+  const animate=(_frames,options)=>{animations.push(options);return {finished:new Promise(()=>{}),cancel(){}};};
   const flash={animate};
+  const element=()=>({style:{setProperty(){}},animate:animated?animate:undefined});
+  const iris=element(),parts={'.intro-head':element(),'.intro-city':element(),'.intro-foot':element()};
+  // the ring's half turns and its dot: their compositor animations are kept apart from the exit's
+  const turn=()=>({style:{},animate:animated?(frames,options)=>{ring.push({frames,options});return {cancel(){},startTime:0};}:undefined});
+  const turns={'.is-low .intro-turn':turn(),'.is-high .intro-turn':turn(),'.intro-ring-dot':turn()};
   const progress={setAttribute:(key,value)=>attributes.set(key,value),getBoundingClientRect:()=>({left:100,top:100,width:120,height:120})};
   class Dialog extends EventTarget {
     open=false;closed=0;classList=classes();style={setProperty:(key,value)=>styles.set(key,value)};
     animate=animated?animate:undefined;
     showModal(){if(throws)throw Error('unsupported state');this.open=true;}
     close(){this.open=false;this.closed++;this.dispatchEvent(new Event('close'));}
-    querySelector(selector){return selector==='button'?button:selector==='.intro-percent'?percent:selector==='.intro-flash'?flash:progress;}
+    querySelector(selector){return selector==='button'?button:selector==='.intro-percent'?percent:selector==='.intro-flash'?flash:
+      selector==='.intro-iris'?iris:parts[selector]??turns[selector]??progress;}
   }
   const intro=new Dialog();if(unsupported)intro.showModal=undefined;
   document.currentScript={previousElementSibling:intro};document.documentElement={classList:classes()};
@@ -44,7 +50,7 @@ function mount({unsupported=false,throws=false,reduced=true,animated=false,userA
   // play display frames at 60 fps
   const run=seconds=>{for(let i=0;i<Math.round(seconds*60);i++){const due=frames;frames=[];advance(1000/60);due.forEach(frame=>frame(clock));}};
   const expire=()=>{const due=[...timers.values()].sort((a,b)=>a.at-b.at)[0];if(due)advance(due.at-clock);};
-  return {intro,document,button,attributes,styles,percent,animations,emit,run,advance,get delay(){return delay;},get scheduledTimers(){return nextTimer;},expire,get cleared(){return cleared;}};
+  return {intro,document,button,attributes,styles,percent,animations,ring,turns,emit,run,advance,get delay(){return delay;},get scheduledTimers(){return nextTimer;},expire,get cleared(){return cleared;}};
 }
 
 test('deployment screenshots use the still scene while normal browsers retain the intro',()=>{
@@ -168,12 +174,14 @@ test('late readiness and duplicate ready events cannot push the count animation 
   state.run(.1);assert.equal(state.intro.open,false);assert.equal(state.intro.closed,1);
 });
 
-test('the deadline immediately releases an animated modal without a leaving overlay',()=>{
+test('the deadline releases the modal at once and still opens onto the page with the iris',()=>{
   const state=mount({reduced:false,animated:true});
+  state.emit('hero:progress',.4);
   state.advance(4000);
   assert.equal(state.intro.open,false);assert.equal(state.intro.closed,1);
-  assert.equal(state.animations.length,0);
-  assert.equal(state.intro.classList.contains('is-leaving'),false);
+  assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false,'scrolling is released immediately');
+  assert.ok(state.intro.classList.contains('is-leaving'),'no cut straight to the page');
+  assert.ok(state.animations.some(({duration})=>duration===900));
 });
 
 test('an early exit closes the modal before its animation and bounds the remaining visual transition',()=>{
@@ -181,14 +189,35 @@ test('an early exit closes the modal before its animation and bounds the remaini
   state.advance(3500);state.button.dispatchEvent(new Event('click'));
   assert.equal(state.intro.open,false);
   assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false);
-  assert.equal(state.animations.length,2);
-  assert.ok(state.animations.every(({duration,delay=0})=>duration+delay<=500));
+  assert.ok(state.animations.length>=2);
+  assert.ok(state.animations.every(({duration,delay=0})=>duration+delay<=550),'a skip opens briskly');
 });
 
 test('a late but successful load still plays the whole opening instead of skipping it',()=>{
   const state=mount({reduced:false,animated:true});
   state.run(3.8);state.emit('hero:ready');state.run(.4);
   assert.equal(state.intro.open,false);
-  assert.equal(state.animations.length,2);
   assert.ok(state.animations.some(({duration})=>duration===900),'the iris keeps its full length');
+});
+
+test('the ring is handed to the compositor as one transform glide per loading step',()=>{
+  const state=mount({reduced:false,animated:true});
+  state.emit('hero:progress',.6);
+  assert.equal(state.ring.length,3,'both half rings and the dot');
+  for(const {frames,options} of state.ring){
+    assert.ok(frames.every(frame=>/^rotate\(-?[\d.e-]+deg\)$/.test(frame.transform)),'transforms only');
+    assert.equal(options.fill,'both');assert.ok(options.duration>=450&&options.duration<=1600);
+  }
+  // the low half is complete and the high half starts exactly when the line passes halfway
+  const [low,high]=state.ring,deg=frame=>parseFloat(frame.transform.slice(7));
+  const handover=low.frames.findIndex(frame=>deg(frame)===0);
+  assert.ok(handover>0);assert.ok(Math.abs(deg(high.frames[handover])+180)<.01);
+  assert.ok(deg(high.frames.at(-1))>-180,'past halfway the high half turns in');
+  state.emit('hero:progress',.5);assert.equal(state.ring.length,3,'no step backwards');
+});
+
+test('without compositor animations the ring is still placed every frame',()=>{
+  const state=mount({reduced:false});
+  state.emit('hero:progress',.3);state.run(2);
+  assert.match(state.turns['.intro-ring-dot'].style.transform,/rotate\(102.6deg\)/);
 });
