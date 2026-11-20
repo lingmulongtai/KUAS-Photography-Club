@@ -344,6 +344,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     `,
   });
   const { mesh, position, setPositions } = terrainTiles(pos, segments, material);
+  // Shade the aerial imagery only where opaque roofs, trees and roads leave ground
+  // visible. At equal depth the overlaid geometry keeps its original priority.
+  mesh.renderOrder = 1;
+  material.depthFunc = THREE.LessDepth;
   // positions for other viewpoints, worked out ahead of time so switching doesn't stall a frame
   const cache = new Map<string, Float32Array>([[`${center.x},${center.z}`, pos]]);
   let generation = 0;
