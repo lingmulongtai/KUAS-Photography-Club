@@ -7,17 +7,21 @@ interface Props {
   exclude?: string;
   heading?: string;
   lang?: SiteLanguage;
+  /** a phone shows the cards as one row to swipe through (the home page) */
+  rail?: boolean;
 }
-const { exclude, heading, lang = 'ja' } = Astro.props;
+const { exclude, heading, lang = 'ja', rail = false } = Astro.props;
 const en = lang === 'en';
 const topics = learnTopics.filter((t) => t.slug !== exclude);
 ---
 <div class="cards-wrap">
   {heading && <h2 class="cards-heading">{heading}</h2>}
-  <ul class="cards">
+  <ul class:list={['cards', { 'is-rail': rail }]} data-learn-cards>
     {topics.map((t) => (
       <li>
         <a class="card" href={`${en ? '/en' : ''}/learn/${t.slug}/`} style={`--fb: ${t.fb}`}>
+          <!-- a few seconds of what the page lets you try: on hover, or when it scrolls into view on a phone -->
+          <span class={`demo demo-${t.slug}`} aria-hidden="true"><i></i><i></i><i></i></span>
           <span class="no">{t.no} ▸ {t.en}</span>
           <span class="title">{en ? t.name : t.title}</span>
           <span class="summary">{en ? t.enSummary : t.summary}</span>
@@ -26,6 +30,21 @@ const topics = learnTopics.filter((t) => t.slug !== exclude);
     ))}
   </ul>
 </div>
+
+<script>
+  // Phones have no hover: play each card's preview once as it comes into view.
+  const touch = matchMedia('(hover: none)');
+  if (touch.matches && 'IntersectionObserver' in window) {
+    const seen = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add('is-playing');
+        seen.unobserve(entry.target);
+      }
+    }, { threshold: 0.6 });
+    document.querySelectorAll('[data-learn-cards] .card').forEach((card) => seen.observe(card));
+  }
+</script>
 
 <style>
   .cards-wrap {
@@ -47,6 +66,9 @@ const topics = learnTopics.filter((t) => t.slug !== exclude);
   }
 
   .card {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
     display: grid;
     align-content: end;
     gap: 6px;
@@ -64,6 +86,66 @@ const topics = learnTopics.filter((t) => t.slug !== exclude);
     transform: translateY(-3px);
     box-shadow: 0 0 0 1px var(--mark);
     color: var(--hud);
+  }
+
+  .card > span:not(.demo) { position: relative; z-index: 1; }
+
+  /* previews: one small motion per topic, still until hovered or seen */
+  .demo { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .demo i { position: absolute; display: block; }
+  .card:is(:hover, :focus-visible, .is-playing) .demo i { animation-play-state: running; }
+  .demo i { animation-play-state: paused; animation-fill-mode: both; }
+
+  /* shutter speed: light trails draw across a long exposure */
+  .demo-shutter-speed i { left: 8%; height: 2px; width: 70%; border-radius: 2px; transform-origin: left; transform: scaleX(0.04);
+    background: linear-gradient(90deg, rgba(255,176,96,0), rgba(255,190,120,.95)); box-shadow: 0 0 10px rgba(255,170,90,.8);
+    animation: trail 2.6s cubic-bezier(.3,.1,.2,1) infinite; }
+  .demo-shutter-speed i:nth-child(1) { top: 26%; }
+  .demo-shutter-speed i:nth-child(2) { top: 31%; width: 55%; animation-delay: .25s; background: linear-gradient(90deg, rgba(255,90,80,0), rgba(255,110,90,.9)); box-shadow: 0 0 10px rgba(255,90,80,.7); }
+  .demo-shutter-speed i:nth-child(3) { top: 36%; width: 62%; animation-delay: .5s; background: linear-gradient(90deg, rgba(140,200,255,0), rgba(160,210,255,.9)); box-shadow: 0 0 10px rgba(140,200,255,.7); }
+  @keyframes trail { 0% { transform: scaleX(.04); opacity: 0; } 15% { opacity: 1; } 70% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+
+  /* aperture: background lights swell into bokeh as the f-number opens */
+  .demo-aperture i { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle, rgba(255,214,150,.55) 55%, rgba(255,214,150,.9) 70%, transparent 72%);
+    animation: bokeh 2.8s ease-in-out infinite alternate; }
+  .demo-aperture i:nth-child(1) { left: 22%; top: 26%; }
+  .demo-aperture i:nth-child(2) { left: 56%; top: 18%; background: radial-gradient(circle, rgba(130,190,255,.5) 55%, rgba(130,190,255,.85) 70%, transparent 72%); animation-delay: .3s; }
+  .demo-aperture i:nth-child(3) { left: 76%; top: 40%; background: radial-gradient(circle, rgba(255,120,185,.5) 55%, rgba(255,120,185,.85) 70%, transparent 72%); animation-delay: .6s; }
+  @keyframes bokeh { from { transform: scale(.25); opacity: .9; } to { transform: scale(2.1); opacity: .55; } }
+
+  /* focal length: frame lines close in, as a longer lens narrows the view */
+  .demo-focal-length i { left: 50%; top: 32%; width: 150px; height: 96px; margin: -48px 0 0 -75px; border: 1px solid rgba(255,236,210,.55); border-radius: 4px;
+    animation: zoom 3s cubic-bezier(.4,0,.2,1) infinite; }
+  .demo-focal-length i:nth-child(2) { animation-delay: 1s; }
+  .demo-focal-length i:nth-child(3) { animation-delay: 2s; }
+  @keyframes zoom { from { transform: scale(1.6); opacity: 0; } 30% { opacity: .9; } to { transform: scale(.35); opacity: 0; } }
+
+  /* developing: a print comes up in the red of the safelight */
+  .demo-darkroom i { left: 50%; top: 30%; width: 120px; height: 84px; margin: -42px 0 0 -60px; border-radius: 3px;
+    background: radial-gradient(circle at 35% 40%, rgba(20,8,8,.85), rgba(60,20,18,.6) 45%, rgba(240,220,210,.25) 75%); border: 6px solid rgba(250,240,232,.6);
+    animation: develop 3.2s ease-in infinite; }
+  .demo-darkroom i:nth-child(n+2) { display: none; }
+  @keyframes develop { from { opacity: 0; filter: contrast(.2); } 75% { opacity: 1; filter: contrast(1); } to { opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) { .demo i { animation: none !important; opacity: 0; } }
+
+  /* the home page on a phone: one row to swipe through instead of four tall cards */
+  @media (max-width: 700px) {
+    .cards.is-rail {
+      grid-template-columns: none;
+      grid-auto-flow: column;
+      grid-auto-columns: min(78%, 300px);
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+      scroll-padding-inline: var(--gutter);
+      margin-inline: calc(-1 * var(--gutter));
+      padding: 2px var(--gutter) 10px;
+      scrollbar-width: none;
+    }
+    .cards.is-rail::-webkit-scrollbar { display: none; }
+    .cards.is-rail li { scroll-snap-align: start; }
+    .cards.is-rail .card { min-height: 200px; height: 100%; }
   }
 
   .no {

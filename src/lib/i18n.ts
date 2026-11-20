@@ -1,6 +1,6 @@
 export type SiteLanguage = 'ja' | 'en';
 export const LANGUAGE_KEY = 'kuas-site-language';
-export const ENGLISH_PAGES = ['', 'about', 'join', 'contact', 'schedule', 'trips', 'learn',
+export const ENGLISH_PAGES = ['', 'about', 'join', 'faq', 'contact', 'schedule', 'trips', 'learn',
   'learn/shutter-speed', 'learn/aperture', 'learn/focal-length', 'learn/darkroom'] as const;
 
 export function preferredLanguage(saved: string | null, languages: readonly string[]): SiteLanguage {

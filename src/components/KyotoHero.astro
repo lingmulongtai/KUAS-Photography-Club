@@ -82,14 +82,23 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
   <div class="hero-inner">
     <div class="copy">
+      <!-- the next meeting from the club calendar; the usual weekly time until it answers -->
+      <a class="next-chip" href={local('/schedule/')} data-next-meeting="chip" data-lang={lang} data-room={club.meetings.room}>
+        <span class="next-dot" aria-hidden="true"></span><span data-next-text>{en ? `Meetings: ${club.meetings.dayEn} ${club.meetings.times[0].replace('〜', '')} · ${club.meetings.room}` : `ミーティング ${club.meetings.day} ${club.meetings.times[0]} · ${club.meetings.room}`}</span>
+      </a>
       <p class="edge eyebrow">KYOTO ▸ <span data-status>いまの空</span></p>
       <h1 id="hero-title">{en ? <>Photography,<br />under Kyoto’s sky.</> : <>京都先端科学大学<br />写真部</>}</h1>
-      <p class="lead">
+      <!-- A wide screen has room for the club's whole profile; a phone gets one sentence and the traits as chips. -->
+      <p class="lead lead-full">
         {en ? 'We are the photography club at Kyoto University of Advanced Science. Members plan photo outings together. A smartphone is enough to take part.' : homeJa.biography.split('\n').map((line, index) => <>{index > 0 && <br />}{line}</>)}
       </p>
+      <p class="lead lead-short">{en ? 'No camera needed. We go on photo outings and exhibit at the campus festival.' : homeJa.short}</p>
+      <ul class="traits" aria-label={en ? 'About the club' : '写真部の特徴'}>
+        {(en ? homeJa.traitsEn : homeJa.traits).map((trait) => <li>{trait}</li>)}
+      </ul>
       <div class="ctas">
-        <a class="btn btn--primary" href={local('/trips/')}>{en ? 'View outing records' : '撮影会の記録を見る'}<span class="arrow" aria-hidden="true">→</span></a>
-        <a class="btn btn--glass" href={local('/join/')}>{en ? 'Visit / Join' : '見学・入部について'}</a>
+        <a class="btn btn--primary" href={local('/join/')}>{en ? 'Plan a visit' : '見学を申し込む'}<span class="arrow" aria-hidden="true">→</span></a>
+        <a class="btn btn--glass" href="#activity">{en ? 'See our activities' : '活動を見る'}</a>
       </div>
     </div>
 
@@ -117,7 +126,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
         </select>
       </label>
       <button type="button" class="explore-sky-back">{en ? 'Back to scenery ↑' : '景色へ戻る ↑'}</button>
-      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Aircraft, seasonal snow, bonfires and the blue night beam are illustrative, rather than live flight, weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。飛行機や季節の雪、夜景の送り火・青い光は演出で、実際の運航・天気・催事を示すものではありません。'}</span></p>
+      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span class="hint-more">{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Aircraft, seasonal snow, bonfires and the blue night beam are illustrative, rather than live flight, weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。飛行機や季節の雪、夜景の送り火・青い光は演出で、実際の運航・天気・催事を示すものではありません。'}</span></p>
+      <details class="hint-note"><summary>{en ? 'About the effects' : '演出について'}</summary><p>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Aircraft, seasonal snow, bonfires and the blue night beam are illustrative, rather than live flight, weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。飛行機や季節の雪、夜景の送り火・青い光は演出で、実際の運航・天気・催事を示すものではありません。'}</p></details>
     </aside>
   </div>
 
@@ -149,10 +159,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
   </div>
 
   <p class="credit">地形・航空写真：国土地理院　建物：国土地理院・PLATEAU（国土交通省）　森林：© OpenStreetMap contributors</p>
-  <a class="scroll-cue" href="#intro"><span>SCROLL</span></a>
+  <a class="scroll-cue" href="#intro"><span>{en ? 'About the club' : '写真部の紹介へ'}</span></a>
 </section>
 
 <script>
+  import '../scripts/next-meeting';
   import { mountStage } from '../scripts/gl/stage';
   import { createHero, type HeroMode, type HeroStatus, type HeroView } from '../scripts/hero/scene';
   import { createLook, kelvin, lookAt, phaseName } from '../scripts/hero/palette';
@@ -687,6 +698,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .explore-toggle:hover, .explore-help:hover { background-color: rgba(22,67,72,.72); }
   .explore-toggle:focus-visible, .explore-help:focus-visible { outline: 2px solid white; outline-offset: 3px; }
   .is-exploring .copy,.is-exploring .scrim,.is-exploring .scroll-cue { opacity: 0; visibility: hidden; pointer-events: none; }
+  .is-exploring .hint-note { display: none; }
   .is-exploring .hint { display: none; }
   @media (pointer: coarse), (max-width: 900px) {
     .explore-guide:not([hidden]) { position: static; flex-basis: 100%; padding: 8px 11px; pointer-events: auto; touch-action: pan-y; }
@@ -782,6 +794,41 @@ const pinTrips = completeSpotPreviews((await getTrips())
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 6px;
+  }
+
+  .next-chip {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 6px 13px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 999px;
+    background: rgba(8, 17, 26, 0.55);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    color: var(--on-dark);
+    font: 600 12.5px/1.35 var(--body);
+    letter-spacing: 0.04em;
+    text-decoration: none;
+  }
+  .next-chip:hover { border-color: rgba(255, 255, 255, 0.7); color: var(--on-dark); }
+  .next-chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  .next-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px rgba(100, 190, 198, 0.25); }
+  .next-chip[data-state='meeting'] .next-dot { background: #7ee2a0; box-shadow: 0 0 0 3px rgba(126, 226, 160, 0.25); }
+  .next-chip[data-state='cancelled'] .next-dot { background: #ffb27a; box-shadow: 0 0 0 3px rgba(255, 178, 122, 0.25); }
+
+  /* the phone versions of the introduction */
+  .lead-short, .traits, .hint-note { display: none; }
+  .traits { flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+  .traits li {
+    padding: 5px 11px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    font: 600 12px/1.4 var(--body);
+    letter-spacing: 0.03em;
   }
 
   .btn--glass {
@@ -974,18 +1021,22 @@ const pinTrips = completeSpotPreviews((await getTrips())
     pointer-events: none;
   }
 
+  /* names what comes next, so the page reads as continuing below the scenery */
   .scroll-cue {
     position: absolute;
     left: 50%;
     bottom: 10px;
     z-index: 2;
     transform: translateX(-50%);
-    font: 700 10px/1 var(--latin);
-    letter-spacing: 0.3em;
-    color: rgba(255, 255, 255, 0.7);
+    font: 700 12px/1 var(--body);
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
     text-decoration: none;
+    white-space: nowrap;
     padding: 8px;
   }
+  .scroll-cue:hover { color: #fff; }
 
   .scroll-cue span::after {
     content: '';
@@ -1054,6 +1105,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .swipe-card small { font-size: 11.5px; letter-spacing: 0.04em; opacity: 0.8; }
   @keyframes swipe-hand { from { transform: translateX(-20px) rotate(-7deg); } to { transform: translateX(20px) rotate(7deg); } }
   @media (prefers-reduced-motion: reduce) { .swipe-card .finger { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .scroll-cue span::after { animation: none; } }
 
   /* pins placed by the scene (created in script, so styled globally) */
   .hero :global(.hero-labels) {
@@ -1141,6 +1193,24 @@ const pinTrips = completeSpotPreviews((await getTrips())
     font: 700 13px/1.25 var(--body);
     letter-spacing: 0.06em;
     text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  }
+
+  /* a place with a published outing: a warm dot and a small "outing" tag */
+  .hero :global(.hero-pin.is-visited .pin-dot) {
+    background: #ffc46b;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 14px rgba(255, 196, 107, 0.95);
+  }
+  .hero :global(.pin-visited) {
+    display: block;
+    width: max-content;
+    margin: 0 auto 3px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(255, 196, 107, 0.92);
+    color: #2b1a05;
+    font: 700 9.5px/1.4 var(--body);
+    letter-spacing: 0.06em;
+    text-shadow: none;
   }
 
   .hero :global(.pin-text small) {
@@ -1287,13 +1357,23 @@ const pinTrips = completeSpotPreviews((await getTrips())
 
     .copy { display: contents; }
     .is-exploring .copy { display: none; }
+    .copy .next-chip { order: -4; }
     .copy .eyebrow { order: -3; }
     .copy h1 { order: -2; }
+    /* one sentence, the traits and the buttons first; the scenery controls after them */
+    .lead-full { display: none; }
+    .lead-short { display: block; font-size: 15px; }
+    .traits { display: flex; }
+    .hint .hint-more { display: none; }
+    .hint-note { display: block; font-size: 12px; color: var(--hud); opacity: 0.85; }
+    .hint-note summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+    .hint-note p { margin-top: 4px; line-height: 1.6; }
 
     .sky-chip {
-      order: -1;
+      order: 1;
       justify-self: stretch;
       max-width: none;
+      margin-top: 8px;
     }
 
     .campus-card {

@@ -3,14 +3,10 @@ import Base from '../layouts/Base.astro';
 import PageHero from '../components/PageHero.astro';
 import FormLink from '../components/FormLink.astro';
 import { club, forms } from '../data/club';
+import { faq } from '../data/faq';
+import FaqList from '../components/FaqList.astro';
 
-const faq = [
-  { q: 'カメラを持っていなくても大丈夫？', a: '大丈夫です。スマートフォンで参加できます。共有機材は整備中です。写真部では、カメラを持っていない人も使える共有カメラの購入を目指しています。' },
-  { q: '留学生でも参加できますか？ / Can international students join?', a: 'もちろんです。日本人と留学生が一緒に活動しています。English is welcome at meetings and on trips.' },
-  { q: '途中の学期からでも入れますか？', a: '見学を希望する時期を運営にご相談ください。正式な入部に必要な手続きは、運営からご案内します。' },
-  { q: '毎回参加しないといけませんか？', a: '撮影会は来られるときだけで大丈夫です。参加・途中参加・途中退出やキャンセルについては、事前に運営と調整してください。' },
-  { q: '費用はかかりますか？', a: `部費は半期${club.feePerSemester.toLocaleString('ja-JP')}円です。撮影会の交通費や入場料等は別途各自負担です。` },
-];
+
 ---
 <Base title="見学・入部" description="KUAS Photography Club への見学・入部の申し込み。通常は毎週金曜18:00から太秦キャンパス S306。休会・教室変更は最新案内をご確認ください。">
   <PageHero
@@ -86,14 +82,8 @@ const faq = [
         <p class="edge">FAQ</p>
         <h2 id="faq">よくある質問</h2>
       </div>
-      <div class="faq">
-        {faq.map((f) => (
-          <details>
-            <summary>{f.q}</summary>
-            <p>{f.a}</p>
-          </details>
-        ))}
-      </div>
+      <FaqList entries={faq.ja.slice(0, 5)} />
+      <p class="more"><a class="link-arrow" href="/faq/">よくある質問をすべて見る →</a></p>
     </div>
   </section>
 </Base>
@@ -196,44 +186,7 @@ const faq = [
     justify-items: start;
   }
 
-  .faq {
-    display: grid;
-    max-width: 52em;
-    border-top: 1px solid var(--line);
-  }
-
-  details {
-    border-bottom: 1px solid var(--line);
-    padding-block: 16px;
-  }
-
-  summary {
-    cursor: pointer;
-    font-weight: 700;
-    list-style: none;
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  summary::-webkit-details-marker {
-    display: none;
-  }
-
-  summary::after {
-    content: '+';
-    font-family: var(--mono);
-    color: var(--accent);
-  }
-
-  details[open] summary::after {
-    content: '−';
-  }
-
-  details p {
-    margin-top: 10px;
-    color: var(--ink);
-  }
+  .more { margin-top: 20px; }
 
   @media (max-width: 900px) {
     .facts,

@@ -1,0 +1,68 @@
+---
+/**
+ * On a phone, a "Plan a visit" button pinned to the bottom of the screen once the scenery is
+ * scrolled past. It steps aside over the scenery, the closing join section and the footer, and
+ * while the free-explore mode is on.
+ */
+interface Props { lang?: 'ja' | 'en'; }
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+---
+<a class="sticky-join" href={en ? '/en/join/' : '/join/'} data-sticky-join tabindex="-1" aria-hidden="true">
+  {en ? 'Plan a visit' : '見学を申し込む'} <span aria-hidden="true">→</span>
+</a>
+
+<script>
+  const button = document.querySelector<HTMLAnchorElement>('[data-sticky-join]');
+  const phone = matchMedia('(max-width: 900px)');
+  if (button && 'IntersectionObserver' in window) {
+    // anything on screen that already offers the way in, or that the button would cover
+    const covers = ['.hero', '#first-steps', '.site-footer'].flatMap((selector) => [...document.querySelectorAll(selector)]);
+    const visible = new Set<Element>();
+    const update = () => {
+      const show = phone.matches && covers.length > 0 && visible.size === 0;
+      button.classList.toggle('is-shown', show);
+      button.tabIndex = show ? 0 : -1;
+      button.setAttribute('aria-hidden', String(!show));
+    };
+    const record = (entries: IntersectionObserverEntry[]) => {
+      for (const entry of entries) entry.isIntersecting ? visible.add(entry.target) : visible.delete(entry.target);
+      update();
+    };
+    // the scenery counts only while it still fills part of the screen below the top quarter,
+    // not for the sliver left under the header
+    const scenery = new IntersectionObserver(record, { rootMargin: '-25% 0px 0px 0px' });
+    const rest = new IntersectionObserver(record);
+    covers.forEach((el) => (el.matches('.hero') ? scenery : rest).observe(el));
+    phone.addEventListener('change', update);
+  }
+</script>
+
+<style>
+  .sticky-join {
+    position: fixed;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 26px;
+    border-radius: 999px;
+    background: var(--brand);
+    color: var(--on-accent);
+    font: 700 15px/1 var(--body);
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    box-shadow: 0 10px 28px rgba(15, 25, 28, 0.28);
+    transform: translate(-50%, 140%);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(.2, .8, .2, 1), opacity 0.3s;
+    pointer-events: none;
+  }
+  .sticky-join.is-shown { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .sticky-join:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  @media (max-width: 900px) { .sticky-join { display: inline-flex; } }
+  @media (prefers-reduced-motion: reduce) { .sticky-join { transition: none; } }
+</style>
