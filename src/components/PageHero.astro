@@ -72,6 +72,13 @@ const { edge, title, lead } = Astro.props;
     top: 9%;
   }
 
+  /* a phone: the circle sits in the corner above the text instead of crossing it */
+  @media (max-width: 760px) {
+    .motif { width: 160px; right: -72px; top: -96px; transform: none; }
+    .ring { border-width: 2px; }
+    .dot { width: 10px; height: 10px; }
+  }
+
   @keyframes rise {
     from {
       opacity: 0;
