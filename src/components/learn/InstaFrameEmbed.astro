@@ -3,6 +3,9 @@
  * InstaFrame, the club's browser tool for EXIF frames and watermarks, running inside the page.
  * It is loaded from its own site so updates there appear here too; photos never leave the
  * visitor's device. A link opens it full screen in its own tab.
+ *
+ * It follows the site's theme: the URL asks for the matching InstaFrame theme when it opens, and
+ * a message keeps it in step when the visitor switches theme (neither is saved in InstaFrame).
  */
 interface Props { lang?: 'ja' | 'en'; }
 const { lang = 'ja' } = Astro.props;
@@ -15,14 +18,28 @@ const url = 'https://lingmulongtai.github.io/InstaFrame/';
     <a class="btn open" href={url} target="_blank" rel="noopener">{en ? 'Open full screen' : '新しいタブで大きく開く'} <span aria-hidden="true">↗</span></a>
   </div>
   <iframe
-    src={url}
+    data-instaframe={url}
     title={en ? 'InstaFrame: add frames and watermarks to photos' : 'InstaFrame：写真にフレームやウォーターマークを付ける'}
     loading="lazy"
     allow="clipboard-write; fullscreen; geolocation"
     referrerpolicy="no-referrer"
   ></iframe>
+  <noscript><iframe src={`${url}?theme=light`} title="InstaFrame" loading="lazy"></iframe></noscript>
   <p class="small muted">{en ? 'If the tool does not appear, open it full screen in a new tab.' : '表示されないときは「新しいタブで大きく開く」から使ってください。'}</p>
 </div>
+
+<script>
+  import { instaFrameTheme } from '../../lib/theme';
+  for (const frame of document.querySelectorAll<HTMLIFrameElement>('iframe[data-instaframe]')) {
+    const base = frame.dataset.instaframe!;
+    const origin = new URL(base).origin;
+    const current = () => instaFrameTheme(document.documentElement.dataset.theme);
+    frame.src = `${base}?theme=${current()}`;
+    new MutationObserver(() => {
+      frame.contentWindow?.postMessage({ type: 'instaframe:theme', theme: current() }, origin);
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+</script>
 
 <style>
   .instaframe { display: grid; gap: 10px; }
