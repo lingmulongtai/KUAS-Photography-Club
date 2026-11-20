@@ -86,8 +86,9 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
   }
 
   function begin(image: SkyImage, w: number, h: number, tw: number, th: number, paddedW: number, paddedH: number) {
-    if (original.defines.FIELD_LATTICE && !frozen.defines.FIELD_LATTICE) {
-      frozen.defines.FIELD_LATTICE = 1;
+    if (original.defines.FIELD_LATTICE !== frozen.defines.FIELD_LATTICE) {
+      if (original.defines.FIELD_LATTICE) frozen.defines.FIELD_LATTICE = 1;
+      else delete frozen.defines.FIELD_LATTICE;
       frozen.needsUpdate = true;
     }
     if (image.target.width !== tw || image.target.height !== th) { image.target.setSize(tw, th); image.checked = false; }
