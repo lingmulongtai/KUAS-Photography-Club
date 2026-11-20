@@ -8,7 +8,9 @@ export type CityInstances = {
   shape: CityShape; pos: Float32Array; size: Float32Array; rot: Float32Array; meta: Float32Array;
 };
 export type CitySurface = CityInstances | { positions: Float32Array; info?: Float32Array };
-export type FaceBatch = { houses: Uint32Array; indices: Uint16Array };
+export type PanoramaTerrain = { positions: Float32Array; river: readonly number[] };
+type Bounds = [number, number, number, number, number, number];
+export type FaceBatch = { houses: Uint32Array; indices: Uint16Array; bounds?: Bounds };
 export type VisibleSurface = { batches: FaceBatch[] } | { indices: Uint32Array };
 
 // A fixed-eye perspective plane looking west, independent of the screen, camera rotation or zoom.
@@ -43,6 +45,7 @@ class Occlusion {
     if (area > -2) return;
     const l=Math.max(0, Math.ceil(Math.min(ax,bx,cx))), r=Math.min(this.width,Math.floor(Math.max(ax,bx,cx)));
     const lo=Math.max(0,Math.ceil(Math.min(ay,by,cy))), hi=Math.min(this.height,Math.floor(Math.max(ay,by,cy)));
+    if (l >= r || lo >= hi) return;
     const dx0=by-ay, dy0=ax-bx, dx1=cy-by, dy1=bx-cx, dx2=ay-cy, dy2=cx-ax;
     const bias = (x:number,y:number) => Math.min(0,x)+Math.min(0,y)-.12*(Math.abs(x)+Math.abs(y));
     const k0=bias(dx0,dy0)-dx0*ax-dy0*ay, k1=bias(dx1,dy1)-dx1*bx-dy1*by, k2=bias(dx2,dy2)-dx2*cx-dy2*cy;
@@ -56,13 +59,36 @@ class Occlusion {
     }
   }
 
-  hidden(left: number, right: number, low: number, high: number, near: number) {
+  hidden(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, near: number, clockwise: boolean) {
+    const margin = .15;
+    const left = Math.min(ax,bx,cx) - margin, right = Math.max(ax,bx,cx) + margin;
+    const low = Math.min(ay,by,cy) - margin, high = Math.max(ay,by,cy) + margin;
     if (near < 100 || left < 0 || right >= this.width || low < 0 || high >= this.height) return false;
     const x0 = Math.floor(left), x1 = Math.floor(right), y0 = Math.floor(low), y1 = Math.floor(high);
+    // For a clockwise face, each inward edge normal must reach the expanded cell.
+    // Empty space outside the triangular outline cannot expose any part of the roof.
+    const dx0 = by-ay, dy0 = ax-bx, dx1 = cy-by, dy1 = bx-cx, dx2 = ay-cy, dy2 = cx-ax;
+    const support = (x: number, y: number) => Math.max(0,x) + Math.max(0,y) + margin * (Math.abs(x)+Math.abs(y));
+    const k0 = support(dx0,dy0)-dx0*ax-dy0*ay;
+    const k1 = support(dx1,dy1)-dx1*bx-dy1*by;
+    const k2 = support(dx2,dy2)-dx2*cx-dy2*cy;
     for (let y = y1; y >= y0; y--) for (let x = x0; x <= x1; x++) {
-      if (this.depths[y * this.width + x] >= near - .25) return false;
+      if (this.depths[y * this.width + x] >= near - .25 &&
+          (!clockwise || (dx0*x+dy0*y+k0 >= 0 && dx1*x+dy1*y+k1 >= 0 && dx2*x+dy2*y+k2 >= 0))) return false;
     }
     return true;
+  }
+}
+
+function addTerrain(map: Occlusion, { positions: p, river }: PanoramaTerrain) {
+  const n = Math.sqrt(p.length / 3);
+  for (let z = 0; z < n - 1; z++) for (let x = 0; x < n - 1; x++) {
+    const a = z * n + x, b = a + 1, c = a + n, d = c + 1;
+    if (p[3*b] > map.eye.x - 100) continue;
+    // The terrain shader cuts the river out of this rectangle. Use only certain opaque ground.
+    if (p[3*b] >= river[0] && p[3*a] <= river[2] && p[3*c+2] >= river[1] && p[3*a+2] <= river[3]) continue;
+    map.triangle(p, a, c, b);
+    map.triangle(p, b, c, d);
   }
 }
 
@@ -132,6 +158,10 @@ function visibleTriangle(p: Float64Array | Float32Array, a: number, b: number, c
   a *= 3; b *= 3; c *= 3;
   const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2];
   const vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
+  // Hip-only treads collapse to a line on a stepped gable. Their two identical
+  // corners have the same placement in the GPU shader and can cover no samples.
+  if ((ux === 0 && uy === 0 && uz === 0) || (vx === 0 && vy === 0 && vz === 0) ||
+      (ux === vx && uy === vy && uz === vz)) return false;
   const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
   const { eye } = map, da = eye.x - p[a], db = eye.x - p[b], dc = eye.x - p[c];
   const facing = nx * da + ny * (eye.y - p[a + 1]) + nz * (eye.z - p[a + 2]);
@@ -140,9 +170,7 @@ function visibleTriangle(p: Float64Array | Float32Array, a: number, b: number, c
   if (near <= 100) return true;
   const ax = map.x(p[a + 2] - eye.z, da), bx = map.x(p[b + 2] - eye.z, db), cx = map.x(p[c + 2] - eye.z, dc);
   const ay = map.y(p[a + 1] - eye.y, da), by = map.y(p[b + 1] - eye.y, db), cy = map.y(p[c + 1] - eye.y, dc);
-  // Expand the silhouette for floating-point vertex placement and raster edge rounding.
-  return !map.hidden(Math.min(ax,bx,cx) - .15, Math.max(ax,bx,cx) + .15,
-    Math.min(ay,by,cy) - .15, Math.max(ay,by,cy) + .15, near);
+  return !map.hidden(ax,ay,bx,by,cx,cy,near,facing > 0);
 }
 
 type Bucket = { mask: Uint32Array; houses: number[]; count: number };
@@ -152,8 +180,33 @@ function population(v: number) {
   return (((v + (v >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
 }
 
+// Project whole house boxes onto a plane through the sector, 1 km from the fixed eye.
+// Perspective preserves the outline on this plane for every turn and every zoom.
+function sectorBounds(src: CityInstances, houses: number[], eye: Eye): Bounds | undefined {
+  const first = houses[0] * 3, x = src.pos[first] - eye.x, z = src.pos[first+2] - eye.z;
+  const alongX = Math.abs(x) > Math.abs(z), sign = Math.sign(alongX ? x : z);
+  let low = Infinity, high = -Infinity, left = Infinity, right = -Infinity;
+  for (const i of houses) {
+    const k = i * 3, cx = src.pos[k]-eye.x, cz = src.pos[k+2]-eye.z;
+    const c = Math.abs(Math.cos(src.rot[i])), s = Math.abs(Math.sin(src.rot[i]));
+    const w = src.size[k] * .5 + .65, d = src.size[k+2] * .5 + .65;
+    const rx = c*w+s*d, rz = s*w+c*d;
+    const along = sign*(alongX ? cx : cz), across = alongX ? cz : cx;
+    const extent = alongX ? rx : rz, width = alongX ? rz : rx;
+    if (along-extent < 1) return undefined;
+    const bottom = src.pos[k+1]-eye.y-6.1, top = src.pos[k+1]+src.size[k+1]+src.meta[4*i+3]-eye.y+.1;
+    for (const scale of [1000/(along-extent), 1000/(along+extent)]) {
+      left = Math.min(left,(across-width)*scale); right = Math.max(right,(across+width)*scale);
+      low = Math.min(low,bottom*scale); high = Math.max(high,top*scale);
+    }
+  }
+  return alongX ? [eye.x+sign*1000, eye.y+low, eye.z+left, eye.x+sign*1000, eye.y+high, eye.z+right]
+    : [eye.x+left, eye.y+low, eye.z+sign*1000, eye.x+right, eye.y+high, eye.z+sign*1000];
+}
+
 function instanceBatches(src: CityInstances, map: Occlusion): FaceBatch[] {
-  const idx = src.shape.indices, triangles = idx.length / 3, groups = new Map<string, Bucket>();
+  const idx = src.shape.indices, triangles = idx.length / 3;
+  const sectors = new Map<number, { groups: Map<string, Bucket>; count: number }>();
   const words = new Uint32Array(Math.ceil(triangles / 32)), p = new Float64Array(src.shape.positions.length);
   for (let i = 0; i < src.rot.length; i++) {
     housePoints(src, i, map.eye, p);
@@ -164,24 +217,35 @@ function instanceBatches(src: CityInstances, map: Occlusion): FaceBatch[] {
       }
     }
     if (!count) continue;
+    const azimuth = Math.atan2(src.pos[i*3+2] - map.eye.z, src.pos[i*3] - map.eye.x);
+    const keySector = Math.floor(azimuth * (15 / Math.PI));
+    let sector = sectors.get(keySector);
+    if (!sector) { sector = { groups: new Map(), count: 0 }; sectors.set(keySector, sector); }
+    sector.count++;
+    const groups = sector.groups;
     const key = words.join(',');
     let group = groups.get(key);
     if (!group) { group = { mask: words.slice(), houses: [], count }; groups.set(key,group); }
     group.houses.push(i);
   }
-  // A shared draw may conservatively include extra faces. Bound draw calls per large city block.
+  return [...sectors.values()].flatMap(({ groups, count }) => batchSector(src, map.eye, groups, count));
+}
+
+function batchSector(src: CityInstances, eye: Eye, groups: Map<string, Bucket>, count: number): FaceBatch[] {
+  const idx = src.shape.indices, triangles = idx.length / 3;
+  // A shared draw may conservatively include extra faces; the whole sector is culled together.
   const ordered = [...groups.values()].sort((a,b) => b.houses.length - a.houses.length);
-  const limit = Math.min(12, Math.max(2, Math.ceil(src.rot.length / 350)));
+  const limit = Math.min(12, Math.max(count < 40 ? 1 : 2, Math.ceil(count / 270)));
   const chosen = ordered.slice(0, limit);
   for (const extra of ordered.slice(limit)) {
     let best = chosen[0], cost = Infinity, joinedCount = 0;
     for (const base of chosen) {
       let union = 0;
-      for (let j=0; j<words.length; j++) union += population(base.mask[j] | extra.mask[j]);
+      for (let j=0; j<base.mask.length; j++) union += population(base.mask[j] | extra.mask[j]);
       const waste = (union - base.count) * base.houses.length + (union - extra.count) * extra.houses.length;
       if (waste < cost) { best = base; cost = waste; joinedCount = union; }
     }
-    for (let j=0; j<words.length; j++) best.mask[j] |= extra.mask[j];
+    for (let j=0; j<best.mask.length; j++) best.mask[j] |= extra.mask[j];
     best.count = joinedCount;
     for (const house of extra.houses) best.houses.push(house);
   }
@@ -191,12 +255,13 @@ function instanceBatches(src: CityInstances, map: Occlusion): FaceBatch[] {
     for (let t=0; t<triangles; t++) if (group.mask[t >>> 5] & (1 << (t & 31))) {
       for (let j=0; j<3; j++) indices[next++] = idx[t*3+j];
     }
-    return { indices, houses: Uint32Array.from(group.houses.sort((a,b) => a-b)) };
+    return { indices, houses: Uint32Array.from(group.houses.sort((a,b) => a-b)), bounds: sectorBounds(src, group.houses, eye) };
   });
 }
 
-export function panoramaVisibility(sources: CitySurface[], eye: Eye): VisibleSurface[] {
+export function panoramaVisibility(sources: CitySurface[], eye: Eye, terrain?: PanoramaTerrain): VisibleSurface[] {
   const map = new Occlusion(eye);
+  if (terrain) addTerrain(map, terrain);
   for (const src of sources) {
     if ('shape' in src) {
       addHouses(map, src);
