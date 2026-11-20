@@ -1,0 +1,37 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageHero from '../../components/PageHero.astro';
+import FaqList from '../../components/FaqList.astro';
+import { faq } from '../../data/faq';
+import { club } from '../../data/club';
+---
+<Base lang="en" title="FAQ" description="Common questions about the KUAS Photography Club: do you need a camera, how much it costs, and whether international students can join.">
+  <PageHero
+    edge="FAQ ▸ BEFORE YOU VISIT"
+    title="Common questions"
+    lead="What people often ask before visiting or joining. For anything else, send us an Instagram DM or an email."
+  />
+  <section class="section first">
+    <div class="wrap stack">
+      <FaqList entries={faq.en} open />
+      <div class="ask">
+        <h2>Something else?</h2>
+        <p class="muted">Ask the organizers directly by Instagram DM or email.</p>
+        <div class="ctas">
+          <a class="btn btn--primary" href="/en/join/">Plan a visit <span class="arrow" aria-hidden="true">→</span></a>
+          <a class="btn" href={club.instagram.url} target="_blank" rel="noopener">Send a DM on Instagram <span aria-hidden="true">↗</span></a>
+        </div>
+        <p class="small muted">Email: <span class="mail">{club.email}</span></p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .first { border-top: 0; padding-top: 8px; }
+  .stack { display: grid; gap: 48px; }
+  .ask { display: grid; gap: 12px; justify-items: start; padding: 24px; background: var(--brand-pale); border-radius: var(--radius); max-width: 52em; }
+  .ask h2 { font-size: var(--step-3); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+  .mail { user-select: all; overflow-wrap: anywhere; }
+</style>

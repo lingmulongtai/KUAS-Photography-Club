@@ -17,6 +17,12 @@ export const club = {
     room: 'S306',
   },
   feePerSemester: 1000,
+  /**
+   * Places the club has actually been to photograph, for the home page introduction
+   * ("これまでに…へ撮りに行きました"). The sentence stays hidden while this is empty.
+   * Example: { ja: '伏見稲荷大社', en: 'Fushimi Inari Taisha' }
+   */
+  visitedPlaces: [] as { ja: string; en: string }[],
   instagram: {
     handle: 'kuas_photographyclub',
     url: 'https://www.instagram.com/kuas_photographyclub',

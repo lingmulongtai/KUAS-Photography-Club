@@ -1,0 +1,103 @@
+---
+/**
+ * The end of the home page: how a first visit works, in the order it happens, and the questions
+ * people ask before coming. The full list lives on the FAQ page.
+ */
+import { club } from '../data/club';
+import { faq } from '../data/faq';
+import FaqList from './FaqList.astro';
+
+interface Props { lang?: 'ja' | 'en'; }
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+const local = (href: string) => (en ? `/en${href}` : href);
+const time = club.meetings.times[0];
+const steps = en
+  ? [
+      { title: 'Request a visit', text: 'Tell us the day you would like to come, using the form or an Instagram DM.' },
+      { title: 'Visit a Friday meeting', text: `Usually ${time.replace('〜', '')} in room ${club.meetings.room}, Uzumasa Campus. Check the schedule for cancellations and room changes.` },
+      { title: 'Join a photo outing', text: 'Pick an outing you like and come along once. A smartphone is enough.' },
+    ]
+  : [
+      { title: '見学を申し込む', text: 'フォームか Instagram の DM で、見学したい日を教えてください。' },
+      { title: '金曜のミーティングへ', text: `通常は ${time}、${club.campus} ${club.meetings.room}。休会・教室変更はスケジュールで確認してください。` },
+      { title: '撮影会に参加', text: '気になる撮影会に、まず1回来てみてください。スマホでも大丈夫です。' },
+    ];
+const questions = faq[lang].filter((entry) => entry.home);
+---
+<section class="section first-steps" id="first-steps" aria-labelledby="first-steps-title">
+  <div class="wrap inner">
+    <div class="head">
+      <p class="edge">{en ? 'FIRST TIME ▸ JOIN US' : 'FIRST TIME ▸ はじめての人へ'}</p>
+      <h2 id="first-steps-title">{en ? 'Your first visit, step by step.' : <><span class="phrase">はじめての人へ。</span><span class="phrase">見学から参加まで</span></>}</h2>
+      <p class="lead">{en ? 'No experience or camera is needed.' : '経験もカメラもいりません。'}</p>
+    </div>
+
+    <ol class="steps">
+      {steps.map((step) => (
+        <li><b>{step.title}</b><span>{step.text}</span></li>
+      ))}
+    </ol>
+
+    <div class="ctas">
+      <a class="btn btn--primary" href={local('/join/')}>{en ? 'Plan a visit' : '見学を申し込む'} <span class="arrow" aria-hidden="true">→</span></a>
+      <a class="btn" href={local('/schedule/')}>{en ? 'See the schedule' : 'スケジュールを見る'}</a>
+    </div>
+
+    <div class="faq-preview">
+      <h3>{en ? 'Common questions' : 'よくある質問'}</h3>
+      <FaqList entries={questions} />
+      <a class="link-arrow" href={local('/faq/')}>{en ? 'All questions →' : 'よくある質問をすべて見る →'}</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .first-steps { background: var(--brand-pale); border-top: 0; scroll-margin-top: var(--header-h, 64px); }
+  .inner { display: grid; gap: 28px; }
+  .head { display: grid; gap: 12px; justify-items: start; }
+  .head h2 { font-size: var(--step-4); }
+  .phrase { display: inline-block; }
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    counter-reset: step;
+  }
+  .steps li {
+    counter-increment: step;
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    padding: 20px;
+    background: var(--raise);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .steps li::before {
+    content: counter(step);
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    margin-bottom: 4px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: var(--on-accent);
+    font: 700 15px/1 var(--latin);
+  }
+  .steps b { font-size: var(--step-1, 18px); }
+  .steps span { color: var(--muted); font-size: 14px; line-height: 1.7; }
+
+  .ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  .faq-preview { display: grid; gap: 14px; justify-items: start; padding-top: 8px; }
+  .faq-preview h3 { font-size: var(--step-2, 20px); }
+  .faq-preview :global(.faq) { width: 100%; }
+
+  @media (max-width: 760px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+</style>

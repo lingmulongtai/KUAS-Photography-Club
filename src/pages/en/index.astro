@@ -1,21 +1,84 @@
 ---
 import Base from '../../layouts/Base.astro';
 import KyotoHero from '../../components/KyotoHero.astro';
-import ClubFacts from '../../components/ClubFacts.astro';
+import HomeIntro from '../../components/HomeIntro.astro';
 import UpcomingEvents from '../../components/UpcomingEvents.astro';
 import InstagramSection from '../../components/InstagramSection.astro';
 import ReelHero from '../../components/ReelHero.astro';
+import LearnCards from '../../components/learn/LearnCards.astro';
+import FirstSteps from '../../components/FirstSteps.astro';
+import StickyJoin from '../../components/StickyJoin.astro';
 import { reelPhotos } from '../../lib/trips';
 const reel = await reelPhotos('en');
 ---
 <Base lang="en" overlayHeader title="Photography under Kyoto’s sky" description="The website operated by the KUAS Photography Club. Visit, join, check confirmed plans and learn photography.">
   <KyotoHero lang="en" />
-  <section id="intro" class="section"><div class="wrap">
-    <div class="section-head"><p class="edge">KUAS PHOTOGRAPHY CLUB</p><h2>Enjoy photography together.</h2><p class="lead">This website is operated by the photography club at Kyoto University of Advanced Science. KUAS students, including international students, are welcome to visit. No experience or camera is required.</p></div>
-    <ClubFacts lang="en" /><p><a class="btn btn--primary" href="/en/join/">Plan a visit →</a></p>
-  </div></section>
-  <section class="section"><div class="wrap"><div class="section-head"><p class="edge">SCHEDULE</p><h2>Coming up</h2></div><UpcomingEvents lang="en" /><p><a href="/en/schedule/">See the schedule →</a></p></div></section>
-  <ReelHero lang="en" heading="h2" photos={reel.photos} placeholder={reel.placeholder} edge="PHOTO TRIPS" title="Outing records" lead="Members plan photo outings together, around Kyoto and nearby prefectures." link={{ href: '/en/trips/', label: 'View outing records →' }} />
-  <section class="section"><div class="wrap"><div class="section-head"><p class="edge">LEARN</p><h2>Explore photography.</h2><p>Learn about shutter speed, aperture, focal length and developing.</p></div><p><a class="btn" href="/en/learn/">Start learning →</a></p></div></section>
+
+  <HomeIntro lang="en" />
+
+  <ReelHero
+    lang="en"
+    id="activity"
+    heading="h2"
+    counter={false}
+    photos={reel.photos}
+    placeholder={reel.placeholder}
+    note={reel.members ? 'Photos by club members, shown with their permission.' : undefined}
+    edge="PHOTO TRIPS ▸ LATEST ROLLS"
+    title="Outing records"
+    lead="Members plan photo outings together, around Kyoto and nearby prefectures."
+    link={{ href: '/en/trips/', label: 'View outing records →' }}
+  />
+
   <InstagramSection lang="en" />
+
+  <section class="section soft" aria-labelledby="next-title">
+    <div class="wrap stack">
+      <div class="head-row">
+        <div class="section-head">
+          <p class="edge">SCHEDULE ▸ COMING UP</p>
+          <h2 id="next-title">Coming up</h2>
+        </div>
+        <a class="link-arrow" href="/en/schedule/">See the schedule →</a>
+      </div>
+      <UpcomingEvents lang="en" />
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="learn-title">
+    <div class="wrap stack">
+      <div class="head-row">
+        <div class="section-head">
+          <p class="edge">LEARN ▸ FOR BEGINNERS</p>
+          <h2 id="learn-title">Learn photography by trying it.</h2>
+          <p class="muted">Shutter speed, aperture, focal length and developing: change the settings in your browser and see what happens.</p>
+        </div>
+        <a class="link-arrow" href="/en/learn/">Start learning →</a>
+      </div>
+      <LearnCards lang="en" rail />
+    </div>
+  </section>
+
+  <FirstSteps lang="en" />
+  <StickyJoin lang="en" />
 </Base>
+
+<style>
+  .soft {
+    background: var(--brand-pale);
+    border-top: 0;
+  }
+
+  .stack {
+    display: grid;
+    gap: 28px;
+  }
+
+  .head-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+  }
+</style>
