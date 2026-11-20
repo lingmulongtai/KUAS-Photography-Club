@@ -27,6 +27,7 @@ for (const path of ['index.html','en/index.html']) {
 }
 for (const route of ['index.html', 'about/index.html', 'join/index.html', 'schedule/index.html', 'trips/index.html',
   'contact/index.html', 'guidelines/index.html', 'guidelines/en/index.html', 'learn/index.html',
+  'learn/editing/index.html', 'en/learn/editing/index.html',
   'en/index.html', 'en/about/index.html', 'en/join/index.html', 'en/schedule/index.html', 'en/trips/index.html', 'en/contact/index.html']) {
   assert.ok(byPath.has(route), `Missing public route ${route}`);
 }
@@ -59,7 +60,7 @@ for (const id of ['ar', 'de', 'es', 'fr', 'hi', 'id', 'ko', 'pt', 'zh-CN']) {
 assert.match(byPath.get('en/join/index.html'), /JPY 1,000/);
 assert.match(byPath.get('join/index.html'), /1,000円/);
 assert.match(byPath.get('en/join/index.html'), /chat alone does not complete membership/);
-for (const path of ['index.html', 'about/index.html', 'en/index.html', 'en/about/index.html']) {
+for (const path of ['index.html', 'en/index.html']) {
   const source = byPath.get(path);
   const section = source.match(/<section\b[^>]*aria-labelledby="insta-title"[^>]*>([\s\S]*?)<\/section>/)?.[1];
   assert.ok(section, `Missing Instagram section: ${path}`);
@@ -70,6 +71,25 @@ for (const path of ['index.html', 'about/index.html', 'en/index.html', 'en/about
   assert.match(iframe, path.startsWith('en/') ? /title="[^"]*Instagram profile and posts"/ : /title="[^"]*プロフィールと投稿"/);
   // The profile remains reachable when Instagram or scripts are blocked.
   assert.match(section.replace(/<iframe\b[\s\S]*?<\/iframe>/g, ''), /<a\b[^>]*href="https:\/\/www\.instagram\.com\/kuas_photographyclub"/);
+}
+for (const path of ['about/index.html', 'en/about/index.html']) {
+  const source = byPath.get(path);
+  const timeline = source.match(/<ol class="timeline"[^>]*>([\s\S]*?)<\/ol>/)?.[1];
+  assert.ok(timeline, `Missing chronology: ${path}`);
+  assert.equal([...timeline.matchAll(/<li(?:\s|>)/g)].length, 6, `Missing milestone: ${path}`);
+  assert.deepEqual([...timeline.matchAll(/<time\s+datetime="([^"]+)"/g)].map((m) => m[1]),
+    ['2025-05', '2026-04', '2026-07-12', '2026-08-08', '2026-10-24'], `Milestone dates: ${path}`);
+  assert.doesNotMatch(source, /運営の役職|<iframe\b/, `About contains obsolete roles or an embed: ${path}`);
+  assert.equal([...source.matchAll(/<figure class="print print-\d/g)].length, 3, `Collage needs three prints: ${path}`);
+  assert.match(source, /<nav class="toc"[^>]*data-about-toc/, `Missing page contents: ${path}`);
+  assert.match(source, /class="ticket-stub"[^>]*href="https:\/\/www\.instagram\.com\/kuas_photographyclub"|href="https:\/\/www\.instagram\.com\/kuas_photographyclub"[^>]*class="ticket-stub"/, `Missing meeting ticket: ${path}`);
+  assert.match(source, /href="https:\/\/www\.instagram\.com\/kuas_photographyclub"/);
+}
+for (const [path, source] of html) {
+  if (/^(?:en\/)?admin\//.test(path)) continue;
+  for (const profile of source.matchAll(/https:\/\/www\.instagram\.com\/([\w.]+)\b/gi)) {
+    assert.equal(profile[1], 'kuas_photographyclub', `Non-club Instagram profile in ${path}`);
+  }
 }
 console.log(`Public output verified: ${html.length} HTML files, ${sampleSlugs.length} sample trip routes excluded, local links intact.`);
 

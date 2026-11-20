@@ -1,0 +1,344 @@
+---
+/**
+ * The About page, in Japanese and English: a collage of members' prints, the club's history by
+ * year, what we do, members' comments and a meeting "ticket". Photographs come from
+ * src/data/about-photos.ts and comments from src/data/member-voices.ts; until they are filled in,
+ * drawn placeholder prints stand in and the comments section stays hidden.
+ */
+import ClubIllustration from './ClubIllustration.astro';
+import { club } from '../data/club';
+import { clubHistory, type HistoryIllustration } from '../data/club-history';
+import { aboutPhotos, type AboutPhoto } from '../data/about-photos';
+import { memberVoices } from '../data/member-voices';
+interface Props { lang?: 'ja' | 'en'; }
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+const schedule = en ? '/en/schedule/' : '/schedule/';
+const trips = en ? '/en/trips/' : '/trips/';
+const alt = (photo: AboutPhoto) => (en ? photo.altEn ?? photo.alt : photo.alt);
+
+const activities: { key: keyof typeof aboutPhotos.activities; icon: HistoryIllustration; label: string; title: string; detail: string; wash: string }[] = [
+  { key: 'outings', icon: 'mountains', label: en ? '1–2 a month' : '月1〜2回', title: en ? 'Photo outings' : '撮影会', detail: en ? 'We aim for one or two outings a month in Kyoto and neighboring prefectures. We pick seasonal subjects such as cherry blossoms and autumn leaves, and members can suggest outings of their own.' : '月1〜2回を目安に、京都や近隣府県へ。桜や紅葉など季節の被写体を探し、部全体の企画に加えて部員発案の撮影会も行います。', wash: 'linear-gradient(160deg, #b9e5de, #2f7f87)' },
+  { key: 'exhibitions', icon: 'frames', label: en ? 'Campus festivals' : '学園祭', title: en ? 'Exhibitions and festivals' : '写真展示・学園祭', detail: en ? 'We share members’ photographs as prints and have set up photo booths where visitors can get involved.' : '部員の作品をプリントして展示したり、学園祭で来場者と一緒に楽しめる撮影ブースを開いたりしています。', wash: 'linear-gradient(160deg, #ffe2ab, #c9553a)' },
+  { key: 'campus', icon: 'campus', label: en ? 'University events' : '大学行事', title: en ? 'University events' : '大学行事の撮影', detail: en ? 'We photograph university events, including open campus days, and help with photography for university communications.' : 'オープンキャンパスなどの大学行事を写真で記録し、大学の広報撮影にも協力しています。', wash: 'linear-gradient(160deg, #cfe0f2, #3d5c8a)' },
+];
+
+// the timeline grouped by year: an undated entry belongs to the year it names
+let lastYear = '';
+const milestones = clubHistory.map((item) => {
+  const year = item.year ?? item.date?.slice(0, 4) ?? lastYear;
+  const first = year !== lastYear;
+  lastYear = year;
+  return { ...item, year, first };
+});
+
+const prints = [
+  { wash: 'linear-gradient(165deg, #b9e5de 0%, #66b7bc 55%, #2f7f87 100%)', ground: '#28666d', sun: '#f9ebbf' },
+  { wash: 'linear-gradient(165deg, #ffe2ab 0%, #e6a07e 55%, #b86a5a 100%)', ground: '#6d5265', sun: '#ffebba' },
+  { wash: 'linear-gradient(165deg, #d9ecc0 0%, #8fb98a 55%, #3d6b4f 100%)', ground: '#2f5641', sun: '#fff4cf' },
+];
+
+const toc = [
+  { id: 'club-history', label: en ? 'History' : '写真部の歩み' },
+  { id: 'club-activities', label: en ? 'What we do' : '普段の活動' },
+  ...(memberVoices.length ? [{ id: 'club-voices', label: en ? 'Members' : '部員の声' }] : []),
+  { id: 'club-visit', label: en ? 'Visit' : '見学・お問い合わせ' },
+];
+---
+<section class="intro" aria-labelledby="club-about-heading" data-about-intro>
+  <div class="wrap intro-grid">
+    <div class="intro-copy">
+      <p class="edge">ABOUT / KUAS PHOTOGRAPHY CLUB</p>
+      <h1 id="club-about-heading">{en ? 'About the KUAS Photography Club' : <><span lang="ja">京都先端科学大学</span><span lang="ja">写真部について</span></>}</h1>
+      <p class="lead">{en ? 'We’re the student-run photography club at Kyoto University of Advanced Science. We go out to take photos, exhibit our work, and meet people who share our interest. A smartphone is enough, and all experience levels are welcome.' : '京都先端科学大学の学生が運営する写真部です。撮影会や作品展示を通して、写真を楽しみ、学年や国籍を越えて交流しています。カメラがなくても、スマートフォンで参加できます。'}</p>
+      <a class="history-link" href="#club-history">{en ? 'See our history' : '写真部の歩みを見る'} <span aria-hidden="true">↓</span></a>
+    </div>
+    <!-- prints spread on a desk: members' photos, or drawn prints until they are added -->
+    <div class="collage">
+      {aboutPhotos.collage.map((photo, i) => (
+        <figure class={`print print-${i + 1}`}>
+          {photo
+            ? <img src={photo.src} alt={alt(photo)} width="600" height="450" loading={i ? 'lazy' : 'eager'} decoding="async" />
+            : <svg class="drawn" viewBox="0 0 160 120" role="img" aria-label={en ? 'Illustration of a print' : 'プリントのイラスト'} style={`background:${prints[i].wash}`}>
+                <circle cx={i === 1 ? 118 : 42} cy="34" r="13" fill={prints[i].sun} />
+                <path d={i === 2 ? 'M0 92 28 64l20 16 30-34 38 40 22-14 22 18v30H0z' : 'M0 88l36-38 26 26 22-24 34 30 18-12 24 20v30H0z'} fill={prints[i].ground} opacity=".55" />
+                <path d="M0 100l30-18 26 10 28-16 34 18 26-8 16 8v26H0z" fill={prints[i].ground} />
+              </svg>}
+          {photo && <figcaption>© {photo.by}</figcaption>}
+        </figure>
+      ))}
+    </div>
+  </div>
+</section>
+
+<nav class="toc" aria-label={en ? 'On this page' : 'このページの目次'} data-about-toc>
+  <ol class="wrap">
+    {toc.map((item) => <li><a href={`#${item.id}`} data-toc-link={item.id}>{item.label}</a></li>)}
+  </ol>
+</nav>
+
+<section class="section history" id="club-history" aria-labelledby="club-history-heading">
+  <div class="wrap">
+    <header class="section-head" data-reveal>
+      <p class="edge">TIMELINE</p>
+      <h2 id="club-history-heading">{en ? 'How the club grew' : '写真部の歩み'}</h2>
+      <p class="muted">{en ? 'From a student circle to a recognized club, here are a few milestones along the way.' : '写真同好会としてのスタートから、正式な部活動になってからの主な活動まで。'}</p>
+    </header>
+    <ol class="timeline">
+      {milestones.map((item) => (
+        <li class:list={{ 'is-first': item.first, 'is-highlight': item.highlight }} data-reveal>
+          <span class="year" aria-hidden={item.first ? undefined : 'true'}>{item.first ? item.year : ''}</span>
+          <article class="milestone">
+            {item.date ? <time datetime={item.date}>{item.label[lang]}</time> : <span class="when">{item.label[lang]}</span>}
+            <h3>{item.highlight && <span class="mark" aria-hidden="true"><ClubIllustration icon={item.illustration} /></span>}{item.title[lang]}</h3>
+            <p>{item.detail[lang]}</p>
+          </article>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>
+
+<section class="section activities" id="club-activities" aria-labelledby="club-activities-heading">
+  <div class="wrap">
+    <header class="section-head" data-reveal>
+      <p class="edge">ACTIVITIES</p>
+      <h2 id="club-activities-heading">{en ? 'What we do' : '普段の活動'}</h2>
+    </header>
+    <div class="activity-grid">
+      {activities.map((activity) => {
+        const photo = aboutPhotos.activities[activity.key];
+        return (
+          <article data-reveal>
+            <div class="shot" style={photo ? undefined : `background:${activity.wash}`}>
+              {photo
+                ? <img src={photo.src} alt={alt(photo)} width="600" height="450" loading="lazy" decoding="async" />
+                : <span class="shot-art" aria-hidden="true"><ClubIllustration icon={activity.icon} /></span>}
+              <span class="label">{activity.label}</span>
+            </div>
+            <div class="text">
+              <h3>{activity.title}</h3>
+              <p>{activity.detail}</p>
+              {photo && <p class="credit">© {photo.by}</p>}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+    <a class="text-link" href={trips}>{en ? 'Explore photo outings' : '撮影会のページを見る'} <span aria-hidden="true">→</span></a>
+  </div>
+</section>
+
+{memberVoices.length > 0 && (
+  <section class="section voices" id="club-voices" aria-labelledby="club-voices-heading">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="edge">VOICES</p>
+        <h2 id="club-voices-heading">{en ? 'From our members' : '部員の声'}</h2>
+      </header>
+      <div class="voice-grid">
+        {memberVoices.map((voice) => (
+          <figure data-reveal>
+            <blockquote lang={en && !voice.quoteEn ? 'ja' : undefined}>{en ? voice.quoteEn ?? voice.quote : voice.quote}</blockquote>
+            {voice.who && <figcaption>{en ? voice.whoEn ?? voice.who : voice.who}</figcaption>}
+          </figure>
+        ))}
+      </div>
+    </div>
+  </section>
+)}
+
+<section class="section visit" id="club-visit" aria-labelledby="club-visit-heading">
+  <div class="wrap visit-inner">
+    <header class="section-head" data-reveal>
+      <p class="edge">VISIT / CONTACT</p>
+      <h2 id="club-visit-heading">{en ? 'Visit or get in touch' : '見学・お問い合わせ'}</h2>
+      <p>{en ? 'Visitors are welcome, with or without a camera.' : '見学だけでも歓迎です。カメラがなくても大丈夫。'}</p>
+    </header>
+    <!-- the weekly meeting as an admission ticket; the stub is the way in -->
+    <div class="ticket" data-reveal>
+      <div class="ticket-main">
+        <p class="edge">ADMIT ONE ▸ WEEKLY MEETING</p>
+        <p class="when"><span class="day">{en ? 'FRI' : '毎週金曜'}</span> 18:00</p>
+        <h3>{en ? `Room ${club.meetings.room}, Uzumasa Campus` : `${club.campus} ${club.meetings.room}`}</h3>
+        <p>{en ? `Club dues: ¥${club.feePerSemester.toLocaleString('en-US')} per semester. Members pay their own transportation and admission fees for outings.` : `部費は半期${club.feePerSemester.toLocaleString('ja-JP')}円。撮影会の交通費や入場料は別途各自負担です。`}</p>
+        <a href={schedule}>{en ? 'Check schedule and room changes' : '休会・教室変更を確認する'} <span aria-hidden="true">→</span></a>
+      </div>
+      <a class="ticket-stub" href={club.instagram.url} rel="noopener" target="_blank">
+        <span class="stub-note">{en ? 'Visits and joining: send a DM' : '見学・入部や撮影のご依頼はDMで'}</span>
+        <span class="stub-handle">@{club.instagram.handle.split('_').map((part, i) => <>{i > 0 && <>_<wbr /></>}{part}</>)}</span>
+        <span class="stub-go">{en ? 'Open Instagram' : 'Instagram を開く'} <span aria-hidden="true">↗</span></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<script>
+  // the table of contents marks the section being read
+  const links = new Map([...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')].map((a) => [a.dataset.tocLink!, a]));
+  const toc = document.querySelector<HTMLElement>('[data-about-toc]');
+  const intro = document.querySelector('[data-about-intro]');
+  if ('IntersectionObserver' in window) {
+    const current = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        links.forEach((a, id) => a.toggleAttribute('aria-current', id === entry.target.id));
+      }
+    }, { rootMargin: '-35% 0px -60% 0px' });
+    links.forEach((_, id) => { const section = document.getElementById(id); if (section) current.observe(section); });
+    // on a wide screen the contents float beside the page once the opening is scrolled past
+    // nothing is marked while the opening is still on screen
+    if (toc && intro) new IntersectionObserver(([entry]) => {
+      toc.classList.toggle('is-past', !entry.isIntersecting);
+      if (entry.isIntersecting) links.forEach((a) => a.removeAttribute('aria-current'));
+    }, { rootMargin: '0px 0px -55% 0px' }).observe(intro);
+
+    // sections still below the screen rise into place as they arrive; everything is visible without this
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const waiting = [...document.querySelectorAll<HTMLElement>('[data-reveal]')].filter((el) => el.getBoundingClientRect().top > innerHeight);
+      const reveal = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add('is-in');
+          reveal.unobserve(entry.target);
+        }
+      }, { rootMargin: '0px 0px -8% 0px' });
+      waiting.forEach((el, i) => {
+        el.classList.add('will-reveal');
+        el.style.setProperty('--delay', `${(i % 3) * 70}ms`);
+        reveal.observe(el);
+      });
+    }
+  }
+</script>
+
+<style>
+  /* white opening, pale history, plain activities, pale voices, a dark closing band */
+  .intro { background: var(--base); padding-block: clamp(28px, 6vw, 80px) clamp(36px, 6vw, 72px); overflow: hidden; }
+  .intro-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px 48px; align-items: center; }
+  .intro-copy { display: grid; gap: clamp(14px, 2.3vw, 24px); align-content: center; justify-items: start; }
+  h1 { font-size: clamp(32px, 4.65vw, 60px); line-height: 1.22; }
+  h1 span[lang=ja] { display: block; }
+  :global([lang=ja]) h3 { word-break: auto-phrase; text-wrap: pretty; }
+  h2 { font-size: var(--step-4); }
+  h3 { font-size: var(--step-2); }
+  .history-link, .text-link { width: fit-content; color: var(--accent); font-weight: 700; }
+  .history-link { border: 1px solid var(--line-strong); border-radius: 999px; padding: .55em 1em; background: var(--raise); text-decoration: none; }
+  .history-link:hover { border-color: var(--accent); }
+  .history-link span, .text-link span { margin-inline-start: .35em; }
+  .section-head { display: grid; gap: 8px; margin-bottom: clamp(20px, 3vw, 32px); }
+
+  /* the collage */
+  .collage { position: relative; aspect-ratio: 5 / 4; width: 100%; max-width: 560px; justify-self: center; }
+  .print { position: absolute; margin: 0; padding: 3.2% 3.2% 9%; background: #fffdf8; border-radius: 3px; box-shadow: 0 2px 4px rgba(15, 25, 28, .12), 0 18px 34px rgba(15, 25, 28, .16); display: grid; gap: 6px; }
+  .print img, .print .drawn { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 1px; }
+  .print figcaption { font: 600 11px/1.2 var(--latin); color: #5d6f74; }
+  .print-1 { width: 56%; left: 0; top: 8%; transform: rotate(-6deg); z-index: 1; }
+  .print-2 { width: 50%; right: 0; top: 0; transform: rotate(5deg); }
+  .print-3 { width: 54%; left: 24%; bottom: 0; transform: rotate(-1.5deg); z-index: 2; }
+
+  /* contents */
+  .toc { position: sticky; top: var(--header-h); z-index: 20; background: color-mix(in srgb, var(--raise) 92%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-block: 1px solid var(--line); }
+  .toc ol { list-style: none; margin: 0 auto; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-block: 8px; }
+  .toc ol::-webkit-scrollbar { display: none; }
+  .toc a { display: inline-block; white-space: nowrap; padding: 7px 14px; border-radius: 999px; color: var(--muted); font-size: 14px; font-weight: 700; text-decoration: none; }
+  .toc a:hover { color: var(--ink); background: var(--raise-2); }
+  .toc a[aria-current] { color: var(--on-accent); background: var(--brand); }
+  .toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (min-width: 1500px) {
+    /* beside the page on a wide screen, once the opening is scrolled past */
+    .toc { position: fixed; top: 50%; left: max(16px, calc((100vw - var(--maxw)) / 2 - 190px)); width: 170px; transform: translate(-12px, -50%); background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; opacity: 0; visibility: hidden; transition: opacity .3s, transform .3s, visibility .3s; }
+    .toc.is-past { opacity: 1; visibility: visible; transform: translate(0, -50%); }
+    .toc ol { flex-direction: column; padding: 0; overflow: visible; max-width: none; }
+    .toc a { white-space: normal; border-left: 2px solid var(--line); border-radius: 0 999px 999px 0; }
+    .toc a[aria-current] { border-left-color: var(--accent); }
+  }
+
+  /* history, by year */
+  .history { background: var(--brand-pale); border-top: 0; }
+  .timeline { list-style: none; margin: 0; padding: 0; display: grid; }
+  .timeline li { display: grid; grid-template-columns: clamp(5.5rem, 12vw, 9rem) minmax(0, 1fr); column-gap: clamp(14px, 3vw, 32px); }
+  .timeline li.is-first:not(:first-child) { margin-top: clamp(20px, 3vw, 32px); }
+  .year { font: 700 clamp(34px, 5vw, 56px)/1 var(--latin); color: var(--brand-deep, var(--accent)); letter-spacing: -.01em; padding-top: 4px; }
+  .milestone { position: relative; display: grid; gap: 4px; padding: 0 0 clamp(18px, 2.6vw, 26px) clamp(20px, 3vw, 30px); border-left: 2px solid var(--line-strong); }
+  .milestone::before { content: ''; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--brand-pale); border: 2px solid var(--accent); }
+  .milestone time, .milestone .when { font: 700 13px/1.4 var(--latin); color: var(--accent); }
+  .milestone h3 { font-size: var(--step-1); display: flex; align-items: center; gap: 10px; }
+  .milestone p { color: var(--muted); max-width: 46em; }
+  /* a turning point: a filled card on the line */
+  .is-highlight .milestone {
+    margin-bottom: clamp(18px, 2.6vw, 26px);
+    padding: clamp(16px, 2.6vw, 24px) clamp(18px, 3vw, 28px) clamp(16px, 2.6vw, 24px) clamp(20px, 3vw, 30px);
+    border-left: 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    background: var(--accent);
+    box-shadow: -2px 0 0 var(--line-strong);
+  }
+  .is-highlight .milestone::before { background: var(--raise); border-color: var(--accent); top: clamp(20px, 3vw, 28px); }
+  .is-highlight .milestone time, .is-highlight .milestone p { color: color-mix(in srgb, var(--on-dark, #fff) 82%, transparent); }
+  .is-highlight .milestone h3 { color: var(--on-dark, #fff); font-size: var(--step-2); }
+  .mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 30%; background: rgba(255, 255, 255, .16); color: #fff; flex: none; }
+  .mark :global(svg) { width: 78%; height: 78%; }
+  :global(:root[data-theme]:not([data-theme="light"])) .is-highlight .milestone { background: #1f5f68; }
+
+  /* what we do */
+  .activities { background: var(--base); }
+  .activity-grid { display: grid; gap: clamp(14px, 2vw, 22px); grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 22px; }
+  .activity-grid article { display: grid; grid-template-rows: auto 1fr; background: var(--raise); border-radius: calc(var(--radius) + 4px); overflow: hidden; box-shadow: 0 0 0 1px var(--line), 0 12px 28px rgba(27, 54, 61, .08); }
+  .shot { position: relative; aspect-ratio: 4 / 3; display: grid; place-items: center; overflow: hidden; }
+  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .shot-art { width: 38%; color: rgba(255, 255, 255, .9); }
+  .shot-art :global(svg) { width: 100%; height: auto; display: block; }
+  .label { position: absolute; left: 12px; bottom: 12px; padding: 4px 11px; border-radius: 999px; background: rgba(255, 255, 255, .92); color: #1b363d; font-size: 12px; font-weight: 700; }
+  .text { display: grid; gap: 6px; align-content: start; padding: clamp(16px, 2.4vw, 22px); }
+  .text p { color: var(--muted); }
+  .text .credit { font-size: 12px; }
+
+  /* members */
+  .voices { background: var(--brand-pale); border-top: 0; }
+  .voice-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+  .voice-grid figure { margin: 0; display: grid; gap: 12px; align-content: space-between; padding: clamp(18px, 3vw, 26px); background: var(--raise); border-radius: var(--radius); position: relative; }
+  .voice-grid blockquote { margin: 0; font-size: var(--step-1); line-height: 1.8; }
+  .voice-grid blockquote::before { content: '“'; display: block; font: 700 44px/0.6 var(--latin); color: var(--brand); margin-bottom: 6px; }
+  .voice-grid figcaption { font-size: 13px; font-weight: 700; color: var(--accent); }
+
+  /* the closing band and the ticket */
+  .visit { --band-ink: #e9f5f6; background: #14303a; color: var(--band-ink); border-top: 0; overflow: hidden; position: relative; }
+  .visit::after { content: ''; position: absolute; right: -120px; bottom: -180px; width: 420px; height: 420px; border: 2px solid rgba(100, 190, 198, .45); border-radius: 50%; pointer-events: none; }
+  .visit .edge { color: #8fe3ea; }
+  .visit h2 { color: #fff; }
+  .visit .section-head p { color: #b8d3d8; }
+  .visit-inner { position: relative; z-index: 1; }
+  .ticket { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); max-width: 760px; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 48px rgba(0, 0, 0, .3); color: #1b363d; }
+  .ticket-main { position: relative; display: grid; gap: 8px; align-content: start; padding: clamp(20px, 3.4vw, 32px); background: #fffdf8; }
+  .ticket-main::after { content: ''; position: absolute; top: 14px; bottom: 14px; right: 0; border-right: 2px dashed #c9dcdd; }
+  .ticket-main .edge { color: #1c7a85; }
+  .ticket-main .when { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--latin); color: #1c7a85; font-variant-numeric: tabular-nums; }
+  .ticket-main .when .day { font: 700 .62em/1 var(--display); letter-spacing: .04em; margin-right: .2em; }
+  .ticket-main h3 { color: #1b363d; }
+  .ticket-main p { color: #557079; }
+  .ticket-main a { color: #1c7a85; font-weight: 700; width: fit-content; }
+  .ticket-stub { display: grid; gap: 10px; align-content: center; padding: clamp(20px, 3.4vw, 32px); background: #64bec6; color: #10272c; text-decoration: none; transition: background-color .2s; }
+  .ticket-stub:hover { background: #7ccbd2; color: #10272c; }
+  .ticket-stub:focus-visible { outline: 3px solid #fff; outline-offset: -6px; }
+  .stub-note { font-size: 13px; font-weight: 700; }
+  .stub-handle { font: 700 clamp(18px, 2.4vw, 24px)/1.25 var(--latin); overflow-wrap: anywhere; }
+  .stub-go { font-size: 13px; font-weight: 700; }
+
+  /* rising into place (only for sections that start below the screen, and never with reduced motion) */
+  :global(.will-reveal) { opacity: 0; transform: translateY(18px); }
+  :global(.will-reveal.is-in) { opacity: 1; transform: none; transition: opacity .6s ease-out var(--delay, 0ms), transform .6s cubic-bezier(.2, .7, .2, 1) var(--delay, 0ms); }
+
+  @media (max-width: 860px) {
+    .intro-grid, .activity-grid { grid-template-columns: minmax(0, 1fr); }
+    .collage { max-width: 420px; }
+    .shot { aspect-ratio: 16 / 9; }
+  }
+  @media (max-width: 600px) {
+    .timeline li { grid-template-columns: minmax(0, 1fr); }
+    .year { font-size: 34px; margin-bottom: 10px; }
+    .timeline li:not(.is-first) .year { display: none; }
+    .ticket { grid-template-columns: minmax(0, 1fr); }
+    .ticket-main::after { top: auto; left: 14px; right: 14px; bottom: 0; border-right: 0; border-bottom: 2px dashed #c9dcdd; }
+  }
+</style>

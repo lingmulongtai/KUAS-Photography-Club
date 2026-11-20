@@ -61,7 +61,7 @@ const topics = learnTopics.filter((t) => t.slug !== exclude);
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 14px;
   }
 
@@ -93,8 +93,6 @@ const topics = learnTopics.filter((t) => t.slug !== exclude);
   /* previews: one small motion per topic, still until hovered or seen */
   .demo { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
   .demo i { position: absolute; display: block; }
-  .card:is(:hover, :focus-visible, .is-playing) .demo i { animation-play-state: running; }
-  .demo i { animation-play-state: paused; animation-fill-mode: both; }
 
   /* shutter speed: light trails draw across a long exposure */
   .demo-shutter-speed i { left: 8%; height: 2px; width: 70%; border-radius: 2px; transform-origin: left; transform: scaleX(0.04);
@@ -126,6 +124,19 @@ const topics = learnTopics.filter((t) => t.slug !== exclude);
     animation: develop 3.2s ease-in infinite; }
   .demo-darkroom i:nth-child(n+2) { display: none; }
   @keyframes develop { from { opacity: 0; filter: contrast(.2); } 75% { opacity: 1; filter: contrast(1); } to { opacity: 1; } }
+
+  /* editing: a frame and its caption line settle around the picture */
+  .demo-editing i:nth-child(1) { left: 50%; top: 26%; width: 104px; height: 74px; margin: -37px 0 0 -52px; border: 0 solid rgba(244,241,234,.7); border-radius: 2px;
+    animation: frame 3s cubic-bezier(.3,.1,.2,1) infinite; }
+  .demo-editing i:nth-child(2) { left: 50%; top: calc(26% + 44px); width: 56px; height: 3px; margin-left: -35px; border-radius: 2px; background: rgba(244,241,234,.8); transform-origin: left;
+    animation: caption 3s ease-out infinite; }
+  .demo-editing i:nth-child(3) { display: none; }
+  @keyframes frame { from { border-width: 0; } 45%, to { border-width: 6px 6px 18px; } }
+  @keyframes caption { 0%, 40% { transform: scaleX(0); opacity: 0; } 70%, to { transform: scaleX(1); opacity: 1; } }
+
+  /* still until hovered or seen; more specific than each preview's animation shorthand, which would reset it */
+  .cards .demo i { animation-play-state: paused; animation-fill-mode: both; }
+  .cards .card:is(:hover, :focus-visible, .is-playing) .demo i { animation-play-state: running; }
 
   @media (prefers-reduced-motion: reduce) { .demo i { animation: none !important; opacity: 0; } }
 
