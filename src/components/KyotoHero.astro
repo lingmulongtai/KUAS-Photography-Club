@@ -7,6 +7,7 @@
 import { club } from '../data/club';
 import { homeJa } from '../data/home-ja';
 import HeroIntro from './HeroIntro.astro';
+import HeroFramePanel from './HeroFramePanel.astro';
 import { languagePath } from '../lib/i18n';
 interface Props { lang?: 'ja' | 'en'; }
 const { lang = 'ja' } = Astro.props;
@@ -23,6 +24,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
 ---
 <HeroIntro lang={lang} />
 <section class="hero" aria-labelledby="hero-title" data-view="city" data-lang={lang}>
+  <HeroFramePanel en={en} />
   <div class="stage hero-stage" data-demo="hero" data-trips={JSON.stringify(pinTrips)}>
     <picture>
       <source type="image/webp" srcset="/brand/kyoto-preview-640.webp 640w, /brand/kyoto-preview-960.webp 960w, /brand/kyoto-preview-1250.webp 1250w" sizes="100vw" />
@@ -179,6 +181,36 @@ const pinTrips = completeSpotPreviews((await getTrips())
   const hero = stage?.closest<HTMLElement>('.hero');
   if (stage && hero && !document.documentElement.classList.contains('screenshot-preview')) {
     const en = hero.dataset.lang === 'en';
+    const framePanel = hero.querySelector<HTMLElement>('[data-frame-panel]')!;
+    let onFrameSubmitted: (() => void) | undefined;
+    let stopFramePanel: (() => void) | undefined;
+    const toggleFramePanel = async () => {
+      framePanel.hidden = !framePanel.hidden;
+      if (framePanel.hidden) {
+        stopFramePanel?.();
+        stopFramePanel = undefined;
+        return;
+      }
+      try {
+        const { observeFramePanel } = await import('../scripts/hero/frame-panel');
+        if (!framePanel.hidden && !stopFramePanel) {
+          stopFramePanel = observeFramePanel(framePanel, stage, frame => { onFrameSubmitted = frame; });
+        }
+      } catch (error) {
+        framePanel.hidden = true;
+        console.warn('Frame statistics unavailable', error);
+      }
+    };
+    framePanel.querySelector('[data-frame-close]')!.addEventListener('click', toggleFramePanel);
+    document.addEventListener('keydown', event => {
+      if (event.code !== 'KeyP' || !event.shiftKey || event.altKey || event.ctrlKey || event.metaKey ||
+          event.repeat || event.isComposing || event.defaultPrevented) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return;
+      event.preventDefault();
+      void toggleFramePanel();
+    });
+    if (new URLSearchParams(location.search).get('fps') === '1') void toggleFramePanel();
     const out = {
       status: hero.querySelector('[data-status]'),
       clock: hero.querySelector('[data-clock]'),
@@ -427,6 +459,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           get reducedMotion() { return motion.matches; },
           drift: !coarse,
           onStatus,
+          get onFrameSubmitted() { return onFrameSubmitted; },
           onProgress: progress => document.dispatchEvent(new CustomEvent('hero:progress', {detail:progress})),
           onReady: () => {
             hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false;timeSlider.disabled=false;
