@@ -145,10 +145,13 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec2 ab = s.zw - s.xy;
         return length(p - s.xy - ab * clamp(dot(p - s.xy, ab) / dot(ab, ab), 0., 1.));
       }
+      float boxInset(vec4 b, vec2 p){
+        vec2 d = min(p - b.xy, b.zw - p);
+        return min(d.x, d.y);
+      }
       // 0 outside the box, rising to 1 within m metres of the edge
       float inside(vec4 b, vec2 p, float m){
-        vec2 d = min(p - b.xy, b.zw - p);
-        return smoothstep(0., m, min(d.x, d.y));
+        return smoothstep(0., m, boxInset(b,p));
       }
 
       void main(){
@@ -332,8 +335,13 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // Reuse the two already-filtered normal samples. Detailed streets take over near the camera.
           float distantLight = (1.-basinSurface.a)*basin
             + (1.-outerSurface.a)*(1.-basin)*uOuterOn*inside(uOuterBox,p,120.);
-          float core = uRoadsOn*inside(uRoadBox,p,180.);
-          float closeDetail = uRegionRoadsOn*inside(uRegionRoadBox,p,120.)*(1.-smoothstep(1400.,4000.,dist));
+          float coreInset = boxInset(uRoadBox,p);
+          float core = uRoadsOn*smoothstep(0.,180.,coreInset);
+          // Both detailed fields include their edge. Feather outside by one basin texel,
+          // so the two neighbouring areas cannot expose a strip of coarse light between them.
+          float detailed = max(uRoadsOn*smoothstep(-30.,0.,coreInset),
+            uRegionRoadsOn*smoothstep(-30.,0.,boxInset(uRegionRoadBox,p)));
+          float closeDetail = detailed*(1.-smoothstep(2400.,4000.,dist));
           emit = max(emit, vec3(.65,.47,.29)*distantLight*(1.-max(core,closeDetail)));
           emit *= uCity * cityLightShimmer(vWorld);
         }
