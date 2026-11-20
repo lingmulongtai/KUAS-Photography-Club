@@ -24,8 +24,12 @@ const DRUM = 52000;
  */
 export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),quality=1,climate:Climate='spring') {
   let weather=cloudWeather(seed,climate);
+  // Runtime loop bounds keep GPU drivers from duplicating the large noise function at compile time.
+  const detail = quality > .75 ? 2 : 1;
   const uniforms = {
     ...env,
+    uMarchSteps: { value: detail === 2 ? 40 : 22 },
+    uEdgeRefinements: { value: detail + 2 },
     uCover: { value: weather.cover },
     uClear: { value: weather.clear },
     uStyle: { value: weather.style },
@@ -36,11 +40,9 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     uOffset: { value: new THREE.Vector2(...weather.offset) },
     uWind: { value: new THREE.Vector2() },
   };
-  // phones march fewer, longer steps and skip the second detail octave
-  const steps = quality > .75 ? 40 : 22;
   const material = new THREE.ShaderMaterial({
     uniforms,
-    defines: { STEPS: steps, DETAIL: quality > .75 ? 2 : 1 },
+    defines: { DETAIL: detail },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
       void main(){
@@ -60,6 +62,8 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
       uniform float uAlto;
       uniform vec2 uOffset;
       uniform vec2 uWind;
+      uniform int uMarchSteps;
+      uniform int uEdgeRefinements;
       varying vec3 vWorld;
 
       /** weather-map units per metre: one unit is about 9 km */
@@ -271,10 +275,10 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           // as a finer, calmer grain than independent random ones)
           float jitter = .25 + .5 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))));
           // tall slabs (towering clouds) need more steps to stay solid
-          float steps = min(float(STEPS) * (1. + (uTop - uBase) / 3000.), float(STEPS) * 2.);
+          float steps = min(float(uMarchSteps) * (1. + (uTop - uBase) / 3000.), float(uMarchSteps) * 2.);
           float tPrev = t0;
           bool inside = false;
-          for (int i = 0; i < STEPS * 2; i++){
+          for (int i = 0; i < uMarchSteps * 2; i++){
             if (T < .03 || float(i) >= steps) break;
             float u0 = float(i) / steps, u1 = (float(i) + 1.) / steps;
             // a per-pixel offset turns the banding of the steps into fine grain
@@ -289,7 +293,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
               // The ray entered a cloud somewhere since the last sample. Find where: shaded at the
               // step it happened to land on, a cloud's face would be sliced into bands, one per step.
               float lo = tPrev, hi = t;
-              for (int k = 0; k < DETAIL + 2; k++){
+              for (int k = 0; k < uEdgeRefinements; k++){
                 float mid = .5 * (lo + hi);
                 if (density(ro + rd * mid, mid) > .002) hi = mid;
                 else lo = mid;
