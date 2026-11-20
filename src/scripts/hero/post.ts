@@ -136,7 +136,9 @@ const BrightPassShader = {
  */
 export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, samples = 4) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  const sceneTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
+  const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
+    type: THREE.HalfFloatType, samples, resolveDepthBuffer: false, storeMultisampledDepthBuffer: false,
+  });
   const scenePass = new RenderPass(scene, camera);
   // Only the scene needs per-sample visibility. All subsequent passes cover every pixel.
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, {
