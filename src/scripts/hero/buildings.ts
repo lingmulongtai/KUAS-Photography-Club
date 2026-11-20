@@ -93,13 +93,13 @@ const walls = (top: number): Face[] => [
   { pts: [[-0.5, 0, -0.5], [-0.5, 0, 0.5], [-0.5, top, 0.5], [-0.5, top, -0.5]], n: [-1, 0, 0], role: 0 },
 ];
 
-function flatShape() {
-  return unitShape([...walls(1), { pts: [[-0.5, 1, -0.5], [0.5, 1, -0.5], [0.5, 1, 0.5], [-0.5, 1, 0.5]], n: [0, 1, 0], role: 3 }]);
+function flatShape(sides = walls(1)) {
+  return unitShape([...sides, { pts: [[-0.5, 1, -0.5], [0.5, 1, -0.5], [0.5, 1, 0.5], [-0.5, 1, 0.5]], n: [0, 1, 0], role: 3 }]);
 }
 
-function pitchedShape() {
+function pitchedShape(sides = walls(1)) {
   return unitShape([
-    ...walls(1),
+    ...sides,
     { pts: [[-0.5, 1, 0.5], [0.5, 1, 0.5], [0.5, 2, 0], [-0.5, 2, 0]], n: [0, 1, 1], role: 1 },
     { pts: [[0.5, 1, -0.5], [-0.5, 1, -0.5], [-0.5, 2, 0], [0.5, 2, 0]], n: [0, 1, -1], role: 1 },
     { pts: [[0.5, 1, 0.5], [0.5, 1, -0.5], [0.5, 2, 0]], n: [1, 0, 0], role: 2 },
@@ -163,12 +163,23 @@ const INSTANCE_VS = /* glsl */ `
 
   void main(){
     vec3 p = position;
+    vec3 face = normal;
+    float c = cos(iRot), s = sin(iRot);
+  #ifdef BLOCK_OVERVIEW
+    // This mesh submits two walls. Rotate each canonical wall to the camera-facing
+    // side of its house, preserving winding and the original window coordinates.
+    if (aRole == 0.) {
+      vec2 eye = cameraPosition.xz - iPos.xz;
+      vec2 axis = face.x > .5 ? vec2(c, s) : vec2(-s, c);
+      if (dot(eye, axis) < 0.) { p.xz = -p.xz; face.xz = -face.xz; }
+    }
+  #endif
     float w = iSize.x, h = iSize.y, d = iSize.z;
     float roof = iMeta.z;
     float rh = iMeta.w;
     float hip = step(1.5, roof);
     float eave = roof > .5 ? h - rh * .5 : h;
-    vec3 n = normal;
+    vec3 n = face;
   #ifdef STEPPED
     float y = p.y < .5 ? -${FOOTING.toFixed(1)} : eave + max(p.y - 1., 0.) * rh;
     vec2 xz = p.xz * vec2(w, d);
@@ -200,14 +211,13 @@ const INSTANCE_VS = /* glsl */ `
     if (aRole == 2. && hip > .5) n = normalize(vec3(sign(p.x) * rh, d * .5, 0.));
   #endif
 
-    float c = cos(iRot), s = sin(iRot);
     mat2 R = mat2(c, s, -s, c);
     vec2 wxz = R * xz;
     vec2 wn = R * n.xz;
     vec3 world = vec3(iPos.x + wxz.x, iPos.y + y, iPos.z + wxz.y);
     vWorld = world;
     vNormal = normalize(vec3(wn.x, n.y, wn.y));
-    float along = abs(normal.x) > .5 ? p.z * d + 31. * sign(normal.x) : p.x * w + 17. * sign(normal.z);
+    float along = abs(face.x) > .5 ? p.z * d + 31. * sign(face.x) : p.x * w + 17. * sign(face.z);
     // level faces are laid out across their plane, so the blocks of a roof run both ways
     vWall = abs(normal.y) > .5 ? xz : vec2(along, y);
     float role = aRole;
@@ -531,7 +541,20 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
  * `keep` can thin out the boxes (phones leave out small houses far from the viewpoint);
  * `dressed` buildings have facades modelled elsewhere and get no facade or roof details.
  */
-function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, keep: (b: BoxBuilding) => boolean, quality: number, dressed: (b: BoxBuilding | PolyBuilding) => boolean) {
+type PanoramaEye = { x: number; z: number };
+
+/** Keep the same measured positions and facade seeds when changing the unit mesh. */
+function instanceShape(shape: THREE.InstancedBufferGeometry, source: THREE.InstancedBufferGeometry) {
+  const geometry = new THREE.InstancedBufferGeometry();
+  for (const name of ['position', 'normal', 'aRole', 'aLevel']) geometry.setAttribute(name, shape.getAttribute(name));
+  for (const name of ['iPos', 'iSize', 'iRot', 'iMeta']) geometry.setAttribute(name, source.getAttribute(name));
+  geometry.instanceCount = source.instanceCount;
+  geometry.boundingBox = source.boundingBox;
+  geometry.boundingSphere = source.boundingSphere;
+  return geometry;
+}
+
+function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, keep: (b: BoxBuilding) => boolean, quality: number, dressed: (b: BoxBuilding | PolyBuilding) => boolean, panoramaEye?: PanoramaEye) {
   const group = new THREE.Group();
   const detailMat = detailMaterial(env, VOXEL);
   // beyond these the parts are thinner than a pixel
@@ -546,17 +569,22 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
   const flat = flatShape();
   const pitched = pitchedShape();
   const stepped = steppedShape();
+  const overview = panoramaEye ? new THREE.Group() : null;
+  const facingWalls = walls(1).filter(face => face.n[0] > 0 || face.n[2] > 0);
+  const proxyShapes = overview ? { flat: flatShape(facingWalls), pitched: pitchedShape(facingWalls) } : null;
+  const proxyMaterial = overview ? new THREE.ShaderMaterial({ uniforms: env, vertexShader: INSTANCE_VS, fragmentShader: BUILDING_FS, defines: { BLOCK_OVERVIEW: 1 } }) : null;
+  const blocks: { proxy: THREE.Group; originals: THREE.Mesh[]; distance: number }[] = [];
   let complete=false;
   try {
   /** Pairs of the same houses: stepped roofs for chunks near the camera, plain slopes beyond. */
   const roofLods: { near: THREE.Mesh; far: THREE.Mesh; x: number; z: number }[] = [];
 
-  type Chunk = { flat: { b: BoxBuilding; y: number; seed: number }[]; pitched: { b: BoxBuilding; y: number; seed: number }[]; polys: { p: PolyBuilding; y: number; seed: number }[] };
+  type Chunk = { x: number; z: number; flat: { b: BoxBuilding; y: number; seed: number }[]; pitched: { b: BoxBuilding; y: number; seed: number }[]; polys: { p: PolyBuilding; y: number; seed: number }[] };
   const chunks = new Map<string, Chunk>();
   const chunkOf = (x: number, z: number) => {
     const key = `${Math.floor(x / CHUNK)},${Math.floor(z / CHUNK)}`;
     let c = chunks.get(key);
-    if (!c) chunks.set(key, (c = { flat: [], pitched: [], polys: [] }));
+    if (!c) chunks.set(key, (c = { x: (Math.floor(x / CHUNK) + .5) * CHUNK, z: (Math.floor(z / CHUNK) + .5) * CHUNK, flat: [], pitched: [], polys: [] }));
     return c;
   };
   for(let i=0;i<data.boxes.length;i++) {
@@ -621,40 +649,63 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
 
   for (const c of chunks.values()) {
     yield;
-    const meshes: [THREE.BufferGeometry, THREE.ShaderMaterial, THREE.ShaderMaterial][] = [];
-    if (c.flat.length) meshes.push([instanced(flat, c.flat, false), instMat, instDepth]);
-    if (c.polys.length) meshes.push([extruded(c.polys), polyMat, polyDepth]);
-    const add = ([geo, mat, depth]: (typeof meshes)[number]) => {
+    const add = (geo: THREE.BufferGeometry, mat: THREE.ShaderMaterial, depth: THREE.ShaderMaterial) => {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.userData.depthMaterial = depth;
       group.add(mesh);
       return mesh;
     };
-    meshes.forEach(add);
+    let block: (typeof blocks)[number] | undefined;
+    if (panoramaEye && overview && (c.flat.length || c.pitched.length)) {
+      const west = panoramaEye.x - c.x, across = Math.abs(panoramaEye.z - c.z);
+      const distance = Math.hypot(Math.max(0, west - CHUNK / 2), Math.max(0, across - CHUNK / 2));
+      if (west > CHUNK / 2 && across < west * 1.25 && distance >= 850) {
+        block = { proxy: new THREE.Group(), originals: [], distance };
+        block.proxy.visible = false;
+        overview.add(block.proxy);
+        blocks.push(block);
+      }
+    }
+    if (c.flat.length) {
+      const full = instanced(flat, c.flat, false);
+      const mesh = add(full, instMat, instDepth);
+      if (block && proxyShapes && proxyMaterial) {
+        block.originals.push(mesh);
+        block.proxy.add(new THREE.Mesh(instanceShape(proxyShapes.flat, full), proxyMaterial));
+      }
+    }
+    if (c.polys.length) add(extruded(c.polys), polyMat, polyDepth);
     if (c.pitched.length) {
       const far = instanced(pitched, c.pitched, true);
       // the stepped houses share the far set's per-house data
-      const near = new THREE.InstancedBufferGeometry();
-      for (const name of ['position', 'normal', 'aRole', 'aLevel']) near.setAttribute(name, stepped.getAttribute(name));
-      for (const name of ['iPos', 'iSize', 'iRot', 'iMeta']) near.setAttribute(name, far.getAttribute(name));
-      near.instanceCount = far.instanceCount;
-      near.boundingBox = far.boundingBox;
-      near.boundingSphere = far.boundingSphere;
+      const near = instanceShape(stepped, far);
       const center = far.boundingSphere!.center;
-      const pair = { far: add([far, instMat, instDepth]), near: add([near, stepMat, stepDepth]), x: center.x, z: center.z };
+      const pair = { far: add(far, instMat, instDepth), near: add(near, stepMat, stepDepth), x: center.x, z: center.z };
       pair.near.visible = false;
       roofLods.push(pair);
+      if (block && proxyShapes && proxyMaterial) {
+        block.originals.push(pair.near, pair.far);
+        block.proxy.add(new THREE.Mesh(instanceShape(proxyShapes.pitched, far), proxyMaterial));
+      }
     }
   }
   complete=true;
   return {
-    group,
+    group, overview,
     /**
      * Swap stepped and plain roofs, and show facade details, by distance from the camera; call once
      * a frame. True when the roofs changed (the sun's shadow map needs redrawing).
      */
-    updateLod(eye: { x: number; y: number; z: number }) {
+    updateLod(eye: { x: number; y: number; z: number }, panoramaFocalPixels = 0) {
       let changed = false;
+      for (const block of blocks) {
+        // Keep full geometry where a 1.5 m detail still spans a screen pixel.
+        const use = panoramaFocalPixels > 0 && block.distance > 1.5 * panoramaFocalPixels;
+        if (use === block.proxy.visible) continue;
+        block.proxy.visible = use;
+        // Layer 1 still draws the measured buildings into the sun shadow map.
+        for (const mesh of block.originals) if (use) mesh.layers.disable(0); else mesh.layers.enable(0);
+      }
       for (const l of roofLods) {
         const near = Math.hypot(l.x - eye.x, l.z - eye.z) < STEPPED_NEAR;
         if (l.near.visible === near) continue;
@@ -684,6 +735,8 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
   } finally {
     if(!complete){
       group.traverse(object=>{const mesh=object as THREE.Mesh;if(mesh.isMesh)mesh.geometry.dispose();});
+      overview?.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); });
+      proxyMaterial?.dispose();
       for(const material of [detailMat,instMat,polyMat,instDepth,polyDepth,stepMat,stepDepth])material.dispose();
       flat.dispose();pitched.dispose();stepped.dispose();
     }
@@ -698,8 +751,8 @@ export function buildCity(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuildi
 }
 
 /** Keep the renderer responsive while a neighbouring region builds its city. */
-export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false) {
-  const steps=buildCitySteps(env,hf,data,keep,quality,dressed);
+export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye) {
+  const steps=buildCitySteps(env,hf,data,keep,quality,dressed,panoramaEye);
   try {
     while(current()){
       const deadline=performance.now()+5;

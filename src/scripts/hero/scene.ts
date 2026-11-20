@@ -314,6 +314,7 @@ export function createHero(
       opts.quality,
       () => true,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
+      VIEWS.shogunzuka.eye,
     );
     if (!city) throw new Error('Initial city preparation cancelled');
     await yieldToBrowser();
@@ -357,6 +358,7 @@ export function createHero(
     scene.add(campusModel);
     casts(campusModel);
     scene.add(city.group, landmarks.mesh);
+    if (city.overview) scene.add(city.overview);
     casts(city.group);
     cityLods.add(city);
     casts(landmarks.mesh);
@@ -841,7 +843,8 @@ export function createHero(
     clouds.mesh.position.x = camera.position.x;
     clouds.mesh.position.z = camera.position.z;
     let roofsChanged = false;
-    for (const c of cityLods) roofsChanged = c.updateLod(camera.position) || roofsChanged;
+    const panorama = mode === 'city' && view === 'shogunzuka' && !flight && !exploring && camera.fov >= baseFov * .82;
+    for (const c of cityLods) roofsChanged = c.updateLod(camera.position, panorama ? pxPerM : 0) || roofsChanged;
     if (roofsChanged) shadow.invalidate();
   }
 
