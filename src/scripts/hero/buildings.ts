@@ -51,11 +51,13 @@ interface Face {
  * 1 eaves (or the top of a flat block), 2 ridge. The vertex shader turns codes into metres.
  * role: 0 wall, 1 roof slope on a long side, 2 end of a pitched roof (gable wall or hip), 3 flat roof.
  */
-function unitShape(faces: Face[]) {
+function unitShape(faces: Face[], indexed = false) {
   const pos: number[] = [];
   const nrm: number[] = [];
   const role: number[] = [];
   const level: number[] = [];
+  const indices: number[] = [];
+  const corners = new Map<number[], number>();
   const tri = (a: number[], b: number[], c: number[], n: number[], r: number, l: number) => {
     // wind counter-clockwise around the outward normal
     const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
@@ -65,6 +67,12 @@ function unitShape(faces: Face[]) {
     const cz = ab[0] * ac[1] - ab[1] * ac[0];
     const flip = cx * n[0] + cy * n[1] + cz * n[2] < 0;
     for (const p of flip ? [a, c, b] : [a, b, c]) {
+      if (indexed) {
+        const corner = corners.get(p);
+        indices.push(corner ?? role.length);
+        if (corner !== undefined) continue;
+        corners.set(p, role.length);
+      }
       pos.push(...p);
       nrm.push(...n);
       role.push(r);
@@ -72,6 +80,7 @@ function unitShape(faces: Face[]) {
     }
   };
   for (const f of faces) {
+    corners.clear(); // Different faces have different normals, even at a shared corner.
     const l = f.level ?? 0.5;
     if (f.pts.length === 3) tri(f.pts[0], f.pts[1], f.pts[2], f.n, f.role, l);
     else {
@@ -80,6 +89,7 @@ function unitShape(faces: Face[]) {
     }
   }
   const g = new THREE.InstancedBufferGeometry();
+  if (indexed) g.setIndex(indices);
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   g.setAttribute('aRole', new THREE.Float32BufferAttribute(role, 1));
@@ -94,18 +104,18 @@ const walls = (top: number): Face[] => [
   { pts: [[-0.5, 0, -0.5], [-0.5, 0, 0.5], [-0.5, top, 0.5], [-0.5, top, -0.5]], n: [-1, 0, 0], role: 0 },
 ];
 
-function flatShape(sides = walls(1)) {
-  return unitShape([...sides, { pts: [[-0.5, 1, -0.5], [0.5, 1, -0.5], [0.5, 1, 0.5], [-0.5, 1, 0.5]], n: [0, 1, 0], role: 3 }]);
+function flatShape(sides = walls(1), indexed = false) {
+  return unitShape([...sides, { pts: [[-0.5, 1, -0.5], [0.5, 1, -0.5], [0.5, 1, 0.5], [-0.5, 1, 0.5]], n: [0, 1, 0], role: 3 }], indexed);
 }
 
-function pitchedShape(sides = walls(1)) {
+function pitchedShape(sides = walls(1), indexed = false) {
   return unitShape([
     ...sides,
     { pts: [[-0.5, 1, 0.5], [0.5, 1, 0.5], [0.5, 2, 0], [-0.5, 2, 0]], n: [0, 1, 1], role: 1 },
     { pts: [[0.5, 1, -0.5], [-0.5, 1, -0.5], [-0.5, 2, 0], [0.5, 2, 0]], n: [0, 1, -1], role: 1 },
     { pts: [[0.5, 1, 0.5], [0.5, 1, -0.5], [0.5, 2, 0]], n: [1, 0, 0], role: 2 },
     { pts: [[-0.5, 1, -0.5], [-0.5, 1, 0.5], [-0.5, 2, 0]], n: [-1, 0, 0], role: 2 },
-  ]);
+  ], indexed);
 }
 
 /** Steps in a stepped roof. */
@@ -436,6 +446,7 @@ function roofFor(b: BoxBuilding) {
 function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pitched: boolean) {
   const n = list.length;
   const geo = new THREE.InstancedBufferGeometry();
+  geo.setIndex(shape.index);
   for (const name of ['position', 'normal', 'aRole']) geo.setAttribute(name, shape.getAttribute(name));
   const pos = new Float32Array(n * 3);
   const size = new Float32Array(n * 3);
@@ -547,6 +558,7 @@ type PanoramaEye = { x: number; z: number };
 /** Keep the same measured positions and facade seeds when changing the unit mesh. */
 function instanceShape(shape: THREE.InstancedBufferGeometry, source: THREE.InstancedBufferGeometry) {
   const geometry = new THREE.InstancedBufferGeometry();
+  geometry.setIndex(shape.index);
   for (const name of ['position', 'normal', 'aRole', 'aLevel']) geometry.setAttribute(name, shape.getAttribute(name));
   for (const name of ['iPos', 'iSize', 'iRot', 'iMeta']) geometry.setAttribute(name, source.getAttribute(name));
   geometry.instanceCount = source.instanceCount;
@@ -572,7 +584,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
   const stepped = steppedShape();
   const overview = panoramaEye ? new THREE.Group() : null;
   const facingWalls = walls(1).filter(face => face.n[0] > 0 || face.n[2] > 0);
-  const proxyShapes = overview ? { flat: flatShape(facingWalls), pitched: pitchedShape(facingWalls) } : null;
+  const proxyShapes = overview ? { flat: flatShape(facingWalls, true), pitched: pitchedShape(facingWalls, true) } : null;
   const proxyMaterial = overview ? new THREE.ShaderMaterial({ uniforms: env, vertexShader: INSTANCE_VS, fragmentShader: BUILDING_FS, defines: { BLOCK_OVERVIEW: 1 } }) : null;
   const blocks: { proxy: THREE.Group; originals: THREE.Mesh[]; distance: number }[] = [];
   let complete=false;
