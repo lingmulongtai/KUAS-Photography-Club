@@ -133,6 +133,19 @@ test('a full-HD viewport keeps its native sampling within the memory budget and 
   assert.equal(h.step(), true);
 });
 
+test('the high-density panorama spends fewer rays outside the viewport and covers a continuous 18-degree turn', () => {
+  const h = setup();
+  h.state.w = 1440; h.state.h = 810; h.state.elapsed = 1 / 30;
+  h.camera.aspect = 16 / 9; h.camera.updateProjectionMatrix();
+  assert.equal(h.step(),false); assert.ok(h.step());
+  const {target} = h.captures[0];
+  assert.equal(target.width, Math.floor((1440 + 2 * Math.ceil(1440 / 16)) * 1.125));
+  for (let i = 0; i < 150; i++) {
+    h.camera.rotateY(THREE.MathUtils.degToRad(.12));
+    assert.ok(h.step());
+  }
+});
+
 test('allocation and shader failures restore the live scene and allow context recovery', () => {
   const h = setup();
   const old = console.warn;
