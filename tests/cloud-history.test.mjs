@@ -89,6 +89,30 @@ test('view changes, time jumps, and weather changes start with a fresh direct fr
   assert.equal(h.step(), false);
 });
 
+test('a full-HD viewport keeps its native sampling within the memory budget and releases it on exit', () => {
+  const h = setup();
+  h.state.w = 1920; h.state.h = 1080;
+  h.camera.aspect = 1920 / 1080; h.camera.updateProjectionMatrix();
+  assert.equal(h.step(), false);
+  assert.equal(h.step(), true);
+  const { target } = h.captures[0];
+  assert.ok(target.width >= 1920 * 1.125 && target.height >= 1080 * 1.125);
+  assert.ok(target.width * target.height * 3 * 8 <= 64 * 1024 * 1024);
+  for (let i = 0; i < 24; i++) {
+    h.camera.rotateY(THREE.MathUtils.degToRad(.2));
+    assert.equal(h.step(), true);
+  }
+  let released = 0;
+  for (const target of new Set(h.captures.map(capture => capture.target))) {
+    target.addEventListener('dispose', () => { released++; });
+  }
+  h.history.invalidate();
+  h.history.invalidate();
+  assert.equal(released, 3);
+  assert.equal(h.step(), false);
+  assert.equal(h.step(), true);
+});
+
 test('allocation and shader failures restore the live scene and allow context recovery', () => {
   const h = setup();
   const old = console.warn;

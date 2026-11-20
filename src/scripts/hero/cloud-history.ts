@@ -63,6 +63,16 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
 
   function reset() { past = present = writing = undefined; strip = 0; }
 
+  function invalidate() {
+    reset();
+    weather = undefined;
+    for (const image of images) {
+      if (!image.checked) continue;
+      image.target.dispose();
+      image.checked = false;
+    }
+  }
+
   // All four live viewport corners must project inside the actual source image.
   function coverage(image: SkyImage) {
     mapping.multiplyMatrices(image.clip, camera.matrixWorld).multiply(camera.projectionMatrixInverse);
@@ -77,7 +87,8 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
 
   function begin(image: SkyImage, w: number, h: number, tw: number, th: number, paddedW: number, paddedH: number) {
     if (image.target.width !== tw || image.target.height !== th) { image.target.setSize(tw, th); image.checked = false; }
-    if (present && coverage(present) < .84) {
+    const anchorLimit = 1 - .8 * (1 - Math.max(w / paddedW, h / paddedH));
+    if (present && coverage(present) < anchorLimit) {
       // Keep identical sample positions on the cloud while the visitor slowly pans.
       image.camera.copy(present.camera, false);
       image.clip.copy(present.clip);
@@ -126,20 +137,24 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
     console.warn('Using direct cloud rendering', error);
     failed = true;
     reset();
-    for (const image of images) image.target.dispose();
+    for (const image of images) { image.target.dispose(); image.checked = false; }
   }
 
   return {
-    invalidate() { reset(); weather = undefined; },
+    invalidate,
     restored() { reset(); weather = undefined; failed = verified = false; for (const image of images) image.checked = false; },
     render(w: number, h: number, currentWeather: object, travel: number, date: number, draw: () => void) {
       if (failed) return false;
-      const paddedW = w + 2 * Math.ceil(w / 8), paddedH = h + 2 * Math.ceil(h / 8);
-      // Add angular samples if memory permits. Larger screens retain the direct full-resolution pass.
-      const density = Math.min(1.125, Math.sqrt(MAX_TEXELS / (paddedW * paddedH)));
-      const tw = Math.floor(paddedW * density), th = Math.floor(paddedH * density);
+      let paddedW = w + 2 * Math.ceil(w / 8), paddedH = h + 2 * Math.ceil(h / 8);
       const limit = renderer.capabilities.maxTextureSize;
-      if (density < 1 || tw > limit || th > limit) { reset(); return false; }
+      // Narrow the off-screen margin on large displays before sacrificing any visible texels.
+      if (paddedW * paddedH > MAX_TEXELS || Math.max(paddedW, paddedH) > limit) {
+        paddedW = w + 2 * Math.ceil(w / 16);
+        paddedH = h + 2 * Math.ceil(h / 16);
+      }
+      const density = Math.min(1.125, limit / Math.max(paddedW, paddedH), Math.sqrt(MAX_TEXELS / (paddedW * paddedH)));
+      const tw = Math.floor(paddedW * density), th = Math.floor(paddedH * density);
+      if (density < 1) { invalidate(); return false; }
       camera.updateMatrixWorld();
       const cut = weather !== currentWeather || travel !== lastTravel || Math.abs(date - lastDate) > 1500 ||
         lastW !== w || lastH !== h || lastFov !== camera.fov || lastEye.distanceToSquared(camera.position) > .0001 ||
