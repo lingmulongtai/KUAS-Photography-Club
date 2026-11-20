@@ -172,6 +172,18 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   return {
     composer,
     bloom,
+    async prepare(object: THREE.Object3D) {
+      if (!renderer.extensions.has('KHR_parallel_shader_compile')) return;
+      // RenderPass uses a linear HDR target. Compiling against the canvas would cache a
+      // different tone-mapping and output-colour variant from the one the hero draws.
+      const previous = renderer.getRenderTarget();
+      try {
+        renderer.setRenderTarget(composer.readBuffer);
+        return renderer.compileAsync(object, camera, scene);
+      } finally {
+        renderer.setRenderTarget(previous);
+      }
+    },
     /** how much of a bright pixel's light the bloom takes (see BrightPassShader) */
     bloomWhole: bright.uniforms.uWhole,
     grade: finish.uniforms.uGrade,
