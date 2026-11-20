@@ -42,7 +42,7 @@ const year = new Date().getFullYear();
       </ul>
     </div>
 
-    <div>
+    <div class="pages">
       <p class="label">PAGES</p>
       <ul class="links small">
         {nav.map((item) => <li><a href={local(item.href)}>{en ? item.en : item.ja}</a></li>)}
@@ -174,9 +174,18 @@ const year = new Date().getFullYear();
     }
   }
 
-  @media (max-width: 480px) {
-    .grid {
-      grid-template-columns: 1fr;
-    }
+  /* a phone: room between groups, the circle kept to the empty corner above the text */
+  @media (max-width: 600px) {
+    .site-footer { padding-block: 64px 36px; gap: 40px; }
+    .arc { width: 200px; height: 200px; right: -70px; top: -120px; border-width: 2px; }
+    .grid { grid-template-columns: 1fr; gap: 40px; }
+    .grid > div { gap: 14px; }
+    .brand img { width: 56px; height: 56px; }
+    .brand-ja { font-size: 22px; letter-spacing: .3em; }
+    .links { gap: 14px; }
+    .links a { display: inline-block; padding-block: 2px; }
+    /* the page names are short: two columns */
+    .pages .links { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+    .base { gap: 12px; padding-top: 28px; }
   }
 </style>

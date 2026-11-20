@@ -1,7 +1,7 @@
 export type SiteLanguage = 'ja' | 'en';
 export const LANGUAGE_KEY = 'kuas-site-language';
 export const ENGLISH_PAGES = ['', 'about', 'join', 'faq', 'contact', 'schedule', 'trips', 'learn',
-  'learn/shutter-speed', 'learn/aperture', 'learn/focal-length', 'learn/darkroom'] as const;
+  'learn/shutter-speed', 'learn/aperture', 'learn/focal-length', 'learn/darkroom', 'learn/editing'] as const;
 
 export function preferredLanguage(saved: string | null, languages: readonly string[]): SiteLanguage {
   if (saved === 'ja' || saved === 'en') return saved;
