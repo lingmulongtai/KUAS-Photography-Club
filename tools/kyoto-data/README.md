@@ -11,6 +11,7 @@ sources once into `cache/` (not committed, about 2 GB) and write compact files t
 | `aerial-wide.webp`, `aerial-city.webp` | Aerial photos draped over the terrain | GSI 全国最新写真（シームレス） |
 | `aerial-arashiyama*.webp`, `aerial-higashiyama*.webp` | Sharper photos of Arashiyama and of the slopes below Shogunzuka and Kiyomizu-dera, PC and mobile sizes | GSI 全国最新写真（シームレス） z16 / z17 |
 | `lines.bin` | Roads (by width), above-ground railways, rivers and ponds | GSI ベクトルタイル |
+| `southern-night-lights.bin` | Distant street lighting south of Takeda on the 30 m basin and 100 m outer terrain grids | Shipped GSI road and tunnel lines |
 | `tunnels.json.gz` | Road tunnel centre lines over the core and every region (8.5 KB); the browser cuts these stretches out of the roads so none is painted over a mountain | GSI ベクトルタイル (ftCode 2704/2714/2724) |
 | `buildings.bin` | Selected building footprints and measured heights; dense detail near viewpoints and KUAS--Arashiyama | PLATEAU 京都市 2025 LOD1 |
 
@@ -30,6 +31,8 @@ python3 extract_buildings.py  # decodes the tiles into cache/buildings.pkl
 python3 build_buildings.py
 python3 -m unittest discover -s . -p 'test_*.py'
 ```
+
+From the repository root, run `node --experimental-strip-types tools/kyoto-data/build-southern-night-lights.mjs` after updating terrain grids, regional roads or tunnels. The light map uses surface road length and width. Where regional sheets overlap, it follows the same priority as the 3D scene.
 
 The building exporter keeps houses of at least 14m² within 1km of the KUAS--Togetsukyo
 corridor; small open sheds remain excluded. This area also uses the near-viewpoint
