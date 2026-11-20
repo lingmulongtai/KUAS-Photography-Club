@@ -14,6 +14,10 @@ const { en } = Astro.props;
     <dt>{en ? 'Over 33.3 ms' : '33.3 ms 超過率'}</dt><dd data-frame-slow>—</dd>
     <dt>{en ? 'Render size' : '描画サイズ'}</dt><dd data-frame-size>—</dd>
   </dl>
+  <button type="button" data-frame-record disabled aria-pressed="false"
+    data-start={en ? 'Start recording' : '記録開始'} data-stop={en ? 'Stop & save CSV' : '停止してCSV保存'}>
+    {en ? 'Start recording' : '記録開始'}
+  </button>
 </aside>
 
 <style>
@@ -32,6 +36,9 @@ const { en } = Astro.props;
     border: 1px solid #657180; border-radius: 5px; background: #202d3c; color: inherit;
     padding: 2px 8px; font: inherit; cursor: pointer;
   }
+  [data-frame-record] { margin-top: 8px; width: 100%; }
+  [data-frame-record][aria-pressed="true"] { border-color: #f0a789; }
+  [data-frame-record]:disabled { opacity: .55; cursor: default; }
   @media (max-width: 900px) {
     .frame-panel { top: calc(var(--header-h) + 106px); right: 12px; }
     .frame-panel button { min-height: 32px; }
