@@ -6,6 +6,7 @@ import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import type { Box } from './geo';
 import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
 import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
+import { createFrameQueue } from './frame-queue';
 import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
 import { initialNormals } from './initial-normals';
@@ -135,6 +136,8 @@ export function createHero(
   const cloudBlur=createCloudBlur(renderer,camera,clouds.mesh);
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
+  const frameQueue = createFrameQueue(renderer.getContext());
+  renderer.domElement.addEventListener('webglcontextrestored', frameQueue.restored);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
   const casts = (o: THREE.Object3D) => o.traverse((c) => (c as THREE.Mesh).isMesh && c.layers.enable(SHADOW_LAYER));
   const look = createLook();
@@ -909,7 +912,7 @@ export function createHero(
     render(t) {
       // The poster covers startup. Avoid rendering an invisible, incomplete scene
       // while the page is already usable; draw once after the complete scene is built.
-      if (!loading.canDraw) return;
+      if (!loading.canDraw || !frameQueue.available()) return;
       const dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
       clock = t;
@@ -927,6 +930,7 @@ export function createHero(
       const top = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) + camera.fov * RAD / 2;
       meteors.update(t, dt, camera.position, { az, half, top }, Math.min(1, env.uStars.value), pxPerM);
       cloudBlur.render(cloudFrame.blur,width,height,pixelRatio,()=>post.render(t));
+      frameQueue.submitted();
       labels?.update(camera, width, height);
       loading.frame();
       // keep the frame rate up on slower devices by rendering fewer pixels
