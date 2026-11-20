@@ -51,7 +51,7 @@ interface Face {
  * 1 eaves (or the top of a flat block), 2 ridge. The vertex shader turns codes into metres.
  * role: 0 wall, 1 roof slope on a long side, 2 end of a pitched roof (gable wall or hip), 3 flat roof.
  */
-function unitShape(faces: Face[], indexed = false) {
+function unitShape(faces: Face[]) {
   const pos: number[] = [];
   const nrm: number[] = [];
   const role: number[] = [];
@@ -67,12 +67,10 @@ function unitShape(faces: Face[], indexed = false) {
     const cz = ab[0] * ac[1] - ab[1] * ac[0];
     const flip = cx * n[0] + cy * n[1] + cz * n[2] < 0;
     for (const p of flip ? [a, c, b] : [a, b, c]) {
-      if (indexed) {
-        const corner = corners.get(p);
-        indices.push(corner ?? role.length);
-        if (corner !== undefined) continue;
-        corners.set(p, role.length);
-      }
+      const corner = corners.get(p);
+      indices.push(corner ?? role.length);
+      if (corner !== undefined) continue;
+      corners.set(p, role.length);
       pos.push(...p);
       nrm.push(...n);
       role.push(r);
@@ -89,7 +87,7 @@ function unitShape(faces: Face[], indexed = false) {
     }
   }
   const g = new THREE.InstancedBufferGeometry();
-  if (indexed) g.setIndex(indices);
+  g.setIndex(indices);
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   g.setAttribute('aRole', new THREE.Float32BufferAttribute(role, 1));
@@ -104,18 +102,18 @@ const walls = (top: number): Face[] => [
   { pts: [[-0.5, 0, -0.5], [-0.5, 0, 0.5], [-0.5, top, 0.5], [-0.5, top, -0.5]], n: [-1, 0, 0], role: 0 },
 ];
 
-function flatShape(sides = walls(1), indexed = false) {
-  return unitShape([...sides, { pts: [[-0.5, 1, -0.5], [0.5, 1, -0.5], [0.5, 1, 0.5], [-0.5, 1, 0.5]], n: [0, 1, 0], role: 3 }], indexed);
+function flatShape(sides = walls(1)) {
+  return unitShape([...sides, { pts: [[-0.5, 1, -0.5], [0.5, 1, -0.5], [0.5, 1, 0.5], [-0.5, 1, 0.5]], n: [0, 1, 0], role: 3 }]);
 }
 
-function pitchedShape(sides = walls(1), indexed = false) {
+function pitchedShape(sides = walls(1)) {
   return unitShape([
     ...sides,
     { pts: [[-0.5, 1, 0.5], [0.5, 1, 0.5], [0.5, 2, 0], [-0.5, 2, 0]], n: [0, 1, 1], role: 1 },
     { pts: [[0.5, 1, -0.5], [-0.5, 1, -0.5], [-0.5, 2, 0], [0.5, 2, 0]], n: [0, 1, -1], role: 1 },
     { pts: [[0.5, 1, 0.5], [0.5, 1, -0.5], [0.5, 2, 0]], n: [1, 0, 0], role: 2 },
     { pts: [[-0.5, 1, -0.5], [-0.5, 1, 0.5], [-0.5, 2, 0]], n: [-1, 0, 0], role: 2 },
-  ], indexed);
+  ]);
 }
 
 /** Steps in a stepped roof. */
@@ -584,7 +582,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
   const stepped = steppedShape();
   const overview = panoramaEye ? new THREE.Group() : null;
   const facingWalls = walls(1).filter(face => face.n[0] > 0 || face.n[2] > 0);
-  const proxyShapes = overview ? { flat: flatShape(facingWalls, true), pitched: pitchedShape(facingWalls, true) } : null;
+  const proxyShapes = overview ? { flat: flatShape(facingWalls), pitched: pitchedShape(facingWalls) } : null;
   const proxyMaterial = overview ? new THREE.ShaderMaterial({ uniforms: env, vertexShader: INSTANCE_VS, fragmentShader: BUILDING_FS, defines: { BLOCK_OVERVIEW: 1 } }) : null;
   const blocks: { proxy: THREE.Group; originals: THREE.Mesh[]; distance: number }[] = [];
   let complete=false;

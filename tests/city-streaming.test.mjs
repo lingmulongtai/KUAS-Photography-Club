@@ -51,6 +51,7 @@ test('incremental regional city matches synchronous geometry and releases cancel
   for(let i=0;i<sync.group.children.length;i++){
     const a=sync.group.children[i].geometry,b=slow.group.children[i].geometry;
     assert.equal(a.instanceCount,b.instanceCount);
+    if(a.index || b.index) same(a.index.array,b.index.array);
     for(const name of Object.keys(a.attributes))same(b.getAttribute(name).array,a.getAttribute(name).array);
   }
   // Startup retains the custom facades already supplied by the landmark models.
