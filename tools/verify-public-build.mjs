@@ -27,6 +27,7 @@ for (const path of ['index.html','en/index.html']) {
 }
 for (const route of ['index.html', 'about/index.html', 'join/index.html', 'schedule/index.html', 'trips/index.html',
   'contact/index.html', 'guidelines/index.html', 'guidelines/en/index.html', 'learn/index.html',
+  'learn/editing/index.html', 'en/learn/editing/index.html',
   'en/index.html', 'en/about/index.html', 'en/join/index.html', 'en/schedule/index.html', 'en/trips/index.html', 'en/contact/index.html']) {
   assert.ok(byPath.has(route), `Missing public route ${route}`);
 }
@@ -79,7 +80,9 @@ for (const path of ['about/index.html', 'en/about/index.html']) {
   assert.deepEqual([...timeline.matchAll(/<time\s+datetime="([^"]+)"/g)].map((m) => m[1]),
     ['2025-05', '2026-04', '2026-07-12', '2026-08-08', '2026-10-24'], `Milestone dates: ${path}`);
   assert.doesNotMatch(source, /運営の役職|<iframe\b/, `About contains obsolete roles or an embed: ${path}`);
-  assert.match(source, /src="\/brand\/about-contact-sheet\.svg"/);
+  assert.equal([...source.matchAll(/<figure class="print print-\d/g)].length, 3, `Collage needs three prints: ${path}`);
+  assert.match(source, /<nav class="toc"[^>]*data-about-toc/, `Missing page contents: ${path}`);
+  assert.match(source, /class="ticket-stub"[^>]*href="https:\/\/www\.instagram\.com\/kuas_photographyclub"|href="https:\/\/www\.instagram\.com\/kuas_photographyclub"[^>]*class="ticket-stub"/, `Missing meeting ticket: ${path}`);
   assert.match(source, /href="https:\/\/www\.instagram\.com\/kuas_photographyclub"/);
 }
 for (const [path, source] of html) {
