@@ -20,6 +20,7 @@ export function createFrameMeter() {
       intervals++;
       if (ms > 1000 / 30) overBudget++;
       recent.push({ at: now, ms });
+      return ms;
     },
     pause() {
       first = previous = undefined;
