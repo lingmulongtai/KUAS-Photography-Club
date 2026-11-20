@@ -8,6 +8,8 @@ import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
 import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
 import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
+import { initialNormals } from './initial-normals';
+import { normalMapBytes } from './normal-map';
 import { buildCelestial, buildSkyDome } from './sky';
 import { createPost } from './post';
 import { loadBuildings } from './buildings-data';
@@ -187,7 +189,14 @@ export function createHero(
     });
     const meta = await metadata;
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
-    const [hf, wide, outer] = await Promise.all([loading.track(loadHeightfield(meta)), loading.track(loadTexture(wideFile, aniso)),
+    const elevation = loading.track(loadHeightfield(meta));
+    const normalGrids = [meta.far, meta.near];
+    if (meta.arashiyama) normalGrids.push(meta.arashiyama.elevation);
+    if (meta.outer && meta.aerialOuter) normalGrids.push(meta.outer);
+    const normals = elevation.then(hf => initialNormals(hf, normalGrids));
+    // The base imagery can fail before normal generation is joined below.
+    void normals.catch(() => {});
+    const [hf, wide, outer] = await Promise.all([elevation, loading.track(loadTexture(wideFile, aniso)),
       loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
         .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : Promise.resolve(null))]);
     // Download the city while normals and terrain are prepared, rather than
@@ -204,14 +213,12 @@ export function createHero(
       const m = meta[r.key];
       return m ? [{ ...r, meta: m }] : [];
     });
-    await yieldToBrowser();
-    const normalFar = await normalTexture(hf, meta.far);
-    await yieldToBrowser();
-    const normalNear = await normalTexture(hf, meta.near);
-    await yieldToBrowser();
-    const regionalNormal = meta.arashiyama ? await normalTexture(hf, meta.arashiyama.elevation) : undefined;
-    await yieldToBrowser();
-    const outerNormal = outer && meta.outer ? await normalTexture(hf, meta.outer) : undefined;
+    const maps = await normals;
+    const textureFor = (grid: typeof meta.far) => normalTexture(grid, maps[grid.file]);
+    const normalFar = textureFor(meta.far);
+    const normalNear = textureFor(meta.near);
+    const regionalNormal = meta.arashiyama ? textureFor(meta.arashiyama.elevation) : undefined;
+    const outerNormal = outer && meta.outer ? textureFor(meta.outer) : undefined;
     await yieldToBrowser();
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
@@ -429,7 +436,10 @@ export function createHero(
       await step();
       if(detailedCampus){
         const campus=buildKameokaCampus(env,hf);group.add(campus);casts(campus);
-        if(meta.kameokaCampus)campusNormal=await normalTexture(hf,meta.kameokaCampus.elevation);
+        if(meta.kameokaCampus) {
+          const grid = meta.kameokaCampus.elevation;
+          campusNormal = normalTexture(grid, await normalMapBytes(hf, grid));
+        }
       }
       await step();
       lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);group.add(lamps.points);

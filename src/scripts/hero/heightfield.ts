@@ -25,6 +25,9 @@ class Grid {
   }
 }
 
+type GridData = Pick<Grid, 'meta' | 'h'>;
+type HeightfieldData = [GridData, GridData, GridData?, GridData?, GridData?];
+
 const smooth = (e0: number, e1: number, v: number) => {
   const t = Math.min(1, Math.max(0, (v - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);
@@ -42,6 +45,16 @@ export class Heightfield {
   private campus?:Grid;
   constructor(far:Grid,near:Grid,regional?:Grid,outer?:Grid,campus?:Grid) {
     this.far=far;this.near=near;this.regional=regional;this.outer=outer;this.campus=campus;
+  }
+
+  /** Structured cloning copies the elevation arrays to the worker without detaching the live terrain. */
+  snapshot(): HeightfieldData {
+    return [this.far, this.near, this.regional, this.outer, this.campus];
+  }
+
+  static fromSnapshot([far, near, regional, outer, campus]: HeightfieldData) {
+    const grid = ({ meta, h }: GridData) => new Grid(meta, h);
+    return new Heightfield(grid(far), grid(near), regional && grid(regional), outer && grid(outer), campus && grid(campus));
   }
 
   get bounds(): Box {
