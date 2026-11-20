@@ -2,6 +2,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import { club } from '../data/club';
 import { isPublicContent } from './public-content';
 import { spotPlaceholders, type ReelCard } from '../data/reel-placeholders';
+import { memberPhotos } from '../data/member-photos';
 
 export type Trip = CollectionEntry<'trips'>;
 export type TripPhoto = Trip['data']['photos'][number];
@@ -32,8 +33,22 @@ export function stripsFrom(trips: Trip[], perStrip = 8, count = 3) {
  * so neighbouring cards come from different outings. Until something is published, drawn cards
  * for the places the club photographs stand in (see reel-placeholders.ts).
  */
-export async function reelPhotos(lang: 'ja' | 'en' = 'ja'): Promise<{ photos: ReelCard[]; placeholder: boolean }> {
+export async function reelPhotos(lang: 'ja' | 'en' = 'ja'): Promise<{ photos: ReelCard[]; placeholder: boolean; members?: boolean }> {
   const published = await getTrips();
+  if (!published.length && memberPhotos.length) {
+    // members' photos stand in until outing records are published (see member-photos.ts)
+    return {
+      photos: memberPhotos.map((p) => ({
+        src: p.src,
+        alt: p.alt,
+        title: lang === 'en' ? p.placeEn ?? p.place : p.place,
+        meta: `© ${p.by}`,
+        href: lang === 'en' ? '/en/trips/' : '/trips/',
+      })),
+      placeholder: false,
+      members: true,
+    };
+  }
   if (!published.length) return { photos: spotPlaceholders(lang), placeholder: true };
   const lists = published.map((t) =>
     t.data.photos.map((p) => ({

@@ -1,5 +1,7 @@
 import {scheduleText} from '../lib/schedule-display';
 import type {LiveSchedule} from '../lib/google-schedule';
+import {loadSchedule} from './live-schedule';
+import {addToCalendarUrl} from '../lib/calendar-link';
 import type {ScheduleEvent} from '../lib/schedule';
 
 const element=<K extends keyof HTMLElementTagNameMap>(tag:K,cls='',text='')=>{
@@ -11,6 +13,29 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
   const lang=root.dataset.lang==='en'?'en':'ja',en=lang==='en',compact=root.dataset.compact==='true';
   const content=root.querySelector<HTMLElement>('[data-calendar-content]')!,status=root.querySelector<HTMLElement>('[data-calendar-status]')!;
   let last='',busy=false;
+  // the standing row for the usual weekly meeting stays first in the short list
+  const regular=content.querySelector<HTMLElement>('[data-regular]')?.cloneNode(true) as HTMLElement|undefined;
+  /** The short list on the home page: a large date, a coloured kind, and an add-to-calendar link. */
+  function shortList(events:ScheduleEvent[]) {
+    const list=element('ol','calendar-list');
+    if(regular)list.append(regular.cloneNode(true));
+    for(const event of events) {
+      const li=element('li','calendar-event k-'+event.kind);li.dataset.date=event.date;
+      const date=new Date(event.date+'T00:00:00Z');
+      const when=element('span','ev-date');
+      when.append(element('b','',en?new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}).format(date):(date.getUTCMonth()+1)+'/'+date.getUTCDate()),
+        element('small','',new Intl.DateTimeFormat(en?'en-GB':'ja-JP',{weekday:'short',timeZone:'UTC'}).format(date)));
+      const body=element('span','ev-body'),text=scheduleText(event.title,event.titleEn,lang);
+      const title=element('b','',text);title.lang=en&&event.titleEn?'en':'ja';
+      body.append(element('span','calendar-kind',kinds[lang][event.kind]),title);
+      if(event.time||event.place)body.append(element('span','calendar-meta',[event.time,event.place].filter(Boolean).join(' · ')));
+      const add=element('a','ev-add',en?'Add to calendar ':'カレンダーに追加 ');
+      add.href=addToCalendarUrl({...event,title:text},'KUAS Photography Club');add.target='_blank';add.rel='noopener';
+      const arrow=element('span','','↗');arrow.setAttribute('aria-hidden','true');add.append(arrow);
+      li.append(when,body,add);list.append(li);
+    }
+    return list;
+  }
   function eventList(events:ScheduleEvent[],today:string) {
     const list=element('ol','calendar-list');
     for(const event of events) {
@@ -29,7 +54,7 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
     if(key===last)return;last=key;
     const events=compact?data.events.filter(e=>e.date>=today).slice(0,Number(root.dataset.count)||4):data.events;
     const fragment=document.createDocumentFragment();
-    if(compact)fragment.append(eventList(events,today));
+    if(compact)fragment.append(shortList(events));
     else {
       const months=new Map<string,ScheduleEvent[]>([[today.slice(0,7),[]]]);
       for(const e of events){const month=e.date.slice(0,7);months.set(month,[...(months.get(month)??[]),e]);}
@@ -54,15 +79,13 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
         layout.append(table,items.length?eventList(items,today):element('p','muted',en?'No confirmed dates yet.':'確定した予定はまだありません。'));section.append(heading,layout);fragment.append(section);
       }
     }
-    if(compact&&!events.length)fragment.append(element('p','muted',en?'Future plans will be announced once confirmed.':'今後の予定は、決まり次第お知らせします。'));
+    if(compact&&!events.length)fragment.append(element('p','muted small',en?'Other plans will be announced once confirmed.':'ほかの予定は、決まり次第お知らせします。'));
     content.replaceChildren(fragment);
   }
   async function refresh() {
     if(busy||document.hidden)return;busy=true;
     try {
-      const response=await fetch(en?'/api/schedule.json?lang=en':'/api/schedule.json',{signal:AbortSignal.timeout(16000)});
-      if(!response.ok)throw new Error('unavailable');
-      const data=await response.json() as LiveSchedule;render(data);
+      const data=await loadSchedule(lang);render(data);
       const time=new Intl.DateTimeFormat(en?'en-GB':'ja-JP',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tokyo'}).format(new Date(data.updatedAt));
       status.textContent=en?'Google Calendar · checked '+time+' JST · '+(data.translationStatus==='partial'?'Some titles could not be translated; original text is shown.':'Event titles may be automatically translated.'):'Googleカレンダー連携 · '+time+' 更新';
     }catch{status.textContent=en?'Calendar could not be refreshed. Check Google Calendar for the latest dates.':'カレンダーを更新できませんでした。最新の予定はGoogleカレンダーでご確認ください。';}

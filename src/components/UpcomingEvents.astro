@@ -1,8 +1,14 @@
 ---
-/** The next few events from the schedule. Past ones are hidden in the browser, so the list stays current between deploys. */
+/**
+ * The next few events from the schedule, below one standing row for the usual weekly meeting.
+ * The usual meeting is shown as a habit, never as a confirmed date. Past events are hidden in the
+ * browser, and the live calendar replaces the list with the same markup (scripts/schedule.ts).
+ */
 import {scheduleText} from '../lib/schedule-display';
 import CalendarFeed from './CalendarFeed.astro';
-import { formatDay, getSchedule, kindLabel, kindLabelEn } from '../lib/schedule';
+import { getSchedule, kindLabel, kindLabelEn, weekdayJa } from '../lib/schedule';
+import { addToCalendarUrl } from '../lib/calendar-link';
+import { club } from '../data/club';
 
 interface Props {
   count?: number;
@@ -11,22 +17,39 @@ interface Props {
 const { count = 4, lang = 'ja' } = Astro.props;
 const en = lang === 'en';
 const events = (await getSchedule()).flatMap((m) => m.events);
+const time = club.meetings.times[0];
+const day = (date: string) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  return en
+    ? { big: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(d), small: new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(d) }
+    : { big: `${d.getUTCMonth() + 1}/${d.getUTCDate()}`, small: weekdayJa(date) };
+};
 ---
 <CalendarFeed lang={lang} compact count={count}>
 <div class="upcoming" data-count={count}>
-  <ol class="events">
+  <ol class="calendar-list">
+    <li class="calendar-event k-meeting is-regular" data-regular>
+      <span class="ev-date"><b>{en ? 'Every' : '毎週'}</b><small>{en ? 'Fri' : '金曜'}</small></span>
+      <span class="ev-body">
+        <span class="calendar-kind">{en ? 'Usual meeting' : 'いつものミーティング'}</span>
+        <b>{en ? 'Regular meeting' : '定例ミーティング'}</b>
+        <span class="calendar-meta">{en ? `Usually ${time.replace('〜', '')} · Room ${club.meetings.room}, Uzumasa Campus` : `通常 ${time} · ${club.campus} ${club.meetings.room}`}</span>
+      </span>
+      <a class="ev-add" href={en ? '/en/schedule/' : '/schedule/'}>{en ? 'Check for changes' : '休会・変更を確認'}</a>
+    </li>
     {events.map((e) => (
-      <li class={`k-${e.kind}`} data-date={e.date} hidden>
-        <span class="date"><span class="num">{en ? e.date : formatDay(e.date)}</span></span>
-        <span class="body">
-          <span class="kind">{(en ? kindLabelEn : kindLabel)[e.kind]}</span>
+      <li class={`calendar-event k-${e.kind}`} data-date={e.date} hidden>
+        <span class="ev-date"><b>{day(e.date).big}</b><small>{day(e.date).small}</small></span>
+        <span class="ev-body">
+          <span class="calendar-kind">{(en ? kindLabelEn : kindLabel)[e.kind]}</span>
           <b lang={en && !e.titleEn ? 'ja' : lang}>{scheduleText(e.title,e.titleEn,lang)}</b>
-          {(e.time || e.place) && <span class="meta">{[e.time, e.place].filter(Boolean).join(' · ')}</span>}
+          {(e.time || e.place) && <span class="calendar-meta">{[e.time, e.place].filter(Boolean).join(' · ')}</span>}
         </span>
+        <a class="ev-add" href={addToCalendarUrl({ ...e, title: scheduleText(e.title, e.titleEn, lang) }, club.name)} target="_blank" rel="noopener">{en ? 'Add to calendar' : 'カレンダーに追加'} <span aria-hidden="true">↗</span></a>
       </li>
     ))}
   </ol>
-  <p class="empty muted" hidden>{en ? 'Future plans will be announced once confirmed.' : '今後の予定は、決まり次第お知らせします。'}</p>
+  <p class="empty muted small" hidden>{en ? 'Other plans will be announced once confirmed.' : 'ほかの予定は、決まり次第お知らせします。'}</p>
 </div>
 
 </CalendarFeed>
@@ -41,69 +64,3 @@ const events = (await getSchedule()).flatMap((m) => m.events);
     if (empty) empty.hidden = items.length > 0;
   });
 </script>
-
-<style>
-  .events {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 12px;
-  }
-
-  li {
-    display: grid;
-    gap: 10px;
-    align-content: start;
-    padding: 18px;
-    background: var(--raise);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    border-top: 5px solid var(--c);
-  }
-
-  li[hidden] {
-    display: none;
-  }
-
-  .date .num {
-    font-size: 20px;
-  }
-
-  .body {
-    display: grid;
-    gap: 2px;
-  }
-
-  .kind {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--muted);
-  }
-
-  .meta {
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  .k-meeting {
-    --c: var(--brand);
-  }
-
-  .k-trip {
-    --c: var(--meeting);
-  }
-
-  .k-event {
-    --c: #e0a23b;
-  }
-
-  .k-deadline {
-    --c: var(--error);
-  }
-
-  .k-other {
-    --c: #8aa1a7;
-  }
-</style>
