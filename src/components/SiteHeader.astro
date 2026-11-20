@@ -406,7 +406,10 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
     }
   }
 
-  @media (max-width: 420px) {
+  .brand-en { white-space: nowrap; }
+
+  /* phones (and phones with large text): the mark and 写真部 only, so nothing wraps */
+  @media (max-width: 520px) {
     .brand-en {
       display: none;
     }
