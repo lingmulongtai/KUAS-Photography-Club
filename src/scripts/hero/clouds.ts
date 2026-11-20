@@ -95,21 +95,35 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         // and wide clear stretches between groups of clouds: these take whole clouds away (the
         // ones at the edge of a group come out smaller) rather than thinning every cloud
         float clear = smoothstep(.35, .7, vnoise(p * .45 - 3.9)) * uClear;
+        float th = 1. - uCover * (.7 + .6 * region) + clear * .4;
+        // Value noise lies in [0,1]. An upper bound below the threshold proves a ray
+        // sample contributes zero, including the wider anvil at the top of a storm.
+        float emptyBelow = th - (isStyle(4.) ? .07 : 0.) - .00001;
+        const vec3 emptyField = vec3(0., 1., 0.);
+        if (emptyBelow > 1.) return emptyField;
         float n;
         if (deck()){
           // long rolls broken into cells
           vec2 q = mat2(.87, -.5, .5, .87) * p * (isStyle(5.) ? .7 : 1.);
-          n = vnoise(q * vec2(2.6, 7.)) * .45 + vnoise(p * 13. + 3.1) * .35 + vnoise(p * 31. - 1.7) * .2;
+          n = vnoise(q * vec2(2.6, 7.)) * .45 + vnoise(p * 13. + 3.1) * .35;
+          if (n + .2 < emptyBelow) return emptyField;
+          n += vnoise(p * 31. - 1.7) * .2;
         } else {
           float f = isStyle(1.) ? 1.7 : isStyle(3.) ? .7 : isStyle(4.) ? .26 : 1.;
           // big clouds in some parts of the sky, small ones in others: two sizes of cell, blended
           // (scaling the coordinates by a varying amount would smear the cells into streaks)
           float big = vnoise(p * 4.2 * f + 5.5) * .6 + vnoise(p * 9. * f - 2.2) * .4;
-          float small = vnoise(p * 9.5 * f) * .55 + vnoise(p * 21. * f + 3.1) * .3 + vnoise(p * 43. * f - 1.7) * .15;
-          // thunderheads are all big
-          n = isStyle(4.) ? big : mix(small, big, smoothstep(.3, .7, vnoise(p * 1.3 - 9.7)));
+          n = big;
+          if (!isStyle(4.)) {
+            float blend = smoothstep(.3, .7, vnoise(p * 1.3 - 9.7));
+            float small = vnoise(p * 9.5 * f) * .55;
+            if (mix(small + .45, big, blend) < emptyBelow) return emptyField;
+            small += vnoise(p * 21. * f + 3.1) * .3;
+            small += vnoise(p * 43. * f - 1.7) * .15;
+            n = mix(small, big, blend);
+          }
         }
-        float th = 1. - uCover * (.7 + .6 * region) + clear * .4;
+        if (n < emptyBelow) return emptyField;
         // some heads stay flat while their neighbours tower; a thunderhead climbs in turrets
         float tall = deck() ? 1. : isStyle(4.) ? mix(.5, 1., vnoise(p * 6. + 1.9)) : mix(.45, 1., vnoise(p * 3.3 + 1.9));
         if (isStyle(3.) || isStyle(4.)) tall *= mix(.75, 1., vnoise(p * 15. - 6.1));
@@ -140,6 +154,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           xz += (vec2(vnoise3(w), vnoise3(w + 17.3)) - .5) * (uTop - uBase) * .22;
         }
         vec3 f = field(xz * K - uWind + uOffset);
+        if (f.z == 0.) return 0.;
         float c = cover(f, 0.);
         float d = smoothstep(0., .1, crown(c) * f.z - h) * smoothstep(0., .04, h) * smoothstep(0., .25, c);
         if (isStyle(4.)){
