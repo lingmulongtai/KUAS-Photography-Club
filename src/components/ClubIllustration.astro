@@ -1,0 +1,13 @@
+---
+import type { HistoryIllustration } from '../data/club-history';
+interface Props { icon: HistoryIllustration; }
+const { icon } = Astro.props;
+---
+<svg viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+  {icon === 'camera' && <><path d="M10 24h10l5-7h14l5 7h10v24H10z"/><circle cx="32" cy="35" r="9"/><path d="M47 29h3M13 14h7m-3.5-3.5v7"/></>}
+  {icon === 'mountains' && <><path d="M7 43 22 21l9 13 9-17 17 26M12 48h40m-27 6h14M38 25l4 5-5 6 5 7"/><circle cx="49" cy="15" r="4"/></>}
+  {icon === 'badge' && <><path d="m23 39-7 13 9-2 5 6 3-12m7-6 7 14-9-2-5 6-2-12"/><circle cx="32" cy="29" r="15"/><path d="m25 29 5 5 9-10M49 15l5-4m-39 5-6-4"/></>}
+  {icon === 'campus' && <><path d="M12 52h40M16 52V26l15-12 17 12v26M28 45v7m8-7v7M21 30h5m12 0h5m-22 7h5m12 0h5"/><circle cx="32" cy="25" r="3"/></>}
+  {icon === 'festival' && <><path d="M12 49h40M17 28v21m30-21v21M13 28l7-13h24l7 13zM21 28l4-13m8 13V15m8 13-3-13M18 40h28M8 14h6m-3-3v6m39-3h6m-3-3v6"/></>}
+  {icon === 'frames' && <><path d="m9 16 29-3 2 31-29 3zm14 10 30-3 3 31-30 3zM27 47l8-10 6 6 4-4 9 6"/><circle cx="46" cy="32" r="2.5"/></>}
+</svg>
