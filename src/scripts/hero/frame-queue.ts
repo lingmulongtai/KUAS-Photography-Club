@@ -1,8 +1,9 @@
 /** Keep the GPU busy without queuing a long series of obsolete camera poses. */
-export function createFrameQueue(gl: WebGLRenderingContext | WebGL2RenderingContext) {
+export function createFrameQueue(gl: WebGLRenderingContext | WebGL2RenderingContext, now = () => performance.now()) {
   const context = 'fenceSync' in gl ? gl : undefined;
   const pending: WebGLSync[] = [];
   let enabled = !!context;
+  let lastFrame = NaN, interval = 0;
   function clear() {
     for (const sync of pending) context?.deleteSync(sync);
     pending.length = 0;
@@ -10,13 +11,16 @@ export function createFrameQueue(gl: WebGLRenderingContext | WebGL2RenderingCont
   return {
     available() {
       if (!context || !enabled || pending.length < 2) return true;
-      // A zero timeout is a poll. Pointer handlers can run while the GPU catches up.
-      const status = context.clientWaitSync(pending[0], 0, 0);
-      if (status === context.TIMEOUT_EXPIRED) return false;
-      if (status === context.WAIT_FAILED) {
-        clear();
-        enabled = false;
-      } else {
+      const age = now() - lastFrame;
+      // Chrome can report two completed fences together. Space their replacement poses apart.
+      if (interval > 24 && age < interval * .5) return false;
+      while (pending.length >= 2) {
+        const status = context.clientWaitSync(pending[0], 0, 0);
+        if (status === context.TIMEOUT_EXPIRED) {
+          // Normally keep two frames in flight. One spare slot covers a late completion notification.
+          return pending.length === 2 && interval > 0 && age >= Math.max(32, interval * 1.2);
+        }
+        if (status === context.WAIT_FAILED) { clear(); enabled = false; break; }
         context.deleteSync(pending.shift()!);
       }
       return true;
@@ -27,8 +31,12 @@ export function createFrameQueue(gl: WebGLRenderingContext | WebGL2RenderingCont
       if (!sync) { clear(); enabled = false; return; }
       pending.push(sync);
       context.flush();
+      const t = now(), delta = t - lastFrame;
+      if (delta > 0 && delta < 200) interval = interval ? interval + (delta - interval) * .125 : delta;
+      else interval = 0;
+      lastFrame = t;
     },
     // Context loss already destroyed the old sync objects.
-    restored() { pending.length = 0; enabled = !!context; },
+    restored() { pending.length = 0; enabled = !!context; lastFrame = NaN; interval = 0; },
   };
 }
