@@ -147,8 +147,9 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
       if (failed) return false;
       let paddedW = w + 2 * Math.ceil(w / 8), paddedH = h + 2 * Math.ceil(h / 8);
       const limit = renderer.capabilities.maxTextureSize;
-      // Narrow the off-screen margin on large displays before sacrificing any visible texels.
-      if (paddedW * paddedH > MAX_TEXELS || Math.max(paddedW, paddedH) > limit) {
+      // Large buffers spend more rays beyond the viewport. Keep full sampling density,
+      // use the narrower guard band, and let the coverage check re-anchor as the eye turns.
+      if (w * h >= 1_000_000 || paddedW * paddedH > MAX_TEXELS || Math.max(paddedW, paddedH) > limit) {
         paddedW = w + 2 * Math.ceil(w / 16);
         paddedH = h + 2 * Math.ceil(h / 16);
       }
