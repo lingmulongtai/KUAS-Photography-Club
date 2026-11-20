@@ -111,7 +111,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           vec2 q = mat2(.87, -.5, .5, .87) * p * (isStyle(5.) ? .7 : 1.);
           n = fieldNoise(q * vec2(2.6, 7.), 3) * .45 + fieldNoise(p * 13. + 3.1, 4) * .35;
           if (n + .2 < emptyBelow) return emptyField;
-          n += fieldNoise(p * 31. - 1.7, 5) * .2;
+          n += wideFieldNoise(p * 31. - 1.7, 5) * .2;
         } else {
           float f = isStyle(1.) ? 1.7 : isStyle(3.) ? .7 : isStyle(4.) ? .26 : 1.;
           // big clouds in some parts of the sky, small ones in others: two sizes of cell, blended
@@ -122,8 +122,8 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
             float blend = smoothstep(.3, .7, fieldNoise(p * 1.3 - 9.7, 8));
             float small = fieldNoise(p * 9.5 * f, 5) * .55;
             if (mix(small + .45, big, blend) < emptyBelow) return emptyField;
-            small += fieldNoise(p * 21. * f + 3.1, 6) * .3;
-            small += fieldNoise(p * 43. * f - 1.7, 7) * .15;
+            small += wideFieldNoise(p * 21. * f + 3.1, 6) * .3;
+            small += wideFieldNoise(p * 43. * f - 1.7, 7) * .15;
             n = mix(small, big, blend);
           }
         }
@@ -401,7 +401,13 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
   return {
     mesh, uniforms, restored: lattice.restored,
     prepareField(renderer: THREE.WebGLRenderer, eye: THREE.Vector3) {
-      if (material.defines.FIELD_LATTICE) updateLattice(renderer,eye);
+      if (material.defines.FIELD_LATTICE) {
+        updateLattice(renderer,eye);
+        if (!lattice.uniforms.uLatticeOn.value) {
+          delete material.defines.FIELD_LATTICE;
+          material.needsUpdate = true;
+        }
+      }
     },
     warmField(renderer: THREE.WebGLRenderer, eye: THREE.Vector3, prepare: (object: THREE.Object3D) => Promise<unknown>) {
       if (warming) return;
@@ -414,6 +420,10 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           updateLattice(renderer,eye);
           if (!lattice.uniforms.uLatticeOn.value) return;
           await prepare(warmMesh);
+          const state = renderer.properties.get(warmMaterial) as { currentProgram?: { program?: WebGLProgram } };
+          const program = state.currentProgram?.program;
+          const gl = renderer.getContext();
+          if (!program || !gl.getProgramParameter(program,gl.LINK_STATUS)) return;
           material.defines.FIELD_LATTICE = 1;
           material.needsUpdate = true;
         } catch { /* The analytic program remains available. */ }

@@ -3,7 +3,7 @@ import { NOISE_GLSL } from './env.ts';
 
 // A texel holds the four original scalar hashes for one noise cell. Interpolation
 // stays in the cloud shader, with the same precision and pixel coordinates.
-const TILE = 128, PAGES = 11;
+const TILE = 192, PAGES = 11;
 export const CLOUD_LATTICE_GLSL = /* glsl */ `
   #ifdef FIELD_LATTICE
   uniform highp sampler2D uCloudLattice;
@@ -11,14 +11,19 @@ export const CLOUD_LATTICE_GLSL = /* glsl */ `
   uniform bool uLatticeOn;
   float fieldNoise(vec2 p, int page) {
     vec2 cell = floor(p), local = cell - uLatticeOrigins[page];
-    if (!uLatticeOn || any(lessThan(local,vec2(0.))) || any(greaterThanEqual(local,vec2(${TILE}.)))) return vnoise(p);
     ivec2 texel = ivec2(local) + ivec2(page % 4, page / 4) * ${TILE};
     vec4 h = texelFetch(uCloudLattice, texel, 0);
     vec2 f = fract(p), u = f*f*(3.-2.*f);
     return mix(mix(h.x,h.y,u.x),mix(h.z,h.w,u.x),u.y);
   }
+  float wideFieldNoise(vec2 p, int page) {
+    vec2 local = floor(p) - uLatticeOrigins[page];
+    if (!uLatticeOn || any(lessThan(local,vec2(0.))) || any(greaterThanEqual(local,vec2(${TILE}.)))) return vnoise(p);
+    return fieldNoise(p,page);
+  }
   #else
   #define fieldNoise(p, page) vnoise(p)
+  #define wideFieldNoise(p, page) vnoise(p)
   #endif
 `;
 
@@ -46,15 +51,15 @@ export function createCloudLattice() {
   const scene = new THREE.Scene(), camera = new THREE.Camera();
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2,2), material);
   quad.frustumCulled = false; scene.add(quad);
-  let anchorX = NaN, anchorZ = NaN, style = -1, failed = false, lastUpdate = -Infinity;
+  let anchorX = NaN, anchorZ = NaN, style = -1, failed = false;
   return {
     uniforms,
-    restored() { failed = uniforms.uLatticeOn.value = false; style = -1; lastUpdate = -Infinity; },
+    restored() { failed = uniforms.uLatticeOn.value = false; style = -1; },
     update(renderer: THREE.WebGLRenderer, x: number, z: number, nextStyle: number) {
-      if (failed || (style === nextStyle && Math.max(Math.abs(x-anchorX), Math.abs(z-anchorZ)) < 2)) return;
-      const now = performance.now();
-      if (style === nextStyle && now-lastUpdate < 500) return;
-      lastUpdate = now;
+      // A 44 km ray spans at most 4.84 weather units. Including light probes,
+      // shape warping and anchor drift the low octaves fit in 96 cells on either
+      // side. Only the three higher frequencies need the analytic edge fallback.
+      if (failed || (style === nextStyle && Math.max(Math.abs(x-anchorX), Math.abs(z-anchorZ)) < .5)) return;
       const f = nextStyle === 1 ? 1.7 : nextStyle === 3 ? .7 : nextStyle === 4 ? .26 : 1;
       const page = (i: number, scale: number, add: number) => origins[i].set(
         Math.floor(x*scale+add)-TILE/2, Math.floor(z*scale+add)-TILE/2);
