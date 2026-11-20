@@ -252,6 +252,7 @@ export function createForest(
       const shapesByLod = kind[first] === 1 ? [closeCedar,midCedar,farCedar,farCedar] : [closeCrown,midCrown,farCrown,farCrown];
       const shape = shapesByLod[lods[first]];
       const geo = new THREE.InstancedBufferGeometry();
+      geo.setIndex(shape.index);
       geo.setAttribute('position', shape.getAttribute('position'));
       geo.setAttribute('normal', shape.getAttribute('normal'));
       geo.setAttribute('aBark', shape.getAttribute('aBark'));
@@ -346,15 +347,17 @@ const FACES: { n: [number, number, number]; corners: [number, number, number][] 
   { n: [0, 0, -1], corners: [[-1, -1, -1], [-1, 1, -1], [1, 1, -1], [1, -1, -1]] },
 ];
 
-/** Blocks as one non-indexed geometry; `hidden(block, face)` drops faces buried against a neighbour. */
+/** Each face has four distinct shaded corners; its two triangles can reuse two of them. */
 function blocksGeometry(blocks: Block[], hidden: (b: Block, n: [number, number, number]) => boolean = () => false) {
   const pos: number[] = [], nrm: number[] = [], vox: number[] = [], bark: number[] = [];
+  const indices: number[] = [];
   for (const b of blocks) {
     for (const f of FACES) {
       if (hidden(b, f.n)) continue;
-      const q = f.corners.map(([x, y, z]) => [b.c[0] + x * b.s[0] / 2, b.c[1] + y * b.s[1] / 2, b.c[2] + z * b.s[2] / 2]);
-      for (const i of [0, 1, 2, 0, 2, 3]) {
-        pos.push(...q[i]);
+      const first = vox.length;
+      indices.push(first, first + 1, first + 2, first, first + 2, first + 3);
+      for (const [x, y, z] of f.corners) {
+        pos.push(b.c[0] + x * b.s[0] / 2, b.c[1] + y * b.s[1] / 2, b.c[2] + z * b.s[2] / 2);
         nrm.push(...f.n);
         vox.push(b.shade);
         bark.push(b.bark);
@@ -362,6 +365,7 @@ function blocksGeometry(blocks: Block[], hidden: (b: Block, n: [number, number, 
     }
   }
   const g = new THREE.BufferGeometry();
+  g.setIndex(indices);
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   g.setAttribute('aVox', new THREE.Float32BufferAttribute(vox, 1));
