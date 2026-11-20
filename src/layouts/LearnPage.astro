@@ -10,8 +10,10 @@ interface Props {
   lead: string;
   description: string;
   lang?: SiteLanguage;
+  /** replaces the note above the demo (a real tool rather than a simplified illustration) */
+  note?: string;
 }
-const { slug, lead, description, lang = 'ja' } = Astro.props;
+const { slug, lead, description, lang = 'ja', note } = Astro.props;
 const topic = learnTopics.find((t) => t.slug === slug)!;
 const en = lang === 'en';
 const name = en ? topic.name : topic.title;
@@ -37,7 +39,7 @@ const t = en
   </PageHero>
 
   <section class="wrap demo-wrap" aria-label={t.demo}>
-    <p class="small muted">{t.note}</p>
+    <p class="small muted">{note ?? t.note}</p>
     <slot name="demo" />
   </section>
 

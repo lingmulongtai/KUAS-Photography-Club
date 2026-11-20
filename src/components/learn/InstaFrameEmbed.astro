@@ -1,0 +1,46 @@
+---
+/**
+ * InstaFrame, the club's browser tool for EXIF frames and watermarks, running inside the page.
+ * It is loaded from its own site so updates there appear here too; photos never leave the
+ * visitor's device. A link opens it full screen in its own tab.
+ */
+interface Props { lang?: 'ja' | 'en'; }
+const { lang = 'ja' } = Astro.props;
+const en = lang === 'en';
+const url = 'https://lingmulongtai.github.io/InstaFrame/';
+---
+<div class="instaframe">
+  <div class="bar">
+    <span class="name"><b>InstaFrame</b> <span class="muted">{en ? 'Frames, camera settings and watermarks' : 'フレーム・撮影情報・ウォーターマーク'}</span></span>
+    <a class="btn open" href={url} target="_blank" rel="noopener">{en ? 'Open full screen' : '新しいタブで大きく開く'} <span aria-hidden="true">↗</span></a>
+  </div>
+  <iframe
+    src={url}
+    title={en ? 'InstaFrame: add frames and watermarks to photos' : 'InstaFrame：写真にフレームやウォーターマークを付ける'}
+    loading="lazy"
+    allow="clipboard-write; fullscreen; geolocation"
+    referrerpolicy="no-referrer"
+  ></iframe>
+  <p class="small muted">{en ? 'If the tool does not appear, open it full screen in a new tab.' : '表示されないときは「新しいタブで大きく開く」から使ってください。'}</p>
+</div>
+
+<style>
+  .instaframe { display: grid; gap: 10px; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+  .name b { font: 700 18px/1.3 var(--latin); }
+  .name .muted { font-size: 13px; margin-left: 6px; }
+  .open { padding: 9px 16px; font-size: 13px; }
+  iframe {
+    display: block;
+    width: 100%;
+    height: min(86vh, 900px);
+    min-height: 560px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--raise);
+    box-shadow: 0 16px 36px rgba(27, 54, 61, 0.12);
+  }
+  @media (max-width: 600px) {
+    iframe { height: 82svh; min-height: 520px; border-radius: 8px; }
+  }
+</style>

@@ -27,6 +27,7 @@ for (const path of ['index.html','en/index.html']) {
 }
 for (const route of ['index.html', 'about/index.html', 'join/index.html', 'schedule/index.html', 'trips/index.html',
   'contact/index.html', 'guidelines/index.html', 'guidelines/en/index.html', 'learn/index.html',
+  'learn/editing/index.html', 'en/learn/editing/index.html',
   'en/index.html', 'en/about/index.html', 'en/join/index.html', 'en/schedule/index.html', 'en/trips/index.html', 'en/contact/index.html']) {
   assert.ok(byPath.has(route), `Missing public route ${route}`);
 }
