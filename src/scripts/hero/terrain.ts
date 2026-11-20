@@ -9,15 +9,14 @@ import type { Heightfield } from './heightfield';
 import type { GridMeta } from './data';
 import type {KamoChannel} from './kamo-channel';
 import { terrainPositions, terrainPositionsAsync } from './terrain-grid';
-import { normalMapBytes } from './normal-map';
+import { terrainTiles } from './terrain-tiles';
 
 /**
  * A normal map baked from an elevation grid, so slopes are lit per pixel no matter how coarse
  * the mesh is out at the far mountains. RGB = normal * 0.5 + 0.5 with y up.
  */
-export async function normalTexture(hf: Heightfield, meta: GridMeta) {
+export function normalTexture(meta: GridMeta, data: Uint8Array) {
   const { nx, nz } = meta;
-  const data = await normalMapBytes(hf, meta);
   const tex = new THREE.DataTexture(data, nx, nz, THREE.RGBAFormat);
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
@@ -44,7 +43,7 @@ export interface TerrainTextures {
 const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
 
 /**
- * One mesh for the whole basin on a warped grid: vertices pack tightly around the viewpoint
+ * The whole basin on a warped grid: vertices pack tightly around the viewpoint
  * and spread out toward the far mountains. Beyond the data the last ring is pulled out 20 km
  * so the edge never shows against the sky. recenter() moves the dense part to a new viewpoint.
  */
@@ -52,23 +51,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   let channel:KamoChannel|undefined;
   let activeCenter={...center},activeAnchored=false;
   const kinkaku = toLocal(35.0395092, 135.7284548), kiyomizu = toLocal(34.9946668, 135.7849382);
-  const n = segments + 1;
   const pos = terrainPositions(hf, center, segments);
-  const idx = new Uint32Array(segments * segments * 6);
-  let q = 0;
-  for (let j = 0; j < segments; j++) {
-    for (let i = 0; i < segments; i++) {
-      const a = j * n + i;
-      const b = a + 1;
-      const c = a + n;
-      const d = c + 1;
-      idx.set([a, c, b, b, c, d], q);
-      q += 6;
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setIndex(new THREE.BufferAttribute(idx, 1));
 
   const uniforms = {
     ...env,
@@ -360,11 +343,13 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       }
     `,
   });
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.frustumCulled = false;
+  const { mesh, position, setPositions } = terrainTiles(pos, segments, material);
+  // Shade the aerial imagery only where opaque roofs, trees and roads leave ground
+  // visible. At equal depth the overlaid geometry keeps its original priority.
+  mesh.renderOrder = 1;
+  material.depthFunc = THREE.LessDepth;
   // positions for other viewpoints, worked out ahead of time so switching doesn't stall a frame
   const cache = new Map<string, Float32Array>([[`${center.x},${center.z}`, pos]]);
-  const position = geo.getAttribute('position') as THREE.BufferAttribute;
   let generation = 0;
   const prepare = (c: { x: number; z: number },anchored=false) => {
     const key = `${anchored?'travel:':''}${c.x},${c.z}`;
@@ -377,8 +362,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     generation++;
     activeCenter={...c};activeAnchored=anchored;
     // Keep one GPU attribute while switching equal-sized terrain grids.
-    position.array = prepare(c,anchored);
-    position.needsUpdate = true;
+    setPositions(prepare(c,anchored));
   };
   const recenterAsync = async (c: { x: number; z: number }, onReady: () => void) => {
     const request = ++generation, target = { x: c.x, z: c.z }, key = `travel:${target.x},${target.z}`;
@@ -388,7 +372,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     activeCenter = target;activeAnchored=true;
     cache.delete(key);cache.set(key,prepared);
     if(cache.size>4)cache.delete(cache.keys().next().value!);
-    position.array=prepared;position.needsUpdate=true;onReady();
+    setPositions(prepared);onReady();
   };
   const cancelRecenter = () => { generation++; };
   /** Show the sharper photo for tex.photos[i]. */
@@ -401,5 +385,5 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
     cache.clear();recenter(activeCenter,activeAnchored);
   };
-  return { mesh, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
+  return { mesh, position, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
 }
