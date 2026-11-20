@@ -863,6 +863,7 @@ export function createHero(
   let maxDpr = 1;
   let lowered = false;
   let slow = 0;
+  let firstDrawAt: number | undefined;
   function setResolution(d: number) {
     pixelRatio = d;
     renderer.setPixelRatio(d);
@@ -945,9 +946,13 @@ export function createHero(
       labels?.update(camera, width, height);
       loading.frame();
       // keep the frame rate up on slower devices by rendering fewer pixels
-      if (dt > 0) {
+      if (dt > 0 && pixelRatio > .75) {
+        const now = performance.now();
+        firstDrawAt ??= now;
         slow = dt > 0.034 ? slow + 1 : Math.max(0, slow - 1);
-        if (slow > 45 && pixelRatio > .75) {
+        // Faster submissions reach 45 samples earlier. Let the opening panorama settle at its requested density.
+        const openingPanorama = steadySky && now - firstDrawAt < 8000;
+        if (slow > 45 && !openingPanorama) {
           slow = 0;
           lowered = true;
           setResolution(Math.max(.75, pixelRatio - 0.25));
