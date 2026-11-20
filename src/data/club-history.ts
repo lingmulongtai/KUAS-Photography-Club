@@ -3,6 +3,10 @@ type Localized = { ja: string; en: string };
 export type HistoryIllustration = 'camera' | 'mountains' | 'badge' | 'campus' | 'festival' | 'frames';
 type Milestone = {
   date?: string;
+  /** the year it belongs to, for undated entries (shown under that year) */
+  year?: string;
+  /** a turning point, drawn larger in the timeline */
+  highlight?: boolean;
   label: Localized;
   title: Localized;
   detail: Localized;
@@ -16,12 +20,12 @@ export const clubHistory: readonly Milestone[] = [
     detail: { ja: '現在の写真部は、写真を楽しむ学生が集まる同好会としてスタートしました。', en: 'The current club began as a student circle for people who wanted to enjoy photography together.' },
   },
   {
-    label: { ja: '同好会時代', en: 'During our circle years' }, illustration: 'mountains',
+    year: '2025', label: { ja: '同好会時代', en: 'During our circle years' }, illustration: 'mountains',
     title: { ja: '初めての撮影会は、箕面大滝へ', en: 'Our first photo outing: Minoh Falls' },
     detail: { ja: '部員と一緒に出かけて撮る活動は、大阪の箕面大滝から始まりました。', en: 'We held our first group photo outing at Minoh Falls in Osaka.' },
   },
   {
-    date: '2026-04', label: { ja: '2026年4月', en: 'April 2026' }, illustration: 'badge',
+    date: '2026-04', label: { ja: '2026年4月', en: 'April 2026' }, illustration: 'badge', highlight: true,
     title: { ja: '同好会から正式な部活動へ', en: 'The circle becomes a recognized club' },
     detail: { ja: '学友会公認の部活動として、京都先端科学大学写真部の活動が始まりました。', en: 'We became an officially recognized student club through the university’s student association.' },
   },
