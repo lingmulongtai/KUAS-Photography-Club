@@ -5,6 +5,7 @@ import type { Heightfield } from './heightfield';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
 import { hash1 } from './util';
 import { inCampus } from './geo';
+import { panoramaHouses, type PlacedHouse } from './panorama-blocks';
 import { isDetailed } from './campus';
 import { BUILT_GLSL } from './building-occlusion';
 import { DetailList, WALL_GLSL, boxDetails, detailMaterial, detailMesh, polyDetails } from './building-details';
@@ -432,7 +433,7 @@ function roofFor(b: BoxBuilding) {
   return { type: 1, rh: Math.min(Math.max(b.d * 0.26, 1.2), b.h * 0.4) };
 }
 
-function instanced(shape: THREE.InstancedBufferGeometry, list: { b: BoxBuilding; y: number; seed: number }[], pitched: boolean) {
+function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pitched: boolean) {
   const n = list.length;
   const geo = new THREE.InstancedBufferGeometry();
   for (const name of ['position', 'normal', 'aRole']) geo.setAttribute(name, shape.getAttribute(name));
@@ -441,8 +442,8 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: { b: BoxBuilding;
   const rot = new Float32Array(n);
   const meta = new Float32Array(n * 4);
   let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity, maxY = -Infinity, minY = Infinity;
-  list.forEach(({ b, y, seed }, i) => {
-    const r = pitched ? roofFor(b) : { type: 0, rh: 0 };
+  list.forEach(({ b, y, seed, roofSource }, i) => {
+    const r = pitched ? roofFor(roofSource ?? b) : { type: 0, rh: 0 };
     const { lift, inset } = separation(seed);
     pos.set([b.x, y, b.z], i * 3);
     size.set([Math.max(1, b.w - 2 * inset), b.h + lift, Math.max(1, b.d - 2 * inset)], i * 3);
@@ -579,7 +580,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
   /** Pairs of the same houses: stepped roofs for chunks near the camera, plain slopes beyond. */
   const roofLods: { near: THREE.Mesh; far: THREE.Mesh; x: number; z: number }[] = [];
 
-  type Chunk = { x: number; z: number; flat: { b: BoxBuilding; y: number; seed: number }[]; pitched: { b: BoxBuilding; y: number; seed: number }[]; polys: { p: PolyBuilding; y: number; seed: number }[] };
+  type Chunk = { x: number; z: number; flat: PlacedHouse[]; pitched: PlacedHouse[]; polys: { p: PolyBuilding; y: number; seed: number }[] };
   const chunks = new Map<string, Chunk>();
   const chunkOf = (x: number, z: number) => {
     const key = `${Math.floor(x / CHUNK)},${Math.floor(z / CHUNK)}`;
@@ -647,6 +648,10 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
     t.done = true;
   };
 
+  const blockGeometry = (shape: THREE.InstancedBufferGeometry, full: THREE.InstancedBufferGeometry, houses: PlacedHouse[], hasRoofs: boolean) => {
+    const compact = panoramaHouses(houses, b => dressed(b) || inCampus(b.x, b.z));
+    return compact.length === houses.length ? instanceShape(shape, full) : instanced(shape, compact, hasRoofs);
+  };
   for (const c of chunks.values()) {
     yield;
     const add = (geo: THREE.BufferGeometry, mat: THREE.ShaderMaterial, depth: THREE.ShaderMaterial) => {
@@ -671,7 +676,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
       const mesh = add(full, instMat, instDepth);
       if (block && proxyShapes && proxyMaterial) {
         block.originals.push(mesh);
-        block.proxy.add(new THREE.Mesh(instanceShape(proxyShapes.flat, full), proxyMaterial));
+        block.proxy.add(new THREE.Mesh(blockGeometry(proxyShapes.flat, full, c.flat, false), proxyMaterial));
       }
     }
     if (c.polys.length) add(extruded(c.polys), polyMat, polyDepth);
@@ -685,7 +690,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
       roofLods.push(pair);
       if (block && proxyShapes && proxyMaterial) {
         block.originals.push(pair.near, pair.far);
-        block.proxy.add(new THREE.Mesh(instanceShape(proxyShapes.pitched, far), proxyMaterial));
+        block.proxy.add(new THREE.Mesh(blockGeometry(proxyShapes.pitched, far, c.pitched, true), proxyMaterial));
       }
     }
   }
