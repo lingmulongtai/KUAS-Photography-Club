@@ -160,10 +160,13 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec2 river=texture2D(uKamoMask,riverUv).rg*inside(uKamoBox,p,1.)*uKamoOn;
 
         // slope from the elevation grids
-        vec3 nf = texture2D(uNormalFar, boxUv(uNormalFarBox, p)).xyz * 2. - 1.;
+        vec4 basinSurface = texture2D(uNormalFar, boxUv(uNormalFarBox, p));
+        vec4 outerSurface = texture2D(uOuterNormal, boxUv(uOuterBox, p));
+        vec3 nf = basinSurface.xyz * 2. - 1.;
         vec3 nn = texture2D(uNormalNear, boxUv(uNormalNearBox, p)).xyz * 2. - 1.;
-        vec3 no=texture2D(uOuterNormal,boxUv(uOuterBox,p)).xyz*2.-1.;
-        nf=mix(nf,mix(no,nf,inside(uNormalFarBox,p,300.)),uOuterOn);
+        vec3 no = outerSurface.xyz * 2. - 1.;
+        float basin = inside(uNormalFarBox,p,300.);
+        nf=mix(nf,mix(no,nf,basin),uOuterOn);
         vec3 n = normalize(mix(nf, nn, inside(uNormalNearBox, p, 300.)));
         float regional = inside(uRegionalBox,p,120.)*uRegionalOn;
         vec3 nr=texture2D(uRegionalNormal,boxUv(uRegionalBox,p)).xyz*2.-1.;
@@ -325,6 +328,13 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // from far away the avenues read as lines of light with a little haze around them
           float halo = smoothstep(900., 4000., dist);
           emit += vec3(1., .74, .46) * exp(-max(rd.avenue, 0.) / 14.) * (1. - smoothstep(16., 30., rd.avenue)) * halo * .18;
+          // Southern streets remain visible before any regional city is requested.
+          // Reuse the two already-filtered normal samples. Detailed streets take over near the camera.
+          float distantLight = (1.-basinSurface.a)*basin
+            + (1.-outerSurface.a)*(1.-basin)*uOuterOn*inside(uOuterBox,p,120.);
+          float core = uRoadsOn*inside(uRoadBox,p,180.);
+          float closeDetail = uRegionRoadsOn*inside(uRegionRoadBox,p,120.)*(1.-smoothstep(1400.,4000.,dist));
+          emit = max(emit, vec3(.65,.47,.29)*distantLight*(1.-max(core,closeDetail)));
           emit *= uCity * cityLightShimmer(vWorld);
         }
         // a teal ring that pulses around the campus when it is in focus

@@ -11,6 +11,7 @@ import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
 import { initialNormals } from './initial-normals';
 import { normalMapBytes } from './normal-map';
+import { applySouthernNightLights } from './southern-night-lights';
 import { buildCelestial, buildSkyDome } from './sky';
 import { createPost } from './post';
 import { createPanoramaCity } from './panorama-city';
@@ -206,6 +207,10 @@ export function createHero(
     if (meta.arashiyama) normalGrids.push(meta.arashiyama.elevation);
     if (meta.outer && meta.aerialOuter) normalGrids.push(meta.outer);
     const normals = elevation.then(hf => initialNormals(hf, normalGrids));
+    // Start once for every viewpoint. The first frame can still proceed on a slow connection.
+    const nightLights = Promise.all([normals, loadBinary('southern-night-lights.bin')])
+      .then(([maps, bytes]) => { applySouthernNightLights(bytes, [meta.far, meta.outer], maps); return true; })
+      .catch(error => { console.warn('Southern road lighting unavailable', error); return false; });
     // The base imagery can fail before normal generation is joined below.
     void normals.catch(() => {});
     const [hf, wide, outer] = await Promise.all([elevation, loading.track(loadTexture(wideFile, aniso)),
@@ -231,6 +236,11 @@ export function createHero(
     const normalNear = textureFor(meta.near);
     const regionalNormal = meta.arashiyama ? textureFor(meta.arashiyama.elevation) : undefined;
     const outerNormal = outer && meta.outer ? textureFor(meta.outer) : undefined;
+    void nightLights.then(ready => {
+      if (!ready) return;
+      normalFar.needsUpdate = true;
+      if (outerNormal) outerNormal.needsUpdate = true;
+    });
     await yieldToBrowser();
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
