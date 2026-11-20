@@ -22,7 +22,8 @@ test('the Shogunzuka overview only replaces distant camera surfaces and retains 
   const [block] = city.overview.children;
   assert.equal(city.overview.children.length, 1);
   assert.equal(block.visible, false);
-  assert.deepEqual(block.children.map(mesh => mesh.geometry.getAttribute('position').count / 3), [6, 10]);
+  assert.deepEqual(block.children.map(mesh => mesh.geometry.index.count / 3), [6, 10]);
+  assert.deepEqual(block.children.map(mesh => mesh.geometry.getAttribute('position').count), [12, 22]);
   for (const mesh of city.group.children) mesh.layers.enable(1);
   city.updateLod(eye, 800);
   assert.ok(block.visible);
