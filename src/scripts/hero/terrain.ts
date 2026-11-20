@@ -343,7 +343,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       }
     `,
   });
-  const { mesh, setPositions } = terrainTiles(pos, segments, material);
+  const { mesh, position, setPositions } = terrainTiles(pos, segments, material);
   // positions for other viewpoints, worked out ahead of time so switching doesn't stall a frame
   const cache = new Map<string, Float32Array>([[`${center.x},${center.z}`, pos]]);
   let generation = 0;
@@ -381,5 +381,5 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
     cache.clear();recenter(activeCenter,activeAnchored);
   };
-  return { mesh, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
+  return { mesh, position, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
 }

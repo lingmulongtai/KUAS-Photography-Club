@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CitySurface, Eye, VisibleSurface } from './panorama-visibility';
+import type { CitySurface, Eye, PanoramaTerrain, VisibleSurface } from './panorama-visibility';
 
 type BuildingMesh = THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
 const perHouse = ['iPos', 'iSize', 'iRot', 'iMeta'];
@@ -42,14 +42,19 @@ function visibleMeshes(mesh: BuildingMesh, surface: VisibleSurface): THREE.Mesh[
       geometry.setAttribute(name, new THREE.InstancedBufferAttribute(values, itemSize));
     }
     geometry.instanceCount = batch.houses.length;
-    return bind(geometry, batch.indices);
+    const part = bind(geometry, batch.indices);
+    if (batch.bounds) {
+      part.userData.sector = new THREE.Box3(new THREE.Vector3().fromArray(batch.bounds), new THREE.Vector3().fromArray(batch.bounds, 3));
+    }
+    return part;
   });
 }
 
 /** Reuse original building shaders and roof shapes. Only the colour pass from this eye
  * may omit hidden faces. Flights, exploration and the sun's shadow map use the full city. */
-export function createPanoramaCity(roots: THREE.Group[], origin: Eye) {
+export function createPanoramaCity(roots: THREE.Group[], origin: Eye, terrain?: { position: THREE.BufferAttribute; river: readonly number[] }) {
   const group = new THREE.Group();
+  const projection = new THREE.Matrix4(), frustum = new THREE.Frustum();
   group.name = 'Shogunzuka visible city';
   group.visible = false;
   const entries: { mesh: BuildingMesh; ancestors: THREE.Object3D[] }[] = [];
@@ -66,6 +71,7 @@ export function createPanoramaCity(roots: THREE.Group[], origin: Eye) {
     entries.push({ mesh: object as BuildingMesh, ancestors });
   });
   let signature: BuildingMesh[] = [], ready = false, worker: Worker | undefined;
+  let terrainPositions: Float32Array | undefined;
   const clear = () => {
     for (const child of group.children) {
       const g = (child as THREE.Mesh).geometry;
@@ -78,8 +84,10 @@ export function createPanoramaCity(roots: THREE.Group[], origin: Eye) {
   };
   function prepare(active: BuildingMesh[]) {
     worker?.terminate();
+    worker = undefined;
     clear();
     signature = active;
+    terrainPositions = terrain?.position.array as Float32Array | undefined;
     if (!active.length || typeof Worker === 'undefined') return;
     try {
       const job = new Worker(new URL('./panorama-visibility.worker.ts', import.meta.url), { type: 'module' });
@@ -94,19 +102,25 @@ export function createPanoramaCity(roots: THREE.Group[], origin: Eye) {
       };
       job.onerror = () => { job.terminate(); if (worker === job) worker = undefined; };
       // Clone the inputs. Their GPU buffers remain live while the worker builds the colour mesh.
-      job.postMessage({ eye: { x: origin.x, y: origin.y, z: origin.z }, sources: active.map(snapshot) });
+      const ground: PanoramaTerrain | undefined = terrain && terrainPositions ? { positions: terrainPositions, river: terrain.river } : undefined;
+      job.postMessage({ eye: { x: origin.x, y: origin.y, z: origin.z }, sources: active.map(snapshot), terrain: ground });
     } catch {
       worker?.terminate(); worker = undefined;
     }
   }
-  return { group, render(eye: Eye, draw: () => void) {
+  return { group, render(camera: THREE.PerspectiveCamera, draw: () => void) {
+    const eye = camera.position;
     if (eye.x !== origin.x || eye.y !== origin.y || eye.z !== origin.z) { draw(); return; }
     const active: BuildingMesh[] = [];
     for (const { mesh, ancestors } of entries) {
       if (mesh.visible && mesh.layers.isEnabled(0) && ancestors.every(parent => parent.visible)) active.push(mesh);
     }
-    if (active.length !== signature.length || active.some((mesh, i) => mesh !== signature[i])) prepare(active);
+    if (terrain?.position.array !== terrainPositions || active.length !== signature.length ||
+        active.some((mesh, i) => mesh !== signature[i])) prepare(active);
     if (!ready) { draw(); return; }
+    projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
+    frustum.setFromProjectionMatrix(projection);
+    for (const part of group.children) part.visible = !part.userData.sector || frustum.intersectsBox(part.userData.sector);
     for (const mesh of active) mesh.visible = false;
     group.visible = true;
     try { draw(); } finally {

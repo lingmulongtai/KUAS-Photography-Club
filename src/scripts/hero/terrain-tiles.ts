@@ -44,5 +44,5 @@ export function terrainTiles(positions: Float32Array, segments: number, material
     }
   }
   setPositions(positions);
-  return { mesh, setPositions };
+  return { mesh, position, setPositions };
 }

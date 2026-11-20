@@ -36,6 +36,23 @@ test('fixed-eye batches keep the original corner index and house number', () => 
   };
   const [{ batches }] = panoramaVisibility([source],eye);
   assert.deepEqual(batches.map(b => [Array.from(b.houses), Array.from(b.indices)]), [[[0],[0,1,2]],[[1],[3,4,5]]]);
+  for (const { houses, bounds } of batches) {
+    const i = houses[0], z = source.pos[i*3+2];
+    for (const x of [-6,6]) for (const y of [-6,8]) for (const dz of [-3.5,3.5]) {
+      const scale = 1000/(eye.x-x), sy = eye.y+(y-eye.y)*scale, sz = eye.z+(z+dz-eye.z)*scale;
+      assert.ok(sy >= bounds[1] && sy <= bounds[4] && sz >= bounds[2] && sz <= bounds[5]);
+    }
+  }
+});
+
+test('only opaque hillside triangles may hide buildings and a river opening keeps them visible', () => {
+  const terrain = { positions: new Float32Array([450,-55,-200, 600,-55,-200, 450,-55,200, 600,-55,200]),
+    river: [-4000,-100,-3000,100] };
+  const low = plane(wall(0,-122,-120,-45,-35)), high = plane(wall(0,50,55,-45,-35));
+  assert.equal(panoramaVisibility([low,high],eye,terrain)[0].indices.length, 0);
+  assert.equal(panoramaVisibility([high],eye,terrain)[0].indices.length, 6);
+  terrain.river = [470,-10,490,10];
+  assert.equal(panoramaVisibility([low],eye,terrain)[0].indices.length, 6);
 });
 
 test('a delayed visibility result only substitutes the matching colour mesh during the draw', () => {
@@ -53,12 +70,14 @@ test('a delayed visibility result only substitutes the matching colour mesh duri
     const source = new THREE.Mesh(geometry, new THREE.ShaderMaterial());
     root.add(source);
     const cache = createPanoramaCity([root], eye);
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.copy(eye); camera.updateMatrixWorld();
     const direct = () => { assert.ok(source.visible); assert.equal(cache.group.visible,false); };
-    cache.render(eye, direct);
+    cache.render(camera, direct);
     assert.equal(jobs.length, 1);
     jobs[0].onmessage({ data: [{ indices: new Uint32Array([0,1,2]) }] });
-    cache.render({...eye,x:999}, direct);
-    assert.throws(() => cache.render(eye, () => {
+    camera.position.x = 999; cache.render(camera, direct); camera.position.x = eye.x;
+    assert.throws(() => cache.render(camera, () => {
       assert.equal(source.visible,false); assert.ok(cache.group.visible);
       const [copy] = cache.group.children;
       assert.equal(copy.material,source.material);
@@ -66,9 +85,13 @@ test('a delayed visibility result only substitutes the matching colour mesh duri
       throw Error('interrupted render');
     }), /interrupted render/);
     direct();
-    source.layers.disable(0); cache.render(eye,direct);
-    source.layers.enable(0); cache.render(eye,direct);
+    source.layers.disable(0); cache.render(camera,direct);
+    source.layers.enable(0); cache.render(camera,direct);
     assert.equal(jobs.length, 2);
+    root.visible = false; cache.render(camera,direct);
+    jobs[1].onmessage({ data: [{ indices: new Uint32Array([0,1,2]) }] });
+    cache.render(camera,direct);
+    assert.equal(cache.group.children.length, 0);
   } finally {
     if (previous === undefined) delete globalThis.Worker;
     else globalThis.Worker = previous;

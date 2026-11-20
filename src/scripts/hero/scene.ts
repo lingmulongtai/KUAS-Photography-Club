@@ -368,7 +368,8 @@ export function createHero(
     casts(campusModel);
     scene.add(city.group, landmarks.mesh);
     if (city.overview) scene.add(city.overview);
-    panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group], eyeOf(VIEWS.shogunzuka));
+    panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
+      eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });
     scene.add(panoramaCity.group);
     casts(city.group);
     cityLods.add(city);
@@ -940,8 +941,10 @@ export function createHero(
       meteors.update(t, dt, camera.position, { az, half, top }, Math.min(1, env.uStars.value), pxPerM);
       const renderScene = () => post.render(t);
       const draw = () => {
-        if (panoramaCity && mode === 'city' && view === 'shogunzuka' && !flight && !exploring)
-          panoramaCity.render(camera.position, renderScene);
+        // An unusually wide view can clip a nearby occluder at the corners of the near plane.
+        const nearCorner = camera.near * Math.hypot(1, 1 / camera.projectionMatrix.elements[0], 1 / camera.projectionMatrix.elements[5]);
+        if (panoramaCity && mode === 'city' && view === 'shogunzuka' && !flight && !exploring && nearCorner < 100)
+          panoramaCity.render(camera, renderScene);
         else renderScene();
       };
       const steadySky = mode === 'city' && view === 'shogunzuka' && !flight && !exploring &&
