@@ -29,6 +29,7 @@ import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds } from './clouds';
 import { createCloudBlur } from './cloud-blur';
+import { createCloudHistory } from './cloud-history';
 import {createCloudClock,createCloudMotion} from './cloud-weather';
 import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio } from './look-controls';
 import {createKamoChannel,kamoMask} from './kamo-channel';
@@ -134,6 +135,8 @@ export function createHero(
   const cloudClock=createCloudClock();
   const cloudMotion=createCloudMotion();
   const cloudBlur=createCloudBlur(renderer,camera,clouds.mesh);
+  const cloudHistory = createCloudHistory(renderer, camera, clouds.mesh);
+  renderer.domElement.addEventListener('webglcontextrestored', cloudHistory.restored);
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
   const frameQueue = createFrameQueue(renderer.getContext());
@@ -918,7 +921,8 @@ export function createHero(
       clock = t;
       const date=opts.now();
       applyTime(date, t);
-      const cloudSeconds=cloudClock.step(opts.cloudTravelMinutes?.()??0,dt,opts.reducedMotion);
+      const travel = opts.cloudTravelMinutes?.() ?? 0;
+      const cloudSeconds=cloudClock.step(travel,dt,opts.reducedMotion);
       const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
@@ -929,7 +933,14 @@ export function createHero(
       const az = Math.atan2(forward.x, -forward.z);
       const top = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) + camera.fov * RAD / 2;
       meteors.update(t, dt, camera.position, { az, half, top }, Math.min(1, env.uStars.value), pxPerM);
-      cloudBlur.render(cloudFrame.blur,width,height,pixelRatio,()=>post.render(t));
+      const draw = () => post.render(t);
+      const steadySky = mode === 'city' && view === 'shogunzuka' && !flight && !exploring &&
+        cloudFrame.blur[0] === 0 && cloudFrame.blur[1] === 0;
+      if (!steadySky) cloudHistory.invalidate();
+      if (!steadySky || !cloudHistory.render(Math.round(width * pixelRatio), Math.round(height * pixelRatio),
+        clouds.weather, travel, date.getTime(), draw)) {
+        cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw);
+      }
       frameQueue.submitted();
       labels?.update(camera, width, height);
       loading.frame();
