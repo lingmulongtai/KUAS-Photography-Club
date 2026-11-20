@@ -13,6 +13,7 @@ import { initialNormals } from './initial-normals';
 import { normalMapBytes } from './normal-map';
 import { buildCelestial, buildSkyDome } from './sky';
 import { createPost } from './post';
+import { createPanoramaCity } from './panorama-city';
 import { loadBuildings } from './buildings-data';
 import { buildingCutout } from './building-cutout';
 import { buildCity, buildCityAsync } from './buildings';
@@ -181,6 +182,7 @@ export function createHero(
   let driveCars: ((dt: number) => void) | null = null;
   /** Cities whose roofs switch to stepped blocks near the camera. */
   const cityLods = new Set<ReturnType<typeof buildCity>>();
+  let panoramaCity: ReturnType<typeof createPanoramaCity> | undefined;
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -366,6 +368,8 @@ export function createHero(
     casts(campusModel);
     scene.add(city.group, landmarks.mesh);
     if (city.overview) scene.add(city.overview);
+    panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group], eyeOf(VIEWS.shogunzuka));
+    scene.add(panoramaCity.group);
     casts(city.group);
     cityLods.add(city);
     casts(landmarks.mesh);
@@ -934,7 +938,12 @@ export function createHero(
       const az = Math.atan2(forward.x, -forward.z);
       const top = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) + camera.fov * RAD / 2;
       meteors.update(t, dt, camera.position, { az, half, top }, Math.min(1, env.uStars.value), pxPerM);
-      const draw = () => post.render(t);
+      const renderScene = () => post.render(t);
+      const draw = () => {
+        if (panoramaCity && mode === 'city' && view === 'shogunzuka' && !flight && !exploring)
+          panoramaCity.render(camera.position, renderScene);
+        else renderScene();
+      };
       const steadySky = mode === 'city' && view === 'shogunzuka' && !flight && !exploring &&
         cloudFrame.blur[0] === 0 && cloudFrame.blur[1] === 0;
       if (!steadySky) cloudHistory.invalidate();
