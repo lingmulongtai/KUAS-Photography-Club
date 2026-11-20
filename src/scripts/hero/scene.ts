@@ -181,7 +181,11 @@ export function createHero(
   const yieldToBrowser = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
   (async () => {
-    const meta = await loading.track(loadJSON<TerrainMeta>('terrain.json'));
+    const metadata = loading.track(loadJSON<TerrainMeta>('terrain.json'));
+    const cloudProgram = post.prepare(clouds.mesh).catch(error => {
+      console.warn('Cloud shader will compile on first draw', error);
+    });
+    const meta = await metadata;
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
     const [hf, wide, outer] = await Promise.all([loading.track(loadHeightfield(meta)), loading.track(loadTexture(wideFile, aniso)),
       loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
@@ -505,6 +509,7 @@ export function createHero(
     };
     ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
+    await cloudProgram;
     loading.built();
     idle(()=>{void loadBinary('buildings-south-lod.json.gz').then(async bytes=>{
       const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[]};
