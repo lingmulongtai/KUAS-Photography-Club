@@ -948,7 +948,7 @@ export function createHero(
         cloudFrame.blur[0] === 0 && cloudFrame.blur[1] === 0;
       if (!steadySky) cloudHistory.invalidate();
       if (!steadySky || !cloudHistory.render(Math.round(width * pixelRatio), Math.round(height * pixelRatio),
-        clouds.weather, travel, date.getTime(), draw)) {
+        clouds.weather, travel, date.getTime(), draw, dt)) {
         cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw);
       }
       frameQueue.submitted();

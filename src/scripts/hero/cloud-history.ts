@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 // Update vertical strips so every frame gets a similar share of the expensive sky rays.
-const STRIPS = 6;
+const MIN_STRIPS = 6, MAX_STRIPS = 12;
 const MAX_TEXELS = Math.floor(64 * 1024 * 1024 / (3 * 8)); // Three RGBA16F images.
 const MAX_TURN = THREE.MathUtils.degToRad(2);
 
@@ -58,7 +58,7 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
   const mapping = new THREE.Matrix4(), corner = new THREE.Vector4();
   const savedColor = new THREE.Color(), lastEye = new THREE.Vector3(), lastTurn = new THREE.Quaternion();
   let present: SkyImage | undefined, past: SkyImage | undefined, writing: SkyImage | undefined;
-  let strip = 0, failed = false, verified = false;
+  let strip = 0, strips = MIN_STRIPS, frameSeconds = .05, failed = false, verified = false;
   let weather: object | undefined, lastTravel = NaN, lastDate = NaN, lastFov = NaN, lastW = 0, lastH = 0;
 
   function reset() { past = present = writing = undefined; strip = 0; }
@@ -143,7 +143,7 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
   return {
     invalidate,
     restored() { reset(); weather = undefined; failed = verified = false; for (const image of images) image.checked = false; },
-    render(w: number, h: number, currentWeather: object, travel: number, date: number, draw: () => void) {
+    render(w: number, h: number, currentWeather: object, travel: number, date: number, draw: () => void, elapsed = .05) {
       if (failed) return false;
       let paddedW = w + 2 * Math.ceil(w / 8), paddedH = h + 2 * Math.ceil(h / 8);
       const limit = renderer.capabilities.maxTextureSize;
@@ -156,9 +156,11 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
       const tw = Math.floor(paddedW * density), th = Math.floor(paddedH * density);
       if (density < 1) { invalidate(); return false; }
       camera.updateMatrixWorld();
+      const turn = lastTurn.angleTo(camera.quaternion);
       const cut = weather !== currentWeather || travel !== lastTravel || Math.abs(date - lastDate) > 1500 ||
         lastW !== w || lastH !== h || lastFov !== camera.fov || lastEye.distanceToSquared(camera.position) > .0001 ||
-        lastTurn.angleTo(camera.quaternion) > MAX_TURN;
+        turn > MAX_TURN;
+      if (elapsed > 0 && elapsed < .15) frameSeconds += (elapsed - frameSeconds) * .12;
       weather = currentWeather; lastTravel = travel; lastDate = date; lastW = w; lastH = h; lastFov = camera.fov;
       lastEye.copy(camera.position); lastTurn.copy(camera.quaternion);
       if (cut || (present && coverage(present) > .995)) { reset(); return false; }
@@ -177,18 +179,24 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
             if (strip === 0) {
               writing = images.find(image => image !== past && image !== present)!;
               begin(writing, w, h, tw, th, paddedW, paddedH);
+              // Refresh the full-resolution field about every 0.3 s, including on faster GPUs.
+              // During a faster turn, finish sooner so the source still covers the viewport.
+              const margin = Math.min(paddedW / w - 1, paddedH / h - 1);
+              const angle = Math.atan(margin * Math.tan(THREE.MathUtils.degToRad(camera.fov) * .5) * Math.min(1, camera.aspect));
+              const turnLimit = Math.floor(.65 * angle / Math.max(turn, .0001));
+              strips = THREE.MathUtils.clamp(Math.min(Math.round(.30 / frameSeconds), turnLimit), MIN_STRIPS, MAX_STRIPS);
             }
-            capture(writing!, strip++, STRIPS);
+            capture(writing!, strip++, strips);
           }
         } catch (error) { disable(error); return false; }
         uniforms.uCloudPast.value = past.target.texture; uniforms.uPastClip.value = past.clip;
         uniforms.uCloudPresent.value = present.target.texture; uniforms.uPresentClip.value = present.clip;
-        uniforms.uCloudMix.value = strip / STRIPS;
+        uniforms.uCloudMix.value = strip / strips;
         mesh.material = composite;
         if (!shaderFailed) draw();
         if (shaderFailed) { disable(new Error('Cloud reprojection shader failed')); return false; }
         verified = true;
-        if (strip === STRIPS) { past = present; present = writing; strip = 0; }
+        if (strip === strips) { past = present; present = writing; strip = 0; }
         return true;
       } finally {
         mesh.material = original;

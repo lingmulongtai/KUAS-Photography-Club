@@ -34,7 +34,7 @@ function setup() {
     frames.push({ past: u.uCloudPast.value, present: u.uCloudPresent.value, weight: u.uCloudMix.value });
   }
   function step(callback = draw) {
-    const result = history.render(state.w, state.h, state.weather, state.travel, state.date, callback);
+    const result = history.render(state.w, state.h, state.weather, state.travel, state.date, callback, state.elapsed);
     assert.equal(mesh.material, material);
     return result;
   }
@@ -87,6 +87,26 @@ test('view changes, time jumps, and weather changes start with a fresh direct fr
   h.state.w = 5000; h.state.h = 3000;
   assert.equal(h.step(), false);
   assert.equal(h.step(), false);
+});
+
+test('faster frames spread the same full image across more frames with a bounded refresh interval', () => {
+  const h = setup();
+  h.state.elapsed = 1 / 36;
+  h.step();
+  let source, width = 0, count = 0;
+  for (let i = 0; i < 80; i++) {
+    assert.ok(h.step());
+    const { target, rect } = h.captures.at(-1);
+    if (target !== source) {
+      if (source) {
+        assert.equal(width, source.width);
+        if (i > 50) assert.ok(count >= 10 && count * h.state.elapsed < .34);
+      }
+      source = target; count = 0; width = 0;
+    }
+    assert.equal(rect.x, width);
+    width += rect.width; count++;
+  }
 });
 
 test('a full-HD viewport keeps its native sampling within the memory budget and releases it on exit', () => {
