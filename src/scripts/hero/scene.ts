@@ -89,6 +89,8 @@ export interface HeroOptions extends HeroLoadingCallbacks {
   quality: number;
   trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
+  /** Called once after the final scene has been submitted, including on the fence fallback. */
+  onFrameSubmitted?: () => void;
   /** A neighbouring area is loading; all navigation remains available. */
   onAreaLoading?:(loading:boolean)=>void;
   onExplore?:(exploring:boolean)=>void;
@@ -957,6 +959,7 @@ export function createHero(
         cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw);
       }
       frameQueue.submitted();
+      opts.onFrameSubmitted?.();
       labels?.update(camera, width, height);
       loading.frame();
       clouds.warmField(renderer,camera.position,post.prepare);
