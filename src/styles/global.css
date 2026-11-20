@@ -522,3 +522,20 @@ table.data th.num {
     animation: none !important;
   }
 }
+
+/* ---------- phones: more air around fewer things ---------- */
+@media (max-width: 600px) {
+  :root {
+    --gutter: 22px;
+    --step-1: 17px;
+  }
+  .section {
+    padding-block: 64px;
+  }
+  .section > .wrap {
+    gap: 36px;
+  }
+  .section-head {
+    gap: 14px;
+  }
+}

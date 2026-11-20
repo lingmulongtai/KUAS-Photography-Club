@@ -40,4 +40,14 @@ export const learnTopics = [
     enSummary: 'Developing film and making prints in the darkroom, and RAW processing on a computer.',
     fb: 'radial-gradient(circle at 25% 0%, rgba(255,46,31,.6), transparent 65%), #140505',
   },
+  {
+    slug: 'editing',
+    no: '05',
+    en: 'EDITING & FRAMES',
+    title: '編集とフレーム',
+    summary: '撮影情報入りのフレームやウォーターマークを付けて、投稿用に仕上げる。InstaFrame をそのまま使えます。',
+    name: 'Editing & frames',
+    enSummary: 'Finish photos for posting with a frame showing the camera settings, or a watermark. InstaFrame runs right on the page.',
+    fb: 'radial-gradient(circle at 50% 30%, rgba(100,190,198,.35), transparent 45%), linear-gradient(160deg, #1d3a42, #0a1418)',
+  },
 ] as const;

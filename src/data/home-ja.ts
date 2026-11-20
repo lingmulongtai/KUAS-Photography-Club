@@ -7,7 +7,6 @@ const biography = [
   "学部・学年・国籍問わず仲良しです！",
   "入部希望やご質問など、お気軽にDMください💌",
   "International students are welcome!",
-  "代表: @ryuta_070303",
 ].join('\n');
 
 export const homeJa = {
@@ -18,7 +17,6 @@ export const homeJa = {
   short: 'カメラがなくても大丈夫。撮影会と、学祭での展示をしています。',
   traits: ['カメラなしでもOK', '撮影会', '学祭で展示', '留学生歓迎'],
   traitsEn: ['No camera needed', 'Photo outings', 'Campus festival exhibition', 'International students welcome'],
-  /** The DM invitation and the representative's account, shown beside Instagram. */
+  /** The DM invitation shown beside the official Instagram account. */
   dm: '入部希望やご質問など、お気軽にDMください',
-  representative: 'ryuta_070303',
 } as const;
