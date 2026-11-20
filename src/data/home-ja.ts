@@ -14,4 +14,11 @@ export const homeJa = {
   title: "京都先端科学大学写真部📸(KUAS Photography Club)",
   biography,
   description: biography.replace(/\r\n?|\n/g, ' '),
+  /** A phone shows this sentence and the traits instead of the whole profile (same facts). */
+  short: 'カメラがなくても大丈夫。撮影会と、学祭での展示をしています。',
+  traits: ['カメラなしでもOK', '撮影会', '学祭で展示', '留学生歓迎'],
+  traitsEn: ['No camera needed', 'Photo outings', 'Campus festival exhibition', 'International students welcome'],
+  /** The DM invitation and the representative's account, shown beside Instagram. */
+  dm: '入部希望やご質問など、お気軽にDMください',
+  representative: 'ryuta_070303',
 } as const;

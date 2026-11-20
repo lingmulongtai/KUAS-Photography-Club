@@ -1,0 +1,37 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import FaqList from '../components/FaqList.astro';
+import { faq } from '../data/faq';
+import { club } from '../data/club';
+---
+<Base title="よくある質問" description={`KUAS Photography Club によくある質問。カメラがなくても参加できる？費用は？留学生は？ 通常は${club.meetings.day} ${club.meetings.times[0]}、${club.campus} ${club.meetings.room}。`}>
+  <PageHero
+    edge="FAQ ▸ BEFORE YOU VISIT"
+    title="よくある質問"
+    lead="見学や入部の前によく聞かれることをまとめました。ここにないことは、Instagram の DM かメールで気軽に聞いてください。"
+  />
+  <section class="section first">
+    <div class="wrap stack">
+      <FaqList entries={faq.ja} open />
+      <div class="ask">
+        <h2>ほかに聞きたいことがあるとき</h2>
+        <p class="muted">Instagram の DM かメールで、運営に直接聞けます。</p>
+        <div class="ctas">
+          <a class="btn btn--primary" href="/join/">見学を申し込む <span class="arrow" aria-hidden="true">→</span></a>
+          <a class="btn" href={club.instagram.url} target="_blank" rel="noopener">Instagram で DM する <span aria-hidden="true">↗</span></a>
+        </div>
+        <p class="small muted">メール：<span class="mail">{club.email}</span></p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .first { border-top: 0; padding-top: 8px; }
+  .stack { display: grid; gap: 48px; }
+  .ask { display: grid; gap: 12px; justify-items: start; padding: 24px; background: var(--brand-pale); border-radius: var(--radius); max-width: 52em; }
+  .ask h2 { font-size: var(--step-3); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+  .mail { user-select: all; overflow-wrap: anywhere; }
+</style>

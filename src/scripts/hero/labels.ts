@@ -43,8 +43,10 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
     const p = toLocal(d.lat, d.lon);
     const ground = hf.height(p.x, p.z);
     const related = trips.filter((t) => t.spot === d.id).slice(0, 3);
+    // the club has a published outing here (not just the neutral spot page)
+    const outings = trips.filter((t) => t.spot === d.id && !t.sample).length;
     const node = document.createElement('div');
-    node.className = `hero-pin is-linked${d.action ? ' is-action' : ''}`;
+    node.className = `hero-pin is-linked${d.action ? ' is-action' : ''}${outings ? ' is-visited' : ''}`;
     node.dataset.spot = d.id;
     node.style.setProperty('--i', String(i));
     node.setAttribute('aria-hidden', 'true');
@@ -54,7 +56,9 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
     trigger.tabIndex = -1;
     trigger.setAttribute('aria-label', lang === 'en' ? `Explore ${d.en} in 3D` : `${d.ja}へ近づく`);
     trigger.className = 'pin-trigger';
-    trigger.innerHTML = `<span class="pin-dot" aria-hidden="true"></span><span class="pin-text">${d.ja}<small>${d.en}</small></span>`;
+    const badge = outings ? `<span class="pin-visited">${lang === 'en' ? `Outing${outings > 1 ? ` ×${outings}` : ''}` : `撮影会${outings > 1 ? ` ×${outings}` : ''}`}</span>` : '';
+    trigger.innerHTML = `<span class="pin-dot" aria-hidden="true"></span><span class="pin-text">${badge}${d.ja}<small>${d.en}</small></span>`;
+    if (outings) trigger.setAttribute('aria-label', lang === 'en' ? `Explore ${d.en} in 3D (club outing here)` : `${d.ja}へ近づく（撮影会の記録あり）`);
     node.appendChild(trigger);
     const popup = document.createElement('div');
     popup.className = 'pin-trips';

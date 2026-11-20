@@ -6,8 +6,10 @@ import ReelHero from '../components/ReelHero.astro';
 import LearnCards from '../components/learn/LearnCards.astro';
 import InstagramSection from '../components/InstagramSection.astro';
 import UpcomingEvents from '../components/UpcomingEvents.astro';
+import FirstSteps from '../components/FirstSteps.astro';
+import HomeIntro from '../components/HomeIntro.astro';
+import StickyJoin from '../components/StickyJoin.astro';
 import { getTrips, reelPhotos } from '../lib/trips';
-import { club } from '../data/club';
 import { homeJa } from '../data/home-ja';
 
 const trips = await getTrips();
@@ -17,44 +19,15 @@ const reel = await reelPhotos('ja');
 <Base overlayHeader documentTitle={homeJa.title} description={homeJa.description}>
   <KyotoHero />
 
-  <section id="intro" class="section intro">
-    <div class="wrap grid">
-      <div class="statement">
-        <p class="edge">KUAS PHOTOGRAPHY CLUB</p>
-        <h2>撮りに行こう。<br />京都と、その少し先まで。</h2>
-        <p class="lead">
-          {club.name} は、{club.university}の写真部です。部員で相談しながら撮影会を企画しています。日本人も留学生も、カメラがある人もスマホの人も一緒です。
-        </p>
-        <a class="link-arrow" href="/about/">写真部について →</a>
-      </div>
-      <aside class="meeting" aria-label="ミーティングの案内">
-        <p class="edge">MEETING ▸ EVERY WEEK</p>
-        <p class="when">{club.meetings.day}</p>
-        <p class="times num"><strong>{club.meetings.times.join(' / ')}</strong></p>
-        <p class="where">通常は <strong>{club.campus}<br /><span class="room">{club.meetings.room} 教室</span></strong></p>
-        <a class="small" href="/schedule/">休会・教室変更などの最新案内を確認</a>
-        <a class="btn btn--primary" href="/join/">見学を申し込む <span class="arrow" aria-hidden="true">→</span></a>
-      </aside>
-    </div>
-  </section>
-
-  <section class="section soft" aria-labelledby="next-title">
-    <div class="wrap stack">
-      <div class="head-row">
-        <div class="section-head">
-          <p class="edge">SCHEDULE ▸ COMING UP</p>
-          <h2 id="next-title">これからの予定</h2>
-        </div>
-        <a class="link-arrow" href="/schedule/">スケジュールを見る →</a>
-      </div>
-      <UpcomingEvents />
-    </div>
-  </section>
+  <HomeIntro />
 
   <ReelHero
+    id="activity"
     heading="h2"
+    counter={false}
     photos={reel.photos}
     placeholder={reel.placeholder}
+    note={reel.members ? '部員が撮った写真です。撮影者の許可を得て掲載しています。' : undefined}
     edge="PHOTO TRIPS ▸ LATEST ROLLS"
     title="最近の撮影会"
     lead="部員で相談しながら、京都の街や近くの府県へ撮影に出かけています。"
@@ -70,6 +43,21 @@ const reel = await reelPhotos('ja');
     </section>
   )}
 
+  <InstagramSection />
+
+  <section class="section soft" aria-labelledby="next-title">
+    <div class="wrap stack">
+      <div class="head-row">
+        <div class="section-head">
+          <p class="edge">SCHEDULE ▸ COMING UP</p>
+          <h2 id="next-title">これからの予定</h2>
+        </div>
+        <a class="link-arrow" href="/schedule/">スケジュールを見る →</a>
+      </div>
+      <UpcomingEvents />
+    </div>
+  </section>
+
   <section class="section" aria-labelledby="learn-title">
     <div class="wrap stack">
       <div class="head-row">
@@ -80,97 +68,15 @@ const reel = await reelPhotos('ja');
         </div>
         <a class="link-arrow" href="/learn/">写真を学ぶ →</a>
       </div>
-      <LearnCards />
+      <LearnCards rail />
     </div>
   </section>
 
-  <InstagramSection />
-
-  <section class="section cta">
-    <div class="wrap cta-inner">
-      <p class="edge">JOIN US</p>
-      <h2>まずは、金曜の<br />ミーティングをのぞいてみませんか。</h2>
-      <p class="lead">経験もカメラもいりません。通常は<strong>{club.meetings.day} {club.meetings.times.join(' / ')}</strong>、<strong>{club.campus} {club.meetings.room} 教室</strong>です。参加前にスケジュールと運営への確認をお願いします。</p>
-      <div class="ctas">
-        <a class="btn btn--primary" href="/join/">見学・入部について <span class="arrow" aria-hidden="true">→</span></a>
-        <a class="btn" href="/guidelines/">ガイドラインを読む</a>
-      </div>
-    </div>
-  </section>
+  <FirstSteps />
+  <StickyJoin />
 </Base>
 
 <style>
-  .intro .grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    gap: 40px 72px;
-    align-items: start;
-  }
-
-  .statement {
-    display: grid;
-    gap: 18px;
-    justify-items: start;
-  }
-
-  .statement h2 {
-    font-size: var(--step-4);
-  }
-
-  .meeting {
-    display: grid;
-    gap: 6px;
-    justify-items: start;
-    padding: 26px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--raise);
-    border-top: 3px solid var(--accent);
-  }
-
-  .when {
-    font: 700 var(--step-3) / 1.35 var(--display);
-    margin-top: 8px;
-  }
-
-  .times {
-    font-size: 30px;
-    color: var(--accent);
-    line-height: 1.2;
-    margin-bottom: 10px;
-    text-decoration: underline;
-    text-decoration-color: var(--line);
-    text-decoration-thickness: 3px;
-    text-underline-offset: 7px;
-  }
-
-  .where {
-    color: var(--muted);
-    margin-bottom: 14px;
-  }
-
-  .where strong {
-    display: block;
-    margin-top: 4px;
-    color: var(--ink);
-    line-height: 1.65;
-  }
-
-  .room {
-    font-size: var(--step-2);
-    text-decoration: underline;
-    text-decoration-color: var(--accent);
-    text-decoration-thickness: 2px;
-    text-underline-offset: 5px;
-  }
-
-  .cta .lead strong {
-    font-weight: 800;
-    text-decoration: underline;
-    text-decoration-color: var(--accent);
-    text-underline-offset: 4px;
-  }
-
   .soft {
     background: var(--brand-pale);
     border-top: 0;
@@ -197,31 +103,4 @@ const reel = await reelPhotos('ja');
 
   @media (max-width: 900px) { .list { grid-template-columns: 1fr; } }
 
-  .cta {
-    background: var(--brand-pale);
-    border-top: 0;
-  }
-
-  .cta-inner {
-    display: grid;
-    gap: 18px;
-    justify-items: start;
-  }
-
-  .cta h2 {
-    font-size: var(--step-4);
-  }
-
-  .ctas {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 6px;
-  }
-
-  @media (max-width: 860px) {
-    .intro .grid {
-      grid-template-columns: 1fr;
-    }
-  }
 </style>

@@ -23,8 +23,14 @@ interface Props {
   heading?: 'h1' | 'h2';
   /** a link under the title, such as to all records */
   link?: { href: string; label: string };
+  /** the section's id, for links into the page */
+  id?: string;
+  /** the LOADING ROLLS percentage; the home page leaves it out, right after its own loading screen */
+  counter?: boolean;
+  /** a note under the lead, e.g. that the cards are members' photos */
+  note?: string;
 }
-const { photos, edge, title, lead, placeholder = false, lang = 'ja', heading = 'h1', link } = Astro.props;
+const { photos, edge, title, lead, placeholder = false, lang = 'ja', heading = 'h1', link, id, counter = true, note } = Astro.props;
 const en = lang === 'en';
 const Heading = heading;
 const SLOTS = 16;
@@ -48,7 +54,7 @@ const t = en
       placeholder: '撮影会の記録を公開すると、ここに写真が並びます。いまは撮影に出かける場所を表示しています。',
     };
 ---
-<section class:list={['reel', { 'is-section': heading === 'h2' }]} data-reel data-photos={JSON.stringify(photos)} aria-labelledby="reel-title">
+<section id={id} class:list={['reel', { 'is-section': heading === 'h2', 'no-counter': !counter }]} data-reel data-photos={JSON.stringify(photos)} aria-labelledby="reel-title">
   <div class="motif" aria-hidden="true"><span class="dot"></span></div>
   <div class="reel-stage" data-reel-stage tabindex="0" role="group" aria-roledescription={en ? 'carousel' : 'カルーセル'} aria-label={t.ring}>
     <div class="reel-ring" data-reel-ring>
@@ -69,10 +75,10 @@ const t = en
     </div>
   </div>
 
-  <div class="loader" aria-hidden="true">
+  {counter && <div class="loader" aria-hidden="true">
     <p class="loading edge" data-scramble>{t.loading}</p>
     <p class="counter num"><span class="col" data-digit></span><span class="col" data-digit></span><span class="col" data-digit></span><span class="pct">%</span></p>
-  </div>
+  </div>}
   <button class="skip" type="button" data-skip>{t.skip}</button>
 
   <div class="copy">
@@ -81,6 +87,7 @@ const t = en
       <Heading id="reel-title" set:html={title} />
       {lead && <p class="lead">{lead}</p>}
       {placeholder && <p class="sample-note small">{t.placeholder}</p>}
+      {note && <p class="sample-note small">{note}</p>}
       {link && <a class="link-arrow more" href={link.href}>{link.label}</a>}
     </div>
   </div>
@@ -99,6 +106,7 @@ const t = en
 
 <style>
   .reel {
+    scroll-margin-top: var(--header-h, 64px);
     --card-w: 300px;
     --reel-ground: var(--brand-pale);
     position: relative;

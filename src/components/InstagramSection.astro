@@ -1,5 +1,6 @@
 ---
 import { club } from '../data/club';
+import { homeJa } from '../data/home-ja';
 
 interface Props {
   lang?: 'ja' | 'en';
@@ -12,8 +13,13 @@ const embedUrl = new URL('embed/', `${club.instagram.url.replace(/\/$/, '')}/`);
   <div class="wrap grid">
     <div class="intro">
       <p class="edge">INSTAGRAM ▸ @{club.instagram.handle}</p>
-      <h2 id="insta-title">{en ? 'A glimpse of our photography.' : '写真部の Instagram を、のぞいてみませんか。'}</h2>
-      <p class="muted">{en ? 'Explore the club’s posts in the official Instagram preview. You can also contact us by DM from our profile.' : '公式の埋め込みから、写真部の投稿をご覧いただけます。プロフィールから DM でのお問い合わせもできます。'}</p>
+      <!-- each phrase stays whole, so the heading breaks between them rather than inside a word -->
+      <h2 id="insta-title">{en ? 'A glimpse of our photography.' : <><span class="phrase">写真部の Instagram を、</span><span class="phrase">のぞいてみませんか。</span></>}</h2>
+      <p class="muted">{en ? 'Explore the club’s posts in the official Instagram preview.' : '公式の埋め込みから、写真部の投稿をご覧いただけます。'}</p>
+      <div class="dm">
+        <p><strong>{en ? 'Want to join, or have a question? Send us a DM.' : `${homeJa.dm}。`}</strong></p>
+        <p class="small muted">{en ? 'Representative' : '代表'}: <a href={`https://www.instagram.com/${homeJa.representative}/`} target="_blank" rel="noopener">@{homeJa.representative}</a></p>
+      </div>
       <div class="actions">
         <a class="btn instagram-button" href={club.instagram.url} target="_blank" rel="noopener">{en ? 'Open Instagram' : 'Instagram を見る'} <span class="arrow" aria-hidden="true">↗</span></a>
         <a class="btn" href="https://lingmulongtai.github.io/InstaFrame/" target="_blank" rel="noopener">{en ? 'Open InstaFrame' : 'InstaFrame を開く'} <span class="arrow" aria-hidden="true">↗</span></a>
@@ -55,6 +61,18 @@ const embedUrl = new URL('embed/', `${club.instagram.url.replace(/\/$/, '')}/`);
   h2 {
     font-size: var(--step-4);
   }
+
+  .phrase { display: inline-block; }
+
+  .dm {
+    display: grid;
+    gap: 2px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--brand);
+    background: var(--raise-2);
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .dm a { color: var(--accent); font-weight: 700; }
 
   .instagram-button,
   .instagram-button:hover {
