@@ -184,9 +184,10 @@ export function createHero(
 
   (async () => {
     const metadata = loading.track(loadJSON<TerrainMeta>('terrain.json'));
-    const cloudProgram = post.prepare(clouds.mesh).catch(error => {
-      console.warn('Cloud shader will compile on first draw', error);
+    const prepare = (object: THREE.Object3D) => post.prepare(object).catch(error => {
+      console.warn('Panorama shaders will compile on first draw', error);
     });
+    const cloudProgram = prepare(clouds.mesh);
     const meta = await metadata;
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
     const elevation = loading.track(loadHeightfield(meta));
@@ -380,6 +381,9 @@ export function createHero(
     pointLayers.push(lamps.uniforms, cars.uniforms);
     scene.add(lamps.points, cars.group);
     updatePointScale();
+    // Submit the initial city's materials together while the last startup jobs run.
+    // Neighbouring cities still compile only when a visitor travels there.
+    const scenePrograms = prepare(scene);
     // Neighbouring basins are intentionally absent from the initial transfer. At most
     // one additional city is alive, and switching destinations never queues all four.
     const coreBuilt=env.uBuilt.value;
@@ -521,7 +525,7 @@ export function createHero(
     };
     ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
-    await cloudProgram;
+    await Promise.all([cloudProgram, scenePrograms]);
     loading.built();
     idle(()=>{void loadBinary('buildings-south-lod.json.gz').then(async bytes=>{
       const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[]};
