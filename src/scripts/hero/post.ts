@@ -61,16 +61,16 @@ const FinishShader = {
  * across the whole frame by the bloom blur and flash the screen black.
  */
 const SanitizeShader = {
-  uniforms: { tDiffuse: { value: null as THREE.Texture | null } },
+  uniforms: { sceneHDR: { value: null as THREE.Texture | null } },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
     void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }
   `,
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse;
+    uniform sampler2D sceneHDR;
     varying vec2 vUv;
     void main(){
-      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      vec3 c = texture2D(sceneHDR, vUv).rgb;
       // comparisons with NaN are always false, which survives compilers that drop isnan()
       bool ok = c.r < 1e20 && c.g < 1e20 && c.b < 1e20 && c.r > -1e20 && c.g > -1e20 && c.b > -1e20;
       if (!ok || any(isnan(c))) c = vec3(0.);
@@ -136,10 +136,15 @@ const BrightPassShader = {
  */
 export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, samples = 4) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
-  const composer = new EffectComposer(renderer, target);
-  composer.addPass(new RenderPass(scene, camera));
-  composer.addPass(new ShaderPass(SanitizeShader));
+  const sceneTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
+  const scenePass = new RenderPass(scene, camera);
+  // Only the scene needs per-sample visibility. All subsequent passes cover every pixel.
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, {
+    type: THREE.HalfFloatType, depthBuffer: false,
+  }));
+  const sanitize = new ShaderPass(SanitizeShader);
+  sanitize.uniforms.sceneHDR.value = sceneTarget.texture;
+  composer.addPass(sanitize);
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.7, 0.5, 0.85);
   const bright = new THREE.ShaderMaterial(BrightPassShader);
   bloom.materialHighPassFilter.dispose();
@@ -178,7 +183,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
       // different tone-mapping and output-colour variant from the one the hero draws.
       const previous = renderer.getRenderTarget();
       try {
-        renderer.setRenderTarget(composer.readBuffer);
+        renderer.setRenderTarget(sceneTarget);
         return renderer.compileAsync(object, camera, scene);
       } finally {
         renderer.setRenderTarget(previous);
@@ -190,12 +195,16 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
     setSize(w: number, h: number, dpr: number) {
       cssWidth = w;
       cssHeight = h;
+      sceneTarget.setSize(Math.max(1, Math.floor(w * dpr)), Math.max(1, Math.floor(h * dpr)));
       composer.setPixelRatio(dpr);
       composer.setSize(w, h);
       finish.uniforms.uRes.value.set(w * dpr, h * dpr);
     },
     render(time: number) {
       finish.uniforms.uTime.value = time;
+      const previous = renderer.getRenderTarget();
+      try { scenePass.render(renderer, sceneTarget, sceneTarget, 0, false); }
+      finally { renderer.setRenderTarget(previous); }
       composer.render();
     },
   };
