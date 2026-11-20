@@ -137,6 +137,7 @@ export function createHero(
   const cloudMotion=createCloudMotion();
   const cloudBlur=createCloudBlur(renderer,camera,clouds.mesh);
   const cloudHistory = createCloudHistory(renderer, camera, clouds.mesh);
+  renderer.domElement.addEventListener('webglcontextrestored', clouds.restored);
   renderer.domElement.addEventListener('webglcontextrestored', cloudHistory.restored);
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
@@ -932,6 +933,7 @@ export function createHero(
       const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
+      clouds.prepareField(renderer,camera.position);
       if (dt > 0) driveCars?.(dt);
       if (dt > 0 && !opts.reducedMotion) aircraft.update(dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);
@@ -957,6 +959,7 @@ export function createHero(
       frameQueue.submitted();
       labels?.update(camera, width, height);
       loading.frame();
+      clouds.warmField(renderer,camera.position,post.prepare);
       // keep the frame rate up on slower devices by rendering fewer pixels
       if (dt > 0 && pixelRatio > .75) {
         const now = performance.now();
