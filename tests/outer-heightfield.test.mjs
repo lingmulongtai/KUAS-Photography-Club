@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Heightfield,loadHeightfield} from '../src/scripts/hero/heightfield.ts';
+import {normalMaps} from '../src/scripts/hero/normal-map.ts';
 import {readFile,stat} from 'node:fs/promises';
 
 const grid=(box,h)=>({meta:{box},sample:(x,z)=>x>=box[0]&&x<=box[2]&&z>=box[1]&&z<=box[3]?h:NaN});
@@ -42,6 +43,11 @@ test('shipped outer data decodes through the runtime and stays within mobile dow
   globalThis.fetch=async(url)=>new Response(await readFile(new URL(String(url).split('/').pop(),root)));
   t.after(()=>{globalThis.fetch=original;});
   const hf=await loadHeightfield(meta);
+  const restored = Heightfield.fromSnapshot(structuredClone(hf.snapshot()));
+  const grids = [meta.far, meta.near, meta.arashiyama.elevation, meta.outer];
+  const pixels = await normalMaps(hf, grids, async () => {});
+  const copied = await normalMaps(restored, grids, async () => {});
+  for (const {file} of grids) assert.ok(Buffer.from(pixels[file]).equals(Buffer.from(copied[file])), file);
   assert.ok(meta.outer.box[3]>=36000, 'central Osaka remains inside the terrain');
   for(const [x,z] of [[-18825,1105],[-28000,-11000],[8000,0],[0,18000],[-10000,25000],[-24058,33406]]) {
     assert.ok(Number.isFinite(hf.height(x,z))&&hf.height(x,z)>0,'new regions have actual elevation');

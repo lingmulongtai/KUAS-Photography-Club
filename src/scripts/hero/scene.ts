@@ -6,10 +6,14 @@ import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
 import type { Box } from './geo';
 import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
 import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
+import { createFrameQueue } from './frame-queue';
 import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
+import { initialNormals } from './initial-normals';
+import { normalMapBytes } from './normal-map';
 import { buildCelestial, buildSkyDome } from './sky';
 import { createPost } from './post';
+import { createPanoramaCity } from './panorama-city';
 import { loadBuildings } from './buildings-data';
 import { buildingCutout } from './building-cutout';
 import { buildCity, buildCityAsync } from './buildings';
@@ -26,6 +30,7 @@ import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds } from './clouds';
 import { createCloudBlur } from './cloud-blur';
+import { createCloudHistory } from './cloud-history';
 import {createCloudClock,createCloudMotion} from './cloud-weather';
 import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio } from './look-controls';
 import {createKamoChannel,kamoMask} from './kamo-channel';
@@ -84,6 +89,8 @@ export interface HeroOptions extends HeroLoadingCallbacks {
   quality: number;
   trips?: HeroTrip[];
   onStatus?: (s: HeroStatus) => void;
+  /** Called once after the final scene has been submitted, including on the fence fallback. */
+  onFrameSubmitted?: () => void;
   /** A neighbouring area is loading; all navigation remains available. */
   onAreaLoading?:(loading:boolean)=>void;
   onExplore?:(exploring:boolean)=>void;
@@ -131,8 +138,13 @@ export function createHero(
   const cloudClock=createCloudClock();
   const cloudMotion=createCloudMotion();
   const cloudBlur=createCloudBlur(renderer,camera,clouds.mesh);
+  const cloudHistory = createCloudHistory(renderer, camera, clouds.mesh);
+  renderer.domElement.addEventListener('webglcontextrestored', clouds.restored);
+  renderer.domElement.addEventListener('webglcontextrestored', cloudHistory.restored);
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
+  const frameQueue = createFrameQueue(renderer.getContext());
+  renderer.domElement.addEventListener('webglcontextrestored', frameQueue.restored);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
   const casts = (o: THREE.Object3D) => o.traverse((c) => (c as THREE.Mesh).isMesh && c.layers.enable(SHADOW_LAYER));
   const look = createLook();
@@ -173,6 +185,7 @@ export function createHero(
   let driveCars: ((dt: number) => void) | null = null;
   /** Cities whose roofs switch to stepped blocks near the camera. */
   const cityLods = new Set<ReturnType<typeof buildCity>>();
+  let panoramaCity: ReturnType<typeof createPanoramaCity> | undefined;
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -181,9 +194,21 @@ export function createHero(
   const yieldToBrowser = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
   (async () => {
-    const meta = await loading.track(loadJSON<TerrainMeta>('terrain.json'));
+    const metadata = loading.track(loadJSON<TerrainMeta>('terrain.json'));
+    const prepare = (object: THREE.Object3D) => post.prepare(object).catch(error => {
+      console.warn('Panorama shaders will compile on first draw', error);
+    });
+    const cloudProgram = prepare(clouds.mesh);
+    const meta = await metadata;
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
-    const [hf, wide, outer] = await Promise.all([loading.track(loadHeightfield(meta)), loading.track(loadTexture(wideFile, aniso)),
+    const elevation = loading.track(loadHeightfield(meta));
+    const normalGrids = [meta.far, meta.near];
+    if (meta.arashiyama) normalGrids.push(meta.arashiyama.elevation);
+    if (meta.outer && meta.aerialOuter) normalGrids.push(meta.outer);
+    const normals = elevation.then(hf => initialNormals(hf, normalGrids));
+    // The base imagery can fail before normal generation is joined below.
+    void normals.catch(() => {});
+    const [hf, wide, outer] = await Promise.all([elevation, loading.track(loadTexture(wideFile, aniso)),
       loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
         .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : Promise.resolve(null))]);
     // Download the city while normals and terrain are prepared, rather than
@@ -200,14 +225,12 @@ export function createHero(
       const m = meta[r.key];
       return m ? [{ ...r, meta: m }] : [];
     });
-    await yieldToBrowser();
-    const normalFar = await normalTexture(hf, meta.far);
-    await yieldToBrowser();
-    const normalNear = await normalTexture(hf, meta.near);
-    await yieldToBrowser();
-    const regionalNormal = meta.arashiyama ? await normalTexture(hf, meta.arashiyama.elevation) : undefined;
-    await yieldToBrowser();
-    const outerNormal = outer && meta.outer ? await normalTexture(hf, meta.outer) : undefined;
+    const maps = await normals;
+    const textureFor = (grid: typeof meta.far) => normalTexture(grid, maps[grid.file]);
+    const normalFar = textureFor(meta.far);
+    const normalNear = textureFor(meta.near);
+    const regionalNormal = meta.arashiyama ? textureFor(meta.arashiyama.elevation) : undefined;
+    const outerNormal = outer && meta.outer ? textureFor(meta.outer) : undefined;
     await yieldToBrowser();
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
@@ -303,6 +326,7 @@ export function createHero(
       opts.quality,
       () => true,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
+      VIEWS.shogunzuka.eye,
     );
     if (!city) throw new Error('Initial city preparation cancelled');
     await yieldToBrowser();
@@ -346,6 +370,10 @@ export function createHero(
     scene.add(campusModel);
     casts(campusModel);
     scene.add(city.group, landmarks.mesh);
+    if (city.overview) scene.add(city.overview);
+    panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
+      eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });
+    scene.add(panoramaCity.group);
     casts(city.group);
     cityLods.add(city);
     casts(landmarks.mesh);
@@ -367,6 +395,9 @@ export function createHero(
     pointLayers.push(lamps.uniforms, cars.uniforms);
     scene.add(lamps.points, cars.group);
     updatePointScale();
+    // Submit the initial city's materials together while the last startup jobs run.
+    // Neighbouring cities still compile only when a visitor travels there.
+    const scenePrograms = prepare(scene);
     // Neighbouring basins are intentionally absent from the initial transfer. At most
     // one additional city is alive, and switching destinations never queues all four.
     const coreBuilt=env.uBuilt.value;
@@ -425,7 +456,10 @@ export function createHero(
       await step();
       if(detailedCampus){
         const campus=buildKameokaCampus(env,hf);group.add(campus);casts(campus);
-        if(meta.kameokaCampus)campusNormal=await normalTexture(hf,meta.kameokaCampus.elevation);
+        if(meta.kameokaCampus) {
+          const grid = meta.kameokaCampus.elevation;
+          campusNormal = normalTexture(grid, await normalMapBytes(hf, grid));
+        }
       }
       await step();
       lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);group.add(lamps.points);
@@ -505,6 +539,7 @@ export function createHero(
     };
     ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
+    await Promise.all([cloudProgram, scenePrograms]);
     loading.built();
     idle(()=>{void loadBinary('buildings-south-lod.json.gz').then(async bytes=>{
       const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[]};
@@ -826,7 +861,8 @@ export function createHero(
     clouds.mesh.position.x = camera.position.x;
     clouds.mesh.position.z = camera.position.z;
     let roofsChanged = false;
-    for (const c of cityLods) roofsChanged = c.updateLod(camera.position) || roofsChanged;
+    const panorama = mode === 'city' && view === 'shogunzuka' && !flight && !exploring && camera.fov >= baseFov * .82;
+    for (const c of cityLods) roofsChanged = c.updateLod(camera.position, panorama ? pxPerM : 0) || roofsChanged;
     if (roofsChanged) shadow.invalidate();
   }
 
@@ -835,6 +871,7 @@ export function createHero(
   let maxDpr = 1;
   let lowered = false;
   let slow = 0;
+  let firstDrawAt: number | undefined;
   function setResolution(d: number) {
     pixelRatio = d;
     renderer.setPixelRatio(d);
@@ -887,16 +924,18 @@ export function createHero(
     render(t) {
       // The poster covers startup. Avoid rendering an invisible, incomplete scene
       // while the page is already usable; draw once after the complete scene is built.
-      if (!loading.canDraw) return;
+      if (!loading.canDraw || !frameQueue.available()) return;
       const dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
       clock = t;
       const date=opts.now();
       applyTime(date, t);
-      const cloudSeconds=cloudClock.step(opts.cloudTravelMinutes?.()??0,dt,opts.reducedMotion);
+      const travel = opts.cloudTravelMinutes?.() ?? 0;
+      const cloudSeconds=cloudClock.step(travel,dt,opts.reducedMotion);
       const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
+      clouds.prepareField(renderer,camera.position);
       if (dt > 0) driveCars?.(dt);
       if (dt > 0 && !opts.reducedMotion) aircraft.update(dt);
       const half = Math.atan(Math.tan((camera.fov * RAD) / 2) * camera.aspect);
@@ -904,13 +943,34 @@ export function createHero(
       const az = Math.atan2(forward.x, -forward.z);
       const top = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) + camera.fov * RAD / 2;
       meteors.update(t, dt, camera.position, { az, half, top }, Math.min(1, env.uStars.value), pxPerM);
-      cloudBlur.render(cloudFrame.blur,width,height,pixelRatio,()=>post.render(t));
+      const renderScene = () => post.render(t);
+      const draw = () => {
+        // An unusually wide view can clip a nearby occluder at the corners of the near plane.
+        const nearCorner = camera.near * Math.hypot(1, 1 / camera.projectionMatrix.elements[0], 1 / camera.projectionMatrix.elements[5]);
+        if (panoramaCity && mode === 'city' && view === 'shogunzuka' && !flight && !exploring && nearCorner < 100)
+          panoramaCity.render(camera, renderScene);
+        else renderScene();
+      };
+      const steadySky = mode === 'city' && view === 'shogunzuka' && !flight && !exploring &&
+        cloudFrame.blur[0] === 0 && cloudFrame.blur[1] === 0;
+      if (!steadySky) cloudHistory.invalidate();
+      if (!steadySky || !cloudHistory.render(Math.round(width * pixelRatio), Math.round(height * pixelRatio),
+        clouds.weather, travel, date.getTime(), draw, dt)) {
+        cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw);
+      }
+      frameQueue.submitted();
+      opts.onFrameSubmitted?.();
       labels?.update(camera, width, height);
       loading.frame();
+      clouds.warmField(renderer,camera.position,post.prepare);
       // keep the frame rate up on slower devices by rendering fewer pixels
-      if (dt > 0) {
+      if (dt > 0 && pixelRatio > .75) {
+        const now = performance.now();
+        firstDrawAt ??= now;
         slow = dt > 0.034 ? slow + 1 : Math.max(0, slow - 1);
-        if (slow > 45 && pixelRatio > .75) {
+        // Faster submissions reach 45 samples earlier. Let the opening panorama settle at its requested density.
+        const openingPanorama = steadySky && now - firstDrawAt < 8000;
+        if (slow > 45 && !openingPanorama) {
           slow = 0;
           lowered = true;
           setResolution(Math.max(.75, pixelRatio - 0.25));

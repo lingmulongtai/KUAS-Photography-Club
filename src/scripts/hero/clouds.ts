@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import {cloudWeather} from './cloud-weather';
+import { CLOUD_LATTICE_GLSL, createCloudLattice } from './cloud-lattice';
 import type {Climate} from './seasons';
 
 /** Height of the cirrus streaks and the altocumulus field, metres. */
@@ -24,8 +25,14 @@ const DRUM = 52000;
  */
 export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),quality=1,climate:Climate='spring') {
   let weather=cloudWeather(seed,climate);
+  const lattice = createCloudLattice();
+  // Runtime loop bounds keep GPU drivers from duplicating the large noise function at compile time.
+  const detail = quality > .75 ? 2 : 1;
   const uniforms = {
     ...env,
+    ...lattice.uniforms,
+    uMarchSteps: { value: detail === 2 ? 40 : 22 },
+    uEdgeRefinements: { value: detail + 2 },
     uCover: { value: weather.cover },
     uClear: { value: weather.clear },
     uStyle: { value: weather.style },
@@ -36,11 +43,9 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     uOffset: { value: new THREE.Vector2(...weather.offset) },
     uWind: { value: new THREE.Vector2() },
   };
-  // phones march fewer, longer steps and skip the second detail octave
-  const steps = quality > .75 ? 40 : 22;
   const material = new THREE.ShaderMaterial({
     uniforms,
-    defines: { STEPS: steps, DETAIL: quality > .75 ? 2 : 1 },
+    defines: { DETAIL: detail },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
       void main(){
@@ -51,6 +56,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
+      ${CLOUD_LATTICE_GLSL}
       uniform float uCover;
       uniform float uClear;
       uniform float uStyle;
@@ -60,6 +66,8 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
       uniform float uAlto;
       uniform vec2 uOffset;
       uniform vec2 uWind;
+      uniform int uMarchSteps;
+      uniform int uEdgeRefinements;
       varying vec3 vWorld;
 
       /** weather-map units per metre: one unit is about 9 km */
@@ -85,30 +93,44 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
        */
       vec3 field(vec2 p){
         // bend the weather map so the cells never line up in rows or repeat one size
-        p += (vec2(vnoise(p * 1.7 + 2.3), vnoise(p * 1.7 - 4.1)) - .5) * .4;
+        p += (vec2(fieldNoise(p * 1.7 + 2.3, 0), fieldNoise(p * 1.7 - 4.1, 0)) - .5) * .4;
         // a regional swell, so some parts of the sky are busier than others
-        float region = vnoise(p * .8 + 7.3);
+        float region = fieldNoise(p * .8 + 7.3, 1);
         // and wide clear stretches between groups of clouds: these take whole clouds away (the
         // ones at the edge of a group come out smaller) rather than thinning every cloud
-        float clear = smoothstep(.35, .7, vnoise(p * .45 - 3.9)) * uClear;
+        float clear = smoothstep(.35, .7, fieldNoise(p * .45 - 3.9, 2)) * uClear;
+        float th = 1. - uCover * (.7 + .6 * region) + clear * .4;
+        // Value noise lies in [0,1]. An upper bound below the threshold proves a ray
+        // sample contributes zero, including the wider anvil at the top of a storm.
+        float emptyBelow = th - (isStyle(4.) ? .07 : 0.) - .00001;
+        const vec3 emptyField = vec3(0., 1., 0.);
+        if (emptyBelow > 1.) return emptyField;
         float n;
         if (deck()){
           // long rolls broken into cells
           vec2 q = mat2(.87, -.5, .5, .87) * p * (isStyle(5.) ? .7 : 1.);
-          n = vnoise(q * vec2(2.6, 7.)) * .45 + vnoise(p * 13. + 3.1) * .35 + vnoise(p * 31. - 1.7) * .2;
+          n = fieldNoise(q * vec2(2.6, 7.), 3) * .45 + fieldNoise(p * 13. + 3.1, 4) * .35;
+          if (n + .2 < emptyBelow) return emptyField;
+          n += wideFieldNoise(p * 31. - 1.7, 5) * .2;
         } else {
           float f = isStyle(1.) ? 1.7 : isStyle(3.) ? .7 : isStyle(4.) ? .26 : 1.;
           // big clouds in some parts of the sky, small ones in others: two sizes of cell, blended
           // (scaling the coordinates by a varying amount would smear the cells into streaks)
-          float big = vnoise(p * 4.2 * f + 5.5) * .6 + vnoise(p * 9. * f - 2.2) * .4;
-          float small = vnoise(p * 9.5 * f) * .55 + vnoise(p * 21. * f + 3.1) * .3 + vnoise(p * 43. * f - 1.7) * .15;
-          // thunderheads are all big
-          n = isStyle(4.) ? big : mix(small, big, smoothstep(.3, .7, vnoise(p * 1.3 - 9.7)));
+          float big = fieldNoise(p * 4.2 * f + 5.5, 3) * .6 + fieldNoise(p * 9. * f - 2.2, 4) * .4;
+          n = big;
+          if (!isStyle(4.)) {
+            float blend = smoothstep(.3, .7, fieldNoise(p * 1.3 - 9.7, 8));
+            float small = fieldNoise(p * 9.5 * f, 5) * .55;
+            if (mix(small + .45, big, blend) < emptyBelow) return emptyField;
+            small += wideFieldNoise(p * 21. * f + 3.1, 6) * .3;
+            small += wideFieldNoise(p * 43. * f - 1.7, 7) * .15;
+            n = mix(small, big, blend);
+          }
         }
-        float th = 1. - uCover * (.7 + .6 * region) + clear * .4;
+        if (n < emptyBelow) return emptyField;
         // some heads stay flat while their neighbours tower; a thunderhead climbs in turrets
-        float tall = deck() ? 1. : isStyle(4.) ? mix(.5, 1., vnoise(p * 6. + 1.9)) : mix(.45, 1., vnoise(p * 3.3 + 1.9));
-        if (isStyle(3.) || isStyle(4.)) tall *= mix(.75, 1., vnoise(p * 15. - 6.1));
+        float tall = deck() ? 1. : isStyle(4.) ? mix(.5, 1., fieldNoise(p * 6. + 1.9, 9)) : mix(.45, 1., fieldNoise(p * 3.3 + 1.9, 9));
+        if (isStyle(3.) || isStyle(4.)) tall *= mix(.75, 1., fieldNoise(p * 15. - 6.1, 10));
         return vec3(n, th, tall);
       }
 
@@ -136,6 +158,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           xz += (vec2(vnoise3(w), vnoise3(w + 17.3)) - .5) * (uTop - uBase) * .22;
         }
         vec3 f = field(xz * K - uWind + uOffset);
+        if (f.z == 0.) return 0.;
         float c = cover(f, 0.);
         float d = smoothstep(0., .1, crown(c) * f.z - h) * smoothstep(0., .04, h) * smoothstep(0., .25, c);
         if (isStyle(4.)){
@@ -271,10 +294,10 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           // as a finer, calmer grain than independent random ones)
           float jitter = .25 + .5 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))));
           // tall slabs (towering clouds) need more steps to stay solid
-          float steps = min(float(STEPS) * (1. + (uTop - uBase) / 3000.), float(STEPS) * 2.);
+          float steps = min(float(uMarchSteps) * (1. + (uTop - uBase) / 3000.), float(uMarchSteps) * 2.);
           float tPrev = t0;
           bool inside = false;
-          for (int i = 0; i < STEPS * 2; i++){
+          for (int i = 0; i < uMarchSteps * 2; i++){
             if (T < .03 || float(i) >= steps) break;
             float u0 = float(i) / steps, u1 = (float(i) + 1.) / steps;
             // a per-pixel offset turns the banding of the steps into fine grain
@@ -289,7 +312,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
               // The ray entered a cloud somewhere since the last sample. Find where: shaded at the
               // step it happened to land on, a cloud's face would be sliced into bands, one per step.
               float lo = tPrev, hi = t;
-              for (int k = 0; k < DETAIL + 2; k++){
+              for (int k = 0; k < uEdgeRefinements; k++){
                 float mid = .5 * (lo + hi);
                 if (density(ro + rd * mid, mid) > .002) hi = mid;
                 else lo = mid;
@@ -366,8 +389,46 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
   mesh.renderOrder = 2;
   mesh.frustumCulled = false;
   let shown = climate;
+  let warming = false;
+  const warmMaterial = material.clone();
+  warmMaterial.uniforms = uniforms;
+  warmMaterial.defines.FIELD_LATTICE = 1;
+  const warmMesh = new THREE.Mesh(geometry,warmMaterial);
+  function updateLattice(renderer: THREE.WebGLRenderer, eye: THREE.Vector3) {
+    lattice.update(renderer, eye.x*.00011-uniforms.uWind.value.x+weather.offset[0],
+      eye.z*.00011-uniforms.uWind.value.y+weather.offset[1], weather.style);
+  }
   return {
-    mesh, uniforms,
+    mesh, uniforms, restored: lattice.restored,
+    prepareField(renderer: THREE.WebGLRenderer, eye: THREE.Vector3) {
+      if (material.defines.FIELD_LATTICE) {
+        updateLattice(renderer,eye);
+        if (!lattice.uniforms.uLatticeOn.value) {
+          delete material.defines.FIELD_LATTICE;
+          material.needsUpdate = true;
+        }
+      }
+    },
+    warmField(renderer: THREE.WebGLRenderer, eye: THREE.Vector3, prepare: (object: THREE.Object3D) => Promise<unknown>) {
+      if (warming) return;
+      warming = true;
+      if (!renderer.extensions.has('KHR_parallel_shader_compile')) return;
+      // Show the analytic sky on the first frame. Drivers can take seconds to compile
+      // the atlas variant; it may take over only after its program is ready.
+      setTimeout(async () => {
+        try {
+          updateLattice(renderer,eye);
+          if (!lattice.uniforms.uLatticeOn.value) return;
+          await prepare(warmMesh);
+          const state = renderer.properties.get(warmMaterial) as { currentProgram?: { program?: WebGLProgram } };
+          const program = state.currentProgram?.program;
+          const gl = renderer.getContext();
+          if (!program || !gl.getProgramParameter(program,gl.LINK_STATUS)) return;
+          material.defines.FIELD_LATTICE = 1;
+          material.needsUpdate = true;
+        } catch { /* The analytic program remains available. */ }
+      },0);
+    },
     get weather() { return weather; },
     /** Redraw the sky for another season (the same visit keeps its seed). */
     setClimate(next: Climate) {

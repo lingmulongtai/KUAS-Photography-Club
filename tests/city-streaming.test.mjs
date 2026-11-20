@@ -10,6 +10,36 @@ const module={exports:{}},require=createRequire(import.meta.url);
 new Function('require','module','exports',compiled)(id=>id==='three'?THREE:require(id),module,module.exports);
 const {buildCity,buildCityAsync}=module.exports;
 
+test('the Shogunzuka overview only replaces distant camera surfaces and retains the shadow casters', async () => {
+  const eye = {x: 2429, y: 230, z: 160};
+  const data = {boxes: [
+    {x: -3400, z: 100, w: 12, d: 8, h: 9, angle: .3, ground: 0, kind: 0},
+    {x: -3380, z: 100, w: 14, d: 8, h: 18, angle: .2, ground: 0, kind: 1},
+    {x: 2500, z: 50, w: 12, d: 7, h: 6, angle: 0, ground: 0, kind: 0},
+  ], polys: []};
+  const hf = {height: () => 50};
+  const city = await buildCityAsync({}, hf, data, () => true, 1, () => true, () => false, eye);
+  const [block] = city.overview.children;
+  assert.equal(city.overview.children.length, 1);
+  assert.equal(block.visible, false);
+  assert.deepEqual(block.children.map(mesh => mesh.geometry.index.count / 3), [6, 10]);
+  assert.deepEqual(block.children.map(mesh => mesh.geometry.getAttribute('position').count), [12, 22]);
+  for (const mesh of city.group.children) mesh.layers.enable(1);
+  city.updateLod(eye, 800);
+  assert.ok(block.visible);
+  const distant = city.group.children.filter(mesh => mesh.geometry.boundingSphere.center.x < 0);
+  assert.ok(distant.every(mesh => !mesh.layers.isEnabled(0) && mesh.layers.isEnabled(1)));
+  assert.ok(block.children.every(mesh => mesh.layers.isEnabled(0) && !mesh.layers.isEnabled(1)));
+  assert.ok(city.group.children.filter(mesh => !distant.includes(mesh)).every(mesh => mesh.layers.isEnabled(0)));
+  for (const scale of [9000, 0]) {
+    city.updateLod(eye, scale);
+    assert.equal(block.visible, false);
+    assert.ok(distant.every(mesh => mesh.layers.isEnabled(0)));
+    city.updateLod(eye, 800);
+  }
+  assert.equal(buildCity({}, hf, data).overview, null);
+});
+
 // Compare raw bytes: deepEqual walks large typed arrays element by element and exhausts memory on small runners.
 const same=(a,b)=>assert.ok(a.length===b.length&&Buffer.from(a.buffer,a.byteOffset,a.byteLength).equals(Buffer.from(b.buffer,b.byteOffset,b.byteLength)),'geometry attributes match');
 
@@ -21,6 +51,7 @@ test('incremental regional city matches synchronous geometry and releases cancel
   for(let i=0;i<sync.group.children.length;i++){
     const a=sync.group.children[i].geometry,b=slow.group.children[i].geometry;
     assert.equal(a.instanceCount,b.instanceCount);
+    if(a.index || b.index) same(a.index.array,b.index.array);
     for(const name of Object.keys(a.attributes))same(b.getAttribute(name).array,a.getAttribute(name).array);
   }
   // Startup retains the custom facades already supplied by the landmark models.

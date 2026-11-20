@@ -44,3 +44,9 @@ export async function normalMapBytes(
   }
   return data;
 }
+
+export async function normalMaps(terrain: Heightfield, grids: GridMeta[], pause?: () => Promise<void>) {
+  const maps: Record<string, Uint8Array> = {};
+  for (const grid of grids) maps[grid.file] = await normalMapBytes(terrain, grid, pause);
+  return maps;
+}

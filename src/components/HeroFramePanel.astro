@@ -1,0 +1,46 @@
+---
+interface Props { en: boolean }
+const { en } = Astro.props;
+---
+<aside class="frame-panel" data-frame-panel hidden aria-label={en ? '3D frame statistics' : '3D描画の計測'}>
+  <div class="heading">
+    <strong>{en ? '3D frame statistics' : '3D描画の計測'}</strong>
+    <button type="button" data-frame-close aria-label={en ? 'Close statistics' : '計測を閉じる'}>×</button>
+  </div>
+  <dl>
+    <dt>{en ? 'FPS · last second' : 'FPS · 直近1秒'}</dt><dd data-frame-fps>—</dd>
+    <dt>{en ? 'Average FPS' : '平均 FPS'}</dt><dd data-frame-avg>—</dd>
+    <dt>{en ? 'Frame time p95 · 1 s' : '描画間隔 p95 · 1秒'}</dt><dd data-frame-p95>—</dd>
+    <dt>{en ? 'Over 33.3 ms' : '33.3 ms 超過率'}</dt><dd data-frame-slow>—</dd>
+    <dt>{en ? 'Render size' : '描画サイズ'}</dt><dd data-frame-size>—</dd>
+  </dl>
+  <button type="button" data-frame-record disabled aria-pressed="false"
+    data-start={en ? 'Start recording' : '記録開始'} data-stop={en ? 'Stop & save CSV' : '停止してCSV保存'}>
+    {en ? 'Start recording' : '記録開始'}
+  </button>
+</aside>
+
+<style>
+  .frame-panel {
+    position: absolute; z-index: 8; top: calc(var(--header-h) + 66px); right: max(12px, var(--gutter));
+    width: max-content; max-width: calc(100% - 24px); padding: 9px 12px 12px;
+    border: 1px solid #58616d; border-radius: 10px; background: #111923; color: #f4f6fa;
+    font: 500 12px/1.5 var(--body); font-variant-numeric: tabular-nums;
+  }
+  .frame-panel[hidden] { display: none; }
+  .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .frame-panel dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; margin: 3px 0 0; }
+  .frame-panel dt { color: #c4ccd5; }
+  .frame-panel dd { margin: 0; text-align: end; }
+  .frame-panel button {
+    border: 1px solid #657180; border-radius: 5px; background: #202d3c; color: inherit;
+    padding: 2px 8px; font: inherit; cursor: pointer;
+  }
+  [data-frame-record] { margin-top: 8px; width: 100%; }
+  [data-frame-record][aria-pressed="true"] { border-color: #f0a789; }
+  [data-frame-record]:disabled { opacity: .55; cursor: default; }
+  @media (max-width: 900px) {
+    .frame-panel { top: calc(var(--header-h) + 106px); right: 12px; }
+    .frame-panel button { min-height: 32px; }
+  }
+</style>
