@@ -4,11 +4,12 @@ import {CampusBuilder,CM} from './campus-architecture';
 import {createCampusMesh} from './campus';
 import {railwayPath,trainSections,serviceTrainProgress,type RailwayRoute} from './railway-path';
 import {SHADOW_LAYER} from './shadow';
-import {LINE,type LineFeature} from './lines-data';
+import {LINE,RAIL,type LineFeature} from './lines-data';
+import type {Box} from './geo';
 
 /** Bounded route groups, one static track draw and one instanced vehicle draw.
  * Vehicle speeds, station shelters and vertical alignment are illustrative. */
-export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:RailwayRoute[],katsuraModeled=false,network:LineFeature[]=[]){
+export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:RailwayRoute[],katsuraModeled=false,network:LineFeature[]=[],trackBox?:Box){
   const group=new THREE.Group();group.name='kyoto-railways';
   const positions:number[]=[],sides:number[]=[],along:number[]=[],trackCounts:number[]=[],gauges:number[]=[];
   const structures=new CampusBuilder(0,{x:0,z:0},0);
@@ -27,7 +28,11 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
       if(!a.visible)continue;
       const width=a.tracks===2?5.6:3.1;
       const gauge=route.id.startsWith('jr-')&&route.id!=='jr-shinkansen'?1.067:1.435;
-      track(a,b,path.distances[i],path.distances[i+1],width,a.tracks,gauge);
+      // The individual ground tracks also cover the through lines at Mukomachi.
+      // Vehicles still follow their continuous route and elevated decks keep their height.
+      const x=(a.x+b.x)/2,z=(a.z+b.z)/2;
+      const surveyed=a.state===0&&trackBox&&x>=trackBox[0]&&z>=trackBox[1]&&x<trackBox[2]&&z<trackBox[3];
+      if(!surveyed)track(a,b,path.distances[i],path.distances[i+1],width,a.tracks,gauge);
       if(a.state===1){
         const start:[number,number,number]=[a.x,a.y-.55,a.z],end:[number,number,number]=[b.x,b.y-.55,b.z];
         structures.beam(start,end,width,.9,CM.concrete);
@@ -49,9 +54,9 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
       }
     }
   });
-  // GSI sidings follow their own branching centrelines and carry no passenger services.
+  // Individual running tracks and sidings share one mesh with the route network.
   for(const {kind,attr,pts} of network){
-    if(kind!==LINE.rail||!(attr&4)||(attr&1))continue;
+    if(kind!==LINE.rail||!(attr&(RAIL.siding|RAIL.individual))||(attr&RAIL.elevated))continue;
     let distance=0;
     for(let i=2;i<pts.length;i+=2){
       const ax=pts[i-2],az=pts[i-1],vx=pts[i]-ax,vz=pts[i+1]-az,length=Math.hypot(vx,vz);
@@ -60,7 +65,7 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
       let a={x:ax,z:az,y:ground(ax,az)+.24,dx,dz};
       for(let j=1;j<=steps;j++){
         const x=ax+vx*j/steps,z=az+vz*j/steps,b={x,z,y:ground(x,z)+.24,dx,dz};
-        track(a,b,distance+length*(j-1)/steps,distance+length*j/steps,3.1,1,1.067);
+        track(a,b,distance+length*(j-1)/steps,distance+length*j/steps,3.1,1,attr&RAIL.standardGauge?1.435:1.067);
         a=b;
       }
       distance+=length;

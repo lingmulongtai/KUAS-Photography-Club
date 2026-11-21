@@ -174,11 +174,12 @@ def merge_osaka_measured(buildings, region):
     return [b for b in combined if b['ground'] is None or b['height']<=127.5]
 
 
-def export_lines(key,box):
+def export_lines(key,box,*,track_box=None,tracks=()):
     feats=[]
     clip=sbox(*box)
     transport=key=='basin-transport'
     south_of_core=sbox(box[0],R.BUILDINGS[3],box[2],box[3]) if transport else None
+    track_survey=sbox(*track_box) if track_box else None
     origin=np.array(box[:2])
     osaka_centre=Point(*R.to_local(34.702911,135.495896)) if key=='osaka' else None
     def add(kind,attr,coords):
@@ -217,6 +218,8 @@ def export_lines(key,box):
                 g=transform(project,make_valid(shape(ft['geometry'])).intersection(sbox(0,0,4096,4096))).intersection(clip)
                 if transport and ((kind==0 and rank>0) or (kind==1 and not attr&4)):
                     g=g.intersection(south_of_core)  # The resident core already has these.
+                if kind==1 and track_survey is not None:
+                    g=g.difference(track_survey)
                 # Keep local streets near Umeda; use wider roads farther out.
                 if kind==0 and osaka_centre is not None and rank==1 and g.distance(osaka_centre)>2500:
                     continue
@@ -231,6 +234,8 @@ def export_lines(key,box):
                         add(2,0,list(part.exterior.coords)[:-1])
                         for hole in part.interiors:
                             add(3,0,list(hole.coords)[:-1])
+    for attr,track in tracks:
+        add(1,attr,list(track.simplify(.20).coords))
     if not feats:
         raise RuntimeError('No regional infrastructure')
     kinds=np.array([f[0] for f in feats],np.uint8);attrs=np.array([f[1] for f in feats],np.uint8)

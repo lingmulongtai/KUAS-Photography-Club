@@ -18,3 +18,16 @@ test('surface sidings follow the terrain in the shared track mesh without spawni
   for(const x of [0,12,24])assert.ok(Array.from({length:p.count},(_,i)=>i)
     .some(i=>p.getX(i)===x&&Math.abs(p.getY(i)-(x/4+.24))<.001));
 });
+
+test('individual track axes replace the generic surface while keeping the passenger service',()=>{
+  const route={id:'hankyu-kyoto',states:[0],tracks:[2],points:[[0,0],[120,0]],stations:[],
+    color:'#702c31',cars:4,carLength:19};
+  const axes=[-2,2].map(z=>({kind:1,attr:8|16,pts:Float32Array.of(0,z,120,z)}));
+  const render=(routes,network,box)=>mod.exports.buildRailways({},()=>0,routes,false,network,box).group;
+  const surveyed=render([route],axes,[-10,-10,130,10]),onlyAxes=render([],axes);
+  assert.equal(surveyed.children[0].geometry.getAttribute('position').count,onlyAxes.children[0].geometry.getAttribute('position').count);
+  assert.ok(Math.abs(surveyed.children[0].geometry.getAttribute('aGauge').getX(0)-1.435)<.001);
+  assert.ok(surveyed.children[2].geometry.instanceCount>0);
+  assert.ok(render([{...route,states:[1]}],axes,[-10,-10,130,10]).children[0].geometry.getAttribute('position').count
+    >onlyAxes.children[0].geometry.getAttribute('position').count);
+});

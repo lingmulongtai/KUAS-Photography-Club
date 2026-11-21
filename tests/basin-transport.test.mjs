@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {loadLines,LINE} from '../src/scripts/hero/lines-data.ts';
+import {loadLines,LINE,RAIL} from '../src/scripts/hero/lines-data.ts';
 
 test('the standing street map crosses Muko with surface lanes, minor streets and mapped yard tracks',async t=>{
   const root=new URL('../public/kyoto/',import.meta.url);
@@ -31,5 +31,17 @@ test('the standing street map crosses Muko with surface lanes, minor streets and
   assert.ok(north.alleys>3000);
   assert.equal(north.roads,0,'the core already owns the larger roads north of the seam');
   assert.ok(lengths(-4530,6600).sidings>2000);
+  // One east-west section through the yard. The generalised network had only four axes.
+  const crossings={running:0,siding:0};
+  for(const {kind,attr,pts} of lines){
+    if(kind!==LINE.rail||!(attr&(RAIL.individual|RAIL.siding)))continue;
+    for(let i=2;i<pts.length;i+=2){
+      const ax=pts[i-2],az=pts[i-1],bx=pts[i],bz=pts[i+1];
+      if((az>6600)===(bz>6600))continue;
+      const x=ax+(bx-ax)*(6600-az)/(bz-az);
+      if(x>-4855&&x< -4205)crossings[attr&RAIL.siding?'siding':'running']++;
+    }
+  }
+  assert.deepEqual(crossings,{running:18,siding:11});
   assert.ok(lines.every(f=>f.kind===LINE.road||(f.kind===LINE.rail&&!(f.attr&1))));
 });

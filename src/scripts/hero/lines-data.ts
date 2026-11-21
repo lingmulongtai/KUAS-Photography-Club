@@ -4,10 +4,11 @@ import {applyWaterDetails,waterChecksum,type WaterDetail} from './water-detail.t
 
 /** Kinds of features in lines.bin (see tools/kyoto-data/build_lines.py). */
 export const LINE = { road: 0, rail: 1, water: 2, waterHole: 3 } as const;
+export const RAIL = { elevated:1, multiple:2, siding:4, individual:8, standardGauge:16 } as const;
 
 export interface LineFeature {
   kind: number;
-  /** road: width rank 0..4 | category << 4; rail: 1 elevated | 2 multi-track */
+  /** Road: width rank 0..4 | category << 4. Rail: flags from RAIL. */
   attr: number;
   /** x0, z0, x1, z1 … metres */
   pts: Float32Array;

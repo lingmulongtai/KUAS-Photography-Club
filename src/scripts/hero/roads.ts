@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS_BOX, type Box } from './geo';
-import { LINE, type LineFeature } from './lines-data';
+import { LINE, RAIL, type LineFeature } from './lines-data';
 
 /** Road widths in metres for each GSI width rank (0 under 3 m … 4 over 19.5 m). */
 export const ROAD_WIDTH = [3, 4.5, 9, 16, 24];
@@ -34,8 +34,8 @@ export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature
       kind = rank >= 3 ? 1 : 0;
     } else if (f.kind === LINE.rail) {
       // ballast for one or two tracks; elevated lines are drawn as structures elsewhere
-      if (f.attr & 1) continue;
-      half = f.attr & 2 ? 5 : 2.6;
+      if (f.attr & RAIL.elevated) continue;
+      half = f.attr & (RAIL.siding|RAIL.individual) ? 1.55 : f.attr & RAIL.multiple ? 5 : 2.6;
       kind = 2;
     } else continue;
     const p = f.pts;

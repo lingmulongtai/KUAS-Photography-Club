@@ -41,7 +41,7 @@ export interface RegionalPhotoMeta {
 export interface BasinSheet { id:string; box:Box; uv:Box }
 export interface BasinAtlas { file:string; sheets:BasinSheet[] }
 export interface TerrainMeta {
-  basinTransport?: {file:string;box:Box;q:number};
+  basinTransport?: {file:string;box:Box;q:number;trackBox?:Box};
   otokuni?: RegionalPhotoMeta;
   aerialBasin?: BasinAtlas & {compact:BasinAtlas; mobile:BasinAtlas};
   /** Coarser outer mountains; the original basin grids retain priority. */
