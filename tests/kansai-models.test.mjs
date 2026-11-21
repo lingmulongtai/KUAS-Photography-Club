@@ -27,6 +27,23 @@ test('Osaka Castle has a resident textured keep at its surveyed height',()=>{
   assert.ok(Math.abs(keep.ellipsoidHeight+geometry.max[1]-121.685)<.05);
 });
 
+test('the Kyoto laser-survey roofs have a registered footprint, camera-lit normals and a photograph',()=>{
+  const catalogue=json('landmarks/index.json'), roofs=json('landmarks/temple-roofs.json');
+  assert.equal(roofs.length,4);
+  for(const roof of roofs){
+    assert.deepEqual(catalogue.find(entry=>entry.id===roof.id),roof);
+    const bytes=readFileSync(new URL(roof.file.slice('/kansai/'.length),root));
+    const doc=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
+    const surface=doc.meshes.find(m=>m.name==='Measured roof').primitives[0];
+    const positions=doc.accessors[surface.attributes.POSITION];
+    assert.ok(positions.count>1000&&positions.max[1]-positions.min[1]>4,roof.id);
+    assert.equal(doc.accessors[surface.attributes.NORMAL].count,positions.count);
+    assert.equal(doc.accessors[surface.attributes.TEXCOORD_0].count,positions.count);
+    assert.ok(doc.materials[surface.material].pbrMetallicRoughness.baseColorTexture);
+    assert.ok(doc.images[0].bufferView!==undefined);
+  }
+});
+
 test('both GSI rail representations keep underground lines out of the rose garden',()=>{
   assert.equal(railStructure('RailCL',8201,'地下'),'hidden');
   assert.equal(railStructure('RailTrCL',2804,''),'hidden');

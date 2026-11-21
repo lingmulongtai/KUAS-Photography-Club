@@ -1,0 +1,226 @@
+{
+  "heightData": {
+    "publisher": "Kyoto Prefecture, Forestry Promotion Division",
+    "product": "DCHM, 0.5 m, relative first-surface height in metres. Forest-canopy product, includes roof returns here. Sample within the building polygon; unrelated canopy and ground can occur at edges. Source does not measure walls, openings or concealed surfaces.",
+    "source": "https://www.geospatial.jp/ckan/dataset/dchm05_kyoto",
+    "sourceZip": "https://gic-kyoto.s3.ap-northeast-1.amazonaws.com/2024/dchm/06ND.zip",
+    "members": [
+      {
+        "member": "06ND/dchm_06ND5243.tiff",
+        "sha256": "d52366db41a08788b0cfc7fc78263fd476be97b8446b2ab1fe5cb4e8fd7e5308",
+        "tfwSha256": "550a310eaa94c105acc77f85e9d3999e7404a5f40c25c7247a6793253fa82b43"
+      },
+      {
+        "member": "06ND/dchm_06ND6532.tiff",
+        "sha256": "239a66654744f88103d05282c891dd70b2d22cf84a31182a02d7789af2b38da9",
+        "tfwSha256": "647cb3b9e490438cb5d2fe75aa0fac76ead7b2aafb01fbb23c160aa906eb7923"
+      }
+    ],
+    "sourceDate": "The dataset description reports FY2019–2023 measurement. Individual acquisition dates for these tiles were not stated. Archive directory is 2024.",
+    "license": "PDL 1.0, name the source, source URL and terms URL, state modifications.",
+    "terms": "https://www.geospatial.jp/ckan/dataset/b5858140-94db-40e1-b666-f4908e2d89c6/resource/f1c1613a-a8d5-4b7e-8022-23bb814be4ba/download/_.pdf",
+    "crs": "EPSG:6674 JGD2011 / Japan Plane Rectangular CS VI; raster x is easting, y is northing",
+    "nodata": -32767,
+    "quantiles": [
+      0.05,
+      0.25,
+      0.5,
+      0.75,
+      0.95
+    ],
+    "heightBasis": "Metres above ground; the per-building medians at the outer 2 m include returns from eaves, inner eaves and adjacent ground. Use the original grid for actual roof structure."
+  },
+  "osm": {
+    "license": "ODbL 1.0 © OpenStreetMap contributors",
+    "terms": "https://www.openstreetmap.org/copyright",
+    "release": "Geofabrik Kansai, 2026-11-01",
+    "source": "https://download.geofabrik.de/asia/japan/kansai/kansai-261101.osm.pbf"
+  },
+  "gsi": {
+    "publisher": "Geospatial Information Authority of Japan",
+    "outlines": "https://cyberjapandata.gsi.go.jp/xyz/optimal_bvmap-v1/optimal_bvmap-v1.pmtiles",
+    "imagery": "全国最新写真（シームレス）, zoom 18. Date varies by source sheet; no exact flight date is asserted. Aligned crops use nearest native source texels.",
+    "tiles": "https://maps.gsi.go.jp/development/ichiran.html",
+    "terms": "https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html"
+  },
+  "plateau": {
+    "publisher": "Kyoto City / Project PLATEAU, 2025",
+    "license": "CC BY 4.0",
+    "terms": "https://www.mlit.go.jp/plateau/site-policy/",
+    "reference": "Municipal package labelled LOD2. These four features have LOD1 shells."
+  },
+  "sites": [
+    {
+      "site": "daikakuji-miedo",
+      "label": "心経前殿（御影堂）",
+      "way": 749139200,
+      "sourceMember": "06ND/dchm_06ND5243.tiff",
+      "shapePixels": [
+        73,
+        71
+      ],
+      "wgs84Center": [
+        135.67862279217272,
+        35.02841617887661
+      ],
+      "overlapWithGsi": 0.9109,
+      "gdalTransform": [
+        -29342.5,
+        0.5,
+        0.0,
+        -107721.500099,
+        0.0,
+        -0.5
+      ],
+      "osmOutlineHeightQuantilesMeters": [
+        5.08,
+        6.11,
+        7.19,
+        8.96,
+        10.64
+      ],
+      "p50InsideBy2m": 8.39,
+      "p50Outer2m": 5.99,
+      "plateauFeature": "bldg_37455dac-2927-43c7-bcf2-64fdcfc842c1",
+      "plateauMeasuredHeightMeters": 11.4,
+      "plateauSource": "https://assets.cms.plateau.reearth.io/assets/64/cf6354-e5ff-4ee4-84d6-1751734da17c/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26108_ukyo-ku_lod2/data/data93.b3dm",
+      "photoTiles": [
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229870/103809.jpg",
+          "sha256": "cb69e4228e067cab292e2dde02d8b3301cdb16fff1d73ffd9ed225568d4d829b"
+        }
+      ]
+    },
+    {
+      "site": "daikakuji-shinden",
+      "label": "宸殿",
+      "way": 571127944,
+      "sourceMember": "06ND/dchm_06ND5243.tiff",
+      "shapePixels": [
+        181,
+        146
+      ],
+      "wgs84Center": [
+        135.6783412822821,
+        35.02812264153061
+      ],
+      "overlapWithGsi": 0.1605,
+      "gdalTransform": [
+        -29423.5,
+        0.5,
+        0.0,
+        -107715.000099,
+        0.0,
+        -0.5
+      ],
+      "osmOutlineHeightQuantilesMeters": [
+        4.9,
+        5.67,
+        6.9,
+        9.01,
+        10.95
+      ],
+      "p50InsideBy2m": 8.25,
+      "p50Outer2m": 5.43,
+      "plateauFeature": "bldg_c63f1b09-a84e-46f4-917e-b3fff87cca82",
+      "plateauMeasuredHeightMeters": 11.9,
+      "plateauSource": "https://assets.cms.plateau.reearth.io/assets/64/cf6354-e5ff-4ee4-84d6-1751734da17c/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26108_ukyo-ku_lod2/data/data93.b3dm",
+      "photoTiles": [
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229869/103809.jpg",
+          "sha256": "15ff2fe42aa86d374ac499e794676aac7c39e6c1dfa2c62cb06fb26634908105"
+        },
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229870/103809.jpg",
+          "sha256": "cb69e4228e067cab292e2dde02d8b3301cdb16fff1d73ffd9ed225568d4d829b"
+        }
+      ]
+    },
+    {
+      "site": "nanzenji-sanmon",
+      "label": "三門",
+      "way": 190876301,
+      "sourceMember": "06ND/dchm_06ND6532.tiff",
+      "shapePixels": [
+        59,
+        115
+      ],
+      "wgs84Center": [
+        135.79260229693364,
+        35.0112953887145
+      ],
+      "overlapWithGsi": 0.9462,
+      "gdalTransform": [
+        -18943.0,
+        0.5,
+        0.0,
+        -109637.500099,
+        0.0,
+        -0.5
+      ],
+      "osmOutlineHeightQuantilesMeters": [
+        5.86,
+        12.62,
+        17.07,
+        19.48,
+        21.75
+      ],
+      "p50InsideBy2m": 18.63,
+      "p50Outer2m": 13.25,
+      "plateauFeature": "bldg_088dbe5d-5014-44a6-93f1-993e4701d889",
+      "plateauMeasuredHeightMeters": 21.9,
+      "plateauSource": "https://assets.cms.plateau.reearth.io/assets/96/d17b9d-5527-4610-90c8-9e9c44d500c3/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26103_sakyo-ku_lod2/data/data147.b3dm",
+      "photoTiles": [
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229953/103824.jpg",
+          "sha256": "1fdb3e6bef19920cddbc1827b709cf3dc2adc053f658b2cf7b76c3268aa0e84d"
+        }
+      ]
+    },
+    {
+      "site": "nanzenji-hatto",
+      "label": "法堂",
+      "way": 190876449,
+      "sourceMember": "06ND/dchm_06ND6532.tiff",
+      "shapePixels": [
+        77,
+        90
+      ],
+      "wgs84Center": [
+        135.7937935963102,
+        35.011245435887865
+      ],
+      "overlapWithGsi": 0.9193,
+      "gdalTransform": [
+        -18839.0,
+        0.5,
+        0.0,
+        -109648.500099,
+        0.0,
+        -0.5
+      ],
+      "osmOutlineHeightQuantilesMeters": [
+        6.63,
+        11.46,
+        13.45,
+        16.2,
+        19.21
+      ],
+      "p50InsideBy2m": 14.68,
+      "p50Outer2m": 7.08,
+      "plateauFeature": "bldg_6d85deae-e509-4dfe-910f-a8b1af2b606e",
+      "plateauMeasuredHeightMeters": 19.3,
+      "plateauSource": "https://assets.cms.plateau.reearth.io/assets/96/d17b9d-5527-4610-90c8-9e9c44d500c3/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26103_sakyo-ku_lod2/data/data146.b3dm",
+      "photoTiles": [
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229953/103824.jpg",
+          "sha256": "1fdb3e6bef19920cddbc1827b709cf3dc2adc053f658b2cf7b76c3268aa0e84d"
+        },
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229954/103824.jpg",
+          "sha256": "e7343647d4ec4b489a83b74f567680b4bc84096002128a2c07bf90c61fff0d80"
+        }
+      ]
+    }
+  ]
+}
