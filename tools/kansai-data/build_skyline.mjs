@@ -3,13 +3,15 @@
  * Run: node --experimental-strip-types tools/kansai-data/build_skyline.mjs [output-directory]
  *
  * Each gzip JSON row is [heightMetres, minHeightMetres, heightSource, part, rings].
- * Height sources: 2 = mapped height, 1 = mapped storeys × 3.1 m, 0 = estimated.
+ * Heights: 0 footprint estimate, 1 mapped storeys × 3.1 m, 2 mapped metres,
+ * 3 median 3D-GloBFP prediction, 4 bounded blend of footprint and GHSL ANBH.
  * Each unclosed ring is a flat array of x/y pairs in its z12 tile's 16384-unit
  * coordinate space. Outer ring first, then holes. The bounding-box centre owns
  * the footprint, so edges can extend beyond that tile. No ground elevation is baked in.
  */
 import {classifyRings, VectorTile} from '@mapbox/vector-tile';
 import Pbf from 'pbf';
+import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -24,6 +26,11 @@ const cellSize = 384; // About 185 metres in Kansai.
 const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const network = readJson(path.join(data, 'network/index.json'));
 const attributes = readJson(path.join(data, 'building-attributes/index.json'));
+const predicted = readJson(path.join(data, 'predicted-heights/index.json'));
+const regional = readJson(path.join(data, 'heights/index.json'));
+const predictedPacks = new Set(predicted.packs);
+const regionalTiles = new Set(regional.tiles.map(([x, y]) => x + '/' + y));
+const regionalCache = new Map();
 const owner = prefectureLookup(readJson(path.join(data, 'prefectures.json')).features);
 const attributeTiles = new Set(attributes.tiles);
 const packOwners = new Map();
@@ -243,16 +250,94 @@ function buildTile(key) {
   }).sort((a, b) => a.y - b.y || a.x - b.x || a.height - b.height);
 }
 
+function blockHeight(lon, lat) {
+  const col = Math.floor((lon - regional.origin[0]) / regional.pixelSize[0]);
+  const row = Math.floor((regional.origin[1] - lat) / regional.pixelSize[1]);
+  const size = regional.tileSize;
+  const key = Math.floor(col / size) + '/' + Math.floor(row / size);
+  if (!regionalTiles.has(key)) return;
+  if (!regionalCache.has(key)) {
+    const tile = fs.readFileSync(path.join(data, 'heights', key + '.f32.gz'));
+    regionalCache.set(key, gunzipSync(tile));
+  }
+  return regionalCache.get(key).readFloatLE(8 * ((row % size) * size + col % size));
+}
+
+// Select the original skyline first so enrichment preserves its footprints,
+// OSM building parts, order, explicitly mapped heights and recorded storeys.
+async function enrichHeights(key, rows) {
+  const [tx, ty] = key.split('/').map(Number);
+  const side = 2 ** (predicted.tileZoom - predicted.packZoom);
+  const tileSize = predicted.tileSize;
+  const pixelsPerUnit = side * tileSize / extent;
+  const packs = new Map(), images = new Map(), targets = new Map();
+  for (const row of rows) {
+    if (row.source !== 0) continue;
+    const values = [];
+    const ring = row.rings[0];
+    const xs = ring.filter((_, i) => i % 2 === 0), ys = ring.filter((_, i) => i % 2 === 1);
+    const west = Math.min(...xs), north = Math.min(...ys);
+    const width = Math.max(...xs) - west, height = Math.max(...ys) - north;
+    targets.set(row, {values, x: west + width / 2, y: north + height / 2});
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+      const x = west + width * (i + .5) / 5, y = north + height * (j + .5) / 5;
+      if (!inside(row, x, y)) continue;
+      const px = tx * side * tileSize + Math.floor(x * pixelsPerUnit);
+      const py = ty * side * tileSize + Math.floor(y * pixelsPerUnit);
+      const sx = Math.floor(px / tileSize), sy = Math.floor(py / tileSize);
+      const packKey = Math.floor(sx / side) + '/' + Math.floor(sy / side);
+      if (!predictedPacks.has(packKey)) continue;
+      const imageKey = sx + '/' + sy;
+      if (!images.has(imageKey)) {
+        if (!packs.has(packKey)) {
+          packs.set(packKey, fs.readFileSync(path.join(data, 'predicted-heights', packKey.replace('/', '-') + '.bin')));
+        }
+        const pack = packs.get(packKey), offset = 4 * ((sy % side) * side + sx % side);
+        const from = pack.readUInt32LE(offset), to = pack.readUInt32LE(offset + 4);
+        images.set(imageKey, from === to ? null : {png: pack.subarray(from, to), samples: []});
+      }
+      const image = images.get(imageKey);
+      if (image) image.samples.push([values, (py % tileSize) * tileSize + px % tileSize]);
+    }
+  }
+  await Promise.all([...images.values()].filter(Boolean).map(async image => {
+    const {data: pixels, info} = await sharp(image.png).raw().toBuffer({resolveWithObject: true});
+    if (info.width !== tileSize || info.height !== tileSize || info.channels !== 3) throw Error('Unexpected height PNG format');
+    for (const [values, pixel] of image.samples) {
+      const dm = 256 * pixels[pixel * 3] + pixels[pixel * 3 + 1];
+      if (dm > 0) values.push(dm / 10);
+    }
+  }));
+  for (const [row, {values, x, y}] of targets) {
+    if (values.length) {
+      values.sort((a, b) => a - b);
+      const mid = Math.floor(values.length / 2);
+      const height = tenth(values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2);
+      if (height > row.minHeight) {
+        row.height = height; row.source = 3;
+        continue;
+      }
+    }
+    const block = blockHeight(...lonLat(tx + x / extent, ty + y / extent, zoom));
+    if (!(block > 0)) continue;
+    const h = row.height;
+    const height = tenth(Math.max(h * .5, Math.min(h * 2, (h + block) / 2)));
+    if (height > row.minHeight) { row.height = height; row.source = 4; }
+  }
+}
+
 fs.mkdirSync(output, {recursive: true});
-const counts = {footprints: 0, mappedHeight: 0, mappedLevels: 0, estimated: 0, parts: 0, bytes: 0};
+const countNames = ['estimated', 'mappedLevels', 'mappedHeight', 'predictedHeight', 'blockHeight'];
+const counts = {footprints: 0, mappedHeight: 0, mappedLevels: 0, predictedHeight: 0, blockHeight: 0, estimated: 0, parts: 0, bytes: 0};
 const perPrefecture = {}, tiles = [];
 for (const key of [...packOwners.keys()].sort()) {
   const rows = buildTile(key);
   if (!rows.length) continue;
+  await enrichHeights(key, rows);
   tiles.push(key);
   const content = rows.map(r => {
     counts.footprints++;
-    counts[['estimated', 'mappedLevels', 'mappedHeight'][r.source]]++;
+    counts[countNames[r.source]]++;
     counts.parts += r.part;
     perPrefecture[r.pref] = (perPrefecture[r.pref] ?? 0) + 1;
     return [r.height, r.minHeight, r.source, r.part, r.rings];
@@ -261,13 +346,16 @@ for (const key of [...packOwners.keys()].sort()) {
   counts.bytes += buffer.length;
   fs.writeFileSync(path.join(output, key.replace('/', '-') + '.json.gz'), buffer);
 }
-if (Object.keys(perPrefecture).length !== 5 || !counts.mappedHeight || !counts.mappedLevels || !counts.estimated) {
+if (Object.keys(perPrefecture).length !== 5 || countNames.some(name => !counts[name])) {
   throw new Error('Incomplete skyline source coverage');
 }
 const index = {zoom, extent, tiles, counts, perPrefecture,
-  heightSources: ['estimated from footprint', 'mapped storeys × 3.1 m', 'mapped height in metres'],
-  sources: [network.sourceInfo, attributes.source],
-  attribution: '国土地理院最適化ベクトルタイルを加工 / © OpenStreetMap contributors',
+  heightSources: ['estimated from footprint', 'mapped storeys × 3.1 m', 'mapped height in metres',
+    'median of positive 3D-GloBFP predicted heights sampled on a 5 × 5 interior grid',
+    'mean of footprint estimate and GHSL block-average net building height, bounded to 0.5–2 times the footprint estimate'],
+  sources: [network.sourceInfo, attributes.source, predicted.sourceUrl, regional.sourceUrl],
+  heightData: [predicted, regional].map(({source, sourceUrl, epoch, license, licenseUrl}) => ({source, sourceUrl, epoch, license, licenseUrl})),
+  attribution: '国土地理院最適化ベクトルタイルを加工 / © OpenStreetMap contributors / Che et al., 3D-GloBFP / Pesaresi & Politis, European Commission JRC, GHS-BUILT-H R2023A',
   licenseUrl: attributes.licenseUrl};
 fs.writeFileSync(path.join(output, 'index.json'), JSON.stringify(index) + '\n');
 console.log(JSON.stringify({tiles: tiles.length, counts, perPrefecture}));
