@@ -18,7 +18,7 @@ const en = lang === 'en';
 const latest = (await getTrips()).slice(0, 3);
 const reel = await reelPhotos(lang);
 ---
-<Base lang={lang} overlayHeader documentTitle={en ? undefined : homeJa.title}
+<Base lang={lang} canonicalPath={en ? '/en/' : '/'} overlayHeader documentTitle={en ? undefined : homeJa.title}
   title={en ? 'Photography under Kyoto’s sky' : undefined}
   description={en ? 'The website operated by the KUAS Photography Club. Visit, join, check confirmed plans and learn photography.' : homeJa.description}>
   <KyotoHero lang={lang} />

@@ -1,4 +1,6 @@
 ---
 import HomePage from '../components/HomePage.astro';
+import HomeLanguageDocument from '../components/HomeLanguageDocument.astro';
+import type { SiteLanguage } from '../lib/i18n';
 ---
-<HomePage lang="ja" />
+<HomeLanguageDocument lang="ja">{(locale: SiteLanguage) => <HomePage lang={locale} />}</HomeLanguageDocument>

@@ -1,4 +1,5 @@
-import { HOME_LANGUAGE_SWITCH_HASH, LANGUAGE_KEY, languagePath, supportsLanguagePreference } from '../lib/i18n';
+import { HOME_LANGUAGE_SWITCH_HASH, LANGUAGE_KEY, languagePath, supportsLanguagePreference, type SiteLanguage } from '../lib/i18n';
+import { mountHomeLanguage } from './home-language';
 
 // Browser language stays on the device. An explicit choice takes precedence.
 let saved: string | null = null;
@@ -8,9 +9,12 @@ const current = document.documentElement.lang === 'en' ? 'en' : 'ja';
 const switchingHome = location.hash === HOME_LANGUAGE_SWITCH_HASH && languagePath(location.pathname, 'ja') === '/';
 const requested = switchingHome ? current : new URLSearchParams(location.search).get('lang');
 const explicit = requested === 'ja' || requested === 'en' ? requested : null;
+function remember(lang: SiteLanguage) {
+  try { localStorage.setItem(LANGUAGE_KEY, lang); return true; } catch { return false; }
+}
 if (explicit) {
   saved = explicit;
-  try { localStorage.setItem(LANGUAGE_KEY, explicit); } catch { storageAvailable = false; }
+  if (!remember(explicit)) storageAvailable = false;
 }
 if (switchingHome) {
   const target = new URL(location.href);
@@ -22,12 +26,16 @@ if (switchingHome) {
 // Keep each locale URL stable on first visit, including search-engine rendering.
 // Only an explicit, saved visitor choice may redirect the Japanese page.
 const preferred = saved === 'en' ? 'en' : 'ja';
+const homeCopy = document.getElementById('home-copy');
+const showHome = homeCopy && mountHomeLanguage(homeCopy, remember);
 if (current === 'ja' && preferred === 'en' && !document.documentElement.classList.contains('screenshot-preview') && supportsLanguagePreference(location.pathname)) {
-  location.replace(languagePath(location.pathname, 'en') + location.search + location.hash);
+  if (showHome) showHome('en', 'replace');
+  else location.replace(languagePath(location.pathname, 'en') + location.search + location.hash);
 }
 
 document.querySelectorAll<HTMLAnchorElement>('[data-language]').forEach(link => {
-  link.addEventListener('click', () => {
+  link.addEventListener('click', event => {
+    if (event.defaultPrevented) return;
     try { localStorage.setItem(LANGUAGE_KEY, link.dataset.language!); } catch {
       // Keep manual switching usable even when all browser storage is blocked.
       const target = new URL(link.href);

@@ -30,12 +30,13 @@ test('language pairs round trip and guidelines retain their existing English URL
   assert.equal(languagePath('/trips/spots/gion/', 'en'), '/en/trips/');
 });
 
-const source = readFileSync(new URL('../src/scripts/language.ts', import.meta.url), 'utf8').replace(/^import .*?;\s*/, '');
+const source = readFileSync(new URL('../src/scripts/language.ts', import.meta.url), 'utf8').replace(/^import [^\n]+;\s*/gm, '');
 const languageScript = stripTypeScriptTypes(source);
 
 function visit(href, { lang = 'ja', saved = null, storage = true, preview = false } = {}) {
   const document = {
     documentElement: { lang, classList: { contains: name => preview && name === 'screenshot-preview' } },
+    getElementById: () => null,
     querySelectorAll: () => [],
   };
   const location = new URL(href, 'https://club.example');
