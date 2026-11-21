@@ -6,6 +6,17 @@ import { buildOcclusion } from '../src/scripts/hero/building-occlusion.ts';
 const box = [0, 0, 640, 640];
 const at = (tex, x, z) => tex.image.data[Math.floor(z / 10) * 64 + Math.floor(x / 10)];
 
+test('adjacent district shadows preserve every core footprint in the same texture',()=>{
+  const footprint=(x,z)=>({x,z,w:20,d:20,angle:0,h:8,ground:0,kind:0});
+  const core=buildOcclusion({boxes:[footprint(105,205)],polys:[]},box,64);
+  const regional=buildOcclusion({boxes:[footprint(305,755)],polys:[]},[0,640,640,1280],64,core);
+  const packed=regional.image.data;
+  assert.equal(packed.length,core.image.data.length*2);
+  assert.ok(core.image.data.every((value,i)=>value===packed[i*2]));
+  assert.equal(packed[(11*64+30)*2+1],255);
+  assert.equal(packed[(20*64+10)*2+1],0);
+});
+
 test('footprints fill the texels they cover and leave open ground at zero', () => {
   const tex = buildOcclusion({ boxes: [{ x: 105, z: 205, w: 30, d: 10, angle: 0, h: 9, ground: 0, kind: 0 }], polys: [] }, box, 64);
   assert.equal(tex.image.width, 64);

@@ -50,6 +50,8 @@ export function createEnv() {
     uBuiltOn: { value: 0 },
     /** metres per texel of uBuilt */
     uBuiltTexel: { value: 8 },
+    uRegionBuiltBox: { value: new THREE.Vector4() },
+    uRegionBuiltTexel: { value: 0 },
   };
 }
 
