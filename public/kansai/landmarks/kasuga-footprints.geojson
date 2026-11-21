@@ -1,0 +1,226 @@
+{
+  "type": "FeatureCollection",
+  "name": "Kasuga Taisha mapped building anchors for documentary parameters",
+  "attribution": "© OpenStreetMap contributors",
+  "license": "https://www.openstreetmap.org/copyright",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "w1134481290",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              135.8485136,
+              34.6816067
+            ],
+            [
+              135.8485584,
+              34.6816071
+            ],
+            [
+              135.8485593,
+              34.6815431
+            ],
+            [
+              135.8485144,
+              34.6815427
+            ],
+            [
+              135.8485136,
+              34.6816067
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "label": "第一殿",
+        "center": [
+          135.8485364,
+          34.6815749
+        ],
+        "osmUrl": "https://www.openstreetmap.org/way/1134481290",
+        "osmVersion": 4,
+        "osmLastEdit": "2026-10-14 14:42:52+00:00",
+        "geometryRole": "mapped footprint",
+        "parameterSet": "k-honden-C1",
+        "measurementApplicability": "Numerical callouts on one representative of the four houses; exact inter-house variation unreported."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "w360648242",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              135.8484607,
+              34.6816063
+            ],
+            [
+              135.8485136,
+              34.6816067
+            ],
+            [
+              135.8485144,
+              34.6815427
+            ],
+            [
+              135.8484613,
+              34.6815423
+            ],
+            [
+              135.8484607,
+              34.6816063
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "label": "第二殿",
+        "center": [
+          135.8484875,
+          34.6815745
+        ],
+        "osmUrl": "https://www.openstreetmap.org/way/360648242",
+        "osmVersion": 4,
+        "osmLastEdit": "2026-02-03 15:22:27+00:00",
+        "geometryRole": "mapped footprint",
+        "parameterSet": "k-honden-C1",
+        "measurementApplicability": "Numerical callouts on one representative of the four houses; exact inter-house variation unreported."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "w1134481289",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              135.8484092,
+              34.681606
+            ],
+            [
+              135.8484607,
+              34.6816063
+            ],
+            [
+              135.8484613,
+              34.6815423
+            ],
+            [
+              135.8484102,
+              34.681542
+            ],
+            [
+              135.8484092,
+              34.681606
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "label": "第三殿",
+        "center": [
+          135.8484353,
+          34.6815742
+        ],
+        "osmUrl": "https://www.openstreetmap.org/way/1134481289",
+        "osmVersion": 4,
+        "osmLastEdit": "2026-02-03 15:22:27+00:00",
+        "geometryRole": "mapped footprint",
+        "parameterSet": "k-honden-C1",
+        "measurementApplicability": "Numerical callouts on one representative of the four houses; exact inter-house variation unreported."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "w1134481288",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              135.8484102,
+              34.681542
+            ],
+            [
+              135.8483595,
+              34.6815416
+            ],
+            [
+              135.8483588,
+              34.6816056
+            ],
+            [
+              135.8484092,
+              34.681606
+            ],
+            [
+              135.8484102,
+              34.681542
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "label": "第四殿",
+        "center": [
+          135.8483844,
+          34.6815738
+        ],
+        "osmUrl": "https://www.openstreetmap.org/way/1134481288",
+        "osmVersion": 4,
+        "osmLastEdit": "2026-02-03 15:22:27+00:00",
+        "geometryRole": "mapped footprint",
+        "parameterSet": "k-honden-C1",
+        "measurementApplicability": "Numerical callouts on one representative of the four houses; exact inter-house variation unreported."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "w1134487309",
+      "properties": {
+        "label": "幣殿・舞殿",
+        "sourceName": "弊殿",
+        "center": [
+          135.84837102326148,
+          34.681252604147225
+        ],
+        "osmUrl": "https://www.openstreetmap.org/way/1134487309",
+        "parameterSet": "k-heiden",
+        "geometryRole": "mapped footprint"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              135.8482707,
+              34.6812939
+            ],
+            [
+              135.848282,
+              34.6811966
+            ],
+            [
+              135.8484713,
+              34.6812113
+            ],
+            [
+              135.8484601,
+              34.6813086
+            ],
+            [
+              135.8482707,
+              34.6812939
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

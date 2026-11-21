@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {createServer} from 'vite';
 import {portTower} from './port-tower.mjs';
 import {districtModel} from './nankinmachi.mjs';
+import {kasugaBuildings} from './kasuga.mjs';
 import {greatBuddhaHall,hikoneKeep,harborHotel,roseGarden} from './outing-landmarks.mjs';
 
 const project=fileURLToPath(new URL('../../',import.meta.url));
@@ -94,6 +95,10 @@ try{
     await save(id,parts,...site.center,[site.ring],'28');
   }
   await save('todaiji',greatBuddhaHall(templeHall),135.83987322,34.68899310,undefined,'29');
+  const kasuga=JSON.parse(await fs.readFile(new URL('kasuga-footprints.geojson',output)));
+  for(const {id,parts,lon,lat,ring} of kasugaBuildings(kasuga.features,block)){
+    await save(id,parts,lon,lat,[ring],'29');
+  }
   await save('hikone-keep',hikoneKeep(block,roof),136.25184170,35.27645385,undefined,'25');
   // build_osaka_keep.py retains the source ellipsoid height of the surveyed keep.
   manifest.push({id:'osaka-keep',pref:'27',lon:135.525856,lat:34.687373,ellipsoidHeight:68.477,

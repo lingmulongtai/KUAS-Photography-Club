@@ -14,6 +14,22 @@ const root=new URL('../public/kansai/',import.meta.url);
 const json=file=>JSON.parse(readFileSync(new URL(file,root),'utf8'));
 const owner=prefectureLookup(json('prefectures.json').features);
 
+test('Nara Park places four Kasuga sanctuaries and the open dance hall on their mapped footprints',()=>{
+  const source=json('landmarks/kasuga-footprints.geojson').features;
+  const models=json('landmarks/index.json').filter(b=>b.id.startsWith('kasuga-'));
+  assert.equal(models.length,5);
+  for(const [i,b] of models.entries()){
+    assert.equal(b.pref,'29');
+    assert.deepEqual([b.lon,b.lat],source[i].properties.center);
+    assert.deepEqual(b.rings,source[i].geometry.coordinates);
+    const file=readFileSync(new URL('landmarks/'+b.id+'.glb',root));
+    const doc=JSON.parse(file.toString('utf8',20,20+file.readUInt32LE(12)));
+    const pos=doc.accessors[doc.meshes[0].primitives[0].attributes.POSITION];
+    assert.ok(pos.min[1]>=-.001);
+    if(i<4)assert.ok(pos.max[1]>6.4&&pos.max[1]<6.6,'the chigi project above the documented 5.712 m ridge');
+  }
+});
+
 test('Osaka Castle has a resident textured keep at its surveyed height',()=>{
   const keep=json('landmarks/index.json').find(b=>b.id==='osaka-keep');
   const camera=OUTINGS.find(p=>p.id==='osaka-castle');
