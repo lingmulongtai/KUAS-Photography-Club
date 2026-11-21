@@ -41,12 +41,12 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
         const framed=span && i>=span.start && i<span.end;
         const depth=framed?1.3:.9;
         const start:[number,number,number]=[a.x,a.y-.1-depth/2,a.z],end:[number,number,number]=[b.x,b.y-.1-depth/2,b.z];
-        structures.beam(start,end,framed?span.width:width,depth,CM.concrete);
+        structures.beam(start,end,framed?span.width:width,depth,framed?CM.weatheredConcrete:CM.concrete);
         if(framed){
           for(const side of [-1,1]){
             const offset=side*(span.width/2-.14);
             structures.beam([a.x-a.dz*offset,a.y+.24,a.z+a.dx*offset],
-              [b.x-b.dz*offset,b.y+.24,b.z+b.dx*offset],.28,.68,CM.concrete);
+              [b.x-b.dz*offset,b.y+.24,b.z+b.dx*offset],.28,.68,CM.weatheredConcrete);
           }
         }else if(Math.floor(path.distances[i]/60)!==Math.floor(path.distances[i+1]/60)){
           const y=ground(a.x,a.z);if(a.y-y>1)structures.box(a.x-.65,a.x+.65,a.z-.65,a.z+.65,y,a.y-.6,CM.concrete);
@@ -57,11 +57,11 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
     if(viaduct)for(const [distance,first,second] of viaduct.piers){
       const p=path.at(distance),top=p.y-1.38;
       const half=viaduct.width*.47;
-      structures.beam([p.x+p.dz*half,top-.35,p.z-p.dx*half],[p.x-p.dz*half,top-.35,p.z+p.dx*half],1.25,.75,CM.concrete);
+      structures.beam([p.x+p.dz*half,top-.35,p.z-p.dx*half],[p.x-p.dz*half,top-.35,p.z+p.dx*half],1.25,.75,CM.weatheredConcrete);
       for(const offset of [first,second]){
         if(offset===undefined)continue;
         const x=p.x-p.dz*offset,z=p.z+p.dx*offset,foot=ground(x,z)-.25;
-        if(top>foot+.5)structures.box(x-.52,x+.52,z-.52,z+.52,foot,top,CM.concrete);
+        if(top>foot+.5)structures.box(x-.52,x+.52,z-.52,z+.52,foot,top,CM.weatheredConcrete);
       }
     }
     for(const station of route.stations){
