@@ -288,23 +288,25 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         if (t1 > t0){
           // steps grow with distance: fine where clouds are big on screen, coarse at the horizon
           float span = t1 - t0;
-          // a per-pixel offset trades the banding of the steps for a fine grain; kept to half a
-          // step, the grain stays below the film grain of the finish
-          // (interleaved gradient noise: neighbouring pixels take evenly spread offsets, which reads
-          // as a finer, calmer grain than independent random ones)
-          float jitter = .25 + .5 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))));
+          // Spread four neighbouring rays across each interval. Shuffle their order
+          // per quad, then rotate the phase down the ray; there is no screen-wide
+          // repeating grid or unsampled half-interval between horizontal slices.
+          ivec2 pixel = ivec2(gl_FragCoord.xy);
+          float quad = puffHash(pixel / 2);
+          int lane = (pixel.x & 1) + 2 * (pixel.y & 1);
+          float phaseOffset = .25 * float(lane ^ int(quad * 4.)) + fract(quad * 64.);
           // tall slabs (towering clouds) need more steps to stay solid
-          float steps = min(float(uMarchSteps) * (1. + (uTop - uBase) / 3000.), float(uMarchSteps) * 2.);
+          float steps = ceil(min(float(uMarchSteps) * (1. + (uTop - uBase) / 3000.), float(uMarchSteps) * 2.));
           float tPrev = t0;
           bool inside = false;
           for (int i = 0; i < uMarchSteps * 2; i++){
             if (T < .03 || float(i) >= steps) break;
             float u0 = float(i) / steps, u1 = (float(i) + 1.) / steps;
-            // a per-pixel offset turns the banding of the steps into fine grain
-            float um = mix(u0, u1, jitter);
-            float t = t0 + span * um * um;
+            float jitter = fract(phaseOffset + float(i) * .618033989);
+            float tStart = t0 + span * u0 * u0;
             float tEnd = t0 + span * u1 * u1;
-            float dt = span * (u1 * u1 - u0 * u0);
+            float t = mix(tStart, tEnd, jitter);
+            float dt = tEnd - tStart;
             vec3 pos = ro + rd * t;
             float d = density(pos, t);
             vec3 lightPos = pos;
@@ -366,6 +368,14 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           L *= fade;
           lowA *= fade;
         }
+        // Neighbours in a fragment quad sampled different parts of the same ray
+        // intervals. Resolve the low layer before compositing the sharper high clouds.
+        vec4 low = vec4(L, lowA);
+        vec2 parity = mod(floor(gl_FragCoord.xy), 2.);
+        vec2 towardCenter = (1. - 2. * parity) * vec2(dFdx(parity.x), dFdy(parity.y));
+        vec4 resolved = low + (towardCenter.x * dFdx(low) + towardCenter.y * dFdy(low)) / 3.;
+        L = max(resolved.rgb, vec3(0.));
+        lowA = clamp(resolved.a, 0., 1.);
         // behind the low clouds: altocumulus, then cirrus
         vec4 alto = highLayer(ro, rd, ${ALTO_Y.toFixed(1)}, false);
         vec4 ci = highLayer(ro, rd, ${CIRRUS_Y.toFixed(1)}, true);
