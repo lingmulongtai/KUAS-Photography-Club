@@ -88,7 +88,7 @@ export async function startMap(root:HTMLElement){
   await terrain;if(widget.isDestroyed())return;
   const architecture=await architecturalModels(widget);
   const [boundaries,sources,heightSources,surveys]=await Promise.all([json<{features:Boundary[]}>('prefectures.json'),modelSources(),regionalHeights(),
-    attachSurveys(widget,()=>{surveyFailed=true;},selected.pref,architecture)]);
+    attachSurveys(widget,()=>{surveyFailed=true;},[selected.lon,selected.lat],architecture)]);
   if(widget.isDestroyed())return;
   const owner=prefectureLookup(boundaries.features);
   void outingPins(widget,en,id=>{const place=byId(id);if(place)void visit(place);},()=>selected.pref);

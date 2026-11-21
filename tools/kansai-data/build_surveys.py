@@ -4,6 +4,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.request import urlopen
+from survey_regions import write_regions
 
 API = "https://api.plateauview.mlit.go.jp/datacatalog/"
 OUT = Path(__file__).resolve().parents[2] / "public/kansai/surveys"
@@ -78,3 +79,4 @@ def build():
 
 if __name__ == "__main__":
     build()
+    write_regions()

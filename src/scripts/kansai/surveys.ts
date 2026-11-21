@@ -5,7 +5,7 @@ import {inBox} from './coordinates';
 import type {Architecture} from './architecture';
 import {surveyMaterial} from './survey-material';
 
-type SurveyLayer={kind:string;lod:number;pref:string;file:string};
+type SurveyLayer={kind:string;lod:number;pref:string;url:string;bounds:Box};
 type RecordBox={box:Box;point:Point;id:number};
 const cell=(x:number,y:number)=>x*100000+y;
 
@@ -33,9 +33,9 @@ function footprintRecords(content:Cesium3DTileContent): RecordBox[] {
   return records;
 }
 
-export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initialPref:string,architecture:Architecture){
-  const res=await fetch('/kansai/surveys/index.json'); if(!res.ok)throw Error('Survey catalogue');
-  const {layers}=await res.json() as {layers:SurveyLayer[]};
+export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initial:Point,architecture:Architecture){
+  const res=await fetch('/kansai/surveys/regions.json'); if(!res.ok)throw Error('Survey catalogue');
+  const layers=await res.json() as SurveyLayer[];
   const material=surveyMaterial(widget);
   const scene=widget.scene, records=new WeakMap<Cesium3DTileContent,RecordBox[]>();
   let visible=new Map<Cesium3DTileContent,number>(),last=new Map<Cesium3DTileContent,number>(),mask=new Footprints(),revision=0;
@@ -63,15 +63,16 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
     }
     last=visible;visible=new Map();
   });
-  // Keep nearby prefectures resident. Cesium selects visible child tiles across the border.
-  const queue=[...layers].sort((a,b)=>Number(b.pref===initialPref)-Number(a.pref===initialPref));
-  async function loadNext(){
-    for(let layer=queue.shift();layer;layer=queue.shift()){
+  const resident=new Map<SurveyLayer,InstanceType<typeof C.Cesium3DTileset>>();
+  const pending=new Set<SurveyLayer>(),retry=new Map<SurveyLayer,number>();
+  let wanted=new Set<SurveyLayer>(),alive=true,lastTarget:Point|undefined,lastAltitude=-1;
+  async function load(layer:SurveyLayer){
+    pending.add(layer);
     try {
-      const tiles=await C.Cesium3DTileset.fromUrl('/kansai/surveys/'+layer.file,{
-        maximumScreenSpaceError:3,enableCollision:true,cacheBytes:32*1024*1024,maximumCacheOverflowBytes:48*1024*1024,
+      const tiles=await C.Cesium3DTileset.fromUrl(layer.url,{
+        maximumScreenSpaceError:4,enableCollision:false,cacheBytes:24*1024*1024,maximumCacheOverflowBytes:24*1024*1024,
       });
-      if(widget.isDestroyed()) {tiles.destroy();return;}
+      if(!alive||widget.isDestroyed()||!wanted.has(layer)) {tiles.destroy();return;}
       if(layer.kind==='bldg'||layer.kind==='brid')tiles.customShader=layer.kind==='bldg'&&layer.lod===1?material.shader:material.detailed;
       if(layer.kind==='bldg'){
         tiles.tileVisible.addEventListener((tile:Cesium3DTile)=>{
@@ -83,15 +84,41 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
         tiles.tileUnload.addEventListener((tile:Cesium3DTile)=>visible.delete(tile.content));
       }
       tiles.tileFailed.addEventListener(onFailure);
-      scene.primitives.add(tiles);
-    }catch{onFailure();}
+      retry.delete(layer);resident.set(layer,tiles);scene.primitives.add(tiles);scene.requestRender();
+    }catch{retry.set(layer,Date.now()+30000);if(alive&&wanted.has(layer))onFailure();}
+    finally{pending.delete(layer);}
+  }
+  async function pump(){
+    while(alive&&pending.size<3){
+      const layer=[...wanted].find(l=>!resident.has(l)&&!pending.has(l)&&(retry.get(l)??0)<=Date.now());
+      if(!layer)return;
+      await load(layer);
     }
   }
-  const ready=Promise.all(Array.from({length:3},loadNext));
+  function plan(target:Point,altitude:number){
+    // A detailed municipal tile outside this range contributes subpixel façades.
+    // The far building layer remains on the globe while sources change or stream.
+    if(lastTarget&&Math.abs(target[0]-lastTarget[0])<.002&&Math.abs(target[1]-lastTarget[1])<.002
+      && Math.abs(altitude-lastAltitude)<150&&!retry.size)return;
+    lastTarget=target;lastAltitude=altitude;
+    const radius=Math.min(14500,Math.max(5000,altitude*3.5));
+    const distances=layers.map(layer=>{
+      const [w,s,e,n]=layer.bounds;
+      return {layer,d:Math.hypot(91500*Math.max(w-target[0],0,target[0]-e),111000*Math.max(s-target[1],0,target[1]-n))};
+    });
+    wanted=new Set(distances.filter(v=>altitude<40000&&v.d<radius*(resident.has(v.layer)?1.3:1))
+      .sort((a,b)=>a.d-b.d||b.layer.lod-a.layer.lod).map(v=>v.layer));
+    for(const [layer,tiles] of resident)if(!wanted.has(layer)){
+      scene.primitives.remove(tiles);resident.delete(layer);
+    }
+    return Promise.all(Array.from({length:3},pump));
+  }
+  const ready=plan(initial,1000);
   return {contains:(p:Point)=>mask.contains(p)||architecture.contains(p),get revision(){return revision+architecture.revision;},ready,
     updatePhoto(target:Point,altitude:number){
-      if([...last.values()].includes(1))void material.update(target,altitude);
+      void plan(target,altitude);
+      if(altitude<10500&&[...last.values()].includes(1))void material.update(target,altitude);
     },
-    dispose(){remove();architecture.dispose();material.dispose();}};
+    dispose(){alive=false;remove();architecture.dispose();material.dispose();}};
 }
 export type Surveys=Awaited<ReturnType<typeof attachSurveys>>;

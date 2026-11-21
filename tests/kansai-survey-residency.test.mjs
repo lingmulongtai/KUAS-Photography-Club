@@ -17,14 +17,15 @@ function content(bounds){
 }
 
 test('a revisited PLATEAU tile can replace or unload its content between traversal and postRender',async()=>{
-  const layer={kind:'bldg',pref:'26',lod:2,file:'kyoto.json'},tiles={tileVisible:event(),tileUnload:event(),tileFailed:event()};
+  const layer={kind:'bldg',pref:'26',lod:2,url:'kyoto.json',bounds:[135.74,34.99,135.78,35.01]};
+  const tiles={tileVisible:event(),tileUnload:event(),tileFailed:event()};
   const postRender=event(),scene={postRender,primitives:{add(){}},requestRender(){}};
   const engine={Cesium3DTileset:{fromUrl:async()=>tiles},UniformType:{},Cartesian3:class {},TextureUniform:class {},
     CustomShader:class{setUniform(){} isDestroyed(){return false;} destroy(){}}};
   const module={exports:{}};
   runInNewContext(script,{module,exports:module.exports,window:{Cesium:engine},
-    fetch:async()=>({ok:true,json:async()=>({layers:[layer]})})});
-  const surveys=await module.exports.attachSurveys({scene,isDestroyed:()=>false},()=>assert.fail(),'26',
+    fetch:async()=>({ok:true,json:async()=>[layer]})});
+  const surveys=await module.exports.attachSurveys({scene,isDestroyed:()=>false},()=>assert.fail(),[135.75,35],
     {revision:0,rings:()=>[],contains:()=>false,dispose(){}});
   await surveys.ready;
   const tile={content:content([135.75,35,135.752,35.002])};

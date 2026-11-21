@@ -22,7 +22,7 @@ export function attachModels(widget:CesiumWidget,sources:ModelSources,heightSour
     const target=visibleTarget();if(!target)return;
     const [tx,ty]=tileXY(...target,16), cx=Math.floor(tx),cy=Math.floor(ty);
     const altitude=scene.camera.positionCartographic.height;
-    if(altitude<10500)void surveys.updatePhoto(target,altitude);
+    void surveys.updatePhoto(target,altitude);
     const near=new Set<string>();
     for(const [key,tile] of resident)if(tile.primitive?.ready)near.add(key);
     if(near.size!==readyCount){readyCount=near.size;update(readyCount);}
