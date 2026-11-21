@@ -47,7 +47,7 @@ import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
 import { createIntroCameraMotion } from './intro-camera';
 import { createSharedPhotoSlot } from './shared-photo';
-import { VIEWS, flightLift, openingPanorama, type ViewDef, type HeroView } from './views';
+import { VIEWS, flightLift, openingPanorama, viewBelowClouds, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
 import { buildOcclusion } from './building-occlusion';
@@ -198,6 +198,10 @@ export function createHero(
   const cityLods = new Set<ReturnType<typeof buildCity>>();
   let panoramaCity: ReturnType<typeof createPanoramaCity> | undefined;
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
+  const currentView = (id: HeroView) => {
+    const ref=VIEWS[id].ref;
+    return viewBelowClouds(id,groundAt?.(ref.x,ref.z)??40,clouds.weather.base);
+  };
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const loading = createHeroLoading(opts, 10);
@@ -277,7 +281,7 @@ export function createHero(
     travelBounds=hf.bounds;
     groundAt = (x, z) => hf.height(x, z);
     view=openingPanorama(groundAt,clouds.weather.base,opts.previousOpening??null,opts.requestedOpening??null);
-    VIEW=VIEWS[view];
+    VIEW=currentView(view);
     eye.copy(eyeOf(VIEW));
     if(view!=='shogunzuka')shadow.setRegion(shadowRegion(VIEW,eye));
     campus.y = hf.height(campus.x, campus.z) + 14;
@@ -769,7 +773,23 @@ export function createHero(
     const minutes = jstMinutes(date);
     env.uTime.value = t;
     const weights=seasonWeights(season,jstParts(date).month);
+    const previousBase=clouds.weather.base;
     clouds.setClimate(climateOf(season,jstParts(date).month));
+    const adjustedView=view==='daimonji' && previousBase!==clouds.weather.base ? currentView(view) : VIEW;
+    if(adjustedView.above!==VIEW.above){
+      VIEW=adjustedView;
+      eye.copy(eyeOf(VIEW));
+      if(flight?.to==='city'){
+        flight.p3.copy(eye);
+        shapeFlightArc(flight);
+      }
+      if(!exploring && (flight?.to??mode)==='city'){
+        terrainRecenter?.(eye);
+        plantTreesAsync?.(eye,VIEW.bearing);
+        ensureCityRegion?.(eye);
+        shadow.setRegion(shadowRegion(VIEW,eye));
+      }
+    }
     env.uSpring.value=weights.spring;env.uAutumn.value=weights.autumn;env.uSnow.value=weights.snow;
     snow.points.visible=weights.snow>0;
     env.uSunDir.value.set(...directionFrom(sun));
@@ -887,6 +907,12 @@ export function createHero(
   const pose = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
+  function shapeFlightArc({p0,p1,p2,p3}:NonNullable<typeof flight>) {
+    const lift=flightLift(p0.y,p3.y,p0.distanceTo(p3),clouds.weather.base);
+    p1.lerpVectors(p0,p3,.3).y+=lift;
+    p2.lerpVectors(p0,p3,.75).y+=lift*.7;
+  }
+
   function cityPose(t: number, out = pose) {
     if (VIEW.orbit) {
       const p = landmarkOrbit(VIEW.orbit,eye,lookDrag.yaw,lookDrag.pitch,groundAt ?? (()=>40),orbitObstruction);
@@ -934,8 +960,9 @@ export function createHero(
     updateZoom();
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
-    ensureCityRegion?.(target==='campus'?CAMPUS_CENTER:landscapeCenter(VIEWS[nextView]));
-    if(target!=='campus')prefetchCityRegion?.(landscapeCenter(VIEWS[nextView]),nextView);
+    const destination=currentView(nextView);
+    ensureCityRegion?.(target==='campus'?CAMPUS_CENTER:landscapeCenter(destination));
+    if(target!=='campus')prefetchCityRegion?.(landscapeCenter(destination),nextView);
     if (!fromExplorer && !flight && mode === to && (to === 'campus' || nextView === view)) {
       resetLook();
       opts.onMode?.(to,false);
@@ -953,7 +980,7 @@ export function createHero(
     const locationChanged = viewChanged || mode !== to || !!flight || !!fromExplorer;
     if (viewChanged) {
       view = nextView;
-      VIEW = VIEWS[view];
+      VIEW = destination;
       eye.copy(eyeOf(VIEW));
       ensureRegionalPhoto?.(view);
     }
@@ -984,19 +1011,18 @@ export function createHero(
     const end = to === 'city' ? cityPose(t, blank()) : campusPose(modeSince, blank());
     const p0 = from.pos;
     const p3 = end.pos;
-    // arc higher for longer hops
-    const lift = new THREE.Vector3(0,flightLift(p0.y,p3.y,p0.distanceTo(p3),clouds.weather.base),0);
     flight = {
       to,
       t: 0,
       dur: seconds,
       p0,
       t0: from.target,
-      p1: p0.clone().lerp(p3, 0.3).add(lift),
-      p2: p0.clone().lerp(p3, 0.75).add(lift.multiplyScalar(0.7)),
+      p1: new THREE.Vector3(),
+      p2: new THREE.Vector3(),
       p3,
       regrow: locationChanged,
     };
+    shapeFlightArc(flight);
     opts.onMode?.(to, false);
   }
 

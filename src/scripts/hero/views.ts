@@ -50,8 +50,8 @@ export const VIEWS = {
   inariRidge: { ja:'稲荷山・京都一望', en:'Mt. Inari / Kyoto panorama', eye:INARI_EAST, ref:INARI_EAST, above:612, bearing:314.7, pitch:-9.3 },
   /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
   kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, orbit: {center:KIYOMIZU,targetHeight:16}, pitch: -13 },
-  /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
-  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 250, 18), ref: DAIMONJI, above: 8, bearing: 245, pitch: -6 },
+  /** Across the firebed towards the western skyline, with Kiyomizu on the left. */
+  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 80, 1704), ref: DAIMONJI, above: 834, bearing: 250.74, pitch: -8.55 },
   daimonjiFirebed: spotOrbit('daimonji',430,150,270,0),
   /** An exterior composition: the whole tower against the northern city and mountains. */
   tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 260), ref: TOWER, above: 112, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
@@ -89,11 +89,27 @@ export const PANORAMA_VIEWS = ['shogunzuka','inariRidge','daimonji','arashiyama'
 export type PanoramaView = (typeof PANORAMA_VIEWS)[number];
 const CLOUD_CLEARANCE=80;
 
+/** Move down the sightline to the firebed pin when a low cloud deck covers the usual eye. */
+export function viewBelowClouds(id:HeroView, ground:number, cloudBase:number):ViewDef {
+  const view=VIEWS[id];
+  if(id!=='daimonji')return view;
+  const above=cloudBase-CLOUD_CLEARANCE-ground;
+  if(above>=view.above)return view;
+  const pinHeight=SPOTS.find(spot=>spot.id==='daimonji')!.above;
+  if(above<=pinHeight)return view;
+  const scale=(above-pinHeight)/(view.above-pinHeight);
+  return {...view,above,eye:{
+    x:view.ref.x+(view.eye.x-view.ref.x)*scale,
+    z:view.ref.z+(view.eye.z-view.ref.z)*scale,
+  }};
+}
+
 /** Select the actual opening eye before any view-centred geometry is prepared. */
 export function openingPanorama(height:(x:number,z:number)=>number,cloudBase:number,previous:string|null,requested:string|null,random=Math.random):PanoramaView {
   const eligible=PANORAMA_VIEWS.filter(id=>{
     const v=VIEWS[id];
-    return height(v.ref.x,v.ref.z)+v.above+CLOUD_CLEARANCE<=cloudBase;
+    const ground=height(v.ref.x,v.ref.z);
+    return viewBelowClouds(id,ground,cloudBase).above<=cloudBase-CLOUD_CLEARANCE-ground;
   });
   // Previously shared Osaka panorama links now open the single Tennozan view.
   const linked=eligible.find(id=>id===(requested==='osakaSkyline'?'tennozan':requested));
