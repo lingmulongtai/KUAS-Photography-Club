@@ -1,15 +1,20 @@
 """Blender 3.6: blender -b -P export_station.py -- buildings.fbx plaza.fbx station.glb.
 
 Inputs: Kyoto City high-resolution FBX (resource 21224), building and plaza layers.
-Then run gltfpack -i station.glb -o kyoto-station.glb -cc -ce ext -mm -km
+Requires host Python with Pillow for the neighboring buildings' photo atlases.
+Then run gltfpack -i station.glb -o kyoto-station-district.glb -cc -ce ext -mm -km
     -si 0.36 -se 0.0015 -sp -tw -tl 2048 -tq 8 (native gltfpack 1.3)
 """
 import sys
+import tempfile
 from pathlib import Path
 
 import bpy
 from mathutils import Matrix
 from mathutils.bvhtree import BVHTree
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from station_district import prepare_district
 
 building, plaza, output = map(Path, sys.argv[sys.argv.index("--") + 1:])
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -27,6 +32,11 @@ for path, is_plaza in [(building, False), (plaza, True)]:
                     key=lambda o: o.name)
     if not meshes:
         raise ValueError(f"Missing station meshes in {path}")
+    district = set()
+    if not is_plaza:
+        district = {o for o in imported if o.type == "MESH"} - set(meshes)
+        with tempfile.TemporaryDirectory() as scratch:
+            prepare_district(sorted(district, key=lambda o: o.name), site, Path(scratch))
     bpy.ops.object.select_all(action="DESELECT")
     for obj in meshes:
         transform = site @ obj.matrix_world
@@ -62,7 +72,7 @@ for path, is_plaza in [(building, False), (plaza, True)]:
             for vertex in obj.data.vertices:
                 surface, _, _, _ = roads.find_nearest(vertex.co)
                 vertex.co.z -= surface.z
-    for obj in imported - set(meshes):
+    for obj in imported - set(meshes) - district:
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.context.view_layer.objects.active = meshes[0]
     bpy.ops.object.join()
