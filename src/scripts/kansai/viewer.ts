@@ -10,6 +10,7 @@ import {architecturalModels} from './architecture';
 import {fireworks} from './fireworks';
 import {prefectureCutout} from './borders';
 import {primeTerrainPrograms} from './terrain-programs';
+import {loadBrdfTable} from './brdf-table';
 
 export async function startMap(root:HTMLElement){
   const en=root.lang==='en',status=root.querySelector<HTMLElement>('[role=status]')!;
@@ -24,6 +25,7 @@ export async function startMap(root:HTMLElement){
   const widget=new C.CesiumWidget(container,{baseLayer:new C.ImageryLayer(imagery),scene3DOnly:true,requestRenderMode:true,
     maximumRenderTimeChange:Infinity,shouldAnimate:false,showRenderLoopErrors:false});
   const scene=widget.scene,terrainPrograms=primeTerrainPrograms(scene.canvas);
+  void loadBrdfTable(widget);
   // The Expo archive captures the six surveyed ground sheets during the fair.
   void json<{bounds:[number,number,number,number];columns:number;rows:number;width:number;height:number;maximumLevel:number}>('expo-imagery/index.json')
     .then(photo=>{
