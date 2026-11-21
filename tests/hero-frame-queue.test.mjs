@@ -46,5 +46,5 @@ test('a late fence permits one spare frame and batched completions do not cause 
   assert.equal(queue.available(), true); queue.submitted();
   assert.deepEqual(freed, [1, 2]);
   clock = 188; assert.equal(queue.available(), false);
-  clock = 213; assert.equal(queue.available(), true);
+  clock = 196; assert.equal(queue.available(), true); // ready GPU at the next ordinary refresh
 });
