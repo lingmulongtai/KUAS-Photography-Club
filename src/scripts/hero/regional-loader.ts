@@ -31,16 +31,17 @@ export function regionInView(regions:readonly CityRegion[],eye:{x:number;z:numbe
   return nearest;
 }
 
-/** Serial loading bounds memory even when destinations change faster than downloads finish.
- * A stale result is released without constructing its city. Failed loads can be retried. */
+/** Keep the visible city during a serial download/build. Release it immediately before
+ * the new city installs its shared terrain textures. Failed loads can be retried. */
 export function createRegionalLoader<T extends {dispose():void}>(
   load:(region:CityRegion)=>Promise<T>,
-  activate:(region:CityRegion,data:T,current:()=>boolean)=> (()=>void) | Promise<()=>void>,
+  activate:(region:CityRegion,data:T,current:()=>boolean,releasePrevious:()=>void)=> (()=>void) | Promise<()=>void>,
   onError:(error:unknown)=>void,
 ) {
   let wanted:CityRegion|null=null;
   let active:{id:string;dispose():void}|null=null;
   let running:Promise<void>|null=null;
+  const releasePrevious=()=>{active?.dispose();active=null;};
   let revision=0,settledRevision=0;
   // One speculative dataset at most, and no parallel regional downloads/decodes.
   let downloading:Promise<unknown>=Promise.resolve();
@@ -58,8 +59,7 @@ export function createRegionalLoader<T extends {dispose():void}>(
     try {
     while(wanted?.id!==active?.id) {
       const next=wanted;
-      active?.dispose();active=null;
-      if(!next) return;
+      if(!next){releasePrevious();return;}
       let data:T;
       try {data=await take(next);} catch(error) {
         onError(error);
@@ -68,8 +68,9 @@ export function createRegionalLoader<T extends {dispose():void}>(
       }
       if(wanted?.id!==next.id){data.dispose();continue;}
       try {
-        const dispose=await activate(next,data,()=>wanted?.id===next.id);
+        const dispose=await activate(next,data,()=>wanted?.id===next.id,releasePrevious);
         if(wanted?.id!==next.id){dispose();continue;}
+        releasePrevious();
         active={id:next.id,dispose};
       } catch(error){data.dispose();if(wanted?.id!==next.id)continue;onError(error);return;}
     }

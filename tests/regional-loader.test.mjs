@@ -96,6 +96,28 @@ test('a request arriving between completion and cleanup is not lost',async()=>{
   assert.deepEqual(events,['a','b']);assert.equal(loader.id,'b');
 });
 
+test('the current streets survive failed downloads and stay visible until the replacement can mount',async()=>{
+  const started=deferred(),ready=deferred(),events=[];
+  const loader=createRegionalLoader(async r=>{
+    if(r.id==='offline')throw Error('offline');
+    return {dispose(){}};
+  },async(r,_data,_current,releasePrevious)=>{
+    if(r.id==='north'){started.resolve();await ready.promise;}
+    releasePrevious();
+    events.push('show '+r.id);
+    return ()=>events.push('hide '+r.id);
+  },e=>events.push(e.message));
+  await loader.request(region('south'));
+  await loader.request(region('offline'));
+  const next=loader.request(region('north'));
+  await started.promise;
+  assert.equal(loader.id,'south');
+  assert.deepEqual(events,['show south','offline']);
+  ready.resolve();await next;
+  assert.deepEqual(events,['show south','offline','hide south','show north']);
+  assert.equal(loader.id,'north');
+});
+
 
 test('view prefetch downloads once without activating or replacing the current region',async()=>{
   const loads=[],activated=[],released=[];
