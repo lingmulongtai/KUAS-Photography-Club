@@ -1,0 +1,45 @@
+{
+  "credit": "国土地理院 全国最新写真（シームレス）の一部を切り出して加工",
+  "terms": "https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html",
+  "tiles": [
+    "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/230056/103767.jpg",
+    "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/230056/103768.jpg",
+    "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/230056/103769.jpg",
+    "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/230057/103767.jpg",
+    "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/230057/103768.jpg",
+    "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/230057/103769.jpg"
+  ],
+  "tileZoom": 18,
+  "topLeftWorldPixel": [
+    58894352,
+    26564578
+  ],
+  "pixelReferenceOrigin": [
+    58894300,
+    26564490
+  ],
+  "designMaxHeightM": 15,
+  "designSource": "https://www.biwahaku.jp/publication/uploads/ee67251feda993ac6cbea40c6512d5b12c8450fc.pdf#page=243",
+  "skylight": [
+    [
+      135.934796333,
+      35.074310705
+    ],
+    [
+      135.934914351,
+      35.074301924
+    ],
+    [
+      135.934898257,
+      35.074136557
+    ],
+    [
+      135.93478024,
+      35.074145338
+    ],
+    [
+      135.934796333,
+      35.074310705
+    ]
+  ]
+}

@@ -30,6 +30,20 @@ test('Nara Park places four Kasuga sanctuaries and the open dance hall on their 
   }
 });
 
+test('Lake Biwa Museum keeps the design height, roof materials and the mapped atrium detail',()=>{
+  const model=json('landmarks/index.json').find(b=>b.id==='biwa-museum');
+  const outlines=json('landmarks/biwa-museum.geojson').features;
+  assert.equal(outlines[0].geometry.coordinates.length,5);
+  assert.deepEqual(model.rings,outlines.map(f=>f.geometry.coordinates[0]));
+  const bytes=readFileSync(new URL('landmarks/biwa-museum.glb',root));
+  const doc=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
+  const primitives=doc.meshes.flatMap(mesh=>mesh.primitives);
+  const heights=primitives.map(p=>doc.accessors[p.attributes.POSITION].max[1]);
+  assert.equal(Math.max(...heights),15);
+  assert.ok(primitives.some(p=>p.attributes.TEXCOORD_0!==undefined&&doc.materials[p.material].pbrMetallicRoughness.baseColorTexture));
+  assert.ok(doc.meshes.some(m=>m.name==='Mullions'));
+});
+
 test('Mizunomori preserves the six pavilion footprints and transparent planted atrium',()=>{
   const model=json('landmarks/index.json').find(b=>b.id==='lotus-pavilion');
   const outlines=json('landmarks/lotus-pavilion.geojson').features;

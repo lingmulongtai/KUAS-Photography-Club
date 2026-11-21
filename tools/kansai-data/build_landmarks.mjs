@@ -104,6 +104,9 @@ try{
   // build_osaka_keep.py retains the source ellipsoid height of the surveyed keep.
   manifest.push({id:'osaka-keep',pref:'27',lon:135.525856,lat:34.687373,ellipsoidHeight:68.477,
     file:'/kansai/landmarks/osaka-keep.glb',rings:[rect(135.525608,34.687154,135.526093,34.687592)]});
+  const biwa=JSON.parse(await fs.readFile(new URL('biwa-museum.geojson',output)));
+  manifest.push({id:'biwa-museum',pref:'25',lon:135.9351978,lat:35.074304,file:'/kansai/landmarks/biwa-museum.glb',
+    rings:biwa.features.map(feature=>feature.geometry.coordinates[0])});
   const lotus=JSON.parse(await fs.readFile(new URL('lotus-pavilion.geojson',output)));
   manifest.push({id:'lotus-pavilion',pref:'25',lon:135.9404719,lat:35.0736969,file:'/kansai/landmarks/lotus-pavilion.glb',
     rings:lotus.features.map(feature=>feature.geometry.coordinates[0])});
