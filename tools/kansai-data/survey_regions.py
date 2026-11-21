@@ -24,6 +24,8 @@ def write_regions():
             bounds = child['boundingVolume']['region'][:4]
             region = {key: layer[key] for key in ('kind', 'lod', 'pref')}
             region.update(url=url, bounds=[round(degrees(v), 8) for v in bounds])
+            if '/27999_osaka-shi_city_2025_' in url:
+                region['preparedUrl'] = '/kansai/expo-models/'+layer['kind']+'/tileset.json'
             prefix, asset, _ = url.split('/assets/')[-1].split('/', 2)
             regions[prefix+'/'+asset] = region
     for lower, upper in SUPERSEDED.items():

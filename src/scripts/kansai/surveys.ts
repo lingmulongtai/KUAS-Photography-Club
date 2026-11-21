@@ -5,7 +5,7 @@ import {inBox} from './coordinates';
 import type {Architecture} from './architecture';
 import {surveyMaterial} from './survey-material';
 
-type SurveyLayer={kind:string;lod:number;pref:string;url:string;bounds:Box};
+type SurveyLayer={kind:string;lod:number;pref:string;url:string;preparedUrl?:string;bounds:Box};
 type RecordBox={box:Box;point:Point;id:number;shown:boolean};
 const cell=(x:number,y:number)=>x*100000+y;
 
@@ -71,16 +71,17 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
   async function load(layer:SurveyLayer){
     pending.add(layer);
     try {
-      const tiles=await C.Cesium3DTileset.fromUrl(layer.url,{
-        maximumScreenSpaceError:4,enableCollision:false,cacheBytes:24*1024*1024,maximumCacheOverflowBytes:24*1024*1024,
-      });
+      const options={maximumScreenSpaceError:4,enableCollision:false,cacheBytes:24*1024*1024,maximumCacheOverflowBytes:24*1024*1024};
+      const prepared=layer.preparedUrl&&C.FeatureDetection.supportsBasis(scene);
+      const tiles=prepared?await C.Cesium3DTileset.fromUrl(layer.preparedUrl!,options)
+        .catch(()=>C.Cesium3DTileset.fromUrl(layer.url,options)):await C.Cesium3DTileset.fromUrl(layer.url,options);
       if(!alive||widget.isDestroyed()||!wanted.has(layer)) {tiles.destroy();return;}
       if(layer.kind==='bldg'||layer.kind==='brid')tiles.customShader=layer.kind==='bldg'?material.shader:material.detailed;
       if(layer.kind==='bldg'){
         tiles.tileVisible.addEventListener((tile:Cesium3DTile)=>{
           if(!tile.content.ready)return;
           // The Expo archive depicts the fair itself; municipal shells can predate construction.
-          const archived=tile.content.url?.includes('/27999_osaka-shi_city_2025_');
+          const archived=layer.url.includes('/27999_osaka-shi_city_2025_');
           visible.set(tile.content,archived?4:layer.lod);
         });
         tiles.tileUnload.addEventListener((tile:Cesium3DTile)=>visible.delete(tile.content));
