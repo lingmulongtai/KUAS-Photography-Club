@@ -10,6 +10,7 @@ export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited
   update:(count:number)=>void){
   const queue=tileQueue();
   const scene=widget.scene,resident=new Map<string,Awaited<ReturnType<typeof buildTile>>>(),pending=new Set<string>();
+  const prepared=new Map<string,Awaited<ReturnType<typeof buildTile>>>();
   let wanted=new Map<string,Point>(),alive=true,previous='',timer=0,readyCount=-1;
   const retry=new Map<string,number>();
   let nextPlan=0,maskStart=0;
@@ -47,26 +48,39 @@ export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited
     }
     retry.clear();pump();
   }
+  function schedule(){
+    if(!alive||timer)return;
+    timer=window.setTimeout(()=>{timer=0;pump();},35);
+  }
   function pump(){
     if(!alive)return;
     for(const [key,p] of wanted){
-      if(pending.size>=3)break;
-      if(resident.has(key)||pending.has(key)||(retry.get(key)??0)>Date.now())continue;
+      if(pending.size+prepared.size>=3)break;
+      if(resident.has(key)||prepared.has(key)||pending.has(key)||(retry.get(key)??0)>Date.now())continue;
       pending.add(key);
       void buildTile(widget,queue,...p).then(tile=>{
         if(!alive||!wanted.has(key)){tile.releaseMaterial();tile.primitive?.destroy();return;}
-        if(tile.primitive)scene.primitives.add(tile.primitive);resident.set(key,tile);
+        prepared.set(key,tile);
         scene.requestRender();
       }).catch(error=>{
         if(!retry.has(key))console.warn('Regional model tile',key,error);
         retry.set(key,Date.now()+20000);
-      }).finally(()=>{pending.delete(key);if(alive)timer=window.setTimeout(pump,35);});
+      }).finally(()=>{pending.delete(key);schedule();});
     }
   }
   const stop=scene.postRender.addEventListener(()=>{
     const now=performance.now();
     if(now>=nextPlan){
       nextPlan=now+100;plan();
+    }
+    // Submit at most one new vertex buffer between frames as neighboring jobs finish together.
+    for(const [key,tile] of prepared){
+      prepared.delete(key);schedule();
+      if(!wanted.has(key)){tile.releaseMaterial();tile.primitive?.destroy();continue;}
+      if(tile.primitive)scene.primitives.add(tile.primitive);
+      resident.set(key,tile);
+      scene.requestRender();
+      break;
     }
     const until=performance.now()+2,tiles=Array.from(resident.values());
     for(let i=0;i<tiles.length;i++){
@@ -78,5 +92,6 @@ export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited
   });
   const poll=window.setInterval(()=>{plan();pump();},3000);
   return ()=>{alive=false;stop();queue.dispose();clearInterval(poll);clearTimeout(timer);distant.dispose();surveys.dispose();
+    for(const tile of prepared.values()){tile.releaseMaterial();tile.primitive?.destroy();}prepared.clear();
     for(const tile of resident.values())tile.releaseMaterial();resident.clear();};
 }
