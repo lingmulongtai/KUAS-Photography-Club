@@ -7,7 +7,7 @@ const outer=new Float32Array([0,0,80,0,80,36,0,36]);
 const hole=new Float32Array([30,10,30,26,50,26,50,10]);
 const ground = (x,z) => .07*x+.015*z;
 const vertices = geometry => Array.from({length:geometry.positions.length/3},(_,i)=>({
-  x:geometry.positions[i*3],y:geometry.positions[i*3+1],z:geometry.positions[i*3+2],kind:geometry.surface[i*3]
+  x:geometry.positions[i*3],y:geometry.positions[i*3+1],z:geometry.positions[i*3+2],kind:geometry.surface[i*4]
 }));
 
 test('the beds and raised paddy bund follow the local elevation', () => {
@@ -35,6 +35,15 @@ test('nearby furrows stop at the headlands and on each side of an interior hole'
     const x=tri.reduce((s,p)=>s+p.x,0)/3, z=tri.reduce((s,p)=>s+p.z,0)/3;
     assert.ok(!(x>30 && x<50 && z>10.7 && z<25.3),'row crossed a hole');
   }
+});
+
+test('close rice plants have a raised crest and an along-row coordinate for individual clumps',()=>{
+  const data=new GroundGeometry();
+  addField(data,{kind:PADDY,paths:[outer,hole]},ground,true);
+  const points=vertices(data);
+  assert.ok(points.length>0 && points.every(p=>p.kind===SURFACE.rice));
+  assert.ok(points.some(p=>Math.abs(p.y-ground(p.x,p.z)-.53)<1e-6));
+  assert.ok(new Set(data.surface.filter((_,i)=>i%4===3)).size>5);
 });
 
 test('stepped shores face land and cover the same cross-section at a map subdivision', () => {

@@ -18,19 +18,22 @@ function groundMaterial(env: Env, roads: RoadUniforms) {
     side: THREE.DoubleSide, transparent: true, forceSinglePass: true,
     polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
     vertexShader: /* glsl */ `
-      attribute vec3 aSurface;
-      varying vec3 vSurface;
+      attribute vec4 aSurface;
+      uniform float uSpring;
+      uniform float uSnow;
+      varying vec4 vSurface;
       varying vec3 vWorld;
       void main(){
         vWorld = position;
         vSurface = aSurface;
-        gl_Position = projectionMatrix * viewMatrix * vec4(position,1.);
+        if(aSurface.x>6.5)vWorld.y-=.28*max(uSpring,uSnow);
+        gl_Position = projectionMatrix * viewMatrix * vec4(vWorld,1.);
       }`,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
       ${SHADOW_GLSL}
       ${ROAD_GLSL}
-      varying vec3 vSurface;
+      varying vec4 vSurface;
       varying vec3 vWorld;
       void main(){
         vec2 p=vWorld.xz;
@@ -42,9 +45,17 @@ function groundMaterial(env: Env, roads: RoadUniforms) {
         float coverage=smoothstep(.12,.9,min(rd.edge,rd.rail));
         float farFade=1.-smoothstep(960.,1320.,dist);
         float ridgeFade=1.-smoothstep(225.,360.,dist);
-        float alpha=coverage*(kind==4.?ridgeFade:farFade);
+        bool row=kind>3.5 && kind<4.5;
+        float alpha=coverage*((row||kind>6.5)?ridgeFade:farFade);
         float fp=max(length(dFdx(p)),length(dFdy(p)));
         float line=cos(6.2831853*across/3.15)*(1.-smoothstep(.65,2.,fwidth(across)));
+        float rowGap=abs(fract(across/2.45+.5)-.5)*2.45;
+        float aa=max(.025,fwidth(across)*.65);
+        float plants=1.-smoothstep(.28-aa,.45+aa,rowGap);
+        float along=vSurface.w;
+        float alongAA=max(.025,fwidth(along)*.65);
+        float clump=1.-smoothstep(.61-alongAA,.76+alongAA,abs(fract(along/1.8+seed)-.5)*1.8);
+        if(kind>6.5)alpha*=mix(.76,clump,1.-smoothstep(.3,1.,fp))*(1.-uSnow*.97);
         if(alpha<.005)discard;
         float grain=mix(.5,vnoise((floor(p/1.3)+.5)*.67),1.-smoothstep(.5,2.,fp));
         float soilTone=vnoise(p*.047);
@@ -55,7 +66,8 @@ function groundMaterial(env: Env, roads: RoadUniforms) {
           vec3 wet=mix(vec3(.11,.135,.093),vec3(.18,.205,.164),seed);
           col=mix(leaves,wet,uSpring*.82);
           col=mix(col,vec3(.176,.134,.082),uSnow*.72);
-          col*=.96+.10*line+.08*(soilTone-.5);
+          float stripe=mix(.37,plants,1.-smoothstep(.38,1.35,fp));
+          col*=.89+.16*stripe+.07*(soilTone-.5);
         }else if(kind<2.5){
           col=mix(vec3(.134,.086,.052),vec3(.244,.174,.093),seed)*(.91+.10*line+.13*soilTone);
         }else if(kind<3.5){
@@ -64,8 +76,12 @@ function groundMaterial(env: Env, roads: RoadUniforms) {
           col=mix(vec3(.167,.105,.059),vec3(.26,.18,.096),seed)*(.85+.18*grain+.10*soilTone);
         }else if(kind<5.5){
           col=mix(vec3(.122,.122,.103),vec3(.29,.256,.181),.44*grain+.56*soilTone);
-        }else{
+        }else if(kind<6.5){
           col=mix(vec3(.161,.175,.091),vec3(.278,.256,.151),soilTone)*(.9+.18*grain);
+        }else{
+          col=mix(vec3(.135,.215,.052),vec3(.224,.297,.077),seed);
+          col=mix(col,vec3(.319,.243,.070),uAutumn);
+          col*=.89+.19*grain;
         }
         col*=.76+.24*max(n.y,0.);
         vec3 lit=shade(seasonalSurface(col,n,vWorld),n,vWorld,shadow);

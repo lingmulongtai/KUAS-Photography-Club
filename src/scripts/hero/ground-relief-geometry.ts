@@ -4,7 +4,7 @@ import { FIELD, PADDY, type GroundFeature } from './ground-relief-data.ts';
 type Point = { x: number; z: number };
 type Section = readonly [offset: number, height: number];
 export type Elevation = (x: number, z: number) => number;
-export const SURFACE = { paddy: 1, field: 2, bund: 3, ridge: 4, gravel: 5, grassBank: 6 } as const;
+export const SURFACE = { paddy: 1, field: 2, bund: 3, ridge: 4, gravel: 5, grassBank: 6, rice: 7 } as const;
 
 /** Adjacent faces share positions; the material derives a flat normal for each face. */
 export class GroundGeometry {
@@ -12,10 +12,10 @@ export class GroundGeometry {
   surface: number[] = [];
   indices: number[] = [];
 
-  vertex(x: number, y: number, z: number, kind: number, seed: number, across = 0) {
+  vertex(x: number, y: number, z: number, kind: number, seed: number, across = 0, along = 0) {
     const id = this.positions.length / 3;
     this.positions.push(x, y, z);
-    this.surface.push(kind, seed, across);
+    this.surface.push(kind, seed, across, along);
     return id;
   }
 
@@ -23,7 +23,7 @@ export class GroundGeometry {
     if (!this.indices.length) return null;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.positions, 3));
-    geometry.setAttribute('aSurface', new THREE.Float32BufferAttribute(this.surface, 3));
+    geometry.setAttribute('aSurface', new THREE.Float32BufferAttribute(this.surface, 4));
     geometry.setIndex(this.indices);
     geometry.computeBoundingSphere();
     return geometry;
@@ -44,7 +44,7 @@ function right(a: Point, b: Point) {
 /** Sweep a stepped cross-section along the map line. Insert ground samples on
  * long edges so the sides stay embedded as the DEM rises or falls. */
 export function groundRibbon(out: GroundGeometry, path: Point[], closed: boolean, profile: readonly Section[],
-  elevation: Elevation, kind: number, seed: number) {
+  elevation: Elevation, kind: number, seed: number, rowAxis?: Point) {
   const count = path.length;
   if (count < 2) return;
   const directions = path.map((p,i) => right(p, path[(i+1)%count]));
@@ -60,7 +60,8 @@ export function groundRibbon(out: GroundGeometry, path: Point[], closed: boolean
     const first = out.positions.length/3;
     for (const [offset, height] of profile) {
       const px = x+offset*nx, pz = z+offset*nz;
-      out.vertex(px, elevation(px,pz)+height, pz, kind, seed);
+      const along=rowAxis?px*rowAxis.x+pz*rowAxis.z:0;
+      out.vertex(px, elevation(px,pz)+height, pz, kind, seed,0,along);
     }
     if (previous >= 0) for (let j = 1; j < profile.length; j++) {
       const a = previous+j-1, b = first+j-1;
@@ -114,18 +115,20 @@ function fieldRows(rings: Point[][], axis: Point, spacing: number, add: (a: Poin
 
 const bund: Section[] = [[-.75,.13],[-.5,.72],[.42,.72],[.72,.08]];
 const furrow: Section[] = [[-.64,.21],[-.38,.62],[.35,.62],[.64,.21]];
+const rice: Section[] = [[-.46,.18],[-.37,.53],[.37,.53],[.46,.18]];
 
 export function addField(out: GroundGeometry, feature: GroundFeature, ground: Elevation, detail: boolean) {
   const rings = feature.paths.map(pathPoints), outer = rings[0], axis = longAxis(outer);
   const noise = Math.sin(outer[0].x*.61+outer[0].z*.37)*43758.5453;
   const seed = noise-Math.floor(noise), paddy = feature.kind === PADDY;
   if (detail) {
-    if (feature.kind === FIELD) fieldRows(rings,axis,3.15,(a,b) => groundRibbon(out,[a,b],false,furrow,ground,SURFACE.ridge,seed));
+    if (paddy) fieldRows(rings,axis,2.45,(a,b) => groundRibbon(out,[a,b],false,rice,ground,SURFACE.rice,seed,axis));
+    else if (feature.kind === FIELD) fieldRows(rings,axis,3.15,(a,b) => groundRibbon(out,[a,b],false,furrow,ground,SURFACE.ridge,seed));
     return;
   }
   const style = paddy ? SURFACE.paddy : SURFACE.field;
   const height = paddy ? .19 : .24;
-  const vertex = (p: Point) => out.vertex(p.x, ground(p.x,p.z)+height, p.z, style, seed, -p.x*axis.z+p.z*axis.x);
+  const vertex = (p: Point) => out.vertex(p.x, ground(p.x,p.z)+height, p.z, style, seed, -p.x*axis.z+p.z*axis.x,p.x*axis.x+p.z*axis.z);
   const points = rings.flat(), ids = points.map(vertex);
   const projected = rings.map(ring => ring.map(p => new THREE.Vector2(p.x,p.z)));
   const triangles = THREE.ShapeUtils.triangulateShape(projected[0],projected.slice(1));
