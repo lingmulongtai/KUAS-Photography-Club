@@ -93,7 +93,7 @@ interface Placed {
   rotY?: number;
 }
 
-const LANDMARKS: Record<string, Placed> = {
+export const LANDMARKS: Record<string, Placed> = {
   kyotoTower: { parts: kyotoTower(), ...KYOTO_TOWER_LOCATION },
   kyotoStation:{parts:kyotoStation(),...STATION_CENTER},
   toji: { parts: pagoda(5, 9.5, 6.6, 54.8, 12, WOOD, ROOF), x: -984, z: 2632 },
