@@ -7,7 +7,7 @@ import {SHADOW_LAYER} from './shadow';
 
 /** Bounded route groups, one static track draw and one instanced vehicle draw.
  * Vehicle speeds, station shelters and vertical alignment are illustrative. */
-export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:RailwayRoute[]){
+export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:RailwayRoute[],katsuraModeled=false){
   const group=new THREE.Group();group.name='kyoto-railways';
   const positions:number[]=[],sides:number[]=[],along:number[]=[],trackCounts:number[]=[];
   const structures=new CampusBuilder(0,{x:0,z:0},0);
@@ -32,6 +32,7 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
       }
     }
     for(const station of route.stations){
+      if(katsuraModeled&&station.code==='40208000759')continue;
       const p=path.at(station.distance),short=route.id.startsWith('randen'),len=short?18:82;
       if(!p.visible)continue;
       for(const side of [-1,1]){
