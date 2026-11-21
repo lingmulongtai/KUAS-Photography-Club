@@ -29,11 +29,10 @@ const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
 const INARI_EAST = toLocal(34.96358,135.79023); // Aerial view from the Yamashina side of Mt. Inari.
 const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
-const ATAGO = toLocal(35.0600453, 135.6342851); // 愛宕山（地図の地点と共通）
+const ATAGO_RIDGE = toLocal(35.052699, 135.655073); // On the eastern flank, above the Katsura valley.
 const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
 const KIRI_TERRACE=toLocal(34.9926914,135.5615125); // OSM viewpoint node/6855829264
-// Kyoto Tourism Federation: https://www.kyoto-kankou.or.jp/info_search/9746
-const CONFLUENCE=toLocal(34.886,135.684); // Over the mapped river southeast of Mt. Tennozan.
+const CONFLUENCE=toLocal(34.873831,135.676099); // Look upstream over the three rivers towards Kyoto.
 
 /** Frame the named structure or area using the same centre as its map pin. */
 function spotOrbit(id: SpotId, distance: number, above: number, bearing: number, targetHeight: number): ViewDef {
@@ -56,7 +55,7 @@ export const VIEWS = {
   /** An exterior composition: the whole tower against the northern city and mountains. */
   tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 260), ref: TOWER, above: 112, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
   arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 105, bearing: 100, pitch: -7 },
-  atago: { ja: '愛宕山', en: 'Mt. Atago', eye: ahead(ATAGO, 130, 60), ref: ATAGO, above: 75, bearing: 130, pitch: -7 },
+  atago: { ja: '愛宕山', en: 'Mt. Atago', eye: ATAGO_RIDGE, ref: ATAGO_RIDGE, above: 542, bearing: 127.05, pitch: -5.36 },
   kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
   station: spotOrbit('station',520,280,0,25),
   toji: spotOrbit('toji',300,180,180,22),
@@ -74,7 +73,7 @@ export const VIEWS = {
   togetsukyo: spotOrbit('arashiyama',330,160,180,8),
   kameoka:spotOrbit('kameoka',820,540,240,15),
   kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:ahead(KIRI_TERRACE,180,480),ref:KIRI_TERRACE,above:84,bearing:325,pitch:-9},
-  tennozan:{ja:'天王山',en:'Mt. Tennozan',eye:CONFLUENCE,ref:CONFLUENCE,above:335,bearing:29,pitch:-6},
+  tennozan:{ja:'天王山',en:'Mt. Tennozan',eye:CONFLUENCE,ref:CONFLUENCE,above:894,bearing:22.14,pitch:-8.34},
   sonobe:spotOrbit('sonobe',1100,650,180,8),
   yamashina:spotOrbit('yamashina',1000,650,180,8),
   fushimi:spotOrbit('fushimi',1100,650,180,8),
@@ -89,12 +88,13 @@ export const PANORAMA_VIEWS = ['shogunzuka','inariRidge','daimonji','arashiyama'
 export type PanoramaView = (typeof PANORAMA_VIEWS)[number];
 const CLOUD_CLEARANCE=80;
 
-/** Move down the sightline to the firebed pin when a low cloud deck covers the usual eye. */
+/** Lower aerial views under a low deck. At Daimonji, keep the firebed in the same part of the frame. */
 export function viewBelowClouds(id:HeroView, ground:number, cloudBase:number):ViewDef {
   const view=VIEWS[id];
-  if(id!=='daimonji')return view;
   const above=cloudBase-CLOUD_CLEARANCE-ground;
   if(above>=view.above)return view;
+  if(id==='atago'||id==='tennozan')return above>=CLOUD_CLEARANCE ? {...view,above} : view;
+  if(id!=='daimonji')return view;
   const pinHeight=SPOTS.find(spot=>spot.id==='daimonji')!.above;
   if(above<=pinHeight)return view;
   const scale=(above-pinHeight)/(view.above-pinHeight);

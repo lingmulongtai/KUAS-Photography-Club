@@ -775,7 +775,7 @@ export function createHero(
     const weights=seasonWeights(season,jstParts(date).month);
     const previousBase=clouds.weather.base;
     clouds.setClimate(climateOf(season,jstParts(date).month));
-    const adjustedView=view==='daimonji' && previousBase!==clouds.weather.base ? currentView(view) : VIEW;
+    const adjustedView=previousBase!==clouds.weather.base ? currentView(view) : VIEW;
     if(adjustedView.above!==VIEW.above){
       VIEW=adjustedView;
       eye.copy(eyeOf(VIEW));
