@@ -236,10 +236,14 @@ export function createForest(
     }
     const { pos, size, tint, kind, lods, shapes,season } = yield* trees(eye);
     const chunks = new Map<string, number[]>();
+    // Small near tiles cull whole high-detail crowns behind the eye. Sparse outer
+    // trees can share larger draws without changing their shapes or positions.
+    const tileWidth = [96, 384, 1536, 3072];
     for(let i=0;i<kind.length;i++) {
       if(i && i%2048===0) yield;
       const k=kind[i];
-      const key = `${Math.floor(pos[i * 3] / 768)},${Math.floor(pos[i * 3 + 2] / 768)},${k},${lods[i]}`;
+      const width = tileWidth[lods[i]];
+      const key = `${Math.floor(pos[i * 3] / width)},${Math.floor(pos[i * 3 + 2] / width)},${k},${lods[i]}`;
       if (!chunks.has(key)) chunks.set(key, []);
       chunks.get(key)!.push(i);
     }
