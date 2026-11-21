@@ -33,8 +33,7 @@ export function buildSkyDome(env: Env) {
       varying vec3 vDir;
       void main(){
         vec3 dir = normalize(vDir);
-        vec3 c = skyColor(dir);
-        if (dir.y < 0.) c = mix(c, uHorizon * .35, smoothstep(0., -.08, dir.y));
+        vec3 c = skyBackground(dir);
 
         // sun disc
         float cosA = dot(dir, uSunDir);

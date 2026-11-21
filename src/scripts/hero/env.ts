@@ -132,6 +132,11 @@ vec3 skyColor(vec3 dir){
   return c;
 }
 
+/* Background behind the last surveyed ridge, also visible when looking down from altitude. */
+vec3 skyBackground(vec3 dir){
+  return mix(skyColor(dir), uHorizon * .35, smoothstep(0., .08, -dir.y));
+}
+
 /* Colour of the haze seen in a direction: the horizon sky, brighter toward the sun. */
 vec3 hazeColor(vec3 dir){
   vec3 d = normalize(vec3(dir.x, max(dir.y, 0.) * .5 + .02, dir.z));

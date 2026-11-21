@@ -46,8 +46,8 @@ const v4 = (b: Box) => new THREE.Vector4(b[0], b[1], b[2], b[3]);
 
 /**
  * The whole basin on a warped grid: vertices pack tightly around the viewpoint
- * and spread out toward the far mountains. Beyond the data the last ring is pulled out 20 km
- * so the edge never shows against the sky. recenter() moves the dense part to a new viewpoint.
+ * and spread out toward the far mountains. The last row follows the surveyed boundary.
+ * recenter() moves the dense part to a new viewpoint.
  */
 export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: number }, tex: TerrainTextures, segments = 640) {
   let channel:KamoChannel|undefined;
@@ -58,6 +58,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   const sheets=tex.sheets??[{id:"city",box:tex.aerialCityBox,uv:[0,0,1,1] as Box}];
   const uniforms = {
     ...env,
+    uTerrainBounds: { value: v4(hf.bounds) },
     uAerialWide: { value: tex.aerialWide },
     uAerialWideBox: { value: v4(tex.aerialWideBox) },
     uAerialCity: { value: tex.aerialCity ?? tex.aerialWide },
@@ -109,6 +110,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
       ${SHADOW_GLSL}
+      uniform vec4 uTerrainBounds;
       uniform sampler2D uAerialWide;
       uniform vec4 uAerialWideBox;
       uniform sampler2D uAerialCity;
@@ -389,7 +391,15 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         // Discard after screen derivatives and shadows, so shoreline pixels keep
         // valid derivatives. Physical bridge decks cover the river independently.
         if(river.r>.5)discard;
-        gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
+        vec3 ground = applyHaze(col, emit, vWorld);
+        float inset = boxInset(uTerrainBounds, p);
+        // Soften the map boundary in the distance. Keep the ground under a
+        // nearby explorer detailed even at the travel limit.
+        float edgeWidth = clamp(dist * .08, 40., 1500.);
+        if (inset < edgeWidth) {
+          ground = mix(skyBackground(normalize(vWorld - cameraPosition)), ground, smoothstep(0., edgeWidth, inset));
+        }
+        gl_FragColor = vec4(ground, 1.);
       }
     `,
   });
