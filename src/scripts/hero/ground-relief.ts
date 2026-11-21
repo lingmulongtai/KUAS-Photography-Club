@@ -146,7 +146,8 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     const mesh=geometry ? new THREE.Mesh(geometry,material) : null;
     if(mesh) {
       mesh.name=cell.detail?'field-furrows':'fields-and-riverbanks';
-      mesh.renderOrder=cell.detail?2:1;
+      // Ground writes depth before additive lights and falling snow are blended.
+      mesh.renderOrder=cell.detail?-1:-2;
       group.add(mesh);
     }
     visible.set(cell.key,mesh);
