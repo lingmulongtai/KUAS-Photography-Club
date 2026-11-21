@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createRegionalLoader,regionAt} from '../src/scripts/hero/regional-loader.ts';
+import {createRegionalLoader,regionAt,regionInView} from '../src/scripts/hero/regional-loader.ts';
 
 const region=(id,box=[0,0,10,10])=>({id,box});
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
@@ -42,6 +42,25 @@ test('regional boundaries do not double-select adjoining datasets',()=>{
   const a=region('a'),b=region('b',[10,0,20,10]);
   assert.equal(regionAt([a,b],{x:10,z:5}),b);
   assert.equal(regionAt([a,b],{x:20,z:5}),null);
+});
+
+test('free exploration keeps Fushimi detailed on both sides of the Takeda boundary',()=>{
+  const south=region('south',[-9000,6200,4600,19000]);
+  const regions=[south];
+  for(const z of [5294,5650,6199,6200,6394]){
+    for(const bearing of [0,90,180,270])assert.equal(regionInView(regions,{x:187,z},bearing),south);
+  }
+  // From farther away a turn toward the station must work without moving the camera.
+  const eye={x:187,z:3500};
+  assert.equal(regionInView(regions,eye,0),null);
+  assert.equal(regionInView(regions,eye,180),south);
+  assert.equal(regionInView(regions,{x:2430,z:161},205),null,'the distant Shogunzuka panorama stays lightweight');
+});
+
+test('entering a region preserves manifest priority even when the camera faces another sheet',()=>{
+  const uji=region('uji',[0,10000,11000,19000]);
+  const south=region('south',[-9000,6200,4600,19000]);
+  assert.equal(regionInView([uji,south],{x:60,z:10100},10),uji);
 });
 
 test('a region superseded during asynchronous activation is disposed before the next one',async()=>{

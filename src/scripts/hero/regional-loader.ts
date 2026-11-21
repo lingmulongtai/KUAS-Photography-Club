@@ -13,6 +13,24 @@ export function regionAt(regions:readonly CityRegion[],p:{x:number;z:number}) {
   return regions.find(r=>p.x>=r.box[0]&&p.x<r.box[2]&&p.z>=r.box[1]&&p.z<r.box[3])??null;
 }
 
+/** Include the streets around the explorer and those visible ahead across a sheet boundary. */
+export function regionInView(regions:readonly CityRegion[],eye:{x:number;z:number},bearing:number) {
+  const inside=regionAt(regions,eye);
+  if(inside)return inside;
+  const yaw=bearing*Math.PI/180;
+  const aheadX=eye.x+1700*Math.sin(yaw),aheadZ=eye.z-1700*Math.cos(yaw);
+  const distance=(x:number,z:number,[west,north,east,south]:Box)=>
+    Math.hypot(Math.max(west-x,0,x-east),Math.max(north-z,0,z-south));
+  let nearest:CityRegion|null=null,best=Infinity;
+  for(const region of regions){
+    const around=distance(eye.x,eye.z,region.box),ahead=distance(aheadX,aheadZ,region.box);
+    if(around>1200 && ahead>1450)continue;
+    const score=around+ahead*.5;
+    if(score<best){nearest=region;best=score;}
+  }
+  return nearest;
+}
+
 /** Serial loading bounds memory even when destinations change faster than downloads finish.
  * A stale result is released without constructing its city. Failed loads can be retried. */
 export function createRegionalLoader<T extends {dispose():void}>(
