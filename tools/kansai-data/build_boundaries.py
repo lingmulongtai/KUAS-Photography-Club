@@ -1,0 +1,39 @@
+"""Build the five prefecture outlines from MLIT N03 municipal polygons (2026-01-01).
+Requires shapely. Coordinates are WGS84-compatible JGD2011 longitude / latitude.
+"""
+import io
+import json
+import zipfile
+from pathlib import Path
+from urllib.request import urlopen
+
+from shapely import make_valid, union_all
+from shapely.geometry import MultiPolygon, mapping, shape
+from shapely.geometry.polygon import orient
+
+OUT = Path(__file__).resolve().parents[2] / "public/kansai"
+SOURCE = "https://nlftp.mlit.go.jp/ksj/gml/data/N03/N03-2026/"
+
+
+def main():
+    features = []
+    for code in ("25", "26", "27", "28", "29"):
+        name = f"N03-20260101_{code}_GML.zip"
+        with urlopen(SOURCE + name, timeout=90) as response:
+            archive = zipfile.ZipFile(io.BytesIO(response.read()))
+        geojson, = [p for p in archive.namelist() if p.lower().endswith(".geojson")]
+        rows = json.loads(archive.read(geojson))["features"]
+        # Union before simplification, to avoid gaps at former municipal boundaries.
+        boundary = union_all([make_valid(shape(row["geometry"])) for row in rows])
+        boundary = boundary.simplify(.00004, preserve_topology=True)
+        parts = boundary.geoms if hasattr(boundary, "geoms") else [boundary]
+        polygon = MultiPolygon([orient(p, sign=1) for p in parts if p.geom_type == "Polygon"])
+        features.append({"type": "Feature", "properties": {"code": code, "name": rows[0]["properties"]["N03_001"]},
+                         "bbox": list(polygon.bounds), "geometry": mapping(polygon)})
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "prefectures.json").write_text(json.dumps({"type": "FeatureCollection", "features": features},
+                ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()
