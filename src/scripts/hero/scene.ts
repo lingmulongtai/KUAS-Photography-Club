@@ -831,13 +831,13 @@ export function createHero(
     env.uSpring.value=weights.spring;env.uAutumn.value=weights.autumn;env.uSnow.value=weights.snow;
     snow.points.visible=weights.snow>0;
     env.uSunDir.value.set(...directionFrom(sun));
-    shadow.update(env.uSunDir.value);
     env.uZenith.value.copy(look.zenith);
     env.uMid.value.copy(look.mid);
     env.uHorizon.value.copy(look.horizon);
     env.uGlow.value.copy(look.glow).multiplyScalar(look.glowAmt);
-    const sunVisible = THREE.MathUtils.smoothstep(alt, -1.2, 1.2);
-    env.uSunLight.value.copy(look.sun).multiplyScalar(look.sunAmt * sunVisible);
+    const directSun = look.sunAmt * THREE.MathUtils.smoothstep(alt, -1.2, 1.2);
+    env.uSunLight.value.copy(look.sun).multiplyScalar(directSun);
+    shadow.update(env.uSunDir.value, directSun);
     env.uCloudLight.value.copy(look.cloud).multiplyScalar(look.cloudAmt);
     env.uCity.value = look.city;
     env.uLit.value = windowsLit(minutes);
