@@ -11,7 +11,7 @@ new Function('require','module','exports',compiled)(id=>id==='three'?THREE:requi
 const {createForest}=module.exports;
 
 test('off-spot planting follows local tree cover even without a photograph and keeps infrastructure open',()=>{
-  const hf={height:()=>120}, eye={x:-26062,z:-7145};
+  const hf={height:()=>120,bounds:[-26500,-7600,-25600,-6700]}, eye={x:-26062,z:-7145};
   const cover=(x,z)=>Math.abs(x-eye.x)<350 && Math.abs(z-eye.z)<350 ? (x<eye.x?1:.25) : 0;
   const forest=createForest({},hf,1,[],cover,(_x,z)=>Math.abs(z-eye.z)<10);
   forest.plant(eye,0);
@@ -31,7 +31,7 @@ test('incremental forest matches synchronous trees and leaves the old forest vis
   const original=globalThis.document;
   globalThis.document={createElement:()=>({width:0,height:0,getContext(){return {drawImage(){},getImageData:()=>({data:new Uint8ClampedArray(32*32*4).map((_,i)=>[34,85,30,255][i%4])})};}})};
   try {
-    const hf={height:(x,z)=>x*.001+z*.002,normal:(_x,_z,_s,out)=>Object.assign(out,{x:0,y:1,z:0})};
+    const hf={bounds:[-12000,-12000,12000,12000],height:(x,z)=>x*.001+z*.002,normal:(_x,_z,_s,out)=>Object.assign(out,{x:0,y:1,z:0})};
     const make=()=>createForest({},hf,.55,[{photo:{width:32,height:32},box:[-20000,-20000,20000,20000]}],()=>1);
     const sync=make(),asyncForest=make(),first={x:0,z:0},next={x:800,z:200};
     sync.plant(next,0);asyncForest.plant(first,0);
