@@ -6,7 +6,7 @@ export const OUTINGS = [
   {id:'botanical', pref:'26', ja:'京都府立植物園', en:'Kyoto Botanical Gardens', lon:135.7635, lat:35.0492, range:1250, heading:20},
   {id:'senrigawa', pref:'27', ja:'千里川土手', en:'Senrigawa River embankment', lon:135.453304, lat:34.771224, range:900, heading:322},
   {id:'miyagahama', pref:'25', ja:'休暇村近江八幡BBQ', en:'Kyukamura Ohmi-Hachiman BBQ', lon:136.080608, lat:35.187032, range:880, heading:345},
-  {id:'setagawa', pref:'25', ja:'瀬田川花火大会（瀬田の唐橋周辺）', en:'Setagawa fireworks (Seta-no-Karahashi area)', lon:135.906341, lat:34.973043, range:1450, heading:350},
+  {id:'setagawa', pref:'25', ja:'瀬田川花火大会（瀬田の唐橋周辺）', en:'Setagawa fireworks (Seta-no-Karahashi area)', lon:135.906341, lat:34.973043, targetHeight:61, pitch:-7, range:930, heading:350},
   {id:'kifune', pref:'26', ja:'貴船・鞍馬 ― 貴船', en:'Kifune & Kurama — Kifune', lon:135.7629, lat:35.12176, range:1100, heading:5},
   {id:'kurama', pref:'26', ja:'貴船・鞍馬 ― 鞍馬', en:'Kifune & Kurama — Kurama', lon:135.7707, lat:35.11785, range:1100, heading:310},
   {id:'kiyomizu', pref:'26', ja:'清水寺', en:'Kiyomizu-dera', lon:135.784989, lat:34.994833, range:570, heading:44},
@@ -39,4 +39,7 @@ export const OUTINGS = [
 // The Expo is an archive exhibit. The outings list records places the club visited.
 export const EXPO = {id:'expo-2025', pref:'27', ja:'大阪・関西万博（2025年・夢洲）',
   en:'Expo 2025 Osaka, Kansai · Yumeshima', lon:135.383485, lat:34.649017, range:1550, heading:27} as const;
-export const MAP_PLACES = [...OUTINGS, EXPO];
+export const BIWA_FIREWORKS = {id:'biwako-fireworks', pref:'25', ja:'びわ湖大花火大会（大津港沖）',
+  en:'Lake Biwa Grand Fireworks · Otsu Port', lon:135.8713, lat:35.0169,
+  range:1490, heading:216, targetHeight:98, pitch:-7} as const;
+export const MAP_PLACES = [...OUTINGS, EXPO, BIWA_FIREWORKS];
