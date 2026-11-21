@@ -42,7 +42,7 @@ export function attachModels(widget:CesiumWidget,sources:ModelSources,heightSour
     wanted=new Map(entries.sort((a,b)=>a.distance-b.distance).map(item=>[item.k,item.p]));
     for(const [key,tile] of resident)if(!wanted.has(key)){
       tile.releaseMaterial();if(tile.primitive)scene.primitives.remove(tile.primitive);
-      if(tile.waterPrimitive)scene.groundPrimitives.remove(tile.waterPrimitive);resident.delete(key);
+      resident.delete(key);
     }
     retry.clear();pump();
   }
@@ -53,8 +53,7 @@ export function attachModels(widget:CesiumWidget,sources:ModelSources,heightSour
       if(resident.has(key)||pending.has(key)||(retry.get(key)??0)>Date.now())continue;
       pending.add(key);
       void buildTile(widget,sources,heightSources,...p,owner).then(tile=>{
-        if(!alive||!wanted.has(key)){tile.releaseMaterial();tile.primitive?.destroy();tile.waterPrimitive?.destroy();return;}
-        if(tile.waterPrimitive)scene.groundPrimitives.add(tile.waterPrimitive);
+        if(!alive||!wanted.has(key)){tile.releaseMaterial();tile.primitive?.destroy();return;}
         if(tile.primitive)scene.primitives.add(tile.primitive);resident.set(key,tile);
         scene.requestRender();
       }).catch(error=>{

@@ -49,14 +49,16 @@ export function prefectureCutout(widget:CesiumWidget,initial:string){
       vec2 cs=normalize(vec2(r,world.z*1.00336409));
       vec2 meridian=vec2(r-42697.6727*cs.x*cs.x*cs.x,world.z+42841.3115*cs.y*cs.y*cs.y);
       vec2 reference=vec2(.8191520443,.5735764364); // 35 degrees north
+      float daylight=smoothstep(-.13,.08,dot(normalize(czm_viewerPositionWC),czm_sunDirectionWC));
+      vec4 outside=vec4(mix(vec3(.012,.019,.029),vec3(.13,.18,.20),daylight),1.);
       float radial=world.y-world.x;
-      if(radial<=0. || dot(meridian,reference)<=0.){out_FragColor=vec4(.13,.18,.20,1.);return;}
+      if(radial<=0. || dot(meridian,reference)<=0.){out_FragColor=outside;return;}
       vec2 tangent=vec2(-(world.x+world.y)/radial,
         dot(meridian,vec2(-reference.y,reference.x))/dot(meridian,reference));
-      if(any(greaterThan(abs(tangent),vec2(.04)))){out_FragColor=vec4(.13,.18,.20,1.);return;}
+      if(any(greaterThan(abs(tangent),vec2(.04)))){out_FragColor=outside;return;}
       vec2 sq=tangent*tangent;
       vec2 p=vec2(1.,1.25)+degrees(tangent*(1.-sq/3.+sq*sq/5.));
-      if(prefecture(p)!=int(selected))out_FragColor=vec4(.13,.18,.20,1.);
+      if(prefecture(p)!=int(selected))out_FragColor=outside;
     }`;
   const stage=widget.scene.postProcessStages.add(new C.PostProcessStage({
     name:'kansai-prefecture-cutout',fragmentShader,

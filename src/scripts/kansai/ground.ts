@@ -3,7 +3,7 @@ import {classifyRings} from '@mapbox/vector-tile';
 import type {Point,Box} from './coordinates';
 import {inPolygon,lonLat} from './coordinates';
 import {Mesh,strip,type RGB,type XYZ} from './mesh';
-import {C} from './engine';
+
 
 export function roadWidth(rank:unknown){
   const label=String(rank??'');
@@ -77,13 +77,6 @@ export function drawGround(mesh:Mesh,x:number,y:number,source:VectorTile|undefin
       }
     }
   }
-  const geometries=waterAreas.map(rings=>{
-    const positions=(ring:Point[])=>C.Cartesian3.fromDegreesArray(ring.flat());
-    const holes=rings.slice(1).filter(r=>r.length>2).map(r=>new C.PolygonHierarchy(positions(r)));
-    return new C.GeometryInstance({geometry:new C.PolygonGeometry({polygonHierarchy:new C.PolygonHierarchy(positions(rings[0]),holes)}),
-      attributes:{color:C.ColorGeometryInstanceAttribute.fromColor(new C.Color(.16,.37,.41,.12))}});
-  });
-  const waterPrimitive=geometries.length?new C.GroundPrimitive({geometryInstances:geometries,
-    classificationType:C.ClassificationType.TERRAIN,allowPicking:false}):undefined;
-  return {waterPrimitive,inWater:(p:Point)=>waterAreas.some(rings=>inPolygon(p,rings))};
+  // The lake surface uses continuous aerial imagery across the near and distant views.
+  return (p:Point)=>waterAreas.some(rings=>inPolygon(p,rings));
 }

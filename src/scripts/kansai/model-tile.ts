@@ -57,7 +57,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
   const here=([lon,lat]:Point)=>lon>=west&&lon<east&&lat>south&&lat<=north;
   const xyz=(p:Point,h:number):XYZ=>[...local(p),h];
   const instances:GeometryInstance[]=[],locations:Point[]=[],groundMesh=new Mesh((east-west)*mx,(north-south)*my);
-  const {waterPrimitive,inWater}=drawGround(groundMesh,x,y,surfaces,edges,ground,xyz,owner);
+  const inWater=drawGround(groundMesh,x,y,surfaces,edges,ground,xyz,owner);
   const occupied=new Map<number,Ring[][]>();
   const bin=(v:number)=>Math.max(0,Math.min(7,Math.floor(v*8)));
   const col=(p:Point)=>bin((p[0]-west)/(east-west)),row=(p:Point)=>bin((p[1]-south)/(north-south));
@@ -168,7 +168,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
     appearance:localAppearance(x,y,()=>{if(!widget.isDestroyed())widget.scene.requestRender();}),
     asynchronous:false,allowPicking:false,compressVertices:false,vertexCacheOptimize:false}):undefined;
   let applied=-1;
-  return {primitive,waterPrimitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys){
+  return {primitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys){
     if(!primitive?.ready||surveys.revision===applied)return;
     for(let i=0;i<locations.length;i++){
       const attr=primitive.getGeometryInstanceAttributes(String(i));
