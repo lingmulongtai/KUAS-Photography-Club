@@ -1,0 +1,72 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          135.7953153,
+          35.0142773
+        ],
+        [
+          135.7953829,
+          35.0142683
+        ],
+        [
+          135.7955082,
+          35.0142517
+        ],
+        [
+          135.7954993,
+          35.0142071
+        ],
+        [
+          135.7954956,
+          35.0141885
+        ],
+        [
+          135.7954857,
+          35.0141383
+        ],
+        [
+          135.7954771,
+          35.0140952
+        ],
+        [
+          135.7954653,
+          35.0140355
+        ],
+        [
+          135.7952724,
+          35.0140612
+        ],
+        [
+          135.7953076,
+          35.0142388
+        ],
+        [
+          135.7953153,
+          35.0142773
+        ]
+      ]
+    ]
+  },
+  "properties": {
+    "source": "OpenStreetMap",
+    "id": "w858269694",
+    "version": 5,
+    "lastEdit": "2025-11-12 10:36:42+00:00",
+    "tags": {
+      "building": "shrine",
+      "building:wikidata": "Q11644528",
+      "name": "釈迦堂",
+      "name:en": "Shaka Hall",
+      "name:etymology": "釈迦如来",
+      "name:etymology:wikidata": "Q11644537",
+      "name:fr": "Pavillon Shaka",
+      "name:ja-Hira": "しゃかどう",
+      "name:ja-Latn": "Shaka-dō",
+      "religion": "buddhist"
+    }
+  }
+}

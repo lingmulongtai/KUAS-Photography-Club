@@ -14,6 +14,16 @@
         "member": "06ND/dchm_06ND6532.tiff",
         "sha256": "239a66654744f88103d05282c891dd70b2d22cf84a31182a02d7789af2b38da9",
         "tfwSha256": "647cb3b9e490438cb5d2fe75aa0fac76ead7b2aafb01fbb23c160aa906eb7923"
+      },
+      {
+        "member": "06ND/dchm_06ND2442.tiff",
+        "sha256": "6e1f3b6bc6c3f48c9c7d035b1e58bf0799f752102a7a2fb791bff2a9ebf9015d",
+        "tfwSha256": "518f668d37068afda73834744df0991e8eb7ee43455caac650aac2a81c4a455c"
+      },
+      {
+        "member": "06ND/dchm_06ND6514.tiff",
+        "sha256": "978ff3d65b27d762fa8f911b33696bee7a4e8a0e808f083883399e28eb570e31",
+        "tfwSha256": "095258c9aea923cfc02f9d1f0ecf4fdaf4b6c50d7ff8dcbeea0336074fdc41ad"
       }
     ],
     "sourceDate": "The dataset description reports FY2019–2023 measurement. Individual acquisition dates for these tiles were not stated. Archive directory is 2024.",
@@ -28,7 +38,27 @@
       0.75,
       0.95
     ],
-    "heightBasis": "Metres above ground; the per-building medians at the outer 2 m include returns from eaves, inner eaves and adjacent ground. Use the original grid for actual roof structure."
+    "heightBasis": "0.5 m relative first-surface height per cell. The historical PLATEAU measuredHeight, where available, is a separate feature attribute and is not an independent surveyed ridge. Null denotes no individually matched and verified PLATEAU height; NumPy clip(heights,0,None) leaves valid measured roof returns intact.",
+    "groundData": {
+      "publisher": "京都府林業振興課",
+      "source": "https://www.geospatial.jp/ckan/dataset/dem05_kyoto",
+      "sourceZip": "https://gic-kyoto.s3.ap-northeast-1.amazonaws.com/2024/dem/06ND.zip",
+      "terms": "https://www.geospatial.jp/ckan/dataset/a7c25ae6-cc29-4f3a-98e9-d32b946dd06b/resource/ce464ec1-da1e-4ae5-ba73-3e06e670d639/download/_.pdf",
+      "members": [
+        {
+          "member": "06ND/06ND2442.tif",
+          "sha256": "f70c2cf9b0d3c06ad7064b6ccab2bcb5e4c09e867a2e6dd001028edb208ed155",
+          "tfwSha256": "518f668d37068afda73834744df0991e8eb7ee43455caac650aac2a81c4a455c"
+        },
+        {
+          "member": "06ND/06ND6514.tif",
+          "sha256": "2e86eeed0ca00fcb4b91b4218db2ff83ba6e451b9becdd135720b905286dc7a8",
+          "tfwSha256": "095258c9aea923cfc02f9d1f0ecf4fdaf4b6c50d7ff8dcbeea0336074fdc41ad"
+        }
+      ],
+      "file": "ground-elevation.tif",
+      "units": "Orthometric elevation in metres according to the published source, FY2019–2023 dataset. DCHM + DEM gives native first-surface elevation."
+    }
   },
   "osm": {
     "license": "ODbL 1.0 © OpenStreetMap contributors",
@@ -221,6 +251,422 @@
           "sha256": "e7343647d4ec4b489a83b74f567680b4bc84096002128a2c07bf90c61fff0d80"
         }
       ]
+    },
+    {
+      "site": "kurama-tenporindo",
+      "label": "転法輪堂",
+      "way": 319198723,
+      "sourceMember": "06ND/dchm_06ND2442.tiff",
+      "shapePixels": [
+        62,
+        60
+      ],
+      "gdalTransform": [
+        -20861.5,
+        0.5,
+        0.0,
+        -97838.5001,
+        0.0,
+        -0.5
+      ],
+      "wgs84Center": [
+        135.7712956,
+        35.11774065
+      ],
+      "overlapWithGsi": 0.7522,
+      "osmOutlineHeightQuantilesMeters": [
+        6.868,
+        9.52,
+        10.725,
+        11.81,
+        12.886
+      ],
+      "p50InsideBy2m": 11.21,
+      "p50Outer2m": 10.23,
+      "plateauFeature": null,
+      "plateauMeasuredHeightMeters": null,
+      "plateauSource": null,
+      "photoTiles": [
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229937/103729.jpg",
+          "sha256": "48f1dc479b13fafb2970d8dd08f2494717bf417cd9a3bd5a276f7c92e55ca1bb"
+        },
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229937/103730.jpg",
+          "sha256": "c8b3751e64a91fb9530bacd4e96bf0347c1c6320de04dc177d3403635d072211"
+        }
+      ],
+      "officialIdentification": "https://www.kuramadera.or.jp/annai.html",
+      "matchedGsiOutline": {
+        "source": "GSI optimal_bvmap-v1 BldA",
+        "tile": [
+          16,
+          57484,
+          25932
+        ],
+        "layerFeatureIndex": 18,
+        "tileSha256": "902c96203482ee5c98f3fdd478c8826ff044aff1c6fdb1f44c7dc0764436d473",
+        "gsiFeature": {
+          "vt_code": 3101,
+          "vt_lvorder": 0
+        },
+        "overlapIoUWithOsm": 0.7522,
+        "partOfOsmCoveredByThisGsiPolygon": 0.9637,
+        "partOfGsiCoveredByOsmBuilding": 0.7741
+      },
+      "roofAssessment": "The operator uses 転法輪堂. The OSM name is 天法輪堂. Four roof planes and their central intersection are visible in the aerial and in the absolute laser surface. The northwestern wooded slope lies outside the main roof. The northwest edge of the mapped outline is less certain than the ridge.",
+      "sourceGroundMember": "06ND/06ND2442.tif",
+      "groundQuantilesInsideM": [
+        390.6,
+        390.7,
+        390.7,
+        392.555,
+        395.2
+      ],
+      "eaveProxyP25P50P75M": [
+        8.1,
+        10.23,
+        11.43
+      ],
+      "ridge": {
+        "method": "Highest 3x3 median absolute surface on the inset footprint. Near-crest statistics include its native interior samples whose filtered surface is within 0.45 m. The heights in the output raw roof raster are paired with a native ground raster.",
+        "absoluteM": 404.37,
+        "localGroundM": 390.7,
+        "relativeHeightM": 13.67,
+        "nativeUnfilteredAbsoluteM": 404.52,
+        "sampleCenterLonLat": [
+          135.77130921651593,
+          35.117735752664274
+        ],
+        "distanceInsideOutlineM": 6.22,
+        "coreErosionM": 1.206,
+        "nearCrestCount05mCells": 11,
+        "nativeRelativeDchmP10P50P90M": [
+          13.31,
+          13.56,
+          13.82
+        ],
+        "nativeAbsoluteSurfaceP10P50P90M": [
+          404.01,
+          404.26,
+          404.52
+        ]
+      },
+      "verticalPrecision": "Native horizontal cell spacing is 0.5 m. Published data have no building-specific vertical RMSE or independently surveyed ridge/eave benchmark. The near-crest percentile range describes return variation, not absolute accuracy. Eaves are a 2 m perimeter-band proxy; underside, posts and wall heights require reconstruction.",
+      "relativeHeightSource": "Kyoto Prefecture original DCHM; no synthetic elevation filling or tree mask.",
+      "plateauHeightMethod": null,
+      "constructionEvidence": null,
+      "roofMaterialEvidence": null
+    },
+    {
+      "site": "eikando-shakado",
+      "label": "釈迦堂（方丈）",
+      "way": 858269694,
+      "sourceMember": "06ND/dchm_06ND6514.tiff",
+      "shapePixels": [
+        64,
+        75
+      ],
+      "gdalTransform": [
+        -18689.5,
+        0.5,
+        0.0,
+        -109330.500099,
+        0.0,
+        -0.5
+      ],
+      "wgs84Center": [
+        135.7953902792935,
+        35.01415642078
+      ],
+      "overlapWithGsi": 0.2044,
+      "osmOutlineHeightQuantilesMeters": [
+        4.496,
+        5.28,
+        6.3,
+        8.14,
+        9.98
+      ],
+      "p50InsideBy2m": 7.58,
+      "p50Outer2m": 5.06,
+      "plateauFeature": null,
+      "plateauMeasuredHeightMeters": null,
+      "plateauSource": null,
+      "photoTiles": [
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229955/103821.jpg",
+          "sha256": "4984be3bf0e82221360193045af21f66e0a6ad0076d89673e1f756b447800af6"
+        },
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229955/103822.jpg",
+          "sha256": "5e5d703e999687cf9f7da03277bd12188591275573d95c889431f301244a5ce3"
+        }
+      ],
+      "officialIdentification": "https://www.eikando.or.jp/pdf/keidaizu.pdf",
+      "matchedGsiOutline": {
+        "source": "GSI optimal_bvmap-v1 BldA",
+        "tile": [
+          16,
+          57488,
+          25955
+        ],
+        "layerFeatureIndex": 497,
+        "tileSha256": "eaf2a40e1d43bb80ca1de7c4a5ec30aa04e14fcc4155c78c264474477643f28a",
+        "gsiFeature": {
+          "vt_code": 3101,
+          "vt_lvorder": 0
+        },
+        "overlapIoUWithOsm": 0.2044,
+        "partOfOsmCoveredByThisGsiPolygon": 0.9783,
+        "partOfGsiCoveredByOsmBuilding": 0.2053
+      },
+      "roofAssessment": "The longitudinal ridge and lower end hips are visible in both the photograph and height grid. The source building area also includes connecting galleries. The separate named roof is verified by the precinct map.",
+      "sourceGroundMember": "06ND/06ND6514.tif",
+      "groundQuantilesInsideM": [
+        66.9,
+        66.95,
+        67.15,
+        67.3,
+        67.4
+      ],
+      "eaveProxyP25P50P75M": [
+        4.73,
+        5.06,
+        5.36
+      ],
+      "ridge": {
+        "method": "Highest 3x3 median absolute surface on the inset footprint. Near-crest statistics include its native interior samples whose filtered surface is within 0.45 m. The heights in the output raw roof raster are paired with a native ground raster.",
+        "absoluteM": 77.55,
+        "localGroundM": 67.1,
+        "relativeHeightM": 10.45,
+        "nativeUnfilteredAbsoluteM": 77.58,
+        "sampleCenterLonLat": [
+          135.79538086799354,
+          35.01408812942271
+        ],
+        "distanceInsideOutlineM": 4.53,
+        "coreErosionM": 1.665,
+        "nearCrestCount05mCells": 92,
+        "nativeRelativeDchmP10P50P90M": [
+          10.001,
+          10.28,
+          10.609
+        ],
+        "nativeAbsoluteSurfaceP10P50P90M": [
+          77.16,
+          77.465,
+          77.788
+        ]
+      },
+      "verticalPrecision": "Native horizontal cell spacing is 0.5 m. Published data have no building-specific vertical RMSE or independently surveyed ridge/eave benchmark. The near-crest percentile range describes return variation, not absolute accuracy. Eaves are a 2 m perimeter-band proxy; underside, posts and wall heights require reconstruction.",
+      "relativeHeightSource": "Kyoto Prefecture original DCHM; no synthetic elevation filling or tree mask.",
+      "plateauHeightMethod": null,
+      "constructionEvidence": null,
+      "roofMaterialEvidence": null
+    },
+    {
+      "site": "eikando-kohojo",
+      "label": "古方丈",
+      "way": 316011165,
+      "sourceMember": "06ND/dchm_06ND6514.tiff",
+      "shapePixels": [
+        64,
+        65
+      ],
+      "gdalTransform": [
+        -18675.5,
+        0.5,
+        0.0,
+        -109306.000099,
+        0.0,
+        -0.5
+      ],
+      "wgs84Center": [
+        135.79554270415187,
+        35.014399294537895
+      ],
+      "overlapWithGsi": 0.1754,
+      "osmOutlineHeightQuantilesMeters": [
+        4.292,
+        5.34,
+        6.43,
+        7.75,
+        9.44
+      ],
+      "p50InsideBy2m": 7.36,
+      "p50Outer2m": 5.16,
+      "plateauFeature": null,
+      "plateauMeasuredHeightMeters": null,
+      "plateauSource": null,
+      "photoTiles": [
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229955/103821.jpg",
+          "sha256": "4984be3bf0e82221360193045af21f66e0a6ad0076d89673e1f756b447800af6"
+        }
+      ],
+      "officialIdentification": "https://www.eikando.or.jp/pdf/keidaizu.pdf",
+      "matchedGsiOutline": {
+        "source": "GSI optimal_bvmap-v1 BldA",
+        "tile": [
+          16,
+          57488,
+          25955
+        ],
+        "layerFeatureIndex": 497,
+        "tileSha256": "eaf2a40e1d43bb80ca1de7c4a5ec30aa04e14fcc4155c78c264474477643f28a",
+        "gsiFeature": {
+          "vt_code": 3101,
+          "vt_lvorder": 0
+        },
+        "overlapIoUWithOsm": 0.1754,
+        "partOfOsmCoveredByThisGsiPolygon": 0.9968,
+        "partOfGsiCoveredByOsmBuilding": 0.1755
+      },
+      "roofAssessment": "Four inclining faces, horizontal central ridge and the perimeter of this individual roof are visible. GSI groups it with adjacent galleries and Shakado. The footprint used here separates this roof.",
+      "sourceGroundMember": "06ND/06ND6514.tif",
+      "groundQuantilesInsideM": [
+        66.85,
+        67.4,
+        67.55,
+        67.7,
+        68.3
+      ],
+      "eaveProxyP25P50P75M": [
+        4.56,
+        5.16,
+        5.69
+      ],
+      "ridge": {
+        "method": "Highest 3x3 median absolute surface on the inset footprint. Near-crest statistics include its native interior samples whose filtered surface is within 0.45 m. The heights in the output raw roof raster are paired with a native ground raster.",
+        "absoluteM": 77.79,
+        "localGroundM": 67.6,
+        "relativeHeightM": 10.19,
+        "nativeUnfilteredAbsoluteM": 77.91,
+        "sampleCenterLonLat": [
+          135.7955279940389,
+          35.01440839904462
+        ],
+        "distanceInsideOutlineM": 7.91,
+        "coreErosionM": 1.526,
+        "nearCrestCount05mCells": 35,
+        "nativeRelativeDchmP10P50P90M": [
+          9.794,
+          10.11,
+          10.35
+        ],
+        "nativeAbsoluteSurfaceP10P50P90M": [
+          77.39,
+          77.71,
+          77.942
+        ]
+      },
+      "verticalPrecision": "Native horizontal cell spacing is 0.5 m. Published data have no building-specific vertical RMSE or independently surveyed ridge/eave benchmark. The near-crest percentile range describes return variation, not absolute accuracy. Eaves are a 2 m perimeter-band proxy; underside, posts and wall heights require reconstruction.",
+      "relativeHeightSource": "Kyoto Prefecture original DCHM; no synthetic elevation filling or tree mask.",
+      "plateauHeightMethod": null,
+      "constructionEvidence": null,
+      "roofMaterialEvidence": null
+    },
+    {
+      "site": "eikando-shoro",
+      "label": "鐘楼",
+      "way": 292177647,
+      "sourceMember": "06ND/dchm_06ND6514.tiff",
+      "shapePixels": [
+        34,
+        35
+      ],
+      "gdalTransform": [
+        -18675.0,
+        0.5,
+        0.0,
+        -109441.000099,
+        0.0,
+        -0.5
+      ],
+      "wgs84Center": [
+        135.79546789460105,
+        35.01325073093204
+      ],
+      "overlapWithGsi": 0.8693,
+      "osmOutlineHeightQuantilesMeters": [
+        4.169,
+        4.765,
+        5.48,
+        5.85,
+        6.412
+      ],
+      "p50InsideBy2m": 5.11,
+      "p50Outer2m": 5.53,
+      "plateauFeature": "bldg_d6d48279-c12f-494b-abf9-4369058aa228",
+      "plateauMeasuredHeightMeters": 7.5,
+      "plateauSource": "https://assets.cms.plateau.reearth.io/assets/96/d17b9d-5527-4610-90c8-9e9c44d500c3/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26103_sakyo-ku_lod2/data/data144.b3dm",
+      "photoTiles": [
+        {
+          "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229955/103822.jpg",
+          "sha256": "5e5d703e999687cf9f7da03277bd12188591275573d95c889431f301244a5ce3"
+        }
+      ],
+      "officialIdentification": "https://www.eikando.or.jp/pdf/keidaizu.pdf",
+      "matchedGsiOutline": {
+        "source": "GSI optimal_bvmap-v1 BldA",
+        "tile": [
+          16,
+          57488,
+          25955
+        ],
+        "layerFeatureIndex": 543,
+        "tileSha256": "eaf2a40e1d43bb80ca1de7c4a5ec30aa04e14fcc4155c78c264474477643f28a",
+        "gsiFeature": {
+          "vt_code": 3101,
+          "vt_lvorder": 0
+        },
+        "overlapIoUWithOsm": 0.8693,
+        "partOfOsmCoveredByThisGsiPolygon": 1.0,
+        "partOfGsiCoveredByOsmBuilding": 0.8693
+      },
+      "roofAssessment": "The small freestanding gable, separated from nearby tree crowns, is visible in both the mapped position and the laser slope. The narrow roof and its edge span relatively few laser/ortho cells. Its open lower frame is not recorded by these returns.",
+      "sourceGroundMember": "06ND/06ND6514.tif",
+      "groundQuantilesInsideM": [
+        74.75,
+        75.145,
+        76.6,
+        76.7,
+        76.75
+      ],
+      "eaveProxyP25P50P75M": [
+        4.75,
+        5.53,
+        5.865
+      ],
+      "ridge": {
+        "method": "Highest 3x3 median absolute surface on the inset footprint. Near-crest statistics include its native interior samples whose filtered surface is within 0.45 m. The heights in the output raw roof raster are paired with a native ground raster.",
+        "absoluteM": 82.94,
+        "localGroundM": 76.6,
+        "relativeHeightM": 6.34,
+        "nativeUnfilteredAbsoluteM": 83.34,
+        "sampleCenterLonLat": [
+          135.79548702620014,
+          35.01325895630731
+        ],
+        "distanceInsideOutlineM": 0.99,
+        "coreErosionM": 0.75,
+        "nearCrestCount05mCells": 12,
+        "nativeRelativeDchmP10P50P90M": [
+          5.923,
+          6.38,
+          6.689
+        ],
+        "nativeAbsoluteSurfaceP10P50P90M": [
+          82.602,
+          83.08,
+          83.209
+        ]
+      },
+      "verticalPrecision": "Native horizontal cell spacing is 0.5 m. Published data have no building-specific vertical RMSE or independently surveyed ridge/eave benchmark. The near-crest percentile range describes return variation, not absolute accuracy. Eaves are a 2 m perimeter-band proxy; underside, posts and wall heights require reconstruction.",
+      "relativeHeightSource": "Kyoto Prefecture original DCHM; no synthetic elevation filling or tree mask.",
+      "plateauHeightMethod": "点群から取得_中央値",
+      "constructionEvidence": "gabled",
+      "roofMaterialEvidence": null
     }
   ]
 }

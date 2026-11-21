@@ -29,14 +29,19 @@ test('Osaka Castle has a resident textured keep at its surveyed height',()=>{
 
 test('the Kyoto laser-survey roofs have a registered footprint, camera-lit normals and a photograph',()=>{
   const catalogue=json('landmarks/index.json'), roofs=json('landmarks/temple-roofs.json');
-  assert.equal(roofs.length,4);
+  assert.equal(roofs.length,8);
   for(const roof of roofs){
     assert.deepEqual(catalogue.find(entry=>entry.id===roof.id),roof);
     const bytes=readFileSync(new URL(roof.file.slice('/kansai/'.length),root));
     const doc=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
     const surface=doc.meshes.find(m=>m.name==='Measured roof').primitives[0];
     const positions=doc.accessors[surface.attributes.POSITION];
-    assert.ok(positions.count>1000&&positions.max[1]-positions.min[1]>4,roof.id);
+    const belfry=roof.id==='eikando-shoro';
+    assert.ok(positions.count>(belfry?120:1000)&&positions.max[1]-positions.min[1]>(belfry?2:4),roof.id);
+    if(belfry){
+      assert.ok(doc.meshes.some(m=>m.name==='Patinated bell'));
+      assert.ok(!doc.meshes.some(m=>m.name==='Lime plaster'));
+    }
     assert.equal(doc.accessors[surface.attributes.NORMAL].count,positions.count);
     assert.equal(doc.accessors[surface.attributes.TEXCOORD_0].count,positions.count);
     assert.ok(doc.materials[surface.material].pbrMetallicRoughness.baseColorTexture);

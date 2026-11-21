@@ -1,0 +1,52 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          135.7954563,
+          35.0132814
+        ],
+        [
+          135.7955023,
+          35.013266
+        ],
+        [
+          135.7954795,
+          35.0132201
+        ],
+        [
+          135.7954335,
+          35.0132354
+        ],
+        [
+          135.7954563,
+          35.0132814
+        ]
+      ]
+    ]
+  },
+  "properties": {
+    "source": "OpenStreetMap",
+    "id": "w292177647",
+    "version": 5,
+    "lastEdit": "2024-11-02 09:22:22+00:00",
+    "tags": {
+      "building": "roof",
+      "man_made": "tower",
+      "name": "鐘楼",
+      "name:en": "Bell Tower",
+      "name:fr": "Tour du Clocher",
+      "name:ja-Hira": "しゅろう",
+      "name:ja-Latn": "Shōrō",
+      "note": "鐘楼",
+      "roof:orientation": "along",
+      "roof:shape": "gabled",
+      "source": "GSI/KIBAN 2500; NARO",
+      "source_ref": "http://wiki.osm.org/wiki/GSI_KIBAN",
+      "tower:construction": "freestanding",
+      "tower:type": "bell_tower"
+    }
+  }
+}

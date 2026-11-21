@@ -1,4 +1,4 @@
-"""Model four surveyed Kyoto roofs using the prefecture's 0.5 m DCHM + GSI aerials.
+"""Model surveyed Kyoto roofs using the prefecture's 0.5 m DCHM + GSI aerials.
 
 Requires numpy, rasterio, pyproj, shapely >= 2.1, Pillow and trimesh >= 4.
 The source crops, image tile hashes, footprint IDs and reuse conditions live in
@@ -57,8 +57,23 @@ def roof_model(info):
     limit = info['plateauMeasuredHeightMeters']
     # The first / last returns occasionally pick up the ground or an adjacent
     # tree. Median-filter a single pixel's neighbourhood before interpolation.
-    padded = np.pad(np.clip(heights,0,limit),1,mode='edge')
+    heights = np.clip(heights,0,limit)
+    terrain_file=folder/'ground-elevation.tif'
+    if terrain_file.is_file():
+        # DCHM measures height *above local ground*. Restore roof elevations
+        # against a single datum before meshing a hall built across a slope.
+        with rasterio.open(terrain_file) as terrain:
+            assert terrain.transform==affine and terrain.shape==heights.shape
+            dem=terrain.read(1,masked=True)
+            reference=next(terrain.sample([tuple(centre)]))[0]
+            if reference==terrain.nodata: raise ValueError('Missing roof datum')
+            heights=heights+np.ma.filled(dem-reference,0)
+    padded = np.pad(heights,1,mode='edge')
     filtered = np.median(np.lib.stride_tricks.sliding_window_view(padded,(3,3)),axis=(-1,-2))
+    if terrain_file.is_file():
+        # Marginal returns can still see the bank behind a roof on a slope.
+        # Bound those returns by the measured absolute crest of the interior footprint.
+        filtered=np.minimum(filtered,info['ridge']['absoluteM']-reference)
     rows,cols = heights.shape
     def sample(x,y):
         c,r = ~affine * (x,y)
@@ -192,6 +207,22 @@ def roof_model(info):
                     post=edge((i+t)/bays,.995)
                     column(*post,.078,deck+.82,deck)
         panel([local(*point(x,y),deck) for x,y in [(-.46,-.39),(.46,-.39),(.46,.39),(-.46,.39)]],timber)
+    elif info['site']=='eikando-shoro':
+        # An open timber belfry. The survey sees the eaves but not the suspended bell.
+        frame=np.array(polygon.minimum_rotated_rectangle.exterior.coords)[:4]
+        mid=frame.mean(axis=0)
+        uprights=mid+(frame-mid)*.59
+        for i,p in enumerate(uprights):
+            q=uprights[(i+1)%4]
+            column(*p,.17,eave,.1)
+            wall(p,q,eave*.77,eave*.86,timber)
+            wall(p,q,eave*.92,eave,timber)
+        bronze=solid('Patinated bell',(78,83,66))
+        profile=[(.13,1.57),(.22,1.48),(.41,1.26),(.45,.4),(.53,.18),(.51,.1)]
+        bell=trimesh.creation.revolve(np.array(profile),sections=28)
+        bell.apply_transform(trimesh.transformations.rotation_matrix(-np.pi/2,[1,0,0]))
+        bell.apply_translation(local(*mid,eave*.43))
+        add(bell,bronze)
     else:
         for enclosed in shapely.get_parts(polygon.buffer(-1.3,join_style='mitre')):
             ring=list(enclosed.exterior.coords)

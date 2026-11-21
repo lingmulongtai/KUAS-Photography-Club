@@ -1,0 +1,44 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          135.7711845,
+          35.1177718
+        ],
+        [
+          135.7713428,
+          35.1178286
+        ],
+        [
+          135.7714067,
+          35.1177095
+        ],
+        [
+          135.7712484,
+          35.1176527
+        ],
+        [
+          135.7711845,
+          35.1177718
+        ]
+      ]
+    ]
+  },
+  "properties": {
+    "source": "OpenStreetMap",
+    "id": "w319198723",
+    "version": 5,
+    "lastEdit": "2024-05-28 18:26:32+00:00",
+    "tags": {
+      "building": "yes",
+      "name": "天法輪堂",
+      "name:ja-Hira": "てん ほうりんどう",
+      "name:ja-Latn": "Tenhōrin-dō",
+      "source": "GSI/KIBAN 2500; NARO",
+      "source_ref": "http://wiki.osm.org/wiki/GSI_KIBAN"
+    }
+  }
+}
