@@ -183,6 +183,8 @@ export function createHero(
   let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let followForest: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let cancelTreePlanting: (() => void) | null = null;
+  let startGroundRelief: (() => void) | undefined;
+  let updateGroundRelief: ((x:number,z:number) => void) | undefined;
   let driveCars: ((dt: number) => void) | null = null;
   /** Cities whose roofs switch to stepped blocks near the camera. */
   const cityLods = new Set<ReturnType<typeof buildCity>>();
@@ -580,6 +582,17 @@ export function createHero(
     prefetchCityRegion(landscapeCenter(VIEW),view);
     await Promise.all([cloudProgram, scenePrograms]);
     loading.built();
+    startGroundRelief=() => idle(() => {
+      void import('./ground-relief').then(({createGroundRelief}) => {
+        const ground=(x:number,z:number)=>hf.height(x,z);
+        const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>{
+          const h=ground(x,z);
+          return channel.contains(x,z)?Math.min(h,channel.surface(x,z,h)-.12):h;
+        });
+        scene.add(relief.group);
+        updateGroundRelief=relief.update;
+      }).catch(error=>console.warn('Ground detail unavailable',error));
+    });
     for(const area of ['south','osaka','north'])idle(()=>{
       void loadBinary(`buildings-${area}-lod.json.gz`).then(async bytes=>{
         const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers?:OverviewBuilding[]};
@@ -894,6 +907,7 @@ export function createHero(
       lastTarget.copy(p.target);
     }
     camera.lookAt(lastTarget);
+    updateGroundRelief?.(camera.position.x,camera.position.z);
     const detail = env.uHighlight.value > 0.02;
     if (campusModel && campusModel.visible !== detail) {
       campusModel.visible = detail;
@@ -1007,6 +1021,7 @@ export function createHero(
       opts.onFrameSubmitted?.();
       labels?.update(camera, width, height);
       loading.frame();
+      if(startGroundRelief){startGroundRelief();startGroundRelief=undefined;}
       clouds.warmField(renderer,camera.position,post.prepare);
       // keep the frame rate up on slower devices by rendering fewer pixels
       if (dt > 0 && pixelRatio > .75) {
