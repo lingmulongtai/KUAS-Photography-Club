@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import {cloudWeather,LOWEST_CLOUD_BASE} from './cloud-weather';
-import { CLOUD_LATTICE_GLSL, createCloudLattice } from './cloud-lattice';
+import { CLOUD_COLUMN_GLSL, CLOUD_COLUMN_LOOKUP, createCloudColumns, WEATHER_SCALE } from './cloud-columns.ts';
 import type {Climate} from './seasons';
 
 /** Height of the cirrus streaks and the altocumulus field, metres. */
@@ -25,12 +25,12 @@ const DRUM = 52000;
  */
 export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),quality=1,climate:Climate='spring') {
   let weather=cloudWeather(seed,climate);
-  const lattice = createCloudLattice();
+
   // Runtime loop bounds keep GPU drivers from duplicating the large noise function at compile time.
   const detail = quality > .75 ? 2 : 1;
   const uniforms = {
     ...env,
-    ...lattice.uniforms,
+
     uMarchSteps: { value: detail === 2 ? 40 : 22 },
     uEdgeRefinements: { value: detail + 2 },
     uCover: { value: weather.cover },
@@ -43,8 +43,9 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     uOffset: { value: new THREE.Vector2(...weather.offset) },
     uWind: { value: new THREE.Vector2() },
   };
+  const columns = createCloudColumns(uniforms);
   const material = new THREE.ShaderMaterial({
-    uniforms,
+    uniforms: { ...uniforms, ...columns.uniforms },
     defines: { DETAIL: detail },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
@@ -56,10 +57,8 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
-      ${CLOUD_LATTICE_GLSL}
-      uniform float uCover;
-      uniform float uClear;
-      uniform float uStyle;
+      ${CLOUD_COLUMN_GLSL}
+      ${CLOUD_COLUMN_LOOKUP}
       uniform float uBase;
       uniform float uTop;
       uniform float uCirrus;
@@ -71,7 +70,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
       varying vec3 vWorld;
 
       /** weather-map units per metre: one unit is about 9 km */
-      const float K = .00011;
+      const float K = ${WEATHER_SCALE};
 
       float vnoise3(vec3 p){
         vec3 i = floor(p), f = fract(p);
@@ -80,70 +79,6 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           mix(mix(hash13(i), hash13(i + vec3(1,0,0)), f.x), mix(hash13(i + vec3(0,1,0)), hash13(i + vec3(1,1,0)), f.x), f.y),
           mix(mix(hash13(i + vec3(0,0,1)), hash13(i + vec3(1,0,1)), f.x), mix(hash13(i + vec3(0,1,1)), hash13(i + vec3(1,1,1)), f.x), f.y),
           f.z);
-      }
-
-      // characters (cloud-weather.ts): 0 cumulus, 1 fair, 2 stratocumulus, 3 congestus,
-      // 4 cumulonimbus, 5 snow deck
-      bool isStyle(float s){ return abs(uStyle - s) < .5; }
-      bool deck(){ return isStyle(2.) || isStyle(5.); }
-
-      /**
-       * The low clouds seen from above: x is how cloudy the sky is at p, y the level above which
-       * it is cloud, z how tall the cloud there grows (0..1).
-       */
-      vec3 field(vec2 p){
-        // bend the weather map so the cells never line up in rows or repeat one size
-        p += (vec2(fieldNoise(p * 1.7 + 2.3, 0), fieldNoise(p * 1.7 - 4.1, 0)) - .5) * .4;
-        // a regional swell, so some parts of the sky are busier than others
-        float region = fieldNoise(p * .8 + 7.3, 1);
-        // and wide clear stretches between groups of clouds: these take whole clouds away (the
-        // ones at the edge of a group come out smaller) rather than thinning every cloud
-        float clear = smoothstep(.35, .7, fieldNoise(p * .45 - 3.9, 2)) * uClear;
-        float th = 1. - uCover * (.7 + .6 * region) + clear * .4;
-        // Value noise lies in [0,1]. An upper bound below the threshold proves a ray
-        // sample contributes zero, including the wider anvil at the top of a storm.
-        float emptyBelow = th - (isStyle(4.) ? .07 : 0.) - .00001;
-        const vec3 emptyField = vec3(0., 1., 0.);
-        if (emptyBelow > 1.) return emptyField;
-        float n;
-        if (deck()){
-          // long rolls broken into cells
-          vec2 q = mat2(.87, -.5, .5, .87) * p * (isStyle(5.) ? .7 : 1.);
-          n = fieldNoise(q * vec2(2.6, 7.), 3) * .45 + fieldNoise(p * 13. + 3.1, 4) * .35;
-          if (n + .2 < emptyBelow) return emptyField;
-          n += wideFieldNoise(p * 31. - 1.7, 5) * .2;
-        } else {
-          float f = isStyle(1.) ? 1.7 : isStyle(3.) ? .7 : isStyle(4.) ? .26 : 1.;
-          // big clouds in some parts of the sky, small ones in others: two sizes of cell, blended
-          // (scaling the coordinates by a varying amount would smear the cells into streaks)
-          float big = fieldNoise(p * 4.2 * f + 5.5, 3) * .6 + fieldNoise(p * 9. * f - 2.2, 4) * .4;
-          n = big;
-          if (!isStyle(4.)) {
-            float blend = smoothstep(.3, .7, fieldNoise(p * 1.3 - 9.7, 8));
-            float small = fieldNoise(p * 9.5 * f, 5) * .55;
-            if (mix(small + .45, big, blend) < emptyBelow) return emptyField;
-            small += wideFieldNoise(p * 21. * f + 3.1, 6) * .3;
-            small += wideFieldNoise(p * 43. * f - 1.7, 7) * .15;
-            n = mix(small, big, blend);
-          }
-        }
-        if (n < emptyBelow) return emptyField;
-        // some heads stay flat while their neighbours tower; a thunderhead climbs in turrets
-        float tall = deck() ? 1. : isStyle(4.) ? mix(.5, 1., fieldNoise(p * 6. + 1.9, 9)) : mix(.45, 1., fieldNoise(p * 3.3 + 1.9, 9));
-        if (isStyle(3.) || isStyle(4.)) tall *= mix(.75, 1., fieldNoise(p * 15. - 6.1, 10));
-        return vec3(n, th, tall);
-      }
-
-      /** 0 clear sky, 1 the thickest part of a cloud; spread lets the cloud reach further out. */
-      float cover(vec3 f, float spread){
-        return clamp((f.x - f.y + spread) / max(1. - f.y, .05), 0., 1.);
-      }
-
-      /** How high a cloud with this coverage grows, as a share of the slab. */
-      float crown(float c){
-        // decks have flat tops; heaps grow domes over their thickest parts; thunderheads tower
-        // (a thunderhead is a broad dome of cloud, widest at the base, not a column or a spire)
-        return deck() ? .5 + .5 * sqrt(c) : isStyle(4.) ? sqrt(1. - (1. - c) * (1. - c)) : isStyle(3.) ? pow(c, .5) : pow(c, .6);
       }
 
       /** Cloud shape without the fine detail: for the light that reaches a point. */
@@ -157,14 +92,11 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           vec3 w = pos * .00045;
           xz += (vec2(vnoise3(w), vnoise3(w + 17.3)) - .5) * (uTop - uBase) * .22;
         }
-        vec3 f = field(xz * K - uWind + uOffset);
-        if (f.z == 0.) return 0.;
-        float c = cover(f, 0.);
-        float d = smoothstep(0., .1, crown(c) * f.z - h) * smoothstep(0., .04, h) * smoothstep(0., .25, c);
+        vec3 column = lookupColumn(xz * K - uWind + uOffset);
+        float d = smoothstep(0., .1, column.r - h) * smoothstep(0., .04, h) * column.g;
         if (isStyle(4.)){
-          // the anvil: at the top of the troposphere a thunderhead spreads out into a flat sheet
           float band = smoothstep(.8, .88, h) * (1. - smoothstep(.95, 1., h));
-          d = max(d, band * smoothstep(0., .3, cover(f, .07)) * .7);
+          d = max(d, band * column.b * .7);
         }
         return d;
       }
@@ -399,45 +331,11 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
   mesh.renderOrder = 2;
   mesh.frustumCulled = false;
   let shown = climate;
-  let warming = false;
-  const warmMaterial = material.clone();
-  warmMaterial.uniforms = uniforms;
-  warmMaterial.defines.FIELD_LATTICE = 1;
-  const warmMesh = new THREE.Mesh(geometry,warmMaterial);
-  function updateLattice(renderer: THREE.WebGLRenderer, eye: THREE.Vector3) {
-    lattice.update(renderer, eye.x*.00011-uniforms.uWind.value.x+weather.offset[0],
-      eye.z*.00011-uniforms.uWind.value.y+weather.offset[1], weather.style);
-  }
   return {
-    mesh, uniforms, restored: lattice.restored,
+    mesh, uniforms, columnMesh: columns.mesh, restored: columns.restored,
     prepareField(renderer: THREE.WebGLRenderer, eye: THREE.Vector3) {
-      if (material.defines.FIELD_LATTICE) {
-        updateLattice(renderer,eye);
-        if (!lattice.uniforms.uLatticeOn.value) {
-          delete material.defines.FIELD_LATTICE;
-          material.needsUpdate = true;
-        }
-      }
-    },
-    warmField(renderer: THREE.WebGLRenderer, eye: THREE.Vector3, prepare: (object: THREE.Object3D) => Promise<unknown>) {
-      if (warming) return;
-      warming = true;
-      if (!renderer.extensions.has('KHR_parallel_shader_compile')) return;
-      // Show the analytic sky on the first frame. Drivers can take seconds to compile
-      // the atlas variant; it may take over only after its program is ready.
-      setTimeout(async () => {
-        try {
-          updateLattice(renderer,eye);
-          if (!lattice.uniforms.uLatticeOn.value) return;
-          await prepare(warmMesh);
-          const state = renderer.properties.get(warmMaterial) as { currentProgram?: { program?: WebGLProgram } };
-          const program = state.currentProgram?.program;
-          const gl = renderer.getContext();
-          if (!program || !gl.getProgramParameter(program,gl.LINK_STATUS)) return;
-          material.defines.FIELD_LATTICE = 1;
-          material.needsUpdate = true;
-        } catch { /* The analytic program remains available. */ }
-      },0);
+      columns.update(renderer, eye.x * WEATHER_SCALE - uniforms.uWind.value.x + weather.offset[0],
+        eye.z * WEATHER_SCALE - uniforms.uWind.value.y + weather.offset[1], weather);
     },
     get weather() { return weather; },
     /** Redraw the sky for another season (the same visit keeps its seed). */

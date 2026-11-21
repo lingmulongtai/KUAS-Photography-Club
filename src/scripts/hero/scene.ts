@@ -210,7 +210,7 @@ export function createHero(
     const prepare = (object: THREE.Object3D) => post.prepare(object).catch(error => {
       console.warn('Panorama shaders will compile on first draw', error);
     });
-    const cloudProgram = prepare(clouds.mesh);
+    const cloudProgram = Promise.all([prepare(clouds.mesh), prepare(clouds.columnMesh)]);
     const meta = await metadata;
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
     const elevation = loading.track(loadHeightfield(meta));
@@ -1178,7 +1178,6 @@ export function createHero(
       labels?.update(camera, width, height);
       loading.frame();
       if(startGroundRelief){startGroundRelief();startGroundRelief=undefined;}
-      clouds.warmField(renderer,camera.position,post.prepare);
       // keep the frame rate up on slower devices by rendering fewer pixels
       if (dt > 0 && pixelRatio > .75) {
         const now = performance.now();
