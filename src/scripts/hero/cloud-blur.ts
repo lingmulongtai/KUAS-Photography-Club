@@ -3,6 +3,8 @@ import { ENV_GLSL } from './env.ts';
 import { HIGH_CLOUD_GLSL } from './high-clouds.ts';
 import { WEATHER_SCALE } from './cloud-columns.ts';
 
+export const cloudVolumeScale = (quality: number) => quality > .75 ? .625 : .5;
+
 /** Filter cloud samples independently of the foreground, including time-lapse motion. */
 export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Camera, clouds: THREE.Mesh, quality = 1) {
   const original = clouds.material as THREE.ShaderMaterial;
@@ -67,7 +69,7 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       const w = Math.max(1, Math.round(width * dpr)), h = Math.max(1, Math.round(height * dpr));
       // The integrated volume is smooth. Keep thin high-cloud features at output resolution.
       const scale = moving ? Math.min(.75, Math.sqrt(1_000_000 / (w * h)))
-        : Math.min(quality > .75 ? .625 : .5, Math.sqrt(1_000_000 / (w * h)));
+        : Math.min(cloudVolumeScale(quality), Math.sqrt(1_000_000 / (w * h)));
       const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
       const resized = target.width !== tw || target.height !== th;
       if (resized) target.setSize(tw, th);

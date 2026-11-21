@@ -7,7 +7,7 @@ function setup() {
   const camera = new THREE.PerspectiveCamera(50, 1.6, 1, 80000);
   camera.position.set(3200, 230, -1500);
   camera.rotation.y = .9;
-  const material = new THREE.ShaderMaterial({ uniforms: { wind: { value: new THREE.Vector2() } } });
+  const material = new THREE.ShaderMaterial({ uniforms: { wind: { value: new THREE.Vector2() }, uVolumeOnly: {value:false} } });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(), material);
   const color = new THREE.Color(.3, .2, .1);
   const initialTarget = {}, captures = [], frames = [];
@@ -19,6 +19,8 @@ function setup() {
     getClearAlpha: () => alpha, getClearColor: t => t.copy(color),
     setClearColor(c, a) { color.set(c); alpha = a; }, clear() {},
     render(scene, eye) {
+      assert.equal(scene.children[0].material.uniforms.uVolumeOnly.value,true);
+      assert.equal(material.uniforms.uVolumeOnly.value,false);
       captures.push({ target, rect: target.scissor.clone(), eye: eye.quaternion.clone(),
         wind: scene.children[0].material.uniforms.wind.value.x });
     },

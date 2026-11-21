@@ -31,7 +31,7 @@ import { createForest } from './trees';
 import { buildMeteors } from './meteors';
 import { buildCampus, campusTreeSpots } from './campus';
 import { buildClouds } from './clouds';
-import { createCloudBlur } from './cloud-blur';
+import { cloudVolumeScale, createCloudBlur } from './cloud-blur';
 import { createCloudHistory } from './cloud-history';
 import {createCloudClock,createCloudMotion} from './cloud-weather';
 import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio } from './look-controls';
@@ -1164,10 +1164,12 @@ export function createHero(
           panoramaCity.render(camera, renderScene);
         else renderScene();
       };
-      const steadySky = mode === 'city' && view === 'shogunzuka' && !flight && !exploring &&
+      const steadySky = mode === 'city' && !flight &&
         cloudFrame.blur[0] === 0 && cloudFrame.blur[1] === 0;
+      const fullPanorama = steadySky && view === 'shogunzuka' && !exploring;
+      const cloudRatio = pixelRatio * (fullPanorama ? 1 : cloudVolumeScale(opts.quality));
       if (!steadySky) cloudHistory.invalidate();
-      if (!steadySky || !cloudHistory.render(Math.round(width * pixelRatio), Math.round(height * pixelRatio),
+      if (!steadySky || !cloudHistory.render(Math.round(width * cloudRatio), Math.round(height * cloudRatio),
         clouds.weather, travel, date.getTime(), draw, dt)) {
         cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw);
       }
@@ -1182,7 +1184,7 @@ export function createHero(
         firstDrawAt ??= now;
         slow = dt > 0.034 ? slow + 1 : Math.max(0, slow - 1);
         // Faster submissions reach 45 samples earlier. Let the opening panorama settle at its requested density.
-        const openingPanorama = steadySky && now - firstDrawAt < 8000;
+        const openingPanorama = fullPanorama && now - firstDrawAt < 8000;
         if (slow > 45 && !openingPanorama) {
           slow = 0;
           lowered = true;
