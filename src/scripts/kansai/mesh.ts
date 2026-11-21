@@ -9,7 +9,7 @@ export type RGB=[number,number,number];
 export class Mesh {
   positions:number[]=[]; normals:number[]=[]; colors:number[]=[];
   uv:number[]=[];
-  surfaceType: 'land'|'wall'|'water'|'roof'='land';
+  surfaceType: 'land'|'wall'|'roof'='land';
   constructor(private width=1,private depth=1){}
   triangle(a:XYZ,b:XYZ,c:XYZ,color:RGB){
     const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
@@ -18,8 +18,8 @@ export class Mesh {
     this.positions.push(...a,...b,...c);
     for(const [x,y,z] of [a,b,c]){
       this.normals.push(nx/len,ny/len,nz/len);
-      this.colors.push(...color,this.surfaceType==='roof'?255:this.surfaceType==='water'?180:this.surfaceType==='wall'?128:0);
-      if(this.surfaceType==='roof'||this.surfaceType==='water')this.uv.push(x/this.width+.5,y/this.depth+.5);
+      this.colors.push(...color,this.surfaceType==='roof'?255:this.surfaceType==='wall'?128:0);
+      if(this.surfaceType==='roof')this.uv.push(x/this.width+.5,y/this.depth+.5);
       else this.uv.push((-ny*x+nx*y)/len,z);
     }
   }

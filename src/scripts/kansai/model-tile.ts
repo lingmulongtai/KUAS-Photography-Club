@@ -7,6 +7,9 @@ import type {BuildingTag,ModelSources} from './sources';
 import type {Surveys} from './surveys';
 import {localAppearance} from './material';
 import {drawGround,roadWidth} from './ground';
+import {hyogoHeights} from './lidar';
+import type {HeightSources} from './building-heights';
+import {railStructure} from './rail';
 
 function openRing(r:Ring):Ring {
   if(r.length<2)return r;
@@ -40,18 +43,21 @@ async function heights(widget:CesiumWidget,west:number,south:number,east:number,
   };
 }
 
-export async function buildTile(widget:CesiumWidget,sources:ModelSources,x:number,y:number,owner:(p:Point)=>string|undefined){
+export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightSources:HeightSources,x:number,y:number,owner:(p:Point)=>string|undefined){
   const nw=lonLat(x,y,16),se=lonLat(x+1,y+1,16),[west,north]=nw,[east,south]=se;
   const key=(x>>4)+'/'+(y>>4), center:Point=[(west+east)/2,(north+south)/2];
   const slot=(y%16)*16+x%16;
-  const [tile,fields,tags,canopy,ground,surfaces,edges]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
-    sources.canopy([nw,se,[west,south],[east,north]]),heights(widget,west,south,east,north),sources.surfaces(x>>1,y>>1),sources.edges(x,y)]);
+  const corners:Point[]=[nw,se,[west,south],[east,north]];
+  const inHyogo=[center,...corners].some(p=>owner(p)==='28');
+  const [tile,fields,tags,canopy,ground,surfaces,edges,lidar,heightsByBuilding]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
+    sources.canopy(corners),heights(widget,west,south,east,north),sources.surfaces(x>>1,y>>1),sources.edges(x,y),
+    inHyogo?hyogoHeights(x,y):undefined,heightSources(x,y,corners)]);
   const cos=Math.cos(center[1]*Math.PI/180),mx=111319.5*cos/Math.sqrt(1-.00669438*(1-cos*cos)),my=110946;
   const local=([lon,lat]:Point):Point=>[(lon-center[0])*mx,(lat-center[1])*my];
   const here=([lon,lat]:Point)=>lon>=west&&lon<east&&lat>south&&lat<=north;
   const xyz=(p:Point,h:number):XYZ=>[...local(p),h];
   const instances:GeometryInstance[]=[],locations:Point[]=[],groundMesh=new Mesh((east-west)*mx,(north-south)*my);
-  const inWater=drawGround(groundMesh,x,y,surfaces,edges,ground,xyz,owner);
+  const {waterPrimitive,inWater}=drawGround(groundMesh,x,y,surfaces,edges,ground,xyz,owner);
   const occupied=new Map<number,Ring[][]>();
   const bin=(v:number)=>Math.max(0,Math.min(7,Math.floor(v*8)));
   const col=(p:Point)=>bin((p[0]-west)/(east-west)),row=(p:Point)=>bin((p[1]-south)/(north-south));
@@ -64,7 +70,12 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,x:numbe
       const k=j*8+i;if(!occupied.has(k))occupied.set(k,[]);occupied.get(k)!.push(rings);
     }
     const style=noise(Math.round(p[0]*1e6),Math.round(p[1]*1e6));
-    const height=(tag?.height && tag.height>0?tag.height:undefined)??(tag?.levels?tag.levels*3.1:solid?Math.min(33,8+Math.sqrt(size)*.24):size>360?8+style*3:5.6+style*2.2);
+    const mapped=tag?.height&&tag.height>0?tag.height:undefined;
+    const measured=()=>!tag?.part&&owner(p)==='28'?lidar?.(rings):undefined;
+    const inferred=solid?Math.min(33,8+Math.sqrt(size)*.24):size>360?8+style*3:5.6+style*2.2;
+    const block=heightsByBuilding.block(p);
+    const fallback=block&&block>0?Math.max(inferred*.5,Math.min(inferred*2,(inferred+block)/2)):inferred;
+    const height=mapped??measured()??(tag?.levels?tag.levels*3.1:undefined)??heightsByBuilding.predicted(rings)??fallback;
     const base=ground(p),minimum=tag?.minHeight??(tag?.minLevel??0)*3.1;
     if(height<=minimum)return;
     const roofShape=tag?.roof??(!solid&&size<320?(style>.65?'hipped':'gabled'):'flat');
@@ -78,6 +89,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,x:numbe
   const relevant=tags.flatMap(tag=>tag.polygons.filter(r=>r[0]?.some(([lon,lat])=>lon>=west-.003&&lon<=east+.003&&lat>=south-.003&&lat<=north+.003))
     .map(rings=>({tag,rings,point:midpoint(rings[0])})));
   const outlines=relevant.filter(row=>!row.tag.part),parts=relevant.filter(row=>row.tag.part);
+  const taggedHeight=(tag:BuildingTag)=>tag.height??(tag.levels===undefined?0:tag.levels*3.1);
   const matched=new Set<string>();
   const buildings=tile?.layers.BldA;
   for(let i=0;i<(buildings?.length??0);i++){
@@ -93,18 +105,19 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,x:numbe
   }
   for(const row of relevant){
     if(!here(row.point)||!owner(row.point))continue;
-    if(!row.tag.part && parts.some(part=>inPolygon(part.point,row.rings))) {
-      // Avoid filling open spaces between the explicitly mapped building parts.
-      if(!row.tag.height&&!row.tag.levels)continue;
-    }
+    // A station outline may repeat the full tower height. Its podium and towers
+    // are represented by their individual parts in both near and distant views.
+    if(!row.tag.part && parts.some(part=>inPolygon(part.point,row.rings)
+      && taggedHeight(part.tag)>=.95*taggedHeight(row.tag)))continue;
     appendBuilding(row.rings,row.point,row.tag,matched.has(row.tag.id)&&row.tag.levels!==undefined&&row.tag.levels>3);
   }
   for(const name of ['RdCL','RailCL','RailTrCL']){
     const layer=tile?.layers[name];if(!layer)continue;
     for(let i=0;i<layer.length;i++){
       const f=layer.feature(i),props=f.properties;
-      if(/地下|トンネル|未供用/.test(String(props.vt_railstate)))continue;
-      const road=name==='RdCL',raised=road||/橋|高架/.test(String(props.vt_railstate));
+      const structure=railStructure(name,Number(props.vt_code),String(props.vt_railstate));
+      if(structure==='hidden')continue;
+      const road=name==='RdCL',raised=road||structure==='raised';
       const width=road?roadWidth(props.vt_rnkwidth):name==='RailCL'?4.6:2.6;
       for(const line of f.loadGeometry()){
         let distance=0;
@@ -155,7 +168,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,x:numbe
     appearance:localAppearance(x,y),
     asynchronous:false,allowPicking:false,compressVertices:false,vertexCacheOptimize:false}):undefined;
   let applied=-1;
-  return {primitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys){
+  return {primitive,waterPrimitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys){
     if(!primitive?.ready||surveys.revision===applied)return;
     for(let i=0;i<locations.length;i++){
       const attr=primitive.getGeometryInstanceAttributes(String(i));

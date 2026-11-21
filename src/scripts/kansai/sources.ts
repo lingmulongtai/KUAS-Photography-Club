@@ -14,7 +14,7 @@ export async function inflate(bytes:Uint8Array<ArrayBuffer>):Promise<ArrayBuffer
   if(bytes[0]!==31 || bytes[1]!==139)return bytes.slice().buffer;
   return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
 }
-function cache<T>(capacity:number, read:(key:string)=>Promise<T>) {
+export function cache<T>(capacity:number, read:(key:string)=>Promise<T>) {
   const pending=new Map<string,Promise<T>>();
   return (key:string)=>{
     const hit=pending.get(key);

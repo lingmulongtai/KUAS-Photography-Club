@@ -8,10 +8,18 @@ import {KANSAI} from '../src/data/kansai.ts';
 import {OUTINGS} from '../src/data/kansai-outings.ts';
 import {prefectureLookup,tileXY,inPolygon} from '../src/scripts/kansai/coordinates.ts';
 import {pitchedRoof} from '../src/scripts/kansai/roofs.ts';
+import {railStructure} from '../src/scripts/kansai/rail.ts';
 
 const root=new URL('../public/kansai/',import.meta.url);
 const json=file=>JSON.parse(readFileSync(new URL(file,root),'utf8'));
 const owner=prefectureLookup(json('prefectures.json').features);
+
+test('both GSI rail representations keep underground lines out of the rose garden',()=>{
+  assert.equal(railStructure('RailCL',8201,'地下'),'hidden');
+  assert.equal(railStructure('RailTrCL',2804,''),'hidden');
+  assert.equal(railStructure('RailTrCL',2803,''),'raised');
+  assert.equal(railStructure('RailTrCL',2801,''),'surface');
+});
 
 test('all outing cameras land inside the named prefecture, including the Mt. Ikoma border',()=>{
   assert.equal(OUTINGS.length,34);

@@ -30,12 +30,12 @@ export function localAppearance(x:number,y:number){
       in vec2 v_uv;
       void main(){
         vec3 base=v_color.rgb;
-        if(v_color.a>.65){
+        if(v_color.a>.8){
           czm_materialInput inputData;
           inputData.st=clamp(v_uv,0.002,0.998);
           vec3 photo=czm_getMaterial(inputData).diffuse;
           // During texture streaming the engine supplies a white placeholder.
-          if(min(photo.r,min(photo.g,photo.b))<.995)base=mix(base,photo,v_color.a>.8?.88:.68);
+          if(min(photo.r,min(photo.g,photo.b))<.995)base=mix(base,photo,.88);
         }else if(v_color.a>.25){
           vec2 pitch=vec2(3.05,3.12);
           vec2 coord=v_uv/pitch;
