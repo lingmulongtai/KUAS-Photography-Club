@@ -5,7 +5,7 @@ import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
 import { kyotoTower } from './kyoto-tower';
 import { goldenPavilion, kiyomizuHall, pagoda, ryoanji, shishinden, togetsukyo } from './temple-models';
-import { SPOTS } from '../../data/spots';
+import { KYOTO_TOWER_LOCATION, SPOTS } from '../../data/spots';
 import {templeHall} from './compound-models';
 import {heianShrine,HEIAN_CENTER} from './heian-shrine';
 import {imperialPalace} from './imperial-palace';
@@ -94,7 +94,7 @@ interface Placed {
 }
 
 const LANDMARKS: Record<string, Placed> = {
-  kyotoTower: { parts: kyotoTower(), lat: 34.9875524, lon: 135.7593295 },
+  kyotoTower: { parts: kyotoTower(), ...KYOTO_TOWER_LOCATION },
   kyotoStation:{parts:kyotoStation(),...STATION_CENTER},
   toji: { parts: pagoda(5, 9.5, 6.6, 54.8, 12, WOOD, ROOF), x: -984, z: 2632 },
   tojiKondo:{parts:templeHall(44.56,29.11,24.9,true),x:-1077.32,z:2578.44},
@@ -115,6 +115,7 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
   const geos: THREE.BufferGeometry[] = [...extraParts,...fushimiInari((x,z)=>hf.height(x,z)),...byodoinParts((x,z)=>hf.height(x,z))].map(paint);
   const positions: Record<string, THREE.Vector3> = {};
   const sites:Record<string,Placed>={...LANDMARKS,...imperialPalace(),...nijoCastle()};
+  const stationGeos: THREE.BufferGeometry[] = [];
   for (const [name, l] of Object.entries(sites)) {
     const p = l.lat !== undefined ? toLocal(l.lat, l.lon!) : { x: l.x!, z: l.z! };
     const y = hf.height(p.x, p.z);
@@ -123,10 +124,11 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
       const g = paint(part);
       if (l.rotY) g.rotateY(l.rotY);
       g.translate(p.x, y, p.z);
-      geos.push(g);
+      (name === 'kyotoStation' ? stationGeos : geos).push(g);
     }
   }
-  const geo = mergeGeometries(geos);
+  const stationStart = geos.reduce((n,g) => n + g.getAttribute('position').count, 0);
+  const geo = mergeGeometries(geos.concat(stationGeos));
   const material = new THREE.ShaderMaterial({
     uniforms: env,
     vertexShader: /* glsl */ `
@@ -187,7 +189,11 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
   }));
   glazing.name='kyoto-station-glazing';
   glazing.position.copy(positions.kyotoStation);
-  return { mesh, glazing, positions };
+  function showStationFallback(show: boolean) {
+    geo.setDrawRange(0, show ? Infinity : stationStart);
+    glazing.visible = show;
+  }
+  return { mesh, glazing, positions, showStationFallback };
 }
 
 /** Red aviation lights blinking on the tallest structures. */

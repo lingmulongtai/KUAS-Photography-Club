@@ -3,6 +3,8 @@ import type { KamoChannel } from './kamo-channel';
 
 /** Keep nearby triangles on the same world lattice across streaming updates. */
 function terrainAxis(lo:number,hi:number,center:number,segments:number,anchored:boolean) {
+  // A distant viewpoint can be outside the fallback DEM when the outer grid fails to load.
+  if (center <= lo || center >= hi) center = (lo + hi) / 2;
   const values=new Float64Array(segments+1),half=Math.floor(segments/4),step=8,radius=half*step;
   const anchorMin=Math.ceil((lo+radius)/step)*step,anchorMax=Math.floor((hi-radius)/step)*step;
   const stable=anchored&&segments>=100&&anchorMin<=anchorMax;
@@ -18,7 +20,7 @@ function terrainAxis(lo:number,hi:number,center:number,segments:number,anchored:
       values[i]=u<0?center-(center-lo)*s:center+(hi-center)*s;
     }
   }
-  values[0]=lo-20000;values[segments]=hi+20000;
+  values[0]=lo;values[segments]=hi;
   return values;
 }
 
@@ -28,16 +30,14 @@ function terrainGrid(hf: Heightfield, center: { x: number; z: number }, segments
   const n = segments + 1;
   // Snapshot both axes before yielding; the explorer can keep moving meanwhile.
   const xs=terrainAxis(minX,maxX,center.x,segments,anchored),zs=terrainAxis(minZ,maxZ,center.z,segments,anchored);
-  const clampedX=xs.map(x=>Math.min(Math.max(x,minX),maxX));
   const pos = new Float32Array(n * n * 3);
   const write = (first: number, end: number) => { for (let j = first; j < end; j++) {
     const z=zs[j];
-    const cz = Math.min(Math.max(z, minZ), maxZ);
     for (let i = 0; i < n; i++) {
-      const x = xs[i], cx = clampedX[i], k = (j * n + i) * 3;
+      const x = xs[i], k = (j * n + i) * 3;
       pos[k] = x;
-      const ground = hf.height(cx, cz);
-      pos[k + 1] = (channel ? channel.bed(cx, cz, ground) : ground) - (cx !== x || cz !== z ? 60 : 0);
+      const ground = hf.height(x, z);
+      pos[k + 1] = channel ? channel.bed(x, z, ground) : ground;
       pos[k + 2] = z;
     }
   }};

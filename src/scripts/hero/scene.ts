@@ -59,6 +59,7 @@ import {createRegionalLoader,regionAt,regionInView,type CityRegion} from './regi
 import {replacesHeianFootprint} from './heian-shrine';
 import {replacesNijoFootprint,replacesNijoBox} from './nijo-castle';
 import {replacesKyotoStation} from './kyoto-station';
+import stationMatches from '../../data/kyoto-station-replacements.json';
 import {kawaramachiFacades} from './kawaramachi-facades';
 import {gionStreetscape} from './gion-streetscape';
 import {buildKameokaCampus,isKameokaBuilding,KAMEOKA_CENTER} from './kameoka-campus';
@@ -193,6 +194,7 @@ export function createHero(
   let cancelTreePlanting: (() => void) | null = null;
   let startGroundRelief: (() => void) | undefined;
   let updateGroundRelief: ((x:number,z:number) => void) | undefined;
+  let updateStation: (() => void) | undefined;
   let driveCars: ((dt: number) => void) | null = null;
   /** Cities whose roofs switch to stepped blocks near the camera. */
   const cityLods = new Set<ReturnType<typeof buildCity>>();
@@ -404,8 +406,10 @@ export function createHero(
       () => true,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
       VIEWS.shogunzuka.eye,
+      new Set([...stationMatches.boxes.map(([i]) => buildings.boxes[i]), ...stationMatches.polys.map(([i]) => buildings.polys[i])]),
     );
     if (!city) throw new Error('Initial city preparation cancelled');
+    city.fallback.name = 'Station district fallback';
     panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
       eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });
     scene.add(panoramaCity.group);
@@ -462,6 +466,40 @@ export function createHero(
     scene.add(campusModel);
     casts(campusModel);
     scene.add(city.group, landmarks.mesh, landmarks.glazing);
+    const station = landmarks.positions.kyotoStation;
+    let stationDetail: Awaited<ReturnType<typeof import('./station-detail').loadStationDetail>> | undefined;
+    let stationLoading = false;
+    let retryStationAt = 0;
+    updateStation = () => {
+      const distanceSq = camera.position.distanceToSquared(station);
+      if (stationDetail) {
+        const group = stationDetail.group;
+        const range = group.visible ? 1450 : 1100;
+        const visible = distanceSq <= range * range;
+        if (visible !== group.visible) {
+          group.visible = visible;
+          landmarks.showStationFallback(!visible);
+          city.fallback.visible = !visible;
+          shadow.invalidate();
+        }
+        if (distanceSq > 2600 * 2600) {
+          scene.remove(group);
+          stationDetail.dispose();
+          stationDetail = undefined;
+        }
+      } else if (distanceSq < 1250 * 1250 && !stationLoading && performance.now() >= retryStationAt) {
+        stationLoading = true;
+        void import('./station-detail').then(m => m.loadStationDetail(env, hf, station, lite)).then(detail => {
+          stationDetail = detail;
+          detail.group.visible = false;
+          scene.add(detail.group);
+          updateStation?.();
+        }).catch(error => {
+          retryStationAt = performance.now() + 30000;
+          console.warn('Kyoto Station detail failed to load', error);
+        }).finally(() => { stationLoading = false; });
+      }
+    };
     if (city.overview) scene.add(city.overview);
     casts(city.group);
     cityLods.add(city);
@@ -775,7 +813,7 @@ export function createHero(
     const weights=seasonWeights(season,jstParts(date).month);
     const previousBase=clouds.weather.base;
     clouds.setClimate(climateOf(season,jstParts(date).month));
-    const adjustedView=view==='daimonji' && previousBase!==clouds.weather.base ? currentView(view) : VIEW;
+    const adjustedView=previousBase!==clouds.weather.base ? currentView(view) : VIEW;
     if(adjustedView.above!==VIEW.above){
       VIEW=adjustedView;
       eye.copy(eyeOf(VIEW));
@@ -793,13 +831,13 @@ export function createHero(
     env.uSpring.value=weights.spring;env.uAutumn.value=weights.autumn;env.uSnow.value=weights.snow;
     snow.points.visible=weights.snow>0;
     env.uSunDir.value.set(...directionFrom(sun));
-    shadow.update(env.uSunDir.value);
     env.uZenith.value.copy(look.zenith);
     env.uMid.value.copy(look.mid);
     env.uHorizon.value.copy(look.horizon);
     env.uGlow.value.copy(look.glow).multiplyScalar(look.glowAmt);
-    const sunVisible = THREE.MathUtils.smoothstep(alt, -1.2, 1.2);
-    env.uSunLight.value.copy(look.sun).multiplyScalar(look.sunAmt * sunVisible);
+    const directSun = look.sunAmt * THREE.MathUtils.smoothstep(alt, -1.2, 1.2);
+    env.uSunLight.value.copy(look.sun).multiplyScalar(directSun);
+    shadow.update(env.uSunDir.value, directSun);
     env.uCloudLight.value.copy(look.cloud).multiplyScalar(look.cloudAmt);
     env.uCity.value = look.city;
     env.uLit.value = windowsLit(minutes);
@@ -1084,6 +1122,7 @@ export function createHero(
       lastTarget.copy(p.target);
     }
     camera.lookAt(lastTarget);
+    updateStation?.();
     updateGroundRelief?.(camera.position.x,camera.position.z);
     const detail = env.uHighlight.value > 0.02;
     if (campusModel && campusModel.visible !== detail) {

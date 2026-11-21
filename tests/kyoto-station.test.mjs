@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {kyotoStation,stationGlazing,replacesKyotoStation} from '../src/scripts/hero/kyoto-station.ts';
 import {loadBuildings} from '../src/scripts/hero/buildings-data.ts';
 
@@ -34,4 +35,50 @@ test('glass encloses the north facade and roof above an open concourse',()=>{
     assert.equal(ray(x,4,-90,0,0,1).length,0);
   }
   geometry.dispose(); material.dispose();
+});
+
+async function verifyDistrictAsset(filename) {
+  const file = await readFile(new URL('../public/kyoto/' + filename, import.meta.url));
+  assert.equal(file.toString('ascii', 0, 4), 'glTF');
+  assert.equal(file.readUInt32LE(8), file.length);
+  const model = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
+  assert.ok(model.extensionsRequired.includes('EXT_meshopt_compression'));
+  assert.ok(model.images.every(image => image.mimeType === 'image/webp' && Number.isInteger(image.bufferView)));
+  assert.equal(model.images.length, 10);
+  const bounds = new THREE.Box3();
+  for (const node of model.nodes.filter(node => node.mesh !== undefined)) {
+    for (const primitive of model.meshes[node.mesh].primitives) {
+      const pos = model.accessors[primitive.attributes.POSITION];
+      for (const point of [pos.min, pos.max]) {
+        bounds.expandByPoint(new THREE.Vector3(...point)
+          .multiply(new THREE.Vector3(...node.scale)).add(new THREE.Vector3(...node.translation)));
+      }
+    }
+  }
+  assert.ok(bounds.min.x < -460 && bounds.max.x > 370 && bounds.max.x < 385);
+  assert.ok(bounds.min.z < -350 && bounds.max.z < 55);
+  assert.ok(bounds.max.y > 59 && bounds.max.y < 80, 'the detailed district leaves the tower to its landmark');
+  assert.ok(!model.materials.some(material => material.name.startsWith('District tower ')));
+  assert.ok(model.materials.some(material => material.name.startsWith('District facade ')));
+  assert.ok(model.materials.some(material => material.name.startsWith('Plaza-')));
+  assert.ok(model.materials.some(material => material.name === 'Atrium glazing'));
+  assert.ok(model.meshes.some(mesh => mesh.primitives.some(primitive =>
+    model.materials[primitive.material].name === 'KYcb0061_org.001'
+  )), 'the opaque station envelope can be selected for planar wall lighting');
+  return file.length;
+}
+
+test('both station detail profiles retain the surveyed geometry, embedded photos and plaza', async () => {
+  const full = await verifyDistrictAsset('kyoto-station-district.glb');
+  const compact = await verifyDistrictAsset('kyoto-station-district-compact.glb');
+  assert.ok(compact < full * .85, 'the compact detail profile reduces the download');
+});
+
+test('the station replacement indices match the shipped city footprints', async () => {
+  const matches = JSON.parse(await readFile(new URL('../src/data/kyoto-station-replacements.json', import.meta.url), 'utf8'));
+  const file = await readFile(new URL('../public/kyoto/buildings.bin', import.meta.url));
+  assert.equal(createHash('sha256').update(file).digest('hex'), matches.buildingsSha256);
+  assert.equal(matches.boxes.length + matches.polys.length, 211);
+  assert.ok(matches.boxes.some(([,survey]) => survey === 26));
+  assert.ok(matches.polys.some(([,survey]) => survey === 95));
 });

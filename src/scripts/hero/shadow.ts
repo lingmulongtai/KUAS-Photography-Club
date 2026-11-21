@@ -78,15 +78,19 @@ export function createSunShadow(renderer: THREE.WebGLRenderer, scene: THREE.Scen
     invalidate() {
       dirty = true;
     },
-    /** Re-render the shadow map if the sun moved; turn shadows off when the sun is down. */
-    update(sunDir: THREE.Vector3) {
-      const up = sunDir.y > 0.003;
-      env.uShadowOn.value = up ? 1 : 0;
-      if (!up) return;
-      if (!dirty && last.dot(sunDir) > Math.cos(0.0012)) return;
-      // while the sun sweeps (time switching) re-render at most five times a second
+    /** The first directly lit frame needs the current shadow, including below the horizon at twilight. */
+    update(sunDir: THREE.Vector3, directSun: number) {
+      env.uShadowOn.value = directSun > 0 ? 1 : 0;
+      if (directSun <= 0) {
+        dirty = true;
+        return;
+      }
+      const alignment = last.dot(sunDir);
+      if (!dirty && alignment > Math.cos(0.0012)) return;
+      // Small movements can reuse a recent map. A time-slider jump needs the
+      // new direction immediately, especially for long shadows at low sun.
       const now = performance.now();
-      if (!dirty && now - lastRender < 200) return;
+      if (!dirty && now - lastRender < 200 && alignment > Math.cos(2 * Math.PI / 180)) return;
       lastRender = now;
       dirty = false;
       last.copy(sunDir);

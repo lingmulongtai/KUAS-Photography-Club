@@ -132,6 +132,11 @@ vec3 skyColor(vec3 dir){
   return c;
 }
 
+/* Background behind the last surveyed ridge, also visible when looking down from altitude. */
+vec3 skyBackground(vec3 dir){
+  return mix(skyColor(dir), uHorizon * .35, smoothstep(0., .08, -dir.y));
+}
+
 /* Colour of the haze seen in a direction: the horizon sky, brighter toward the sun. */
 vec3 hazeColor(vec3 dir){
   vec3 d = normalize(vec3(dir.x, max(dir.y, 0.) * .5 + .02, dir.z));
@@ -162,6 +167,11 @@ float cityLightShimmer(vec3 wp){
   float wave=.65*sin(uTime*.55+wp.x*.013+wp.z*.009)
             +.35*sin(uTime*.91-wp.x*.017+wp.z*.011);
   return 1.+(.012+.09*distant)*wave;
+}
+
+const vec3 WARM_WINDOW = vec3(1., .58, .26);
+vec3 cityWindowRadiance(float coolMix, bool wooden){
+  return mix(WARM_WINDOW, vec3(.95, .85, .7), coolMix) * (wooden ? .75 : 1.05) * uCity;
 }
 
 /* lit: reflected light, emit: self-lit (windows, lamps). */

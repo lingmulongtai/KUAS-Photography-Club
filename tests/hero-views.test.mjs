@@ -28,8 +28,6 @@ test('panoramas turn at a fixed observation point', () => {
     assert.equal(VIEWS[id].orbit,undefined);
     assert.ok(VIEWS[id].above>0);
   }
-  const atago=SPOTS.find(s=>s.id==='atago');
-  assert.deepEqual(VIEWS.atago.ref,toLocal(atago.lat,atago.lon));
   assert.equal('funaoka' in VIEWS,false);
 });
 
@@ -87,13 +85,53 @@ test('the Yamashina-side panorama frames Inari on the left and clears the lowest
   }
 });
 
-test('the single Tennozan view faces Kyoto Station from over the confluence', () => {
-  const view=VIEWS.tennozan, station=toLocal(34.9858,135.7588);
-  const bearing=Math.atan2(station.x-view.eye.x,view.eye.z-station.z)*180/Math.PI;
-  assert.ok(Math.abs(view.bearing-bearing)<4);
+function panoramaCamera(view, eyeHeight) {
+  const camera=new PerspectiveCamera(39.58,2000/1067,20,60000);
+  camera.position.set(view.eye.x,eyeHeight,view.eye.z);
+  const rad=Math.PI/180, yaw=view.bearing*rad, pitch=view.pitch*rad;
+  camera.lookAt(camera.position.clone().add(new Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch))));
+  camera.updateMatrixWorld();
+  return camera;
+}
+
+function checkPins(camera,terrain,anchors) {
+  for(const [id,x,y] of anchors){
+    const pin=SPOTS.find(s=>s.id===id), p=toLocal(pin.lat,pin.lon);
+    const ndc=new Vector3(p.x,terrain(p.x,p.z)+pin.above,p.z).project(camera);
+    assert.ok(Math.abs((ndc.x+1)/2-x)<.02 && Math.abs((1-ndc.y)/2-y)<.02,id);
+  }
+}
+
+test('Tennozan and Atago frame opposite sides of Kyoto and clear winter clouds', async t => {
+  const hf=await surveyedTerrain(t), terrain=(x,z)=>hf.height(x,z);
   assert.equal(PANORAMA_VIEWS.length,7);
   assert.equal(openingPanorama(()=>10,850,null,'osakaSkyline'),'tennozan');
-  assert.ok(view.eye.z>toLocal(34.897931,135.679798).z+900);
+  for(const [id,anchors] of [
+    ['tennozan',[['kuas',.40,.37],['nijo',.51,.37],['tower',.62,.37],['inari',.75,.39]]],
+    ['atago',[['daimonji',.18,.43],['yamashina',.33,.44],['toji',.58,.47],['arashiyama',.88,.64]]],
+  ]){
+    const view=VIEWS[id], ground=terrain(view.ref.x,view.ref.z);
+    checkPins(panoramaCamera(view,ground+view.above),terrain,anchors);
+    const winter=viewBelowClouds(id,ground,LOWEST_CLOUD_BASE);
+    assert.equal(winter.eye,view.eye);
+    assert.ok(winter.above>=80 && ground+winter.above<=LOWEST_CLOUD_BASE-80);
+    assert.equal(openingPanorama(terrain,LOWEST_CLOUD_BASE,null,id),id);
+  }
+});
+
+test('Kameoka Terrace keeps the campus roofs below the open basin',async t=>{
+  const hf=await surveyedTerrain(t), view=VIEWS.kameokaTerrace;
+  const height=hf.height(view.ref.x,view.ref.z)+view.above;
+  assert.ok(height+80<LOWEST_CLOUD_BASE);
+  const camera=panoramaCamera(view,height);
+  // Northwest roof corner of the bio building and southwest corner of Hobunkan.
+  for(const [x,y,z,screenX,screenY] of [
+    [-18989.89,159.83,1000.35,.364,.671],
+    [-18692.39,155.58,967.85,.517,.685],
+  ]){
+    const p=new Vector3(x,y,z).project(camera);
+    assert.ok(Math.abs((p.x+1)/2-screenX)<.015 && Math.abs((1-p.y)/2-screenY)<.015);
+  }
 });
 
 test('every map spot has a camera destination and landmarks stay centred', () => {
@@ -131,15 +169,6 @@ test('Daimonji frames the firebed below the western skyline and stays clear of l
     const eyeHeight=ground+view.above;
     assert.ok(eyeHeight+80<=base && eyeHeight>terrain(view.eye.x,view.eye.z)+80);
     assert.equal(openingPanorama(terrain,base,null,'daimonji'),'daimonji');
-    const camera=new PerspectiveCamera(39.58,2000/1067,20,60000);
-    camera.position.set(view.eye.x,eyeHeight,view.eye.z);
-    const rad=Math.PI/180, yaw=view.bearing*rad, pitch=view.pitch*rad;
-    camera.lookAt(camera.position.clone().add(new Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch))));
-    camera.updateMatrixWorld();
-    for(const [id,x,y] of base===1500?anchors:anchors.slice(0,1)){
-      const pin=SPOTS.find(s=>s.id===id), p=toLocal(pin.lat,pin.lon);
-      const ndc=new Vector3(p.x,terrain(p.x,p.z)+pin.above,p.z).project(camera);
-      assert.ok(Math.abs((ndc.x+1)/2-x)<.02 && Math.abs((1-ndc.y)/2-y)<.02,id);
-    }
+    checkPins(panoramaCamera(view,eyeHeight),terrain,base===1500?anchors:anchors.slice(0,1));
   }
 });

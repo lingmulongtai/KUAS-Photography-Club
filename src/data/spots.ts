@@ -1,6 +1,9 @@
+// Centre of three shaft rings in the Kyoto City station survey (Building.026).
+export const KYOTO_TOWER_LOCATION = {lat: 34.9875572, lon: 135.7593223};
+
 /** Shared place IDs for content, admin and hero pins. */
 export const SPOTS = [
-  { id: 'tower', rank: 1, ja: '京都タワー', en: 'Kyoto Tower', lat: 34.9875524, lon: 135.7593295, above: 140 },
+  { id: 'tower', rank: 1, ja: '京都タワー', en: 'Kyoto Tower', ...KYOTO_TOWER_LOCATION, above: 140 },
   { id: 'station', rank: 4, ja: '京都駅', en: 'Kyoto Station', lat: 34.9858, lon: 135.7588, above: 72 },
   { id: 'toji', rank: 2, ja: '東寺', en: 'Toji', lat: 34.98016, lon: 135.74757, above: 64 },
   { id: 'yasaka', rank: 3, ja: '八坂の塔', en: 'Yasaka Pagoda', lat: 34.99823, lon: 135.77905, above: 52 },
