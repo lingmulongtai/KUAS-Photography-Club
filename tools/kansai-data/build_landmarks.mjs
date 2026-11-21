@@ -5,6 +5,7 @@ import {createServer} from 'vite';
 import {portTower} from './port-tower.mjs';
 import {districtModel} from './nankinmachi.mjs';
 import {kasugaBuildings} from './kasuga.mjs';
+import {flightAviary} from './aviary.mjs';
 import {greatBuddhaHall,hikoneKeep,harborHotel,roseGarden} from './outing-landmarks.mjs';
 
 const project=fileURLToPath(new URL('../../',import.meta.url));
@@ -103,6 +104,8 @@ try{
   // build_osaka_keep.py retains the source ellipsoid height of the surveyed keep.
   manifest.push({id:'osaka-keep',pref:'27',lon:135.525856,lat:34.687373,ellipsoidHeight:68.477,
     file:'/kansai/landmarks/osaka-keep.glb',rings:[rect(135.525608,34.687154,135.526093,34.687592)]});
+  const aviary=flightAviary(),outline=JSON.parse(await fs.readFile(new URL('tennoji-aviary.geojson',output)));
+  await save('tennoji-aviary',aviary.parts,aviary.lon,aviary.lat,outline.geometry.coordinates,'27');
   const garden=JSON.parse(await fs.readFile(new URL('nakanoshima-beds.json',output)));
   const roseLon=135.50788,roseLat=34.69240;
   await save('nakanoshima-roses',roseGarden(garden.beds,roseLon,roseLat),roseLon,roseLat,[],'27');
