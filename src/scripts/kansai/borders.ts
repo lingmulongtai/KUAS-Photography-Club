@@ -3,8 +3,16 @@ import {C} from './engine';
 
 // Classify the visible world position after opaque terrain, buildings, roads and
 // water have drawn. The same survey line therefore cuts through crossing meshes.
-export function prefectureCutout(widget:CesiumWidget,initial:string){
-  const root='/kansai/borders/';
+export async function prefectureCutout(widget:CesiumWidget,initial:string){
+  // Present the first frame with the same administrative cut as every later frame.
+  const {canvas}=widget.scene;
+  canvas.style.visibility='hidden';
+  if(!widget.scene.pickPositionSupported)throw new Error('The prefecture boundary needs a depth texture.');
+  const [coarse,districts,edges,islets]=await Promise.all(['prefectures','districts','edges','islets'].map(async name=>{
+    const image=new Image();image.src='/kansai/borders/'+name+'.png';
+    await image.decode();return image;
+  }));
+  if(widget.isDestroyed())return ()=>{};
   const fragmentShader=`
     uniform sampler2D colorTexture;
     uniform sampler2D depthTexture;
@@ -131,9 +139,16 @@ export function prefectureCutout(widget:CesiumWidget,initial:string){
   widget.scene.preRender.addEventListener(updateCamera);
   const stage=widget.scene.postProcessStages.add(new C.PostProcessStage({
     name:'kansai-prefecture-cutout',fragmentShader,
-    uniforms:{selected:Number(initial),coarse:root+'prefectures.png',districts:root+'districts.png',edges:root+'edges.png',
-      islets:root+'islets.png',eyeToENU:()=>eyeToENU,cameraCell:()=>cameraCell,cameraFraction:()=>cameraFraction,
+    uniforms:{selected:Number(initial),coarse,districts,edges,islets,
+      eyeToENU:()=>eyeToENU,cameraCell:()=>cameraCell,cameraFraction:()=>cameraFraction,
       curvature:()=>curvature,curvatureSlope:()=>curvatureSlope},
   }));
+  let readyLastFrame=false;
+  const stop=widget.scene.postRender.addEventListener(()=>{
+    if(readyLastFrame&&stage.ready){canvas.style.visibility='';stop();return;}
+    readyLastFrame=stage.ready;
+    widget.scene.requestRender();
+  });
+  widget.scene.requestRender();
   return (pref:string)=>{stage.uniforms.selected=Number(pref);widget.scene.requestRender();};
 }

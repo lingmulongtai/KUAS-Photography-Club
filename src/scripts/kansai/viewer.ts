@@ -43,7 +43,10 @@ export async function startMap(root:HTMLElement){
   widget.clock.currentTime=C.JulianDate.fromIso8601('2026-05-15T04:30:00Z');
   const display=fireworks(widget,root.querySelector<HTMLButtonElement>('[data-fireworks]')!,en);
   let selected=byId(new URLSearchParams(location.search).get('view')??'26')??byId('26')!;
-  const showPrefecture=prefectureCutout(widget,selected.pref);
+  let showPrefecture:((pref:string)=>void)|undefined;
+  const boundary=prefectureCutout(widget,selected.pref).then(select=>{
+    if(!widget.isDestroyed()){showPrefecture=select;select(selected.pref);}
+  });
   function frame(place:typeof selected,height:number){
     const focus=height+('targetHeight' in place?place.targetHeight:0);
     scene.camera.lookAt(C.Cartesian3.fromDegrees(place.lon,place.lat,focus),new C.HeadingPitchRange(
@@ -53,7 +56,7 @@ export async function startMap(root:HTMLElement){
   async function visit(place:typeof selected){
     selected=place;userMoved=false;const token=++sequence;
     expoLink.hidden=place.id!==EXPO.id;
-    showPrefecture(place.pref);
+    showPrefecture?.(place.pref);
     display.select(place.id);
     terrainPrograms.select(scene.globe.enableLighting);
     prefecture.value=place.pref;outing.value=place.id===place.pref?'':place.id;
@@ -85,7 +88,9 @@ export async function startMap(root:HTMLElement){
     .then(provider=>{if(widget.isDestroyed())return;widget.terrainProvider=provider;ready=true;void visit(selected);})
     .catch(()=>{status.textContent=en?'Elevation is unavailable. Showing aerial imagery.':'標高を取得できません。航空写真を表示しています。';});
   let surveyFailed=false;
-  await terrain;if(widget.isDestroyed())return;
+  try{await Promise.all([terrain,boundary]);}
+  catch(error){dispose();throw error;}
+  if(widget.isDestroyed())return;
   const architecture=await architecturalModels(widget);
   const surveys=await attachSurveys(widget,()=>{surveyFailed=true;},[selected.lon,selected.lat],architecture);
   if(widget.isDestroyed())return;
