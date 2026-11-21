@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-/** Render only the moving cloud layer at reduced resolution, then blur it in screen space. */
+/** Filter cloud samples independently of the foreground, including time-lapse motion. */
 export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Camera, clouds: THREE.Mesh) {
   const original = clouds.material as THREE.Material;
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false });
@@ -12,6 +12,7 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
     uCloud: { value: target.texture },
     uResolution: { value: new THREE.Vector2(1, 1) },
     uStep: { value: new THREE.Vector2() },
+    uCloudRadius: { value: new THREE.Vector2() },
   };
   const material = new THREE.ShaderMaterial({
     uniforms,
@@ -20,11 +21,19 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       uniform sampler2D uCloud;
       uniform vec2 uResolution;
       uniform vec2 uStep;
+      uniform vec2 uCloudRadius;
       void main(){
         vec2 uv = gl_FragCoord.xy / uResolution;
-        vec4 c = texture2D(uCloud, uv) * .375;
-        c += (texture2D(uCloud, uv + uStep) + texture2D(uCloud, uv - uStep)) * .25;
-        c += (texture2D(uCloud, uv + 2. * uStep) + texture2D(uCloud, uv - 2. * uStep)) * .0625;
+        vec4 c;
+        if (uCloudRadius.x > 0.) {
+          vec2 d = uCloudRadius, e = vec2(d.x, -d.y);
+          c = .2 * (texture2D(uCloud, uv) + texture2D(uCloud, uv+d) + texture2D(uCloud, uv-d)
+                    + texture2D(uCloud, uv+e) + texture2D(uCloud, uv-e));
+        } else {
+          c = texture2D(uCloud, uv) * .375;
+          c += (texture2D(uCloud, uv + uStep) + texture2D(uCloud, uv - uStep)) * .25;
+          c += (texture2D(uCloud, uv + 2. * uStep) + texture2D(uCloud, uv - 2. * uStep)) * .0625;
+        }
         gl_FragColor = vec4(c.a > .0005 ? c.rgb / c.a : vec3(0.), c.a);
       }
     `,
@@ -37,18 +46,20 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
   const viewRotation = new THREE.Matrix3();
   let failed = false, verified = false;
   return {
-    render(blur: readonly [number, number], width: number, height: number, dpr: number, draw: () => void) {
+    render(blur: readonly [number, number], width: number, height: number, dpr: number, draw: () => void, proximity=0) {
       const strength = Math.hypot(...blur);
-      if (failed || !Number.isFinite(strength) || strength < .0015) { draw(); return; }
+      if (failed || !Number.isFinite(strength) || (strength < .0015 && !proximity)) { draw(); return; }
       camera.updateMatrixWorld();
       viewRotation.setFromMatrix4(camera.matrixWorldInverse);
       localWind.set(blur[0], 0, blur[1]).applyMatrix3(viewRotation);
       const screenLength = Math.hypot(localWind.x, localWind.y);
       // A wind parallel to the view has no single screen-space direction.
-      const lateral = Math.min(1, screenLength / strength * 2);
-      if (lateral < .05) { draw(); return; }
+      const lateral = strength > 0 ? Math.min(1, screenLength / strength * 2) : 0;
+      const moving = strength >= .0015 && lateral >= .05;
+      if (!moving && !proximity) { draw(); return; }
       const w = Math.max(1, Math.round(width * dpr)), h = Math.max(1, Math.round(height * dpr));
-      const scale = Math.min(.75, Math.sqrt(1_000_000 / (w * h)));
+      const scale = moving ? Math.min(.75, Math.sqrt(1_000_000 / (w * h)))
+        : Math.min(1, Math.sqrt(2_000_000 / (w * h)));
       const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
       const resized = target.width !== tw || target.height !== th;
       if (resized) target.setSize(tw, th);
@@ -63,10 +74,11 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
         renderer.setClearColor(0, 0);
         renderer.clear(true, false, false);
         renderer.render(isolated, camera);
-        const dx = localWind.x / screenLength, dy = localWind.y / screenLength;
-        const pixels = Math.min(1, (strength - .0015) / .0285) * lateral * 4 * dpr;
+        const pixels = moving ? Math.min(1, (strength - .0015) / .0285) * lateral * 4 * dpr / screenLength : 0;
+        const radius = moving ? 0 : 1.45 * proximity;
         uniforms.uResolution.value.set(w, h);
-        uniforms.uStep.value.set(dx * pixels / w, dy * pixels / h);
+        uniforms.uStep.value.set(localWind.x * pixels / w, localWind.y * pixels / h);
+        uniforms.uCloudRadius.value.set(radius / tw, radius / th);
       } catch (error) {
         failed = true;
         console.warn('Cloud motion blur unavailable', error);

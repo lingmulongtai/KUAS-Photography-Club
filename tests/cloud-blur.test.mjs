@@ -29,6 +29,21 @@ test('still clouds keep their original material and moving clouds use one bounde
   h.blur.dispose();
 });
 
+test('a camera inside the layer resolves still clouds with finite, symmetric sample offsets',()=>{
+  const h=setup();
+  h.blur.render([0,0],1200,800,1,()=>{
+    assert.notEqual(h.mesh.material,h.original);
+    const {uCloudRadius,uStep,uCloud}=h.mesh.material.uniforms;
+    assert.deepEqual(uStep.value.toArray(),[0,0]);
+    const radius=uCloudRadius.value.x*uCloud.value.image.width;
+    assert.ok(radius>1&&radius<2);
+    assert.ok(Math.abs(radius-uCloudRadius.value.y*uCloud.value.image.height)<1e-6);
+  },1);
+  assert.equal(h.counts().offscreen,1);
+  assert.equal(h.mesh.material,h.original);
+  h.blur.dispose();
+});
+
 test('view-aligned wind and an incomplete framebuffer use the sharp fallback',()=>{
   const h=setup();let draws=0;
   h.blur.render([0,-.03],100,100,1,()=>{draws++;assert.equal(h.mesh.material,h.original);});

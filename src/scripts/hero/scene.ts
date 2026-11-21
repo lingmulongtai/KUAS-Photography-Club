@@ -1169,7 +1169,9 @@ export function createHero(
       if (!steadySky) cloudHistory.invalidate();
       if (!steadySky || !cloudHistory.render(Math.round(width * pixelRatio), Math.round(height * pixelRatio),
         clouds.weather, travel, date.getTime(), draw, dt)) {
-        cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw);
+        const outsideLayer=Math.max(clouds.weather.base-camera.position.y,camera.position.y-clouds.weather.top,0);
+        const proximity=1-THREE.MathUtils.smoothstep(outsideLayer,0,300);
+        cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw, proximity);
       }
       frameQueue.submitted();
       opts.onFrameSubmitted?.();
