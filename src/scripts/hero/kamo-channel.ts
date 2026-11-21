@@ -70,7 +70,44 @@ export function createKamoChannel(lines:LineFeature[],ground:(x:number,z:number)
   const smooth=(v:number)=>{const t=Math.max(0,Math.min(1,v));return t*t*(3-2*t);};
   const stability=(x:number,z:number)=>smooth(Math.min(z-box[1],box[3]-z)/200)*smooth(Math.min(x-box[0],box[2]-x)/40);
   const surface=(x:number,z:number,h:number)=>h+.4+(level(z)-h-.4)*stability(x,z);
-  const bed=(x:number,z:number,h:number)=>contains(x,z)?Math.min(h,surface(x,z,h)-.6):h;
+  // The DEM can jump several metres across the precise water mask. Give the
+  // terrain and the two ledges one continuous grade on both sides of the shore.
+  const fringe=8, bucket=32;
+  type Segment={x:number;z:number;dx:number;dz:number;inverse:number};
+  const bins=new Map<number,Segment[]>();
+  const key=(cx:number,cz:number)=>cx*4096+cz;
+  for(const p of polygons)for(const ring of [p.outer,...p.holes]){
+    for(let i=0,j=ring.length-2;i<ring.length;j=i,i+=2){
+      const x=ring[j],z=ring[j+1],endX=ring[i],endZ=ring[i+1],dx=endX-x,dz=endZ-z;
+      if(!dx&&!dz)continue;
+      const segment={x,z,dx,dz,inverse:1/(dx*dx+dz*dz)};
+      const west=Math.max(box[0],Math.min(x,endX)-fringe),east=Math.min(box[2],Math.max(x,endX)+fringe);
+      const north=Math.max(box[1],Math.min(z,endZ)-fringe),south=Math.min(box[3],Math.max(z,endZ)+fringe);
+      for(let cx=Math.floor(west/bucket);cx<=Math.floor(east/bucket);cx++){
+        for(let cz=Math.floor(north/bucket);cz<=Math.floor(south/bucket);cz++){
+          const k=key(cx,cz);
+          if(!bins.has(k))bins.set(k,[]);
+          bins.get(k)!.push(segment);
+        }
+      }
+    }
+  }
+  const bed=(x:number,z:number,h:number)=>{
+    if(!inBounds(x,z))return h;
+    const nearby=bins.get(key(Math.floor(x/bucket),Math.floor(z/bucket)));
+    const wet=contains(x,z);
+    if(!wet && !nearby)return h;
+    const water=surface(x,z,h);
+    const original=wet?Math.min(h,water-.6):h;
+    if(!nearby)return original;
+    let d2=fringe*fringe;
+    for(const s of nearby){
+      const px=x-s.x,pz=z-s.z,t=Math.max(0,Math.min(1,(px*s.dx+pz*s.dz)*s.inverse));
+      d2=Math.min(d2,(px-t*s.dx)**2+(pz-t*s.dz)**2);
+    }
+    const blend=(1-smooth(Math.sqrt(d2)/fringe))*stability(x,z);
+    return original+(water-.08-original)*blend;
+  };
   return {box,polygons,owns,inBounds,contains,level,stability,surface,bed};
 }
 

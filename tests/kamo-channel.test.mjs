@@ -24,6 +24,9 @@ test('the river surface stays level across raised banks and flows south past a r
     assert.ok(Math.abs(river.surface(1050,z,100)-100.4)<1e-9,'meet legacy water exactly at patch ends');
   }
   assert.equal(river.stability(1050,-1653),1);
+  const bank=x=>river.bed(x,-1500,ground(x,-1500));
+  assert.ok(Math.abs(bank(999.8)-bank(1000.2))<.15,'the bank has no binary height jump at the shoreline');
+  assert.equal(bank(990),ground(990,-1500),'land outside the narrow bank keeps its DEM elevation');
   assert.ok(Math.abs(river.surface(1050,1499,100)-river.surface(1050,1500,100))<.01,'no sudden step at the patch edge');
 });
 

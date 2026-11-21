@@ -586,10 +586,7 @@ export function createHero(
     startGroundRelief=() => idle(() => {
       void import('./ground-relief').then(({createGroundRelief}) => {
         const ground=(x:number,z:number)=>hf.height(x,z);
-        const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>{
-          const h=ground(x,z);
-          return channel.contains(x,z)?Math.min(h,channel.surface(x,z,h)-.12):h;
-        },refreshForest);
+        const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,ground(x,z)),refreshForest);
         scene.add(relief.group);
         cultivated=relief.containsField;
         updateGroundRelief=relief.update;
