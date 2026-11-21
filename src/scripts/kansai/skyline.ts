@@ -1,95 +1,77 @@
-import type {CesiumWidget,GeometryInstance} from 'cesium';
+import type {CesiumWidget,Cesium3DTileContent,Cesium3DTile} from 'cesium';
 import {C} from './engine';
 import {lonLat,tileXY,type Point} from './coordinates';
-import {Mesh,building,noise} from './mesh';
-import {midpoint} from './model-tile';
-import {inflate,json} from './sources';
+import {json} from './sources';
 import type {Surveys} from './surveys';
 
-type SkylineRow=[height:number,minimum:number,source:number,part:number,rings:number[][]];
-async function makeDistrict(widget:CesiumWidget,x:number,y:number){
-  const response=await fetch('/kansai/skyline/'+x+'-'+y+'.json.gz');
-  if(!response.ok)throw Error('Skyline '+response.status);
-  const rows:SkylineRow[]=JSON.parse(new TextDecoder().decode(await inflate(new Uint8Array(await response.arrayBuffer()))));
-  const origin=lonLat(x+.5,y+.5,12),radians=origin[1]*Math.PI/180;
-  const cos=Math.cos(radians),mx=111319.5*cos/Math.sqrt(1-.00669438*(1-cos*cos));
-  const shapes=rows.map(row=>{
-    const rings=row[4].map(flat=>{
-      const ring:Point[]=[];
-      for(let i=0;i<flat.length;i+=2)ring.push(lonLat(x+flat[i]/16384,y+flat[i+1]/16384,12));
-      return ring;
-    });
-    const centre=midpoint(rings[0]);
-    const tile=tileXY(...centre,16).map(Math.floor).join('/');
-    return {rings,centre,height:row[0],min:row[1],tile};
-  });
-  const points=shapes.map(f=>C.Cartographic.fromDegrees(...f.centre));
-  if(widget.terrainProvider.availability)await C.sampleTerrain(widget.terrainProvider,11,points);
-  const instances:GeometryInstance[]=[],locations:{point:Point;tile:string;id:string}[]=[];
-  for(let i=0;i<shapes.length;i++){
-    const {rings,centre,height,min,tile}=shapes[i],base=points[i].height??0;
-    const local=rings.map(r=>r.map(p=>[(p[0]-origin[0])*mx,(p[1]-origin[1])*110946] as Point));
-    const m=new Mesh();
-    building(m,local,base+min,base+Math.max(height,min+.2),0,noise(i,x+y),'flat',min?base+min:base-2);
-    // Distant buildings use opaque vertex colours, without a second set of façade textures.
-    for(let j=3;j<m.colors.length;j+=4)m.colors[j]=255;
-    const id=String(i),instance=m.instance(id);
-    if(instance){instances.push(instance);locations.push({point:centre,tile,id});}
-  }
-  const primitive=instances.length?new C.Primitive({geometryInstances:instances,
-    modelMatrix:C.Transforms.eastNorthUpToFixedFrame(C.Cartesian3.fromDegrees(...origin)),
-    appearance:new C.PerInstanceColorAppearance({flat:false,translucent:false}),
-    asynchronous:false,allowPicking:false,compressVertices:false}):undefined;
-  let revision='',shown=new Uint8Array(locations.length).fill(1);
-  return {primitive,refresh(surveys:Surveys,near:ReadonlySet<string>,signature:string){
-    if(!primitive?.ready || revision===signature)return;
-    revision=signature;
-    for(let i=0;i<locations.length;i++){
-      const {point,tile,id}=locations[i],value=near.has(tile)||surveys.contains(point)?0:1;
-      if(value!==shown[i]){
-        primitive.getGeometryInstanceAttributes(id).show=new Uint8Array([value]);
-        shown[i]=value;
-      }
-    }
-  }};
-}
-
 export async function distantModels(widget:CesiumWidget,surveys:Surveys){
-  const {tiles}=await json<{tiles:string[]}>('skyline/index.json'),available=new Set(tiles);
-  const resident=new Map<string,Awaited<ReturnType<typeof makeDistrict>>>(),pending=new Set<string>(),retry=new Map<string,number>();
-  let wanted:string[]=[],signature='',alive=true;
-  function pump(){
-    if(!alive)return;
-    for(const key of wanted){
-      if(pending.size>=2)break;
-      if(resident.has(key)||pending.has(key)||(retry.get(key)??0)>Date.now())continue;
+  const {tiles}=await json<{tiles:string[]}>('skyline/index.json');
+  const available=new Set(tiles),scene=widget.scene;
+  const resident=new Map<string,InstanceType<typeof C.Cesium3DTileset>>(),pending=new Set<string>(),retry=new Map<string,number>();
+  const spheres=new Map<string,InstanceType<typeof C.BoundingSphere>>();
+  const batches=new WeakMap<Cesium3DTileContent,{point:Point;tile:string;shown:boolean}[]>();
+  const refreshed=new WeakMap<Cesium3DTileContent,string>();
+  let wanted=new Set<string>(),near:ReadonlySet<string>=new Set(),mask='',alive=true;
+  let lastView='',lastDirection=new C.Cartesian3();
+  function visible(tile:Cesium3DTile){
+    const content=tile.content;
+    if(!content.ready||refreshed.get(content)===mask)return;
+    let rows=batches.get(content);
+    if(!rows){
+      rows=[];
+      for(let i=0;i<content.featuresLength;i++){
+        const feature=content.getFeature(i),point:Point=[feature.getProperty('lon'),feature.getProperty('lat')];
+        rows.push({point,tile:tileXY(...point,16).map(Math.floor).join('/'),shown:true});
+      }
+      batches.set(content,rows);
+    }
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i],show=!near.has(row.tile)&&!surveys.contains(row.point);
+      if(show!==row.shown){content.getFeature(i).show=show;row.shown=show;}
+    }
+    refreshed.set(content,mask);
+  }
+  async function pump(){
+    while(alive&&pending.size<2){
+      const key=[...wanted].find(k=>!resident.has(k)&&!pending.has(k)&&(retry.get(k)??0)<=Date.now());
+      if(!key)return;
       pending.add(key);
-      const [x,y]=key.split('/').map(Number);
-      void makeDistrict(widget,x,y).then(d=>{
-        if(!alive||!wanted.includes(key)){d.primitive?.destroy();return;}
-        if(d.primitive)widget.scene.primitives.add(d.primitive);resident.set(key,d);widget.scene.requestRender();
-      }).catch(()=>retry.set(key,Date.now()+30000)).finally(()=>{pending.delete(key);if(alive)window.setTimeout(pump,40);});
+      try{
+        const model=await C.Cesium3DTileset.fromUrl('/kansai/skyline-mesh/'+key.replace('/','-')+'.json',{
+          maximumScreenSpaceError:8,enableCollision:false,cacheBytes:6*1024*1024,maximumCacheOverflowBytes:4*1024*1024,
+        });
+        if(!alive||!wanted.has(key)||widget.isDestroyed()){model.destroy();continue;}
+        model.tileVisible.addEventListener(visible);
+        resident.set(key,model);scene.primitives.add(model);scene.requestRender();
+      }catch(error){if(alive){if(!retry.has(key))console.warn('Distant buildings',key,error);retry.set(key,Date.now()+20000);}}
+      finally{pending.delete(key);}
     }
   }
   return {
-    update(target:Point,altitude:number,near:Set<string>){
+    update(target:Point,altitude:number,nearby:ReadonlySet<string>){
+      near=nearby;mask=surveys.revision+':'+[...nearby].join(',');
       const [cx,cy]=tileXY(...target,12).map(Math.floor),far=altitude>55000;
-      const view=cx+'/'+cy+'/'+far;
-      if(view!==signature){
-        signature=view;
-        const keys:{key:string;distance:number}[]=[];
+      const signature=cx+'/'+cy+'/'+far,cam=scene.camera;
+      if(lastView!==signature||C.Cartesian3.distance(cam.directionWC,lastDirection)>.025){
+        lastView=signature;C.Cartesian3.clone(cam.directionWC,lastDirection);
+        const view=cam.frustum.computeCullingVolume(cam.positionWC,cam.directionWC,cam.upWC);
+        const entries:{key:string;distance:number}[]=[];
         if(!far)for(let j=-2;j<=2;j++)for(let i=-2;i<=2;i++){
-          const key=(cx+i)+'/'+(cy+j);if(available.has(key))keys.push({key,distance:i*i+j*j});
+          const x=cx+i,y=cy+j,key=x+'/'+y;if(!available.has(key))continue;
+          let sphere=spheres.get(key);
+          if(!sphere){
+            const [w,n]=lonLat(x,y,12),[e,s]=lonLat(x+1,y+1,12);
+            sphere=C.BoundingSphere.fromRectangle3D(C.Rectangle.fromDegrees(w,s,e,n));
+            sphere.radius+=900;spheres.set(key,sphere);
+          }
+          if((i||j)&&view.computeVisibility(sphere)===C.Intersect.OUTSIDE)continue;
+          entries.push({key,distance:i*i+j*j});
         }
-        wanted=keys.sort((a,b)=>a.distance-b.distance).map(k=>k.key);
-        for(const [key,d] of resident)if(!wanted.includes(key)){
-          if(d.primitive)widget.scene.primitives.remove(d.primitive);resident.delete(key);
-        }
+        wanted=new Set(entries.sort((a,b)=>a.distance-b.distance).map(v=>v.key));
+        for(const [k,model] of resident)if(!wanted.has(k)){scene.primitives.remove(model);resident.delete(k);}
       }
-      pump();
-      const mask=surveys.revision+':'+[...near].join(',');
-      for(const d of resident.values())d.refresh(surveys,near,mask);
+      void pump();void pump();
     },
-    dispose(){alive=false;}
+    dispose(){alive=false;for(const model of resident.values())scene.primitives.remove(model);resident.clear();}
   };
 }
