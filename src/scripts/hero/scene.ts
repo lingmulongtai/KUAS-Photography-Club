@@ -378,6 +378,13 @@ export function createHero(
       VIEWS.shogunzuka.eye,
     );
     if (!city) throw new Error('Initial city preparation cancelled');
+    panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
+      eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });
+    scene.add(panoramaCity.group);
+    if(view==='shogunzuka'){
+      city.updateLod(eyeOf(VIEW),pxPerM);
+      panoramaCity.prepare();
+    }
     await yieldToBrowser();
     const builtSize = lite ? 1024 : 2048;
     const coreBuilt = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
@@ -428,9 +435,6 @@ export function createHero(
     casts(campusModel);
     scene.add(city.group, landmarks.mesh, landmarks.glazing);
     if (city.overview) scene.add(city.overview);
-    panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
-      eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });
-    scene.add(panoramaCity.group);
     casts(city.group);
     cityLods.add(city);
     casts(landmarks.mesh);
@@ -627,7 +631,9 @@ export function createHero(
     };
     const residentSouth=southSurvey.then(async survey=>{
       if(!survey)return false;
-      installOverview(await buildResidentCity(env,hf,survey.buildings,survey.region.box));
+      const skyline=await buildResidentCity(env,hf,survey.buildings,survey.region.box);
+      await prepare(skyline.mesh);
+      installOverview(skyline);
       return true;
     }).catch(error=>{console.warn('Southern survey unavailable; using sampled skyline',error);return false;});
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
