@@ -32,7 +32,6 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
 
     uVolumeOnly: { value: false },
     uMarchSteps: { value: detail === 2 ? 40 : 22 },
-    uEdgeRefinements: { value: detail + 2 },
     uCover: { value: weather.cover },
     uClear: { value: weather.clear },
     uStyle: { value: weather.style },
@@ -63,7 +62,6 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
       uniform float uTop;
       uniform bool uVolumeOnly;
       uniform int uMarchSteps;
-      uniform int uEdgeRefinements;
       varying vec3 vWorld;
 
       /** weather-map units per metre: one unit is about 9 km */
@@ -174,9 +172,9 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           // horizon must not move the samples already inside a nearby cloud.
           float verticalLimit = (uTop - uBase) / (float(uMarchSteps) * max(abs(rd.y), .001));
           #if DETAIL > 1
-          float maxStep = min(76., verticalLimit), startStep = min(16., maxStep);
+          float maxStep = min(56., verticalLimit), startStep = min(16., maxStep);
           #else
-          float maxStep = min(96., verticalLimit), startStep = min(20., maxStep);
+          float maxStep = min(72., verticalLimit), startStep = min(18., maxStep);
           #endif
           float knee = maxStep - startStep;
           vec4 grid = vec4(startStep, maxStep, knee, knee*(startStep + .5*knee));
@@ -186,7 +184,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           float layerDepth = uTop-uBase;
           bool useCeilings = uColumnsReady && !isStyle(3.) && !isStyle(4.);
           for (int i = 0; i < uMarchSteps * 32; ++i) {
-            if (T < .012 || t >= t1) break;
+            if (T < .002 || t >= t1) break;
             if (useCeilings && t >= nextBlock) {
               float run;
               bool empty = emptyColumnRun(uColumnEye + rd.xz*t/outerColumnMetres, rd.xz,
@@ -207,23 +205,11 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
             float d1 = density(ro + rd*nextT, nextT);
             float lo = t, hi = nextT, left = d0, right = d1;
             t = nextT; d0 = d1;
-            if (max(left, right) <= .002) continue;
-            if ((left > .002) != (right > .002)) {
-              // Locate both entrances and exits. Only the occupied part absorbs light.
-              float a = lo, b = hi;
-              for (int k = 0; k < uEdgeRefinements; ++k) {
-                float m = .5*(a+b);
-                if ((density(ro+rd*m, m) > .002) == (right > .002)) b=m; else a=m;
-              }
-              if (left <= .002) lo=a; else hi=b;
-            }
-            // Integrate extinction over the segment, and shade at its optical-depth centroid.
-            // A middle sample resolves steep changes; nearly uniform interiors integrate linearly.
-            float middle = .5*(left+right);
-            if (abs(left-right) > .12) {
-              float m = .5*(lo+hi);
-              middle = density(ro+rd*m, m);
-            }
+            // Simpson integration is continuous as a billow enters or leaves the interval.
+            // Its midpoint also sees thin wisps between two empty endpoints.
+            float midT = .5*(lo+hi);
+            float middle = density(ro+rd*midT, midT);
+            if (max(max(left, right), middle) < .00001) continue;
             float mass = left + 4.*middle + right;
             float segmentDensity = mass / 6., dt = hi-lo;
             float shadeT = mix(lo, hi, (2.*middle + right) / mass);
