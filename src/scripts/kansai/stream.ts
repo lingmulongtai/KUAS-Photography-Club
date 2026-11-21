@@ -2,13 +2,14 @@ import type {CesiumWidget} from 'cesium';
 import {C} from './engine';
 import {tileXY,lonLat,type Point} from './coordinates';
 import {buildTile} from './model-tile';
+import {setaWater} from './seta-water';
 import {tileQueue} from './tile-queue';
 import type {Surveys} from './surveys';
 import type {distantModels} from './skyline';
 
 export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited<ReturnType<typeof distantModels>>,
   update:(count:number)=>void){
-  const queue=tileQueue();
+  const queue=tileQueue(),bridgeWater=setaWater(widget);
   const scene=widget.scene,resident=new Map<string,Awaited<ReturnType<typeof buildTile>>>(),pending=new Set<string>();
   const prepared=new Map<string,Awaited<ReturnType<typeof buildTile>>>();
   let wanted=new Map<string,Point>(),alive=true,previous='',timer=0,readyCount=-1;
@@ -27,6 +28,7 @@ export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited
     void surveys.updatePhoto(target,altitude);
     const near=new Set<string>();
     for(const [key,tile] of resident)if(tile.primitive?.ready)near.add(key);
+    bridgeWater.update(near);
     if(near.size!==readyCount){readyCount=near.size;update(readyCount);}
     distant.update(target,altitude,near);
     const overview=altitude>10500;
@@ -91,7 +93,7 @@ export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited
     }
   });
   const poll=window.setInterval(()=>{plan();pump();},3000);
-  return ()=>{alive=false;stop();queue.dispose();clearInterval(poll);clearTimeout(timer);distant.dispose();surveys.dispose();
+  return ()=>{alive=false;stop();queue.dispose();bridgeWater.dispose();clearInterval(poll);clearTimeout(timer);distant.dispose();surveys.dispose();
     for(const tile of prepared.values()){tile.releaseMaterial();tile.primitive?.destroy();}prepared.clear();
     for(const tile of resident.values())tile.releaseMaterial();resident.clear();};
 }
