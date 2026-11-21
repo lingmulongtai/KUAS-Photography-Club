@@ -103,7 +103,17 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
               float street = vertical * exp(-abs(height-3.)/9.);
               light += uCity * street * (.08+base) * vec3(.047,.035,.024);
             #else
-              light += uCity * interior * levels * transmission * vec3(.15,.104,.060);
+              #ifdef STATION_ENVELOPE
+                // A continuous curtain wall shows reflected ceilings and deeper
+                // rooms along a floor, with the photo retaining its actual mullions.
+                float floorSeed = hash12(vec2(floor(rooms.y), 23.));
+                float bays = .5+.5*cos(along*.085 + floorSeed*6.);
+                float ceiling = 1.-smoothstep(.06,.54,abs(fract(rooms.y)-.68));
+                float floorLight = mix(.30, (.14+.86*ceiling)*(.22+.78*bays), detail);
+                light += uCity * levels * transmission * mix(interior,floorLight,.62) * vec3(.127,.091,.057);
+              #else
+                light += uCity * interior * levels * transmission * vec3(.15,.104,.060);
+              #endif
               // Pools of warm light at the entrance continue softly up the north wall.
               float pool = .72+.28*cos((vWorld.x+45.)*.13);
               light += uCity * plaza * pool * (.22+base) * vec3(.092,.065,.042);
