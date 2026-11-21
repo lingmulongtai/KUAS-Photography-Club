@@ -19,7 +19,7 @@ function setTextSlot(el: Element, index: number, value: string) {
   else el.insertBefore(document.createTextNode(value), end);
 }
 
-export function mountHomeLanguage(source: Element, remember: (lang: SiteLanguage) => boolean) {
+export function mountHomeLanguage(source: Element, remember: (lang: SiteLanguage) => boolean, carryInLinks: (lang: SiteLanguage) => void) {
   const toggle = document.querySelector<HTMLAnchorElement>('.site-header .language-switch')!;
   // Only parse the translations if the visitor actually switches languages.
   let copy: HomeCopy | undefined;
@@ -48,15 +48,8 @@ export function mountHomeLanguage(source: Element, remember: (lang: SiteLanguage
         else el.setAttribute(key, value);
       }
     }
-    if (!stored) {
-      document.querySelectorAll<HTMLAnchorElement>('a[href^="/"]').forEach(link => {
-        const target = new URL(link.href);
-        if (target.origin !== location.origin) return;
-        target.searchParams.set('lang', link.dataset.language ?? lang);
-        link.href = target.href;
-      });
-    }
     document.dispatchEvent(new Event('home:language'));
+    if (!stored) carryInLinks(lang);
   }
   toggle.addEventListener('click', event => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey ||

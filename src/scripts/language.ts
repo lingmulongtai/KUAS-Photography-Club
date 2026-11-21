@@ -12,6 +12,14 @@ const explicit = requested === 'ja' || requested === 'en' ? requested : null;
 function remember(lang: SiteLanguage) {
   try { localStorage.setItem(LANGUAGE_KEY, lang); return true; } catch { return false; }
 }
+function carryInLinks(lang: SiteLanguage) {
+  document.querySelectorAll<HTMLAnchorElement>('a[href^="/"]').forEach(link => {
+    const target = new URL(link.href);
+    if (target.origin !== location.origin) return;
+    target.searchParams.set('lang', link.dataset.language ?? lang);
+    link.setAttribute('href', target.pathname + target.search + target.hash);
+  });
+}
 if (explicit) {
   saved = explicit;
   if (!remember(explicit)) storageAvailable = false;
@@ -27,7 +35,7 @@ if (switchingHome) {
 // Only an explicit, saved visitor choice may redirect the Japanese page.
 const preferred = saved === 'en' ? 'en' : 'ja';
 const homeCopy = document.getElementById('home-copy');
-const showHome = homeCopy && mountHomeLanguage(homeCopy, remember);
+const showHome = homeCopy && mountHomeLanguage(homeCopy, remember, carryInLinks);
 if (current === 'ja' && preferred === 'en' && !document.documentElement.classList.contains('screenshot-preview') && supportsLanguagePreference(location.pathname)) {
   if (showHome) showHome('en', 'replace');
   else location.replace(languagePath(location.pathname, 'en') + location.search + location.hash);
@@ -45,11 +53,4 @@ document.querySelectorAll<HTMLAnchorElement>('[data-language]').forEach(link => 
   });
 });
 
-if (!storageAvailable && explicit) {
-  document.querySelectorAll<HTMLAnchorElement>('a[href^="/"]').forEach(link => {
-    const target = new URL(link.href);
-    if (target.origin !== location.origin) return;
-    target.searchParams.set('lang', explicit);
-    link.href = target.href;
-  });
-}
+if (!storageAvailable && explicit) carryInLinks(explicit);

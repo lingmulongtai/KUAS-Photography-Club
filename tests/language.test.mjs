@@ -33,11 +33,11 @@ test('language pairs round trip and guidelines retain their existing English URL
 const source = readFileSync(new URL('../src/scripts/language.ts', import.meta.url), 'utf8').replace(/^import [^\n]+;\s*/gm, '');
 const languageScript = stripTypeScriptTypes(source);
 
-function visit(href, { lang = 'ja', saved = null, storage = true, preview = false } = {}) {
+function visit(href, { lang = 'ja', saved = null, storage = true, preview = false, links = [] } = {}) {
   const document = {
     documentElement: { lang, classList: { contains: name => preview && name === 'screenshot-preview' } },
     getElementById: () => null,
-    querySelectorAll: () => [],
+    querySelectorAll: selector => selector === 'a[href^="/"]' ? links : [],
   };
   const location = new URL(href, 'https://club.example');
   let redirected = null;
@@ -84,4 +84,18 @@ test('either home switch selects the destination once, even when opened in anoth
   const otherPage = visit('/about/' + HOME_LANGUAGE_SWITCH_HASH);
   assert.equal(otherPage.saved, null);
   assert.equal(otherPage.location.hash, HOME_LANGUAGE_SWITCH_HASH);
+});
+
+test('with storage blocked, content links carry the current language and the switch carries its destination', () => {
+  function link(path, language) {
+    return {
+      path, dataset: { language },
+      get href() { return new URL(this.path, 'https://club.example').href; },
+      setAttribute(name, value) { assert.equal(name, 'href'); this.path = value; },
+    };
+  }
+  const content = link('/en/trips/?page=2#photos'), toggle = link('/#switch-language', 'ja');
+  visit('/en/?lang=en', { lang: 'en', storage: false, links: [content, toggle] });
+  assert.equal(content.path, '/en/trips/?page=2&lang=en#photos');
+  assert.equal(toggle.path, '/?lang=ja#switch-language');
 });
