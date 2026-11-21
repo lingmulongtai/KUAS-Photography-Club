@@ -88,6 +88,8 @@ const SanitizeShader = {
 const BrightPassShader = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
+    uDepth: { value: null as THREE.DepthTexture | null },
+    uViewFromClip: { value: new THREE.Matrix4() },
     luminosityThreshold: { value: 1 },
     /** one screen pixel, in uv */
     uTexel: { value: new THREE.Vector2(1, 1) },
@@ -106,6 +108,8 @@ const BrightPassShader = {
   `,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
+    uniform sampler2D uDepth;
+    uniform mat4 uViewFromClip;
     uniform float luminosityThreshold;
     uniform vec2 uTexel;
     uniform float uSpan;
@@ -119,7 +123,15 @@ const BrightPassShader = {
       soft = soft * soft / (4. * k);
       float part = max(soft, l - t) / max(l, 1e-4);
       float whole = smoothstep(t, t + .01, l);
-      return c * mix(part, whole, uWhole);
+      float halo = mix(part, whole, uWhole);
+      if (uWhole < 1. && halo > 0.) {
+        float depth = textureLod(uDepth, uv, 0.).r;
+        vec4 view = uViewFromClip * vec4(uv*2.-1., depth*2.-1., 1.);
+        float distanceM = length(view.xyz) / view.w;
+        float nightGain = mix(.22, 1., smoothstep(150., 1050., distanceM));
+        halo *= mix(nightGain, 1., uWhole);
+      }
+      return c * halo;
     }
     void main(){
       vec2 o = uTexel * uSpan * .25;
@@ -138,6 +150,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
     type: THREE.HalfFloatType, samples, resolveDepthBuffer: false, storeMultisampledDepthBuffer: false,
+    depthTexture: new THREE.DepthTexture(1, 1),
   });
   const scenePass = new RenderPass(scene, camera);
   // Only the scene needs per-sample visibility. All subsequent passes cover every pixel.
@@ -149,6 +162,8 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   composer.addPass(sanitize);
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.7, 0.5, 0.85);
   const bright = new THREE.ShaderMaterial(BrightPassShader);
+  bright.uniforms.uDepth.value = sceneTarget.depthTexture;
+  bright.uniforms.uViewFromClip.value = camera.projectionMatrixInverse;
   bloom.materialHighPassFilter.dispose();
   bloom.materialHighPassFilter = bright;
   bloom.highPassUniforms = bright.uniforms;
@@ -204,6 +219,11 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
     },
     render(time: number) {
       finish.uniforms.uTime.value = time;
+      // Only the nocturnal bright pass samples depth. Retain its resolved
+      // attachment through the blur; the daylight pass can discard it.
+      const needsDepth = bright.uniforms.uWhole.value < 1;
+      sceneTarget.resolveDepthBuffer = needsDepth;
+      sceneTarget.storeMultisampledDepthBuffer = needsDepth;
       const previous = renderer.getRenderTarget();
       try { scenePass.render(renderer, sceneTarget, sceneTarget, 0, false); }
       finally { renderer.setRenderTarget(previous); }
