@@ -62,17 +62,24 @@ export function createForest(
     const shapes: number[] = [];
     const season:number[]=[];
     let scanned=0;
-    for (const { x, z, lod, seed } of forestCells(eye, quality,true)) {
+    const spread = [1.25, 1.55, 2.1, 3.1, 4.3, 5.5];
+    for (const { x, z, lod, level, seed } of forestCells(eye, quality, hf.bounds)) {
         if (++scanned % 512 === 0) yield;
         const cover = density(x,z);
-        if (!cover || seed >= cover || (lod < 2 && seed >= cover * standDensity(x,z)) || excluded(x,z)) continue;
+        if (seed >= cover || seed >= cover * (.55 + .45 * standDensity(x,z)) || excluded(x,z)) continue;
         const y = hf.height(x, z);
         const profile = treeProfile(x,z);
         const cedar = profile.cedar;
         pos.push(x, y - 0.5, z);
-        // Broader far clusters fill distant wooded slopes without adding tree instances.
-        const cluster = lod === 3 ? quality>.75 ? 9 : 12 : lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
-        size.push((cedar ? 2.6 : 4.2) * profile.width * cluster, (cedar ? 15 : 10.5) * profile.height);
+        const radius = (cedar ? 2.6 : 4.2) * profile.width;
+        let cluster = lod === 0 ? 1 : spread[level];
+        if (lod >= 2) {
+          // Large representative crowns are for stand interiors. Keep the scale of an
+          // individual tree beside open water, fields or a narrow mountain clearing.
+          const edge = radius * cluster;
+          if (density(x-edge,z) < .3 || density(x+edge,z) < .3 || density(x,z-edge) < .3 || density(x,z+edge) < .3) cluster = 1;
+        }
+        size.push(radius * cluster, (cedar ? 15 : 10.5) * profile.height);
         const c = sample(x,z) ?? profile.tint;
         tint.push(...profile.tint.map((v,i)=>v*.8+Math.min(c[i],.45)*.2));
         kind.push(cedar ? 1 : 0);
@@ -94,18 +101,22 @@ export function createForest(
     return { pos, size, tint, kind, lods, shapes,season };
   }
 
-  // Keep block silhouettes in every ring. Beyond the close trees, two boxes then one replace
-  // the old round crowns; distant clusters cost 12 triangles instead of 20 and cannot sparkle
-  // with subpixel voxels. Population density, chunk culling and cache budgets stay the same.
+  // Keep the stepped silhouette through the middle distance. Only the horizon
+  // reduces whole stands to a single block, with the mapped canopy below them.
   const closeCrown = voxelCrown();
   const midCrown = blocksGeometry([
     {c:[0,.56,0],s:[.9,.48,.88],shade:.4,bark:0},
     {c:[.15,.85,.08],s:[.58,.32,.56],shade:.7,bark:0},
   ]);
   const farCrown = blocksGeometry([{c:[0,.66,0],s:[.86,.65,.86],shade:.5,bark:0}]);
+  const standCrown = blocksGeometry([
+    {c:[-.13,.59,.02],s:[.67,.55,.78],shade:.42,bark:0},
+    {c:[.20,.73,-.08],s:[.52,.50,.60],shade:.68,bark:0},
+  ]);
   const closeCedar=voxelCedar();
   const midCedar=voxelCedar(2);
-  const farCedar=blocksGeometry([{c:[0,.625,0],s:[.65,.75,.65],shade:.5,bark:0}]);
+  const crownLods = [closeCrown, midCrown, standCrown, farCrown, farCrown];
+  const cedarLods = [closeCedar, midCedar, midCedar, farCrown, farCrown];
 
   const vertexShader = /* glsl */ `
       attribute vec3 iPos;
@@ -231,10 +242,10 @@ export function createForest(
     const chunks = new Map<string, number[]>();
     // Small near tiles cull whole high-detail crowns behind the eye. Sparse outer
     // trees can share larger draws without changing their shapes or positions.
-    const tileWidth = [96, 384, 1536, 3072];
+    const tileWidth = [96, 384, 1536, 3072, 8192];
     for(let i=0;i<kind.length;i++) {
       if(i && i%2048===0) yield;
-      const k=kind[i];
+      const k=lods[i] < 3 ? kind[i] : 0;
       const width = tileWidth[lods[i]];
       const key = `${Math.floor(pos[i * 3] / width)},${Math.floor(pos[i * 3 + 2] / width)},${k},${lods[i]}`;
       if (!chunks.has(key)) chunks.set(key, []);
@@ -246,7 +257,7 @@ export function createForest(
     for (const idx of chunks.values()) {
       if(++chunkCount%12===0) yield;
       const first = idx[0];
-      const shapesByLod = kind[first] === 1 ? [closeCedar,midCedar,farCedar,farCedar] : [closeCrown,midCrown,farCrown,farCrown];
+      const shapesByLod = kind[first] === 1 ? cedarLods : crownLods;
       const shape = shapesByLod[lods[first]];
       const geo = new THREE.InstancedBufferGeometry();
       geo.setIndex(shape.index);
