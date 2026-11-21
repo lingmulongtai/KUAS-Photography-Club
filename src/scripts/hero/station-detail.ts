@@ -9,7 +9,6 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
   const map = source.map;
   const glazing = source.name === 'Atrium glazing';
   const district = source.name.startsWith('District ');
-  const tower = source.name.startsWith('District tower ');
   map?.updateMatrix();
   if (map) map.anisotropy = 4;
   return new THREE.ShaderMaterial({
@@ -20,9 +19,8 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
     defines: {
       ...(map && { STATION_PHOTO: 1 }),
       ...(glazing && { ATRIUM_GLASS: 1 }),
-      ...((source.name === 'KYcb0061_org.001' || (district && !tower)) && { STATION_ENVELOPE: 1 }),
+      ...((source.name === 'KYcb0061_org.001' || district) && { STATION_ENVELOPE: 1 }),
       ...(district && { DISTRICT_BUILDING: 1 }),
-      ...(tower && { KYOTO_TOWER: 1 }),
     },
     uniforms: {
       ...env, uPhoto: { value: map }, uUvMatrix: { value: map?.matrix ?? new THREE.Matrix3() },
@@ -110,10 +108,6 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
             float aperture = mix(.20, resolved, detail);
             float interior = lit * mix(.85,lamp,detail) * aperture;
             interior = mix(interior, occupancy*.18, smoothstep(1.4,2.8,cells));
-            #ifdef KYOTO_TOWER
-              // Occupied rooms belong to the hotel below the illuminated shaft.
-              interior *= 1.-smoothstep(36.,42.,height);
-            #endif
             light += cityWindowRadiance(.34, false) * interior * transmission * levels;
             #ifdef DISTRICT_BUILDING
               float street = vertical * exp(-abs(height-3.)/9.);
@@ -133,16 +127,6 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
               light += uCity * plaza * pool * (.22+base) * vec3(.092,.065,.042);
             #endif
           }
-        #endif
-        #ifdef KYOTO_TOWER
-          // The two tower atlases include the hotel below the shaft. Highlight
-          // the surveyed shaft and original observation-deck colours above its roof.
-          float heightAGL = vWorld.y-uGroundY;
-          float shaft = smoothstep(37.,47.,heightAGL);
-          float deck = smoothstep(95.,98.,heightAGL)*(1.-smoothstep(103.,106.,heightAGL));
-          vec3 flood = vec3(.060,.052,.044) + base*vec3(.094,.083,.071);
-          flood = mix(flood, vec3(.026,.013,.007)+base*vec3(.13,.077,.042), deck);
-          light += uCity * shaft * flood;
         #endif
         vec3 col = shade(seasonalSurface(base,n,vWorld), n, vWorld, sunShadow(vWorld,n));
         float opacity = 1.;

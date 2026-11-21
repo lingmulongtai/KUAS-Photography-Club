@@ -36,7 +36,9 @@ for path, is_plaza in [(building, False), (plaza, True)]:
         raise ValueError(f"Missing station meshes in {path}")
     district = set()
     if not is_plaza:
-        district = {o for o in imported if o.type == "MESH"} - set(meshes)
+        # Kyoto Tower and its hotel are drawn by the same landmark at every distance.
+        district = {o for o in imported if o.type == "MESH" and o.parent
+                    and o.parent.name != "Building.026"} - set(meshes)
         with tempfile.TemporaryDirectory() as scratch:
             prepare_district(sorted(district, key=lambda o: o.name), site, Path(scratch), "--compact" in args[3:])
     bpy.ops.object.select_all(action="DESELECT")

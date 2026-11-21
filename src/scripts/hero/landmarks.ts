@@ -5,7 +5,7 @@ import type { Heightfield } from './heightfield';
 import { toLocal } from './geo';
 import { kyotoTower } from './kyoto-tower';
 import { goldenPavilion, kiyomizuHall, pagoda, ryoanji, shishinden, togetsukyo } from './temple-models';
-import { SPOTS } from '../../data/spots';
+import { KYOTO_TOWER_LOCATION, SPOTS } from '../../data/spots';
 import {templeHall} from './compound-models';
 import {heianShrine,HEIAN_CENTER} from './heian-shrine';
 import {imperialPalace} from './imperial-palace';
@@ -94,7 +94,7 @@ interface Placed {
 }
 
 const LANDMARKS: Record<string, Placed> = {
-  kyotoTower: { parts: kyotoTower(), lat: 34.9875524, lon: 135.7593295 },
+  kyotoTower: { parts: kyotoTower(), ...KYOTO_TOWER_LOCATION },
   kyotoStation:{parts:kyotoStation(),...STATION_CENTER},
   toji: { parts: pagoda(5, 9.5, 6.6, 54.8, 12, WOOD, ROOF), x: -984, z: 2632 },
   tojiKondo:{parts:templeHall(44.56,29.11,24.9,true),x:-1077.32,z:2578.44},
@@ -124,7 +124,7 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
       const g = paint(part);
       if (l.rotY) g.rotateY(l.rotY);
       g.translate(p.x, y, p.z);
-      (name === 'kyotoStation' || name === 'kyotoTower' ? stationGeos : geos).push(g);
+      (name === 'kyotoStation' ? stationGeos : geos).push(g);
     }
   }
   const stationStart = geos.reduce((n,g) => n + g.getAttribute('position').count, 0);

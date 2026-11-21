@@ -1,6 +1,6 @@
 import { PLACES, toLocal } from './geo.ts';
 import type { OrbitSite } from './landmark-orbit.ts';
-import { SPOTS, type SpotId } from '../../data/spots.ts';
+import { KYOTO_TOWER_LOCATION, SPOTS, type SpotId } from '../../data/spots.ts';
 
 const RAD = Math.PI / 180;
 
@@ -27,7 +27,7 @@ const ahead = (p: { x: number; z: number }, bearing: number, m: number) => ({
 const KIYOMIZU = toLocal(34.9946668, 135.7849382); // 清水寺 本堂舞台
 const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
 const INARI_EAST = toLocal(34.96358,135.79023); // Aerial view from the Yamashina side of Mt. Inari.
-const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
+const TOWER = toLocal(KYOTO_TOWER_LOCATION.lat, KYOTO_TOWER_LOCATION.lon);
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
 const ATAGO_RIDGE = toLocal(35.052699, 135.655073); // On the eastern flank, above the Katsura valley.
 const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物

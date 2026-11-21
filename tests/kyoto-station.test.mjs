@@ -44,7 +44,7 @@ async function verifyDistrictAsset(filename) {
   const model = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
   assert.ok(model.extensionsRequired.includes('EXT_meshopt_compression'));
   assert.ok(model.images.every(image => image.mimeType === 'image/webp' && Number.isInteger(image.bufferView)));
-  assert.equal(model.images.length, 11);
+  assert.equal(model.images.length, 10);
   const bounds = new THREE.Box3();
   for (const node of model.nodes.filter(node => node.mesh !== undefined)) {
     for (const primitive of model.meshes[node.mesh].primitives) {
@@ -57,8 +57,8 @@ async function verifyDistrictAsset(filename) {
   }
   assert.ok(bounds.min.x < -460 && bounds.max.x > 370 && bounds.max.x < 385);
   assert.ok(bounds.min.z < -350 && bounds.max.z < 55);
-  assert.ok(bounds.max.y > 130 && bounds.max.y < 134, 'includes the surveyed Kyoto Tower');
-  assert.ok(model.materials.some(material => material.name.startsWith('District tower ')));
+  assert.ok(bounds.max.y > 59 && bounds.max.y < 80, 'the detailed district leaves the tower to its landmark');
+  assert.ok(!model.materials.some(material => material.name.startsWith('District tower ')));
   assert.ok(model.materials.some(material => material.name.startsWith('District facade ')));
   assert.ok(model.materials.some(material => material.name.startsWith('Plaza-')));
   assert.ok(model.materials.some(material => material.name === 'Atrium glazing'));

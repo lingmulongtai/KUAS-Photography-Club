@@ -1,4 +1,4 @@
-"""Prepare the 222 neighboring survey buildings in the same local frame as the station."""
+"""Prepare the neighboring survey buildings in the same local frame as the station."""
 import gzip
 import json
 import subprocess
@@ -46,7 +46,7 @@ def prepare_district(meshes, site, folder, compact):
     minmax = {}
     for obj in meshes:
         by_building[obj.parent.name].append(obj)
-    if len(by_building) != 222:
+    if len(by_building) != 221:
         raise ValueError(f"Unexpected district building count: {len(by_building)}")
 
     for name, objects in by_building.items():
@@ -55,7 +55,7 @@ def prepare_district(meshes, site, folder, compact):
         lo, hi = corners.min(axis=0), corners.max(axis=0)
         minmax[name] = (lo, hi)
         span = max((hi-lo)[:2])
-        limit = 1280 if name == "Building.026" else 640 if span >= 60 else 384 if span >= 30 else 256
+        limit = 640 if span >= 60 else 384 if span >= 30 else 256
         for obj in objects:
             for slot in obj.material_slots:
                 image = survey_photo(slot.material)
@@ -73,10 +73,9 @@ def prepare_district(meshes, site, folder, compact):
     layout = json.loads((folder / "layout.json").read_text())
     materials, maps = {}, {}
 
-    def material(page, tower):
-        key = (page, tower)
-        if key not in materials:
-            mat = bpy.data.materials.new(f"District {'tower' if tower else 'facade'} {page}")
+    def material(page):
+        if page not in materials:
+            mat = bpy.data.materials.new(f"District facade {page}")
             mat.use_nodes = True
             shader = mat.node_tree.nodes.get("Principled BSDF")
             shader.inputs["Base Color"].default_value = (.56, .57, .57, 1)
@@ -87,8 +86,8 @@ def prepare_district(meshes, site, folder, compact):
                 node = mat.node_tree.nodes.new("ShaderNodeTexImage")
                 node.image = maps[page]
                 mat.node_tree.links.new(node.outputs["Color"], shader.inputs["Base Color"])
-            materials[key] = mat
-        return materials[key]
+            materials[page] = mat
+        return materials[page]
 
     for name, objects in by_building.items():
         lo, hi = minmax[name]
@@ -121,7 +120,7 @@ def prepare_district(meshes, site, folder, compact):
                     page, u, v, w, h = layout[photos[image]]
                     mask = face_slots == idx
                     uv[mask] = np.clip(uv[mask], 0, 1) * (w, h) + (u, v)
-                replacement = material(page, name == "Building.026")
+                replacement = material(page)
                 if len(mesh.materials):
                     mesh.materials[idx] = replacement
                 else:
