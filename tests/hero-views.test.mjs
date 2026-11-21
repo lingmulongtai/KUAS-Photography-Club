@@ -34,7 +34,7 @@ test('panoramas turn at a fixed observation point', () => {
 
 test('openings draw uniformly from clear locations and skip the previous location on reload',()=>{
   const terrain=(x,z)=>x===VIEWS.atago.ref.x && z===VIEWS.atago.ref.z?920:80;
-  const groups=[['shogunzuka'],['inariRidge'],['daimonji'],['arashiyama'],['atago'],['kameokaTerrace'],['tennozan','osakaSkyline']];
+  const groups=[['shogunzuka'],['inariRidge'],['daimonji'],['arashiyama'],['atago'],['kameokaTerrace'],['tennozan']];
   for(const previous of [null,...PANORAMA_VIEWS]){
     const choices=groups.filter(group=>!group.includes(previous));
     choices.forEach((group,i)=>group.forEach((view,j)=>{
@@ -82,21 +82,13 @@ test('the Yamashina-side panorama frames Inari on the left and clears the lowest
   }
 });
 
-test('Tennozan keeps the confluence view and has a separate view aimed at Osaka', () => {
-  const view=VIEWS.tennozan;
-  assert.deepEqual(view.ref,toLocal(34.897931,135.679798));
-  assert.deepEqual(view.eye,view.ref);
-  assert.ok(view.above>=45,'clear the mountain canopy');
-  assert.ok(view.pitch<=-10,'look down over the plain');
-  assert.ok(view.bearing>=145&&view.bearing<=180,'face the confluence and Osaka');
-  assert.ok(PANORAMA_VIEWS.includes('tennozan'));
-  const osaka=VIEWS.osakaSkyline;
-  assert.deepEqual(osaka.eye,view.eye);
-  const station=toLocal(34.702911,135.495896);
-  const bearing=(Math.atan2(station.x-osaka.eye.x,osaka.eye.z-station.z)*180/Math.PI+360)%360;
-  assert.ok(Math.abs(osaka.bearing-bearing)<3,'the Osaka skyline is centred even on narrow screens');
-  assert.ok(PANORAMA_VIEWS.includes('osakaSkyline'));
-  assert.equal('sewaritei' in VIEWS,false);
+test('the single Tennozan view faces Kyoto Station from over the confluence', () => {
+  const view=VIEWS.tennozan, station=toLocal(34.9858,135.7588);
+  const bearing=Math.atan2(station.x-view.eye.x,view.eye.z-station.z)*180/Math.PI;
+  assert.ok(Math.abs(view.bearing-bearing)<4);
+  assert.equal(PANORAMA_VIEWS.length,7);
+  assert.equal(openingPanorama(()=>10,850,null,'osakaSkyline'),'tennozan');
+  assert.ok(view.eye.z>toLocal(34.897931,135.679798).z+900);
 });
 
 test('every map spot has a camera destination and landmarks stay centred', () => {

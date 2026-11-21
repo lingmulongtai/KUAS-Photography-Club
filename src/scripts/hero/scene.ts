@@ -297,7 +297,7 @@ export function createHero(
     const ensurePhotos=ensureRegionalPhoto;
     ensureRegionalPhoto = v => {
       ensurePhotos(v);
-      sharedSlot?.select(v==='tennozan'||v==='osakaSkyline');
+      sharedSlot?.select(v==='tennozan');
     };
     ensureRegionalPhoto(view);
     terrainRecenter = terrain.recenter;
@@ -581,16 +581,14 @@ export function createHero(
       };
       return attempt();
     };
-    prefetchCityRegion=(center,target)=>{
-      const next=target==='tennozan'||target==='osakaSkyline'
-        ?regionManifest.regions.find(r=>r.id==='osaka'):regionAt(regionManifest.regions,center);
+    prefetchCityRegion=(center)=>{
+      const next=regionAt(regionManifest.regions,center);
       if(next)regionLoader.prefetch(next);
       if(next?.id==='osaka')void osakaPhotos.prefetch(center);
     };
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
-    const openingSkyline=view==='osakaSkyline'||view==='tennozan';
-    await Promise.all([cloudProgram,scenePrograms,openingRegion,openingSkyline && loadOverview('osaka')]);
+    await Promise.all([cloudProgram,scenePrograms,openingRegion,loadOverview('south')]);
     loading.built();
     startGroundRelief=() => idle(() => {
       const ground=(x:number,z:number)=>hf.height(x,z);
@@ -599,8 +597,8 @@ export function createHero(
       cultivated=relief.containsField;
       updateGroundRelief=relief.update;
     });
-    for(const area of ['south','osaka','north']){
-      if(area!=='osaka'||!openingSkyline)idle(()=>void loadOverview(area));
+    for(const area of ['osaka','north']){
+      idle(()=>void loadOverview(area));
     }
     async function loadOverview(area:string) {
       try {
