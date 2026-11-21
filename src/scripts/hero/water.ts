@@ -49,7 +49,7 @@ function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: Wat
       // A bounded fallback retains the complete shoreline if a pathological polygon is huge.
       let refined;
       for(const edge of [regionalEdge,regionalEdge*2,regionalEdge*4]) {
-        try {refined=yield* refineWaterSurfaceSteps(all,tris,edge,40000,f.attr===1?{x:senkoji.x,y:senkoji.z}:undefined);break;} catch { /* retry coarser, never drop water */ }
+        try {refined=yield* refineWaterSurfaceSteps(all,tris,edge,40000,f.attr===1?{x:senkoji.x,y:senkoji.z}:undefined,regionalSurface&&edge<=36?(x,z)=>hf.height(x,z):undefined);break;} catch { /* retry coarser, never drop water */ }
       }
       if(refined) {all=refined.points;tris=refined.triangles;}
     }
