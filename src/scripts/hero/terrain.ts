@@ -61,6 +61,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uAerialCityBox: { value: v4(tex.aerialCityBox) },
     uCityOn: { value: tex.aerialCity ? 1 : 0 },
     uWoodland: { value: tex.aerialWide },
+    uWoodlandBox: { value: v4(tex.aerialWideBox) },
     uWoodlandOn: { value: 0 },
     uTempleGrounds: { value: new THREE.Vector4(kinkaku.x,kinkaku.z,kiyomizu.x,kiyomizu.z) },
     uNormalFar: { value: tex.normalFar },
@@ -109,6 +110,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform vec4 uAerialCityBox;
       uniform float uCityOn;
       uniform sampler2D uWoodland;
+      uniform vec4 uWoodlandBox;
       uniform float uWoodlandOn;
       uniform vec4 uTempleGrounds;
       uniform sampler2D uNormalFar;
@@ -183,7 +185,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         outerPhoto=mix(vec3(.22,.25,.22),outerPhoto,inside(uOuterBox,p,1000.));
         photo=mix(photo,mix(outerPhoto,photo,inside(uAerialWideBox,p,300.)),uOuterOn);
         vec3 city = blockPhoto(uAerialCity,uAerialCityBox,p,fp);
-        float mappedForest = texture2D(uWoodland, uw).a * uWoodlandOn * inside(uAerialWideBox,p,5.);
+        vec2 forestUV = (p - uWoodlandBox.xy) / (uWoodlandBox.zw - uWoodlandBox.xy);
+        float mappedForest = texture2D(uWoodland, forestUV).r * uWoodlandOn * inside(uWoodlandBox,p,5.);
         photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
         // Sharper local photos. Only a uniform condition guards the samples, never a spatial
         // one, so automatic mip derivatives stay defined.

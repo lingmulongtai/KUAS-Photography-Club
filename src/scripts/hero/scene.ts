@@ -39,6 +39,7 @@ import {buildBridges} from './bridges';
 import { createBuildingMask } from './vegetation-mask';
 import type { Woodland } from './woodland';
 import { buildWoodlandTexture } from './woodland-texture';
+import { decodeTreeCover } from './tree-cover';
 import { infrastructureMask } from './forest-infrastructure';
 import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
@@ -113,10 +114,9 @@ export type HeroMode = 'city' | 'campus';
 const RAD = Math.PI / 180;
 
 /** Sharper local photos and the views that look over them; each loads when one of its views is first chosen. */
-const REGIONAL_PHOTOS: { key: 'arashiyama' | 'higashiyama'; views: HeroView[]; seasonal: boolean }[] = [
-  // photographed with the woods leafless or in autumn colour
-  { key: 'arashiyama', views: ['arashiyama','togetsukyo'], seasonal: true },
-  { key: 'higashiyama', views: ['shogunzuka', 'kiyomizu','yasaka'], seasonal: false },
+const REGIONAL_PHOTOS: { key: 'arashiyama' | 'higashiyama'; views: HeroView[] }[] = [
+  { key: 'arashiyama', views: ['arashiyama','togetsukyo'] },
+  { key: 'higashiyama', views: ['shogunzuka', 'kiyomizu','yasaka'] },
 ];
 
 export function createHero(
@@ -190,7 +190,7 @@ export function createHero(
   const eyeOf = (v: ViewDef) => new THREE.Vector3(v.eye.x, (groundAt ? groundAt(v.ref.x, v.ref.z) : 40) + v.above, v.eye.z);
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const loading = createHeroLoading(opts, 9);
+  const loading = createHeroLoading(opts, 10);
   // A task boundary lets the intro paint and accept input between expensive setup steps.
   const yieldToBrowser = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
@@ -207,6 +207,10 @@ export function createHero(
     if (meta.arashiyama) normalGrids.push(meta.arashiyama.elevation);
     if (meta.outer && meta.aerialOuter) normalGrids.push(meta.outer);
     const normals = elevation.then(hf => initialNormals(hf, normalGrids));
+    const treeCover = loading.track(loadBinary('tree-cover.bin').then(decodeTreeCover).catch(error => {
+      console.warn('Regional tree cover unavailable; using mapped woods and aerial imagery', error);
+      return null;
+    }));
     // Start once for every viewpoint. The first frame can still proceed on a slow connection.
     const nightLights = Promise.all([normals, loadBinary('southern-night-lights.bin')])
       .then(([maps, bytes]) => { applySouthernNightLights(bytes, [meta.far, meta.outer], maps); return true; })
@@ -257,8 +261,6 @@ export function createHero(
       photos: [meta.far.box,...regions.map((r) => r.meta.box)],
     }, opts.quality > 0.75 ? 640 : 400);
     const regionalPhotos: (Promise<unknown> | undefined)[] = [];
-    const detailedPhotos: (THREE.Texture | undefined)[] = [];
-    let updateForestPhoto:((photo:THREE.Texture,i:number)=>void) | undefined;
     // Tennozan and Arashiyama are disjoint, so reuse one sampler to stay within
     // WebGL's minimum texture-unit limit rather than adding a fourth photo slot.
     const sharedPhoto=regions.findIndex(r=>r.key==='arashiyama');
@@ -271,10 +273,8 @@ export function createHero(
       if (!r.views.includes(v) || regionalPhotos[i]) return;
       const file=opts.quality<.75?r.meta.mobile.file:r.meta.file;
       regionalPhotos[i]=loadTexture(file,aniso).then(photo=>{
-        detailedPhotos[i]=photo;
         if(i===sharedPhoto&&sharedSlot)sharedSlot.setFallback({photo,box:r.meta.box});
         else terrain.setPhoto(i+1,photo,r.meta.box);
-        updateForestPhoto?.(photo,i);
       }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
     });
     const osakaPhotos=createNearbyPhotos(
@@ -308,10 +308,11 @@ export function createHero(
     const streetGround=Object.create(hf) as Heightfield;
     streetGround.height=bridges.heightAt;
     const woodlandData = JSON.parse(new TextDecoder().decode(woodlandBytes)) as {polygons: Woodland[]};
-    const woodlandRaster = buildWoodlandTexture(woodlandData.polygons, meta.aerialWide.box);
+    const cover = await treeCover;
+    const woodlandRaster = buildWoodlandTexture(woodlandData.polygons, meta.aerialWide.box, cover, renderer.capabilities.maxTextureSize);
     await yieldToBrowser();
-    const forestArea = woodlandRaster.contains;
     terrain.uniforms.uWoodland.value = woodlandRaster.texture;
+    terrain.uniforms.uWoodlandBox.value.set(...woodlandRaster.box);
     terrain.uniforms.uWoodlandOn.value = 1;
     terrain.uniforms.uAerialCity.value = cityPhoto;
     terrain.uniforms.uCityOn.value = 1;
@@ -358,13 +359,17 @@ export function createHero(
     const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
-    const forest = createForest(env, hf, cityPhoto.image as HTMLImageElement, meta.aerialCity.box, opts.quality, [...campusTreeSpots(hf),...cherries], { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box }, (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) || replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z), (x,z) => forestArea(x,z) || island(x,z));
-    const forestPhoto=(photo:THREE.Texture,i:number)=>{
-      void forest.setRegionalPhoto(photo.image as HTMLImageElement,regions[i].meta.box,regions[i].seasonal)
-        .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
+    const forest = createForest(env, hf, opts.quality, [
+      { photo: cityPhoto.image as HTMLImageElement, box: meta.aerialCity.box },
+      { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box },
+      ...(outer && meta.aerialOuter ? [{ photo: outer.image as HTMLImageElement, box: meta.aerialOuter.box }] : []),
+    ], (x,z) => woodlandRaster.sample(x,z) || (island(x,z) ? 1 : 0),
+    (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
+      replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
+    [...campusTreeSpots(hf),...cherries], !cover);
+    const refreshForest = () => {
+      void forest.refreshExclusions().then(() => shadow.invalidate()).catch(error => console.warn('Forest update failed', error));
     };
-    updateForestPhoto=forestPhoto;
-    detailedPhotos.forEach((photo,i)=>photo&&forestPhoto(photo,i));
     orbitObstruction = (x,z) => {
       const center=landscapeCenter(VIEW);
       const canopy=Math.hypot(x-center.x,z-center.z)>24 && forest.contains(x,z);
@@ -488,7 +493,7 @@ export function createHero(
       }
       const detailedCampus=r.id==='kameoka-campus';
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
-      let forestPhotoChanged=false;
+      let forestMaskChanged=false;
       const release=(releaseData=true)=>{
         detailBox=null;southOverview?.setDetailBox(null);osakaOverview?.setDetailBox(null);
         cityLods.delete(city);
@@ -500,8 +505,7 @@ export function createHero(
         env.uBuilt.value=coreBuilt;env.uBuiltBox.value.set(...BUILDINGS_BOX);
         env.uBuiltTexel.value=(BUILDINGS_BOX[2]-BUILDINGS_BOX[0])/builtSize;
         outerExcluded=()=>false;
-        if(forestPhotoChanged)void forest.setOuterPhoto(null,r.photo.box)
-          .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
+        if(forestMaskChanged)refreshForest();
         road.dispose();built.dispose();if(releaseData)data.dispose();shadow.invalidate();
         if(campusNormal){terrain.uniforms.uRegionalNormal.value=oldNormal;terrain.uniforms.uRegionalBox.value.copy(oldNormalBox);
           terrain.uniforms.uRegionalOn.value=oldNormalOn;campusNormal.dispose();}
@@ -516,9 +520,8 @@ export function createHero(
       env.uBuilt.value=built;env.uBuiltBox.value.set(...r.box);
       env.uBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
       outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
-      forestPhotoChanged=true;
-      void forest.setOuterPhoto(data.photo.image as HTMLImageElement,r.photo.box)
-        .then(()=>shadow.invalidate()).catch(error=>console.warn('Forest photo update failed',error));
+      forestMaskChanged=true;
+      refreshForest();
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
       scene.add(group);casts(city.group);cityLods.add(city);shadow.invalidate();
