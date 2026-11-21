@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {HOME_LANGUAGE_SWITCH_HASH} from '../src/lib/i18n.ts';
 
 const source=readFileSync(new URL('../src/components/HeroIntro.astro',import.meta.url),'utf8');
 const script=source.match(/<script is:inline>([\s\S]*?)<\/script>/)[1];
@@ -9,7 +10,7 @@ const classes=()=>{
   const set=new Set();
   return {add:value=>set.add(value),remove:value=>set.delete(value),contains:value=>set.has(value)};
 };
-function mount({unsupported=false,throws=false,reduced=true,animated=false,userAgent='Mozilla/5.0',hostname='kuas-photography-club.vercel.app'}={}) {
+function mount({unsupported=false,throws=false,reduced=true,animated=false,userAgent='Mozilla/5.0',hostname='kuas-photography-club.vercel.app',hash=''}={}) {
   const document=new EventTarget(),button=new EventTarget(),attributes=new Map(),styles=new Map(),percent={textContent:'00%'};
   const animations=[],ring=[];
   const animate=(_frames,options)=>{animations.push(options);return {finished:new Promise(()=>{}),cancel(){}};};
@@ -21,6 +22,7 @@ function mount({unsupported=false,throws=false,reduced=true,animated=false,userA
   const turns={'.is-low .intro-turn':turn(),'.is-high .intro-turn':turn(),'.intro-ring-dot':turn()};
   const progress={setAttribute:(key,value)=>attributes.set(key,value),getBoundingClientRect:()=>({left:100,top:100,width:120,height:120})};
   class Dialog extends EventTarget {
+    dataset={languageSwitchHash:HOME_LANGUAGE_SWITCH_HASH};
     open=false;closed=0;classList=classes();style={setProperty:(key,value)=>styles.set(key,value)};
     animate=animated?animate:undefined;
     showModal(){if(throws)throw Error('unsupported state');this.open=true;}
@@ -41,7 +43,7 @@ function mount({unsupported=false,throws=false,reduced=true,animated=false,userA
     }
     clock=end;
   };
-  runInNewContext(script,{document,Event,navigator:{userAgent},location:{hostname},HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
+  runInNewContext(script,{document,Event,navigator:{userAgent},location:{hostname,hash},HTMLDialogElement:Dialog,matchMedia:()=>({matches:reduced}),
     performance:{now:()=>clock},innerWidth:1280,innerHeight:720,
     setTimeout:(callback,ms)=>{delay=ms;const id=++nextTimer;timers.set(id,{callback,at:clock+ms});return id;},
     clearTimeout:id=>{cleared=true;timers.delete(id);},
@@ -66,6 +68,15 @@ test('deployment screenshots use the still scene while normal browsers retain th
     assert.equal(mount({userAgent}).intro.open,true,userAgent);
   }
   assert.equal(mount({userAgent:headless,hostname:'localhost'}).intro.open,true);
+});
+
+test('switching the home language skips the modal and leaves the live scene enabled',()=>{
+  const state=mount({hash:HOME_LANGUAGE_SWITCH_HASH,reduced:false,animated:true});
+  assert.equal(state.intro.open,false);
+  assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false);
+  assert.equal(state.document.documentElement.classList.contains('screenshot-preview'),false);
+  assert.equal(state.scheduledTimers,0);
+  assert.equal(mount({hash:'#intro'}).intro.open,true);
 });
 
 test('intro opens immediately, reports real progress, then releases the page on readiness',()=>{

@@ -1,6 +1,6 @@
 ---
 import { nav } from '../data/club';
-import { languagePath } from '../lib/i18n';
+import { HOME_LANGUAGE_SWITCH_HASH, languagePath } from '../lib/i18n';
 import ThemePicker from './ThemePicker.astro';
 
 interface Props {
@@ -12,6 +12,8 @@ const { overlay = false, lang = 'ja' } = Astro.props;
 const en = lang === 'en';
 const local = (href: string) => languagePath(href, en ? 'en' : 'ja');
 const path = languagePath(Astro.url.pathname, 'ja');
+const otherLanguage = en ? 'ja' : 'en';
+const languageHref = languagePath(Astro.url.pathname, otherLanguage) + (path === '/' ? HOME_LANGUAGE_SWITCH_HASH : '');
 const isCurrent = (href: string) => path === href || path.startsWith(href);
 ---
 <header class:list={['site-header', { overlay }]}>
@@ -24,7 +26,7 @@ const isCurrent = (href: string) => path === href || path.startsWith(href);
       </span>
     </a>
 
-    <a class="language-switch" href={languagePath(Astro.url.pathname, en ? 'ja' : 'en')} data-language={en ? 'ja' : 'en'} lang={en ? 'ja' : 'en'} aria-label={en ? '日本語に切り替える' : 'Switch to English'}>{en ? '日本語' : 'English'}</a>
+    <a class="language-switch" href={languageHref} data-language={otherLanguage} lang={otherLanguage} aria-label={en ? '日本語に切り替える' : 'Switch to English'}>{en ? '日本語' : 'English'}</a>
 
     <ThemePicker lang={lang} />
 
