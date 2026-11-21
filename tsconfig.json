@@ -1,5 +1,5 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "node_modules", "vendor"]
+  "exclude": ["dist", "node_modules", "vendor", "public/kansai-engine"]
 }
