@@ -53,7 +53,7 @@ import { buildIslands } from './islands';
 import { islandMask } from './island-mask';
 import { LINE, loadLines } from './lines-data';
 import { withoutTunnels } from './tunnels';
-import {createRegionalLoader,regionAt,type CityRegion} from './regional-loader';
+import {createRegionalLoader,regionAt,regionInView,type CityRegion} from './regional-loader';
 import {replacesHeianFootprint} from './heian-shrine';
 import {replacesNijoFootprint,replacesNijoBox} from './nijo-castle';
 import {replacesKyotoStation} from './kyoto-station';
@@ -178,7 +178,7 @@ export function createHero(
   let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
-  let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
+  let ensureCityRegion:((center:{x:number;z:number},bearing?:number)=>void)|null=null;
   let prefetchCityRegion:((center:{x:number;z:number},target?:HeroView)=>void)|null=null;
   let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let followForest: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
@@ -533,18 +533,26 @@ export function createHero(
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
     const regionManifest=await loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
       .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
-    let areaRequest=0;
-    ensureCityRegion=center=>{
-      let region=regionAt(regionManifest.regions,center);
+    let lastAreaRequest:{id:string|null;retryAfter:number}|undefined;
+    ensureCityRegion=(center,bearing)=>{
+      let region=bearing===undefined?regionAt(regionManifest.regions,center):regionInView(regionManifest.regions,center,bearing);
       sharedSlot?.select(region?.id==='tennozan');
-      void osakaPhotos.update(region?.id==='osaka'?center:null);
+      if(region?.id==='osaka')void osakaPhotos.update(center);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
       if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)
         region={...region,id:'uji-detail',photo:meta.byodoin};
-      const request=++areaRequest;
-      opts.onAreaLoading?.(!!region&&region.id!==regionLoader.id);
-      void regionLoader.request(region).finally(()=>{if(request===areaRequest)opts.onAreaLoading?.(false);});
+      const id=region?.id??null;
+      if(lastAreaRequest?.id===id && (regionLoader.id===id || performance.now()<lastAreaRequest.retryAfter))return;
+      if(id!=='osaka')void osakaPhotos.update(null);
+      const request={id,retryAfter:Infinity};
+      lastAreaRequest=request;
+      opts.onAreaLoading?.(!!region&&id!==regionLoader.id);
+      void regionLoader.request(region).finally(()=>{
+        if(request!==lastAreaRequest)return;
+        request.retryAfter=performance.now()+5000;
+        opts.onAreaLoading?.(false);
+      });
     };
     prefetchCityRegion=(center,target)=>{
       const next=target==='tennozan'||target==='osakaSkyline'
@@ -650,7 +658,7 @@ export function createHero(
   heroControls.addEventListener('keydown', event => {
     if (['Enter', ' ', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'w', 'a', 's', 'd', 'q', 'e'].includes(event.key)) stopIntroCamera();
   }, true);
-  let exploring=false,freeBearing=0,freePitch=0,lastInput=performance.now();
+  let exploring=false,freeBearing=0,freePitch=0,lastInput=performance.now(),nextAreaCheck=0;
   const freePosition=new THREE.Vector3(),freeCenter=new THREE.Vector3();
   const keys=new Set<string>();
   const touchMove={forward:0,side:0,up:0,fast:false};
@@ -827,8 +835,12 @@ export function createHero(
       camera.position.copy(freePosition);const yaw=(freeBearing+lookDrag.yaw)*RAD,pitch=THREE.MathUtils.clamp(freePitch+lookDrag.pitch,-85,85)*RAD;
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
       followForest?.(freePosition,yaw/RAD);
+      if(now>=nextAreaCheck){
+        ensureCityRegion?.(freePosition,yaw/RAD);
+        nextAreaCheck=now+250;
+      }
       if(freeCenter.distanceTo(freePosition)>600){
-        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);ensureCityRegion?.(freePosition);
+        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);
         prefetchCityRegion?.({x:freePosition.x+Math.sin(yaw)*1200,z:freePosition.z-Math.cos(yaw)*1200});
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }
@@ -915,6 +927,7 @@ export function createHero(
         flight=null;resetLook();freePosition.copy(camera.position);freeCenter.copy(freePosition);
         terrainRecenter?.(freePosition,true);shadow.invalidate();
         const d=lastTarget.clone().sub(camera.position).normalize();freeBearing=Math.atan2(d.x,-d.z)/RAD;freePitch=Math.asin(d.y)/RAD;
+        ensureCityRegion?.(freePosition,freeBearing);nextAreaCheck=performance.now()+250;
         exploring=true;env.uHighlight.value=1;el.tabIndex=0;el.focus({preventScroll:true});opts.onExplore?.(true);
       }else flyTo(mode==='campus'?'campus':view,clock);
     },
