@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import { VIEWS, PANORAMA_VIEWS, openingPanorama, spotDestination } from '../src/scripts/hero/views.ts';
+import { VIEWS, PANORAMA_VIEWS, flightLift, openingPanorama, spotDestination } from '../src/scripts/hero/views.ts';
 import { SPOTS } from '../src/data/spots.ts';
 import { toLocal } from '../src/scripts/hero/geo.ts';
 import { landmarkOrbit } from '../src/scripts/hero/landmark-orbit.ts';
@@ -43,6 +43,15 @@ test('openings draw uniformly from clear panoramas and skip the previous opening
   for(const requested of ['atago','inari','invalid']){
     for(let i=0;i<24;i++)assert.notEqual(openingPanorama(terrain,850,null,requested,()=>i/24),'atago');
   }
+});
+
+test('flights between viewpoints below the clouds stay below the deck for their entire curve',()=>{
+  for(const [from,to] of [[240,760],[760,240],[740,760],[760,840]]) {
+    const lift=flightLift(from,to,20000,850), cap=Math.max(770,from,to);
+    assert.ok(from*.7+to*.3+lift<=cap);
+    assert.ok(from*.25+to*.75+lift*.7<=cap);
+  }
+  assert.equal(flightLift(120,250,1000,1350),220);
 });
 
 test('the Yamashina-side panorama frames Inari on the left and clears the lowest cloud deck',async t=>{

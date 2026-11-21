@@ -46,7 +46,7 @@ import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
 import { createIntroCameraMotion } from './intro-camera';
 import { createSharedPhotoSlot } from './shared-photo';
-import { VIEWS, openingPanorama, type ViewDef, type HeroView } from './views';
+import { VIEWS, flightLift, openingPanorama, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
 import { buildOcclusion } from './building-occlusion';
@@ -843,7 +843,7 @@ export function createHero(
     const p0 = from.pos;
     const p3 = end.pos;
     // arc higher for longer hops
-    const lift = new THREE.Vector3(0, 160 + Math.min(p0.distanceTo(p3) * 0.06, 420), 0);
+    const lift = new THREE.Vector3(0,flightLift(p0.y,p3.y,p0.distanceTo(p3),clouds.weather.base),0);
     flight = {
       to,
       t: 0,

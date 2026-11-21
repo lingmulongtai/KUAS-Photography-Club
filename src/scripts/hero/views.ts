@@ -88,18 +88,27 @@ export type HeroView = keyof typeof VIEWS;
 export type HeroDestination = 'campus' | HeroView;
 export const PANORAMA_VIEWS = ['shogunzuka','inariRidge','daimonji','arashiyama','atago','kameokaTerrace','tennozan','osakaSkyline'] as const satisfies readonly HeroView[];
 export type PanoramaView = (typeof PANORAMA_VIEWS)[number];
+const CLOUD_CLEARANCE=80;
 
 /** Select the actual opening eye before any view-centred geometry is prepared. */
 export function openingPanorama(height:(x:number,z:number)=>number,cloudBase:number,previous:string|null,requested:string|null,random=Math.random):PanoramaView {
   const eligible=PANORAMA_VIEWS.filter(id=>{
     const v=VIEWS[id];
-    return height(v.ref.x,v.ref.z)+v.above+80<=cloudBase;
+    return height(v.ref.x,v.ref.z)+v.above+CLOUD_CLEARANCE<=cloudBase;
   });
   const linked=eligible.find(id=>id===requested);
   if(linked)return linked;
   const other=eligible.filter(id=>id!==previous);
   const choices=other.length?other:eligible;
   return choices[Math.floor(random()*choices.length)]??'shogunzuka';
+}
+
+/** Both inner controls of a cubic flight must clear the cloud deck too. */
+export function flightLift(from:number,to:number,distance:number,cloudBase:number) {
+  const lift=160+Math.min(distance*.06,420);
+  if(Math.max(from,to)>=cloudBase)return lift;
+  const ceiling=Math.max(from,to,cloudBase-CLOUD_CLEARANCE);
+  return Math.min(lift,ceiling-(from*.7+to*.3),(ceiling-(from*.25+to*.75))/.7);
 }
 
 export function spotDestination(id: SpotId): HeroDestination {
