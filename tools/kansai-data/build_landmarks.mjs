@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {createServer} from 'vite';
 import {portTower} from './port-tower.mjs';
+import {districtModel} from './nankinmachi.mjs';
 import {greatBuddhaHall,hikoneKeep,harborHotel,roseGarden} from './outing-landmarks.mjs';
 
 const project=fileURLToPath(new URL('../../',import.meta.url));
@@ -88,6 +89,10 @@ try{
   const hotelMask=hotel.floorOutlines[0].map(([x,z])=>[hotel.lon+x/91644,hotel.lat-z/110940]);
   await save('kobe-harbor-hotel',harborHotel(hotel),hotel.lon,hotel.lat,[hotelMask],'28');
   const {templeHall,block}=await load('compound-models'),{roof}=await load('temple-models');
+  for(const site of JSON.parse(await fs.readFile(new URL('nankinmachi.json',output)))){
+    const {id,parts}=districtModel(site,block);
+    await save(id,parts,...site.center,[site.ring],'28');
+  }
   await save('todaiji',greatBuddhaHall(templeHall),135.83987322,34.68899310,undefined,'29');
   await save('hikone-keep',hikoneKeep(block,roof),136.25184170,35.27645385,undefined,'25');
   // build_osaka_keep.py retains the source ellipsoid height of the surveyed keep.

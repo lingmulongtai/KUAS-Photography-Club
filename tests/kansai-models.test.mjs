@@ -44,6 +44,19 @@ test('the Kyoto laser-survey roofs have a registered footprint, camera-lit norma
   }
 });
 
+test('Nankinmachi retains the measured heights and individual street footprints of all four structures',()=>{
+  const catalogue=json('landmarks/index.json'), source=json('landmarks/nankinmachi.json');
+  assert.equal(source.length,4);
+  for(const {center,dimension,ring} of source){
+    const b=catalogue.find(b=>b.pref==='28'&&b.lon===center[0]&&b.lat===center[1]);
+    assert.deepEqual(b.rings,[ring]);
+    const bytes=readFileSync(new URL(b.file.slice('/kansai/'.length),root));
+    const doc=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
+    const pos=doc.accessors[doc.meshes[0].primitives[0].attributes.POSITION];
+    assert.ok(Math.abs(pos.max[1]-(dimension.maximumHeightM??dimension.originalHeightM))<.01,b.id);
+  }
+});
+
 test('both GSI rail representations keep underground lines out of the rose garden',()=>{
   assert.equal(railStructure('RailCL',8201,'地下'),'hidden');
   assert.equal(railStructure('RailTrCL',2804,''),'hidden');
