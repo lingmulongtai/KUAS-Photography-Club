@@ -193,6 +193,7 @@ export function createHero(
   let cancelTreePlanting: (() => void) | null = null;
   let startGroundRelief: (() => void) | undefined;
   let updateGroundRelief: ((x:number,z:number) => void) | undefined;
+  let updateStation: (() => void) | undefined;
   let driveCars: ((dt: number) => void) | null = null;
   /** Cities whose roofs switch to stepped blocks near the camera. */
   const cityLods = new Set<ReturnType<typeof buildCity>>();
@@ -462,6 +463,40 @@ export function createHero(
     scene.add(campusModel);
     casts(campusModel);
     scene.add(city.group, landmarks.mesh, landmarks.glazing);
+    const station = landmarks.positions.kyotoStation;
+    let stationDetail: Awaited<ReturnType<typeof import('./station-detail').loadStationDetail>> | undefined;
+    let stationLoading = false;
+    let retryStationAt = 0;
+    updateStation = () => {
+      const distanceSq = camera.position.distanceToSquared(station);
+      if (stationDetail) {
+        const group = stationDetail.group;
+        const range = group.visible ? 1450 : 1100;
+        const visible = distanceSq <= range * range;
+        if (visible !== group.visible) {
+          group.visible = visible;
+          landmarks.showStationFallback(!visible);
+          shadow.invalidate();
+        }
+        if (distanceSq > 2600 * 2600) {
+          scene.remove(group);
+          stationDetail.dispose();
+          stationDetail = undefined;
+        }
+      } else if (distanceSq < 1250 * 1250 && !stationLoading && performance.now() >= retryStationAt) {
+        stationLoading = true;
+        void import('./station-detail').then(m => m.loadStationDetail(env, hf, station)).then(detail => {
+          stationDetail = detail;
+          detail.group.visible = false;
+          scene.add(detail.group);
+          casts(detail.group);
+          updateStation?.();
+        }).catch(error => {
+          retryStationAt = performance.now() + 30000;
+          console.warn('Kyoto Station detail failed to load', error);
+        }).finally(() => { stationLoading = false; });
+      }
+    };
     if (city.overview) scene.add(city.overview);
     casts(city.group);
     cityLods.add(city);
@@ -1084,6 +1119,7 @@ export function createHero(
       lastTarget.copy(p.target);
     }
     camera.lookAt(lastTarget);
+    updateStation?.();
     updateGroundRelief?.(camera.position.x,camera.position.z);
     const detail = env.uHighlight.value > 0.02;
     if (campusModel && campusModel.visible !== detail) {

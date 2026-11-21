@@ -35,3 +35,27 @@ test('glass encloses the north facade and roof above an open concourse',()=>{
   }
   geometry.dispose(); material.dispose();
 });
+
+test('surveyed station ships with local geometry, embedded facade photos and named plaza surfaces', async () => {
+  const file = await readFile(new URL('../public/kyoto/kyoto-station.glb', import.meta.url));
+  assert.equal(file.toString('ascii', 0, 4), 'glTF');
+  assert.equal(file.readUInt32LE(8), file.length);
+  const model = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
+  assert.ok(model.extensionsRequired.includes('EXT_meshopt_compression'));
+  assert.ok(model.images.every(image => image.mimeType === 'image/webp' && Number.isInteger(image.bufferView)));
+  assert.ok(model.images.length >= 4);
+  const bounds = new THREE.Box3();
+  for (const node of model.nodes.filter(node => node.mesh !== undefined)) {
+    for (const primitive of model.meshes[node.mesh].primitives) {
+      const pos = model.accessors[primitive.attributes.POSITION];
+      for (const point of [pos.min, pos.max]) {
+        bounds.expandByPoint(new THREE.Vector3(...point)
+          .multiply(new THREE.Vector3(...node.scale)).add(new THREE.Vector3(...node.translation)));
+      }
+    }
+  }
+  assert.ok(bounds.min.x < -230 && bounds.max.x > 230 && bounds.max.x < 265);
+  assert.ok(bounds.min.z < -145 && bounds.max.z < 55);
+  assert.ok(bounds.max.y > 60 && bounds.max.y < 72, 'includes rooftop equipment, excludes Kyoto Tower');
+  assert.ok(model.materials.some(material => material.name.startsWith('Plaza-')));
+});

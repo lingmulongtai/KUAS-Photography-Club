@@ -115,6 +115,7 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
   const geos: THREE.BufferGeometry[] = [...extraParts,...fushimiInari((x,z)=>hf.height(x,z)),...byodoinParts((x,z)=>hf.height(x,z))].map(paint);
   const positions: Record<string, THREE.Vector3> = {};
   const sites:Record<string,Placed>={...LANDMARKS,...imperialPalace(),...nijoCastle()};
+  const stationGeos: THREE.BufferGeometry[] = [];
   for (const [name, l] of Object.entries(sites)) {
     const p = l.lat !== undefined ? toLocal(l.lat, l.lon!) : { x: l.x!, z: l.z! };
     const y = hf.height(p.x, p.z);
@@ -123,10 +124,11 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
       const g = paint(part);
       if (l.rotY) g.rotateY(l.rotY);
       g.translate(p.x, y, p.z);
-      geos.push(g);
+      (name === 'kyotoStation' ? stationGeos : geos).push(g);
     }
   }
-  const geo = mergeGeometries(geos);
+  const stationStart = geos.reduce((n,g) => n + g.getAttribute('position').count, 0);
+  const geo = mergeGeometries(geos.concat(stationGeos));
   const material = new THREE.ShaderMaterial({
     uniforms: env,
     vertexShader: /* glsl */ `
@@ -187,7 +189,11 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
   }));
   glazing.name='kyoto-station-glazing';
   glazing.position.copy(positions.kyotoStation);
-  return { mesh, glazing, positions };
+  function showStationFallback(show: boolean) {
+    geo.setDrawRange(0, show ? Infinity : stationStart);
+    glazing.visible = show;
+  }
+  return { mesh, glazing, positions, showStationFallback };
 }
 
 /** Red aviation lights blinking on the tallest structures. */
