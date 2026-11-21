@@ -6,7 +6,7 @@ import type {Architecture} from './architecture';
 import {surveyMaterial} from './survey-material';
 
 type SurveyLayer={kind:string;lod:number;pref:string;url:string;bounds:Box};
-type RecordBox={box:Box;point:Point;id:number};
+type RecordBox={box:Box;point:Point;id:number;shown:boolean};
 const cell=(x:number,y:number)=>x*100000+y;
 
 class Footprints {
@@ -26,7 +26,7 @@ function footprintRecords(content:Cesium3DTileContent): RecordBox[] {
     if(!f.hasProperty('_xmin')) break;
     const b:Box=[f.getProperty('_xmin'),f.getProperty('_ymin'),f.getProperty('_xmax'),f.getProperty('_ymax')];
     if(!b.every(Number.isFinite)||b[2]-b[0]>.08||b[3]-b[1]>.08)continue;
-    records.push({box:b,point:[(b[0]+b[2])/2,(b[1]+b[3])/2],id:i});
+    records.push({box:b,point:[(b[0]+b[2])/2,(b[1]+b[3])/2],id:i,shown:f.show});
   }
   // A survey tile may contain only a few buildings. Its bounding volume cannot
   // determine which mapped houses in the same neighbourhood it replaces.
@@ -52,8 +52,10 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
           const rows=records.get(content)??footprintRecords(content);records.set(content,rows);
           for(const r of rows){
             const show=!next.contains(r.point)&&!architecture.contains(r.point);
-            const feature=content.getFeature(r.id);
-            if(feature.show!==show)feature.show=show;
+            if(r.shown!==show){
+              content.getFeature(r.id).show=show;
+              r.shown=show;
+            }
             if(show)boxes.push(r.box);
           }
         }

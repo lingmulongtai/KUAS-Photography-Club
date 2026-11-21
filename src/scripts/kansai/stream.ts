@@ -12,6 +12,7 @@ export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited
   const scene=widget.scene,resident=new Map<string,Awaited<ReturnType<typeof buildTile>>>(),pending=new Set<string>();
   let wanted=new Map<string,Point>(),alive=true,previous='',timer=0,readyCount=-1;
   const retry=new Map<string,number>();
+  let nextPlan=0,maskStart=0;
   function visibleTarget(){
     const ray=scene.camera.getPickRay(new C.Cartesian2(scene.canvas.clientWidth/2,scene.canvas.clientHeight/2));
     const position=ray&&scene.globe.pick(ray,scene);if(!position)return;
@@ -63,8 +64,17 @@ export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited
     }
   }
   const stop=scene.postRender.addEventListener(()=>{
-    plan();
-    for(const tile of resident.values())tile.refresh(surveys);
+    const now=performance.now();
+    if(now>=nextPlan){
+      nextPlan=now+100;plan();
+    }
+    const until=performance.now()+2,tiles=Array.from(resident.values());
+    for(let i=0;i<tiles.length;i++){
+      const index=(maskStart+i)%tiles.length;
+      if(!tiles[index].refresh(surveys,until))continue;
+      maskStart=(index+1)%tiles.length;
+      scene.requestRender();break;
+    }
   });
   const poll=window.setInterval(()=>{plan();pump();},3000);
   return ()=>{alive=false;stop();queue.dispose();clearInterval(poll);clearTimeout(timer);distant.dispose();surveys.dispose();

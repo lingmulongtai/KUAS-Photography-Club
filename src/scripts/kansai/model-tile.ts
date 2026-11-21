@@ -36,14 +36,20 @@ export async function buildTile(widget:CesiumWidget,queue:TileQueue,x:number,y:n
     modelMatrix:C.Transforms.eastNorthUpToFixedFrame(C.Cartesian3.fromDegrees(...center)),
     appearance:localAppearance(x,y,()=>{if(!widget.isDestroyed())widget.scene.requestRender();}),
     asynchronous:false,allowPicking:false,compressVertices:false,vertexCacheOptimize:false}):undefined;
-  let applied=-1;
-  return {primitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys){
-    if(!primitive?.ready||surveys.revision===applied)return;
-    for(let i=0;i<locations.length;i++){
-      const attr=primitive.getGeometryInstanceAttributes(String(i));
-      const value=surveys.contains(locations[i])?0:1;
-      if(attr.show[0]!==value)attr.show=new Uint8Array([value]);
+  const shown=new Uint8Array(locations.length).fill(1);
+  let applied=-1,checking=-1,cursor=0;
+  return {primitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys,until:number){
+    if(!primitive?.ready||applied===surveys.revision)return;
+    if(cursor===0)checking=surveys.revision;
+    // Allow another frame to present while a large municipal model is arriving.
+    while(cursor<locations.length){
+      if((cursor&31)===0 && performance.now()>=until)return true;
+      const i=cursor++,value=surveys.contains(locations[i])?0:1;
+      if(shown[i]===value)continue;
+      primitive.getGeometryInstanceAttributes(String(i)).show=new Uint8Array([value]);
+      shown[i]=value;
     }
-    applied=surveys.revision;
+    applied=checking;cursor=0;
+    return applied!==surveys.revision;
   }};
 }
