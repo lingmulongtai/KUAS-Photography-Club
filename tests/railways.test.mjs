@@ -6,9 +6,15 @@ import {railwayPath,trainSections,serviceTrainProgress} from '../src/scripts/her
 
 test('the source routes include the Shinkansen, stay continuous and retain hidden tunnel segments',async()=>{
   const data=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/railways.json.gz',import.meta.url))));
-  assert.equal(data.routes.length,8);let stations=0,tunnels=0;
+  assert.equal(new Set(data.routes.map(r=>r.id)).size,data.routes.length);let stations=0,tunnels=0;
+  for(const [id,stationCodes] of [['hankyu-kyoto',['40208000571','40208000759']],['jr-kyoto',['40207004387','40207001535']]]){
+    const route=data.routes.find(r=>r.id===id);
+    for(const code of stationCodes)assert.ok(route?.stations.some(s=>s.code===code),`${id} serves ${code}`);
+    assert.ok(route.points.some(([,z])=>z>12000));
+  }
   const shinkansen=data.routes.find(r=>r.id==='jr-shinkansen');
   assert.ok(shinkansen);assert.equal(shinkansen.cars,8);assert.ok(shinkansen.states.includes(2));
+  assert.ok(shinkansen.points.some(([,z])=>z>12000),'Shinkansen tracks approach Oyamazaki');
   assert.ok(shinkansen.stations.length>=1);
   for(const route of data.routes){
     assert.equal(route.states.length,route.points.length-1);assert.equal(route.tracks.length,route.states.length);
