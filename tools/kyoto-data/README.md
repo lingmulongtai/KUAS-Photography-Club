@@ -87,6 +87,16 @@ The existing 2048-pixel wide image remains the lightweight mobile variant.
 Elevation, building and road binaries are unchanged by these commands.
 # 森林の輪郭
 
+広域の樹林分布は [ESA WorldCover 2021 v200（Zanaga et al., 2022）](https://doi.org/10.5281/zenodo.7254221) から生成します。
+[N33E135](https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N33E135_Map.tif) を取得し、NumPy と rasterio が使える Python 3.11 以降で次のコマンドを実行します。
+
+```sh
+python build_tree_cover.py ESA_WorldCover_10m_2021_v200_N33E135_Map.tif
+```
+
+元データの樹木クラス（10）の面積割合を、地形全域の20 m格子に集計し、`tree-cover.bin` に格納します。値は0〜15で、樹木がほぼなく農地・恒久水域が90%以上を占める区画は16です。2021年の衛星分類に基づく被覆で、一本ずつの実測位置や樹種は含みません。
+© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
 `build_woodland.py` の冒頭にあるOverpassクエリで `natural=wood` / `landuse=forest` のwayとrelationを取得し、ローカルに保存したJSONを渡します。
 
 ```sh
