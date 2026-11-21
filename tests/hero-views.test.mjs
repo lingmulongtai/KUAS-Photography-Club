@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import { VIEWS, PANORAMA_VIEWS, spotDestination } from '../src/scripts/hero/views.ts';
 import { SPOTS } from '../src/data/spots.ts';
 import { toLocal } from '../src/scripts/hero/geo.ts';
 import { landmarkOrbit } from '../src/scripts/hero/landmark-orbit.ts';
+import {loadHeightfield} from '../src/scripts/hero/heightfield.ts';
+import {LOWEST_CLOUD_BASE} from '../src/scripts/hero/cloud-weather.ts';
 
 test('landmark destinations keep their named model centred through full turns', () => {
   for (const id of ['tower', 'kinkaku']) {
@@ -27,6 +30,31 @@ test('panoramas turn at a fixed observation point', () => {
   const atago=SPOTS.find(s=>s.id==='atago');
   assert.deepEqual(VIEWS.atago.ref,toLocal(atago.lat,atago.lon));
   assert.equal('funaoka' in VIEWS,false);
+});
+
+test('the Yamashina-side panorama frames Inari on the left and clears the lowest cloud deck',async t=>{
+  const root=new URL('../public/kyoto/',import.meta.url);
+  const meta=JSON.parse(await readFile(new URL('terrain.json',root),'utf8'));
+  const original=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(await readFile(new URL(String(url).split('/').pop(),root)));
+  t.after(()=>{globalThis.fetch=original;});
+  const hf=await loadHeightfield(meta);
+  const view=VIEWS.inariRidge;
+  assert.ok(PANORAMA_VIEWS.includes('inariRidge'));
+  assert.equal(spotDestination('inari'),'inari');
+  const height=hf.height(view.eye.x,view.eye.z)+view.above;
+  assert.ok(height>680 && height+80<LOWEST_CLOUD_BASE);
+  assert.ok(view.pitch<0 && view.pitch>-12);
+  for(const [id,min,max] of [['inari',-34,-14],['kuas',-14,2],['gosho',0,29]]){
+    const spot=SPOTS.find(s=>s.id===id),p=toLocal(spot.lat,spot.lon);
+    const bearing=Math.atan2(p.x-view.eye.x,view.eye.z-p.z)*180/Math.PI;
+    const offset=(bearing-view.bearing+540)%360-180;
+    assert.ok(offset>min && offset<max,`${id} at ${offset} degrees`);
+    for(let f=.04;f<1;f+=.04) {
+      const target=hf.height(p.x,p.z)+spot.above;
+      assert.ok(hf.height(view.eye.x+(p.x-view.eye.x)*f,view.eye.z+(p.z-view.eye.z)*f)<height+(target-height)*f,'clear view of '+id);
+    }
+  }
 });
 
 test('Tennozan keeps the confluence view and has a separate view aimed at Osaka', () => {

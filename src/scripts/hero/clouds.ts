@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
-import {cloudWeather} from './cloud-weather';
+import {cloudWeather,LOWEST_CLOUD_BASE} from './cloud-weather';
 import { CLOUD_LATTICE_GLSL, createCloudLattice } from './cloud-lattice';
 import type {Climate} from './seasons';
 
@@ -383,7 +383,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
   // cloud base any character uses. Every point of it stays inside the camera's far plane (60 km):
   // the corners of a box that reached as far along the axes were beyond it, and the clouds toward
   // north-east, south-east and so on were cut off there.
-  const bottom = 850;
+  const bottom = LOWEST_CLOUD_BASE;
   const geometry = new THREE.CylinderGeometry(DRUM, DRUM, CIRRUS_Y + 400 - bottom, 96, 1).translate(0, (CIRRUS_Y + 400 + bottom) / 2, 0);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 2;

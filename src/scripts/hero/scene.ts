@@ -117,7 +117,7 @@ const RAD = Math.PI / 180;
 /** Sharper local photos and the views that look over them; each loads when one of its views is first chosen. */
 const REGIONAL_PHOTOS: { key: 'arashiyama' | 'higashiyama'; views: HeroView[] }[] = [
   { key: 'arashiyama', views: ['arashiyama','togetsukyo'] },
-  { key: 'higashiyama', views: ['shogunzuka', 'kiyomizu','yasaka'] },
+  { key: 'higashiyama', views: ['shogunzuka','inariRidge','kiyomizu','yasaka'] },
 ];
 
 export function createHero(
