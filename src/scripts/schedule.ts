@@ -10,11 +10,15 @@ const element=<K extends keyof HTMLElementTagNameMap>(tag:K,cls='',text='')=>{
 const dayString=(date:Date)=>new Date(+date+9*3600000).toISOString().slice(0,10);
 const kinds={ja:{meeting:'ミーティング',trip:'撮影会',event:'イベント',deadline:'締切',other:'お知らせ'},en:{meeting:'Meeting',trip:'Photo outing',event:'Event',deadline:'Deadline',other:'Notice'}};
 for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')) {
-  const lang=root.dataset.lang==='en'?'en':'ja',en=lang==='en',compact=root.dataset.compact==='true';
+  let lang: 'ja' | 'en' = root.dataset.lang === 'en' ? 'en' : 'ja';
+  let en = lang === 'en';
+  const compact = root.dataset.compact === 'true';
   const content=root.querySelector<HTMLElement>('[data-calendar-content]')!,status=root.querySelector<HTMLElement>('[data-calendar-status]')!;
-  let last='',busy=false;
+  let last = '';
+  let pending: symbol | undefined;
+  const fallback = compact ? Array.from(content.childNodes) : [];
   // the standing row for the usual weekly meeting stays first in the short list
-  const regular=content.querySelector<HTMLElement>('[data-regular]')?.cloneNode(true) as HTMLElement|undefined;
+  const regular=content.querySelector<HTMLElement>('[data-regular]');
   /** The short list on the home page: a large date, a coloured kind, and an add-to-calendar link. */
   function shortList(events:ScheduleEvent[]) {
     const list=element('ol','calendar-list');
@@ -83,13 +87,29 @@ for(const root of document.querySelectorAll<HTMLElement>('[data-calendar-root]')
     content.replaceChildren(fragment);
   }
   async function refresh() {
-    if(busy||document.hidden)return;busy=true;
+    if (pending || document.hidden) return;
+    const request = pending = Symbol();
     try {
-      const data=await loadSchedule(lang);render(data);
+      const data=await loadSchedule(lang);
+      if (pending !== request) return;
+      render(data);
       const time=new Intl.DateTimeFormat(en?'en-GB':'ja-JP',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tokyo'}).format(new Date(data.updatedAt));
       status.textContent=en?'Google Calendar · checked '+time+' JST · '+(data.translationStatus==='partial'?'Some titles could not be translated; original text is shown.':'Event titles may be automatically translated.'):'Googleカレンダー連携 · '+time+' 更新';
-    }catch{status.textContent=en?'Calendar could not be refreshed. Check Google Calendar for the latest dates.':'カレンダーを更新できませんでした。最新の予定はGoogleカレンダーでご確認ください。';}
-    finally{busy=false;}
+    }catch{
+      if (pending === request) status.textContent=en?'Calendar could not be refreshed. Check Google Calendar for the latest dates.':'カレンダーを更新できませんでした。最新の予定はGoogleカレンダーでご確認ください。';
+    }finally{if (pending === request) pending = undefined;}
+  }
+  if (compact) {
+    document.addEventListener('home:before-language', () => {
+      pending = undefined;
+      last = '';
+      content.replaceChildren(...fallback);
+    });
+    document.addEventListener('home:language', () => {
+      lang = root.dataset.lang === 'en' ? 'en' : 'ja';
+      en = lang === 'en';
+      void refresh();
+    });
   }
   void refresh();
   window.setInterval(()=>void refresh(),60000);
