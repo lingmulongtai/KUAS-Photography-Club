@@ -38,7 +38,7 @@ def survey_photo(material):
         return next((n.image for n in material.node_tree.nodes if n.type == "TEX_IMAGE" and n.image), None)
 
 
-def prepare_district(meshes, site, folder):
+def prepare_district(meshes, site, folder, compact):
     by_building = defaultdict(list)
     limits, photos = {}, {}
     height = terrain_height()
@@ -68,7 +68,8 @@ def prepare_district(meshes, site, folder):
                     key = photos[image]
                     limits[key] = max(limits.get(key, 0), limit)
     (folder / "photos.json").write_text(json.dumps(limits))
-    subprocess.run(["python", str(Path(__file__).with_name("pack_station_photos.py")), str(folder)], check=True)
+    command = ["python", str(Path(__file__).with_name("pack_station_photos.py")), str(folder)]
+    subprocess.run(command + (["--compact"] if compact else []), check=True)
     layout = json.loads((folder / "layout.json").read_text())
     materials, maps = {}, {}
 

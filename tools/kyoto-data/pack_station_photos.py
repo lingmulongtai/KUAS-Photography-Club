@@ -9,7 +9,7 @@ SIZE = 2048
 GUTTER = 4
 
 
-def pack(folder):
+def pack(folder, compact):
     items = json.loads((folder / "photos.json").read_text())
     rects = []
     for name, limit in items.items():
@@ -47,10 +47,14 @@ def pack(folder):
         pages[page].paste(tile, (x - GUTTER, y - GUTTER))
         positions[name] = [page, (x + .5) / SIZE, 1 - (y + h - .5) / SIZE,
                            (w - 1) / SIZE, (h - 1) / SIZE]
+    # Keep the tower's two large photos at full resolution on both profiles.
+    tower_pages = {positions[name][0] for name, limit in items.items() if limit == 1280}
     for page, image in enumerate(pages):
+        if compact and page not in tower_pages:
+            image = image.resize((SIZE // 2, SIZE // 2), Image.Resampling.LANCZOS)
         image.save(folder / f"district-{page}.png")
     (folder / "layout.json").write_text(json.dumps(positions))
 
 
 if __name__ == "__main__":
-    pack(Path(sys.argv[1]))
+    pack(Path(sys.argv[1]), "--compact" in sys.argv[2:])

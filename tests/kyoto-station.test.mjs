@@ -37,14 +37,14 @@ test('glass encloses the north facade and roof above an open concourse',()=>{
   geometry.dispose(); material.dispose();
 });
 
-test('surveyed station ships with local geometry, embedded facade photos and named plaza surfaces', async () => {
-  const file = await readFile(new URL('../public/kyoto/kyoto-station-district.glb', import.meta.url));
+async function verifyDistrictAsset(filename) {
+  const file = await readFile(new URL('../public/kyoto/' + filename, import.meta.url));
   assert.equal(file.toString('ascii', 0, 4), 'glTF');
   assert.equal(file.readUInt32LE(8), file.length);
   const model = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
   assert.ok(model.extensionsRequired.includes('EXT_meshopt_compression'));
   assert.ok(model.images.every(image => image.mimeType === 'image/webp' && Number.isInteger(image.bufferView)));
-  assert.ok(model.images.length >= 4);
+  assert.equal(model.images.length, 11);
   const bounds = new THREE.Box3();
   for (const node of model.nodes.filter(node => node.mesh !== undefined)) {
     for (const primitive of model.meshes[node.mesh].primitives) {
@@ -65,6 +65,13 @@ test('surveyed station ships with local geometry, embedded facade photos and nam
   assert.ok(model.meshes.some(mesh => mesh.primitives.some(primitive =>
     model.materials[primitive.material].name === 'KYcb0061_org.001'
   )), 'the opaque station envelope can be selected for planar wall lighting');
+  return file.length;
+}
+
+test('both station detail profiles retain the surveyed geometry, embedded photos and plaza', async () => {
+  const full = await verifyDistrictAsset('kyoto-station-district.glb');
+  const compact = await verifyDistrictAsset('kyoto-station-district-compact.glb');
+  assert.ok(compact < full * .85, 'the compact detail profile reduces the download');
 });
 
 test('the station replacement indices match the shipped city footprints', async () => {

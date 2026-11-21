@@ -4,6 +4,7 @@ Inputs: Kyoto City high-resolution FBX (resource 21224), building and plaza laye
 Requires host Python with Pillow for the neighboring buildings' photo atlases.
 Then run gltfpack -i station.glb -o kyoto-station-district.glb -cc -ce ext -mm -km
     -si 0.36 -se 0.0015 -sp -tw -tl 2048 -tq 8 (native gltfpack 1.3)
+Repeat with --compact after the three paths for kyoto-station-district-compact.glb.
 """
 import sys
 import tempfile
@@ -16,7 +17,8 @@ from mathutils.bvhtree import BVHTree
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from station_district import prepare_district
 
-building, plaza, output = map(Path, sys.argv[sys.argv.index("--") + 1:])
+args = sys.argv[sys.argv.index("--") + 1:]
+building, plaza, output = map(Path, args[:3])
 bpy.ops.wm.read_factory_settings(use_empty=True)
 # Kyoto JGD2011 plane VI east/north into the hero's local east/north axes.
 site = Matrix(((.999876364, -.002417062, 0, -.374283),
@@ -36,7 +38,7 @@ for path, is_plaza in [(building, False), (plaza, True)]:
     if not is_plaza:
         district = {o for o in imported if o.type == "MESH"} - set(meshes)
         with tempfile.TemporaryDirectory() as scratch:
-            prepare_district(sorted(district, key=lambda o: o.name), site, Path(scratch))
+            prepare_district(sorted(district, key=lambda o: o.name), site, Path(scratch), "--compact" in args[3:])
     bpy.ops.object.select_all(action="DESELECT")
     for obj in meshes:
         transform = site @ obj.matrix_world

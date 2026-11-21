@@ -489,7 +489,7 @@ export function createHero(
         }
       } else if (distanceSq < 1250 * 1250 && !stationLoading && performance.now() >= retryStationAt) {
         stationLoading = true;
-        void import('./station-detail').then(m => m.loadStationDetail(env, hf, station)).then(detail => {
+        void import('./station-detail').then(m => m.loadStationDetail(env, hf, station, lite)).then(detail => {
           stationDetail = detail;
           detail.group.visible = false;
           scene.add(detail.group);
