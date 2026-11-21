@@ -445,7 +445,7 @@ export function createHero(
         throw results.find(result=>result.status==='rejected')!.reason;
       }
       return {buildings:b.value,lines:l.value,photo:p.value,dispose:()=>p.value.dispose()};
-    },async(r,data,current)=>{
+    },async(r,data,current,releasePrevious)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
       const step=async()=>{await yieldToBrowser();if(!current())throw new Error('Region superseded');};
       let campusNormal:THREE.Texture|null=null;
@@ -494,6 +494,7 @@ export function createHero(
         throw error;
       }
       const detailedCampus=r.id==='kameoka-campus';
+      releasePrevious();
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
       let forestMaskChanged=false;
       const release=(releaseData=true)=>{
