@@ -483,7 +483,7 @@ export function createHero(
         }
       }
       await step();
-      lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);group.add(lamps.points);
+      lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7,true);group.add(lamps.points);
       traffic=buildCars(env,hf,data.lines,lite ? .25 : .45);group.add(traffic.group);
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
