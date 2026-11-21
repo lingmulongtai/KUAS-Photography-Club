@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {buildSync} from 'esbuild';
+import {createRequire} from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { signalApproaches, signalAspect, remainingAfterSignal, VEHICLE_GAP } from '../src/scripts/hero/traffic-signals.ts';
 import { trafficJunctions } from '../src/scripts/hero/traffic-junctions.ts';
@@ -73,4 +75,27 @@ test('the shipped central, southern and Tamba networks contain bounded signal ap
     const arms = at(paths, () => false, 260);
     assert.ok(arms.length >= 3 && arms.length <= 260, id);
   }
+});
+
+test('culling packs the same moving bodies, paint and lamps and preserves traffic outside the view',()=>{
+  const code=buildSync({entryPoints:['src/scripts/hero/cars.ts'],bundle:true,format:'cjs',platform:'node',packages:'external',write:false}).outputFiles[0].text;
+  const mod={exports:{}};new Function('require','module','exports',code)(createRequire(import.meta.url),mod,mod.exports);
+  const lines=[{kind:LINE.road,attr:4,pts:new Float32Array([-500,0,500,0])}];
+  const make=()=>mod.exports.buildCars({uTime:{value:10}},{height:()=>10},lines,1);
+  const full=make(),clipped=make(),view={intersectsSphere:s=>s.center.x>0};
+  full.update(.1);clipped.update(.1,view);
+  const [bodies,lamps]=clipped.group.children.map(o=>o.geometry);
+  const [original,originalLamps]=full.group.children.map(o=>o.geometry);
+  const expected=[];
+  for(let i=0;i<full.count;i++)if(original.getAttribute('iPos').getX(i)>0)expected.push(i);
+  assert.ok(expected.length>0&&expected.length<full.count);
+  assert.equal(bodies.instanceCount,expected.length);
+  assert.equal(lamps.instanceCount,expected.length*2);
+  for(const [drawn,id] of expected.entries()){
+    assert.equal(bodies.getAttribute('iPos').getX(drawn),original.getAttribute('iPos').getX(id));
+    assert.equal(bodies.getAttribute('iColor').getY(drawn),original.getAttribute('iColor').getY(id));
+    assert.equal(lamps.getAttribute('aLightPosition').getX(2*drawn),originalLamps.getAttribute('aLightPosition').getX(2*id));
+  }
+  full.update(.1);clipped.update(.1);
+  assert.deepEqual(bodies.getAttribute('iPos').array,original.getAttribute('iPos').array);
 });

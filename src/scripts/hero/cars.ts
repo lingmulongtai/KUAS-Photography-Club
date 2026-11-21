@@ -146,7 +146,8 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
   for (let i = 0; i < count; i++) color.set(COLORS[Math.floor(r() * COLORS.length)], i * 3);
   geo.setAttribute('iPos', iPos);
   geo.setAttribute('iDir', iDir);
-  geo.setAttribute('iColor', new THREE.InstancedBufferAttribute(color, 3));
+  const iColor = new THREE.InstancedBufferAttribute(color.slice(),3).setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('iColor',iColor);
   geo.instanceCount = count;
   const bodyMat = new THREE.ShaderMaterial({
     uniforms: env,
@@ -286,8 +287,11 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
       }
     }
   }
-  function update(dt: number) {
+  // Traffic continues to simulate around the city. Stream just the bodies and lamps in view.
+  const carBounds=new THREE.Sphere(new THREE.Vector3(),4);
+  function update(dt: number, frustum?:THREE.Frustum) {
     planMovement(dt);
+    let drawn=0;
     for (let i = 0; i < count; i++) {
       let path = paths[pathOf[i]];
       let n = path.cum.length;
@@ -334,27 +338,36 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
         deckDistance[i] = dist[i]; deckPath[i] = pathOf[i];
       }
       const y = Math.max(ground, deckHeight[i]) + .05;
-      pos[i * 3] = x;
-      pos[i * 3 + 1] = y;
-      pos[i * 3 + 2] = z;
-      fwd[i * 2] = ux;
-      fwd[i * 2 + 1] = uz;
-      const o = i * 6;
+      carBounds.center.set(x,y+.8,z);
+      if(frustum&&!frustum.intersectsSphere(carBounds))continue;
+      const dst=drawn++;
+      iColor.setXYZ(dst,color[3*i],color[3*i+1],color[3*i+2]);
+      pos[dst * 3] = x;
+      pos[dst * 3 + 1] = y;
+      pos[dst * 3 + 2] = z;
+      fwd[dst * 2] = ux;
+      fwd[dst * 2 + 1] = uz;
+      const o = dst * 6;
       lp[o] = x + ux * 2.3;
       lp[o + 1] = y + 0.75;
       lp[o + 2] = z + uz * 2.3;
       lp[o + 3] = x - ux * 2.3;
       lp[o + 4] = y + 0.85;
       lp[o + 5] = z - uz * 2.3;
-      ld[i * 4] = ux;
-      ld[i * 4 + 1] = uz;
-      ld[i * 4 + 2] = ux;
-      ld[i * 4 + 3] = uz;
+      ld[dst * 4] = ux;
+      ld[dst * 4 + 1] = uz;
+      ld[dst * 4 + 2] = ux;
+      ld[dst * 4 + 3] = uz;
     }
-    iPos.needsUpdate = true;
-    iDir.needsUpdate = true;
-    lpos.needsUpdate = true;
-    ldir.needsUpdate = true;
+    geo.instanceCount=drawn;
+    lgeo.instanceCount=drawn*2;
+    for(const [attribute,instances] of [[iPos,drawn],[iDir,drawn],[iColor,drawn],[lpos,drawn*2],[ldir,drawn*2]] as const){
+      attribute.clearUpdateRanges();
+      if(instances){
+        attribute.addUpdateRange(0,instances*attribute.itemSize);
+        attribute.needsUpdate=true;
+      }
+    }
   }
   update(0);
 

@@ -448,7 +448,6 @@ export function createHero(
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, labelLanguage);
     const lamps = buildLamps(env, streetGround, lines, opts.quality);
     const cars = buildCars(env, hf, lines, opts.quality,roadHeight);
-    driveCars = cars.update;
     pointLayers.push(lamps.uniforms, cars.uniforms);
     scene.add(lamps.points, cars.group);
     updatePointScale();
@@ -457,13 +456,22 @@ export function createHero(
     const scenePrograms = prepare(scene);
     // Neighbouring basins are intentionally absent from the initial transfer. At most
     // one additional city is alive, and switching destinations never queues all four.
-    let regionalDrive:((dt:number)=>void)|null=null;
+    let regionalDrive:typeof cars.update|null=null;
     let railDrive:((dt:number)=>void)|null=null;
     void loadBinary('railways.json.gz').then(bytes=>{
       const railways=buildRailways(env,(x,z)=>hf.height(x,z),(JSON.parse(new TextDecoder().decode(bytes)) as {routes:RailwayRoute[]}).routes);
       scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
     }).catch(error=>console.warn('Railway scenery unavailable',error));
-    driveCars=(dt)=>{cars.update(dt);regionalDrive?.(dt);railDrive?.(dt);};
+    const trafficView=new THREE.Frustum(),trafficProjection=new THREE.Matrix4();
+    driveCars=(dt)=>{
+      camera.updateMatrixWorld();
+      trafficProjection.copy(camera.projectionMatrix);
+      // Include the glow of headlights centred just outside the viewport.
+      trafficProjection.elements[0]/=1+24/Math.max(1,width);
+      trafficProjection.elements[5]/=1+24/Math.max(1,height);
+      trafficView.setFromProjectionMatrix(trafficProjection.multiply(camera.matrixWorldInverse));
+      cars.update(dt,trafficView);regionalDrive?.(dt,trafficView);railDrive?.(dt);
+    };
     const overviews:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void}[]=[];
     const installOverview=(item:(typeof overviews)[number])=>{
       item.setDetailBox(detailBox);overviews.push(item);scene.add(item.mesh);
