@@ -180,8 +180,8 @@ export function createHero(
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
   let prefetchCityRegion:((center:{x:number;z:number},target?:HeroView)=>void)|null=null;
-  let plantTrees: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
+  let followForest: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let cancelTreePlanting: (() => void) | null = null;
   let driveCars: ((dt: number) => void) | null = null;
   /** Cities whose roofs switch to stepped blocks near the camera. */
@@ -375,10 +375,12 @@ export function createHero(
       const canopy=Math.hypot(x-center.x,z-center.z)>24 && forest.contains(x,z);
       return hf.height(x,z)+(canopy?24:4);
     };
-    forest.plant(landscapeCenter(VIEW), VIEW.bearing);
-    await yieldToBrowser();
-    plantTrees = forest.plant;
-    plantTreesAsync = (eye,bearing) => { void forest.plantAsync(eye,bearing).then(() => shadow.invalidate()); };
+    await forest.plantAsync(landscapeCenter(VIEW), VIEW.bearing);
+    const planted = (work: Promise<void> | undefined) => {
+      void work?.then(() => shadow.invalidate()).catch(error => console.warn('Forest planting failed',error));
+    };
+    plantTreesAsync = (eye,bearing) => planted(forest.plantAsync(eye,bearing));
+    followForest = (eye,bearing) => planted(forest.follow(eye,bearing));
     cancelTreePlanting = forest.cancelPlant;
     scene.add(forest.group);
     campusModel = buildCampus(env, hf).mesh;
@@ -779,7 +781,7 @@ export function createHero(
       if (locationChanged) {
         const center = to === 'campus' ? CAMPUS_CENTER : landscapeCenter(VIEW);
         terrainRecenter?.(center);
-        plantTrees?.(center, VIEW.bearing);
+        plantTreesAsync?.(center, VIEW.bearing);
         shadow.invalidate();
       }
       flight = null;
@@ -824,8 +826,9 @@ export function createHero(
         axis(pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft')+touchMove.side),axis(pressed('KeyE')-pressed('KeyQ')+touchMove.up),inputDt,!!pressed('ShiftLeft','ShiftRight')||touchMove.fast,groundAt??(()=>40),travelBounds);
       camera.position.copy(freePosition);const yaw=(freeBearing+lookDrag.yaw)*RAD,pitch=THREE.MathUtils.clamp(freePitch+lookDrag.pitch,-85,85)*RAD;
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
+      followForest?.(freePosition,yaw/RAD);
       if(freeCenter.distanceTo(freePosition)>600){
-        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);plantTreesAsync?.(freePosition,yaw/RAD);ensureCityRegion?.(freePosition);
+        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);ensureCityRegion?.(freePosition);
         prefetchCityRegion?.({x:freePosition.x+Math.sin(yaw)*1200,z:freePosition.z-Math.cos(yaw)*1200});
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }
@@ -846,7 +849,7 @@ export function createHero(
         flight.regrow = false;
         const center = flight.to === 'campus' ? CAMPUS_CENTER : landscapeCenter(VIEW);
         terrainRecenter?.(center);
-        plantTrees?.(center, VIEW.bearing);
+        plantTreesAsync?.(center, VIEW.bearing);
         shadow.invalidate();
       }
       const h = flight.to === 'campus' ? THREE.MathUtils.smoothstep(flight.t, 0.4, 1) : 1 - THREE.MathUtils.smoothstep(flight.t, 0, 0.5);

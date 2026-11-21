@@ -54,3 +54,20 @@ test('incremental forest matches synchronous trees and leaves the old forest vis
     assert.notDeepEqual(asyncForest.group.children,current);
   } finally {globalThis.document=original;}
 });
+
+test('travel finishes the current update and then samples the latest horizontal position',async()=>{
+  const forest=createForest({}, {bounds:[-700,-700,700,700],height:()=>0}, .55, [], ()=>1);
+  forest.plant({x:0,z:0},0);
+  const old=forest.group.children[0];
+  assert.equal(forest.follow({x:0,y:1500,z:0},0),undefined);
+  const pending=forest.follow({x:180,z:0},0);
+  assert.ok(pending);
+  assert.equal(forest.follow({x:400,z:0},90),undefined);
+  await pending;
+  assert.notEqual(forest.group.children[0],old);
+  assert.equal(forest.follow({x:180,z:0},0),undefined);
+  const latest=forest.follow({x:400,z:0},90);
+  assert.ok(latest);
+  await latest;
+  assert.equal(forest.follow({x:400,z:0},180),undefined);
+});
