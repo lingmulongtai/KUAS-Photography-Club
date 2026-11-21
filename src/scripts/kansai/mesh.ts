@@ -1,7 +1,5 @@
 import earcut from 'earcut';
 import {pitchedRoof} from './roofs';
-import type {GeometryInstance} from 'cesium';
-import {C} from './engine';
 import type {Point} from './coordinates';
 
 export type XYZ=[number,number,number];
@@ -30,20 +28,13 @@ export class Mesh {
     const indices=earcut(points.flatMap(([x,y])=>[x,y]),holes);
     for(let i=0;i<indices.length;i+=3)this.triangle(points[indices[i]],points[indices[i+1]],points[indices[i+2]],color);
   }
-  instance(id?:string):GeometryInstance|undefined{
+  buffers(id?:string){
     if(!this.positions.length)return;
-    const pos=new Float64Array(this.positions);
-    const geometry=new C.Geometry({
-      attributes:Object.assign(new C.GeometryAttributes(),{
-        position:new C.GeometryAttribute({componentDatatype:C.ComponentDatatype.DOUBLE,componentsPerAttribute:3,values:pos}),
-        normal:new C.GeometryAttribute({componentDatatype:C.ComponentDatatype.FLOAT,componentsPerAttribute:3,values:new Float32Array(this.normals)}),
-        color:new C.GeometryAttribute({componentDatatype:C.ComponentDatatype.UNSIGNED_BYTE,componentsPerAttribute:4,normalize:true,values:new Uint8Array(this.colors)}),
-        st:new C.GeometryAttribute({componentDatatype:C.ComponentDatatype.FLOAT,componentsPerAttribute:2,values:new Float32Array(this.uv)}),
-      }),primitiveType:C.PrimitiveType.TRIANGLES,boundingSphere:C.BoundingSphere.fromVertices(this.positions),
-    });
-    return new C.GeometryInstance({geometry,id,attributes:{show:new C.ShowGeometryInstanceAttribute(true)}});
+    return {id,positions:new Float64Array(this.positions),normals:new Float32Array(this.normals),
+      colors:new Uint8Array(this.colors),uv:new Float32Array(this.uv)};
   }
 }
+export type PackedMesh=NonNullable<ReturnType<Mesh['buffers']>>;
 export function noise(x:number,y:number){
   let n=Math.imul(x|0,0x165667b1)^Math.imul(y|0,0x27d4eb2d);
   n=Math.imul(n^(n>>>15),0x85ebca77);return ((n^(n>>>13))>>>0)/4294967296;

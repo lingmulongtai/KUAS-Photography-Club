@@ -1,3 +1,4 @@
+import {rasterPixels} from './raster';
 import {cache,inflate,json} from './sources';
 import {inPolygon,tileXY,type Point,type Ring} from './coordinates';
 type BlockGrid={origin:Point;pixelSize:Point;tileSize:number;tiles:Point[]};
@@ -15,9 +16,7 @@ export async function regionalHeights(){
     const contents=await archive(parent),table=new DataView(contents.buffer,0,260),i=((y%8)*8+x%8)*4;
     const a=table.getUint32(i,true),b=table.getUint32(i+4,true);if(a===b)return;
     const bitmap=await createImageBitmap(new Blob([contents.subarray(a,b)],{type:'image/png'}),{colorSpaceConversion:'none'});
-    const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
-    const ctx=canvas.getContext('2d',{willReadFrequently:true})!;ctx.drawImage(bitmap,0,0);bitmap.close();
-    return ctx.getImageData(0,0,256,256);
+    return rasterPixels(bitmap);
   });
   const cell=([lon,lat]:Point):Point=>[Math.floor((lon-grid.origin[0])/grid.pixelSize[0]),Math.floor((grid.origin[1]-lat)/grid.pixelSize[1])];
   const gridKey=([x,y]:Point)=>Math.floor(x/size)+'/'+Math.floor(y/size);

@@ -2,13 +2,13 @@ import type {CesiumWidget} from 'cesium';
 import {C} from './engine';
 import {tileXY,lonLat,type Point} from './coordinates';
 import {buildTile} from './model-tile';
-import type {ModelSources} from './sources';
+import {tileQueue} from './tile-queue';
 import type {Surveys} from './surveys';
 import type {distantModels} from './skyline';
-import type {HeightSources} from './building-heights';
 
-export function attachModels(widget:CesiumWidget,sources:ModelSources,heightSources:HeightSources,surveys:Surveys,distant:Awaited<ReturnType<typeof distantModels>>,
+export function attachModels(widget:CesiumWidget,surveys:Surveys,distant:Awaited<ReturnType<typeof distantModels>>,
   update:(count:number)=>void){
+  const queue=tileQueue();
   const scene=widget.scene,resident=new Map<string,Awaited<ReturnType<typeof buildTile>>>(),pending=new Set<string>();
   let wanted=new Map<string,Point>(),alive=true,previous='',timer=0,readyCount=-1;
   const retry=new Map<string,number>();
@@ -52,7 +52,7 @@ export function attachModels(widget:CesiumWidget,sources:ModelSources,heightSour
       if(pending.size>=3)break;
       if(resident.has(key)||pending.has(key)||(retry.get(key)??0)>Date.now())continue;
       pending.add(key);
-      void buildTile(widget,sources,heightSources,...p).then(tile=>{
+      void buildTile(widget,queue,...p).then(tile=>{
         if(!alive||!wanted.has(key)){tile.releaseMaterial();tile.primitive?.destroy();return;}
         if(tile.primitive)scene.primitives.add(tile.primitive);resident.set(key,tile);
         scene.requestRender();
@@ -67,6 +67,6 @@ export function attachModels(widget:CesiumWidget,sources:ModelSources,heightSour
     for(const tile of resident.values())tile.refresh(surveys);
   });
   const poll=window.setInterval(()=>{plan();pump();},3000);
-  return ()=>{alive=false;stop();clearInterval(poll);clearTimeout(timer);distant.dispose();surveys.dispose();
+  return ()=>{alive=false;stop();queue.dispose();clearInterval(poll);clearTimeout(timer);distant.dispose();surveys.dispose();
     for(const tile of resident.values())tile.releaseMaterial();resident.clear();};
 }

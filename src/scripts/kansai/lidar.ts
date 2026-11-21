@@ -1,3 +1,4 @@
+import {rasterPixels} from './raster';
 import {inPolygon,tileXY,type Point,type Ring} from './coordinates';
 import {json} from './sources';
 
@@ -14,11 +15,7 @@ async function read(layer:string,x:number,y:number,signal:AbortSignal){
   const res=await fetch('https://tiles.gsj.jp/tiles/elev/'+layer+'/17/'+y+'/'+x+'.png',{signal});
   if(!res.ok)throw Error('Elevation '+res.status);
   const bitmap=await createImageBitmap(await res.blob(),{colorSpaceConversion:'none',premultiplyAlpha:'none'});
-  try{
-    const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
-    const ctx=canvas.getContext('2d',{willReadFrequently:true})!;
-    ctx.drawImage(bitmap,0,0);return ctx.getImageData(0,0,256,256);
-  }finally{bitmap.close();}
+  return rasterPixels(bitmap);
 }
 function pair(x:number,y:number){
   const key=x+'/'+y,existing=pairs.get(key);if(existing)return existing;

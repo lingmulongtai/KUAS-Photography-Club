@@ -1,13 +1,12 @@
 import {KANSAI} from '../../data/kansai';
 import {EXPO,MAP_PLACES} from '../../data/kansai-outings';
 import {C} from './engine';
-import {json,modelSources} from './sources';
+import {json} from './sources';
 import {attachSurveys} from './surveys';
 import {attachModels} from './stream';
 import {distantModels} from './skyline';
 import {outingPins} from './pins';
 import {architecturalModels} from './architecture';
-import {regionalHeights} from './building-heights';
 import {fireworks} from './fireworks';
 import {prefectureCutout} from './borders';
 
@@ -86,14 +85,13 @@ export async function startMap(root:HTMLElement){
   let surveyFailed=false;
   await terrain;if(widget.isDestroyed())return;
   const architecture=await architecturalModels(widget);
-  const [sources,heightSources,surveys]=await Promise.all([modelSources(),regionalHeights(),
-    attachSurveys(widget,()=>{surveyFailed=true;},[selected.lon,selected.lat],architecture)]);
+  const surveys=await attachSurveys(widget,()=>{surveyFailed=true;},[selected.lon,selected.lat],architecture);
   if(widget.isDestroyed())return;
 
   void outingPins(widget,en,id=>{const place=byId(id);if(place)void visit(place);},()=>selected.pref);
   const distant=await distantModels(widget,surveys);
   if(widget.isDestroyed()){distant.dispose();return;}
-  close=attachModels(widget,sources,heightSources,surveys,distant,count=>{
+  close=attachModels(widget,surveys,distant,count=>{
     if(renderFailed)return;
     const note=!ready?(en?' · Elevation is unavailable':'・標高データを取得できません'):
       surveyFailed?(en?' · Some survey tiles are unavailable':'・一部の実測モデルは取得待ち'):'';
