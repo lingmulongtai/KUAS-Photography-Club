@@ -181,7 +181,7 @@ export function createHero(
   let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
-  let ensureCityRegion:((center:{x:number;z:number},bearing?:number)=>void)|null=null;
+  let ensureCityRegion:((center:{x:number;z:number},bearing?:number)=>Promise<void>|undefined)|null=null;
   let prefetchCityRegion:((center:{x:number;z:number},target?:HeroView)=>void)|null=null;
   let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let followForest: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
@@ -201,6 +201,8 @@ export function createHero(
 
   (async () => {
     const metadata = loading.track(loadJSON<TerrainMeta>('terrain.json'));
+    const cityRegions=loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
+      .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
     const prepare = (object: THREE.Object3D) => post.prepare(object).catch(error => {
       console.warn('Panorama shaders will compile on first draw', error);
     });
@@ -544,8 +546,7 @@ export function createHero(
       } catch(error) {release(false);throw error;}
       return ()=>release();
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
-    const regionManifest=await loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
-      .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
+    const regionManifest=await cityRegions;
     let lastAreaRequest:{id:string|null;retry?:ReturnType<typeof setTimeout>}|undefined;
     let lastPhotoX=0,lastPhotoZ=0;
     ensureCityRegion=(center,bearing)=>{
@@ -568,7 +569,7 @@ export function createHero(
       let delay=5000;
       const attempt=()=>{
         opts.onAreaLoading?.(!!region&&id!==regionLoader.id);
-        void regionLoader.request(region).finally(()=>{
+        return regionLoader.request(region).finally(()=>{
           if(request!==lastAreaRequest)return;
           opts.onAreaLoading?.(false);
           if(region && regionLoader.id!==id){
@@ -577,7 +578,7 @@ export function createHero(
           }
         });
       };
-      attempt();
+      return attempt();
     };
     prefetchCityRegion=(center,target)=>{
       const next=target==='tennozan'||target==='osakaSkyline'
@@ -585,9 +586,10 @@ export function createHero(
       if(next)regionLoader.prefetch(next);
       if(next?.id==='osaka')void osakaPhotos.prefetch(center);
     };
-    ensureCityRegion(landscapeCenter(VIEW));
+    const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
-    await Promise.all([cloudProgram, scenePrograms]);
+    const openingSkyline=view==='osakaSkyline'||view==='tennozan';
+    await Promise.all([cloudProgram,scenePrograms,openingRegion,openingSkyline && loadOverview('osaka')]);
     loading.built();
     startGroundRelief=() => idle(() => {
       const ground=(x:number,z:number)=>hf.height(x,z);
@@ -596,8 +598,12 @@ export function createHero(
       cultivated=relief.containsField;
       updateGroundRelief=relief.update;
     });
-    for(const area of ['south','osaka','north'])idle(()=>{
-      void loadBinary(`buildings-${area}-lod.json.gz`).then(async bytes=>{
+    for(const area of ['south','osaka','north']){
+      if(area!=='osaka'||!openingSkyline)idle(()=>void loadOverview(area));
+    }
+    async function loadOverview(area:string) {
+      try {
+        const bytes=await loadBinary(`buildings-${area}-lod.json.gz`);
         const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers?:OverviewBuilding[]};
         const overview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
         overview.mesh.name=`${area}-overview`;
@@ -607,8 +613,8 @@ export function createHero(
           const skyline=await buildSouthOverview(env,data.towers,(x,z)=>hf.height(x,z));
           scene.add(skyline.mesh);
         }
-      }).catch(error=>console.warn(`City overview unavailable: ${area}`,error));
-    });
+      } catch(error){console.warn(`City overview unavailable: ${area}`,error);}
+    }
   })().catch((err) => { console.error('Kyoto data failed to load', err); loading.fail(err); });
 
   let lastStatus = '';
