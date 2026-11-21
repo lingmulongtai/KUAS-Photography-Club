@@ -47,6 +47,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       </select>
       <button type="button" class="spot-return" hidden>{en ? 'Back to view' : '展望へ戻る'}</button>
       <a class="spot-records" hidden>{en ? 'Outing records' : '活動記録'}</a>
+      <a class="kansai-map-link" href={local('/kansai/')}>{en ? 'Kansai in 3D' : '関西の撮影地'}</a>
       <span class="visually-hidden" role="status" data-place-status></span>
       <span class="area-status" role="status" data-area-status hidden>{en ? 'Loading the surrounding area…' : '周辺の景色を読み込んでいます…'}</span>
       <button type="button" class="explore-toggle" aria-pressed="false" disabled>{en ? 'Explore freely ↗' : '自由散策を始める ↗'}</button>
@@ -777,7 +778,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     .explore-touch:not([hidden]) { justify-content: flex-start; gap: 24px; }
   }
   .no-3d .views, .no-3d .spot-nav { display: none; }
-  .spot-select, .spot-return, .spot-records {
+  .spot-select, .spot-return, .spot-records, .kansai-map-link {
     min-height: 36px;
     padding: 8px 10px;
     border: 1px solid rgba(255, 255, 255, 0.25);

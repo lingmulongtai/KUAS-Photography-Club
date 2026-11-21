@@ -33,5 +33,5 @@ export const OUTINGS = [
   {id:'wakakusa', pref:'29', ja:'若草山', en:'Mt. Wakakusa', lon:135.8543, lat:34.6912, range:1250, heading:245},
   {id:'ikoma', pref:'29', ja:'生駒山', en:'Mt. Ikoma', lon:135.6791, lat:34.6784, range:1300, heading:255},
   {id:'osaka-castle', pref:'27', ja:'大阪城', en:'Osaka Castle', lon:135.525856, lat:34.687373, range:710, heading:18},
-  {id:'nakanoshima', pref:'27', ja:'中之島バラ園', en:'Nakanoshima Rose Garden', lon:135.507847, lat:34.6924, range:600, heading:288},
+  {id:'nakanoshima', pref:'27', ja:'中之島バラ園', en:'Nakanoshima Rose Garden', lon:135.507847, lat:34.6924, range:160, heading:286},
 ] as const;

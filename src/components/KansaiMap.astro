@@ -1,0 +1,55 @@
+---
+import Base from '../layouts/Base.astro';
+import { KANSAI } from '../data/kansai';
+import { OUTINGS } from '../data/kansai-outings';
+interface Props {lang:'ja'|'en'}
+const {lang}=Astro.props;
+const en=lang==='en';
+const title=en?'Kansai in 3D':'関西の撮影地を3Dで巡る';
+---
+<Base {lang} {title}>
+  <link slot="head" rel="stylesheet" href="/kansai-engine/Widgets/widgets.css" />
+  <section class="atlas" {lang}>
+    <div class="controls">
+      <h1>{title}</h1>
+      <label>{en?'Prefecture':'府県'}<select id="map-prefecture">{KANSAI.map(p=><option value={p.code} selected={p.code==='26'}>{p[lang]}</option>)}</select></label>
+      <label>{en?'Club outings':'これまでの撮影地'}<select id="map-outing">
+        <option value="">{en?'Choose a place':'場所を選ぶ'}</option>
+        {KANSAI.map(p=><optgroup label={p[lang]}>{OUTINGS.filter(o=>o.pref===p.code).map(o=><option value={o.id}>{o[lang]}</option>)}</optgroup>)}
+      </select></label>
+    </div>
+    <div class="globe" aria-label={title}></div>
+    <div class="caption"><span role="status">{en?'Loading the map…':'地図を読み込んでいます…'}</span>
+      <span>{en?'Drag to pan · Wheel to zoom · Ctrl + drag or two fingers to tilt':'ドラッグで移動・ホイールで拡大・Ctrl＋ドラッグまたは2本指で傾ける'}</span></div>
+    <details><summary>{en?'Model detail and map sources':'モデルの精度・地図の出典'}</summary>
+      <p>{en?'Published PLATEAU surveys supply detailed buildings and bridges. Elsewhere we model the mapped footprints, using recorded height, floor count and roof shape when available. Other heights and individual trees are estimates. Camera targets mark representative views of the outing areas.':'建物・橋は公開されているPLATEAUの実測モデルを優先しています。ほかの地域では建物の実際の外形に、記録のある高さ・階数・屋根形状を反映しています。高さの記録がない建物と森林内の個々の木は推定です。撮影地を選ぶと、その周辺を見渡せる代表地点に移動します。'}</p>
+      <p><a href="https://docs.plateauview.mlit.go.jp/datasets/3d-tiles/">PLATEAU</a> · <a href="https://docs.plateauview.mlit.go.jp/datasets/terrain/">PLATEAU | Mapterhorn | 国土地理院</a> · <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院（全国最新写真・最適化ベクトルタイルを加工）</a> · <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2026.html">国土数値情報（行政区域）</a> · <a href="https://www.maff.go.jp/j/tokei/census/shuraku_data/2025/mb/index.html">農林水産省統計部「筆ポリゴンデータ（2026年）」を加工して作成</a></p>
+      <p><a href="https://data.city.kyoto.lg.jp/resource/?id=21224">{en?'Kyoto Station district · Adapted from Kyoto City open data':'京都駅ビル・駅前広場・周辺建物 © 京都市オープンデータを加工'}</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></p>
+      <p><a href="https://web.pref.hyogo.lg.jp/kk26/3dgeo.html">兵庫県「全域数値地形図」</a>・<a href="https://tiles.gsj.jp/tiles/elev/tiles.html">産総研地質調査総合センター「シームレス標高タイル」</a>{en?' · Building heights estimated from airborne surface and terrain elevations.':'を加工し、航空レーザーの地表面と地盤面の差から兵庫県内の建物高を推定。'}</p>
+      <p><a href="https://doi.org/10.6084/m9.figshare.28906499">Che et al., 3D-GloBFP (2020)</a> · <a href="https://doi.org/10.2905/85005901-3a49-48dd-9d19-6261354f56fe">Pesaresi &amp; Politis, GHS-BUILT-H R2023A (European Commission, JRC)</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. {en?'The source polygons and height grids were clipped to the five prefectures. Unsurveyed buildings use matched predictions or a neighbourhood estimate.':'5府県分を抽出・加工。建物の個別資料がない場合は、外形と一致する予測高、または街区の平均高と建物面積からの推定値を使っています。'}</p>
+      <p><a href="https://doi.org/10.5281/zenodo.7254221">© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors (ODbL)</a> · <a href="/kansai/building-attributes/index.json">{en?'Download building attributes':'建物属性データの配布索引'}</a></p>
+      <p><a href="https://www.todaiji.or.jp/information/daibutsuden/">東大寺大仏殿</a> · <a href="https://www.city.hikone.lg.jp/material/files/group/4/Hikonejo_Kenzobutsu_HozonKatsuyo_Keikaku.pdf">彦根城建造物保存活用計画</a> · <a href="https://www.kobe-orientalhotel.co.jp/about/">神戸メリケンパークオリエンタルホテル</a> · <a href="/kansai/landmarks/nakanoshima-beds.json">{en?'Mapped rose beds (OSM, ODbL)':'中之島の花壇輪郭（OSM・ODbL）'}</a></p>
+    </details>
+  </section>
+  <script is:inline src="/kansai-engine/Cesium.js"></script>
+  <script>
+    import {startMap} from '../scripts/kansai/viewer';
+    const root=document.querySelector<HTMLElement>('.atlas')!;
+    startMap(root).catch(error=>{
+      console.error(error);
+      root.querySelector('[role=status]')!.textContent=root.lang==='en'?'Map unavailable. Check the connection and WebGL support.':'地図を開けませんでした。通信とブラウザのWebGL設定をご確認ください。';
+    });
+  </script>
+</Base>
+<style>
+.atlas{margin:auto;max-width:1800px;padding:clamp(1rem,3vw,3rem);color:var(--ink)}
+.controls,.caption{display:flex;align-items:center;flex-wrap:wrap;gap:.7rem 1.35rem}
+.controls{margin-bottom:1rem;align-items:flex-end}
+h1{margin:0 auto 0 0;line-height:1.16;font-size:clamp(1.5rem,3.6vw,3.5rem)}
+label{display:grid;gap:.25rem;font-size:.85rem}
+select{padding:.55rem .8rem;max-width:100%;font:inherit;color:inherit;background:var(--paper,#fff);border:1px solid currentColor;border-radius:.4rem}
+.globe{position:relative;width:100%;height:clamp(320px,68svh,900px);overflow:hidden;background:#1a2d34;border-radius:.55rem}
+.caption{justify-content:space-between;font-size:.82rem;margin:.6rem 0 1.1rem}
+details{max-width:95ch;font-size:.85rem;line-height:1.6}summary{cursor:pointer}details p{margin:.65rem 0}
+@media(max-width:620px){h1{width:100%}.controls{gap:.55rem}.controls label:last-child{flex:1;min-width:0}.globe{height:62svh}}
+</style>
