@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image
 from affine import Affine
 from rasterio.features import rasterize
-from shapely import STRtree, box, get_parts
+from shapely import STRtree, box, get_parts, intersects, prepare, union_all
 from shapely.geometry import shape
 
 DATA = Path(__file__).resolve().parents[2] / 'public/kansai'
@@ -39,9 +39,13 @@ def main():
     features = json.loads((DATA / 'prefectures.json').read_text(encoding='utf-8'))['features']
     parts = [(p, int(f['properties']['code'])) for f in features for p in get_parts(shape(f['geometry']))]
     transform = Affine.translation(WEST, SOUTH) * Affine.scale(1/SCALE)
-    # All touched cells, including very small islands invisible at this first scale.
-    edges = rasterize([(p.boundary, 1) for p, _ in parts], (HEIGHT, WIDTH),
-                      transform=transform, all_touched=True, dtype='uint8')
+    # Rasterizing a line with all_touched can miss a cell that just grazes its
+    # corner. An exact intersection keeps those slivers and small offshore islets.
+    boundary = union_all([p.boundary for p, _ in parts])
+    prepare(boundary)
+    row, col = np.indices((HEIGHT, WIDTH))
+    boxes = box(WEST+col/SCALE, SOUTH+row/SCALE, WEST+(col+1)/SCALE, SOUTH+(row+1)/SCALE)
+    edges = intersects(boundary, boxes)
     coarse = np.zeros((HEIGHT, WIDTH, 3), dtype='uint8')
     coarse[:, :, 0] = rasterize(parts, (HEIGHT, WIDTH), transform=transform, dtype='uint8')
     tree = STRtree([p for p, _ in parts])

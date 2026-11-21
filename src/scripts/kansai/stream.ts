@@ -8,7 +8,7 @@ import type {distantModels} from './skyline';
 import type {HeightSources} from './building-heights';
 
 export function attachModels(widget:CesiumWidget,sources:ModelSources,heightSources:HeightSources,surveys:Surveys,distant:Awaited<ReturnType<typeof distantModels>>,
-  owner:(p:Point)=>string|undefined,update:(count:number)=>void){
+  update:(count:number)=>void){
   const scene=widget.scene,resident=new Map<string,Awaited<ReturnType<typeof buildTile>>>(),pending=new Set<string>();
   let wanted=new Map<string,Point>(),alive=true,previous='',timer=0,readyCount=-1;
   const retry=new Map<string,number>();
@@ -52,7 +52,7 @@ export function attachModels(widget:CesiumWidget,sources:ModelSources,heightSour
       if(pending.size>=3)break;
       if(resident.has(key)||pending.has(key)||(retry.get(key)??0)>Date.now())continue;
       pending.add(key);
-      void buildTile(widget,sources,heightSources,...p,owner).then(tile=>{
+      void buildTile(widget,sources,heightSources,...p).then(tile=>{
         if(!alive||!wanted.has(key)){tile.releaseMaterial();tile.primitive?.destroy();return;}
         if(tile.primitive)scene.primitives.add(tile.primitive);resident.set(key,tile);
         scene.requestRender();

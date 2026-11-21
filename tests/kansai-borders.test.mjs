@@ -29,7 +29,11 @@ test('both sides of a prefectural line, the lake and offshore islands survive at
   }
   const sites=[[135.8332,35.005,26],[135.8348,35.005,25],
     [135.81,34.716,29],[135.81,34.718,26],[135.678,34.678,27],[135.679,34.678,29],
-    [134.96,34.5761,0],[134.96,34.5749,28],...MAP_PLACES.map(p=>[p.lon,p.lat,Number(p.pref)])];
+    [134.96,34.5761,0],[134.96,34.5749,28],
+    // Centres of fine cells lost when Kyoto and Osaka were simplified independently.
+    [135.5414276123047,34.91520690917969,26],[135.6495819091797,34.92472839355469,27],
+    [135.2742156982422,35.73771667480469,26],[135.6248321533203,33.99998474121094,29],
+    ...MAP_PLACES.map(p=>[p.lon,p.lat,Number(p.pref)])];
   for(const [lon,lat,wanted] of sites){
     assert.equal(Number(original([lon,lat])??0),wanted);
     assert.equal(lookup([lon,lat]),wanted,lon+', '+lat);

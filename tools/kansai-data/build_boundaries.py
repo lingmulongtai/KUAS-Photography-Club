@@ -1,6 +1,7 @@
 """Build the five prefecture outlines from MLIT N03 municipal polygons (2026-01-01).
 Requires shapely. Coordinates are WGS84-compatible JGD2011 longitude / latitude.
 """
+import argparse
 import io
 import json
 import zipfile
@@ -16,16 +17,23 @@ SOURCE = "https://nlftp.mlit.go.jp/ksj/gml/data/N03/N03-2026/"
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--archives', type=Path, help='Directory containing the original N03 GML zip archives')
+    archives = parser.parse_args().archives
     features = []
     for code in ("25", "26", "27", "28", "29"):
         name = f"N03-20260101_{code}_GML.zip"
-        with urlopen(SOURCE + name, timeout=90) as response:
-            archive = zipfile.ZipFile(io.BytesIO(response.read()))
-        geojson, = [p for p in archive.namelist() if p.lower().endswith(".geojson")]
-        rows = json.loads(archive.read(geojson))["features"]
-        # Union before simplification, to avoid gaps at former municipal boundaries.
+        if archives:
+            data = (archives / name).read_bytes()
+        else:
+            with urlopen(SOURCE + name, timeout=90) as response:
+                data = response.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            geojson, = [p for p in archive.namelist() if p.lower().endswith(".geojson")]
+            rows = json.loads(archive.read(geojson))["features"]
+        # Preserve shared edges exactly. Simplifying each prefecture separately
+        # previously turned slivers of land between Kyoto and Osaka into gaps.
         boundary = union_all([make_valid(shape(row["geometry"])) for row in rows])
-        boundary = boundary.simplify(.00004, preserve_topology=True)
         parts = boundary.geoms if hasattr(boundary, "geoms") else [boundary]
         polygon = MultiPolygon([orient(p, sign=1) for p in parts if p.geom_type == "Polygon"])
         features.append({"type": "Feature", "properties": {"code": code, "name": rows[0]["properties"]["N03_001"]},

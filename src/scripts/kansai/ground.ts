@@ -44,7 +44,7 @@ function clipSegment(a:Point,b:Point,box:Box):[Point,Point]|undefined{
   return [at(start),at(end)];
 }
 export function drawGround(mesh:Mesh,x:number,y:number,source:VectorTile|undefined,edges:VectorTile|undefined,
-  ground:(p:Point)=>number,xyz:(p:Point,h:number)=>XYZ,owner:(p:Point)=>string|undefined){
+  ground:(p:Point)=>number,xyz:(p:Point,h:number)=>XYZ){
   const [w,n]=lonLat(x,y,16),[e,s]=lonLat(x+1,y+1,16),bounds:Box=[w,s,e,n];
   const water=source?.layers.WA;
   const waterAreas:Point[][][]=[];
@@ -53,7 +53,7 @@ export function drawGround(mesh:Mesh,x:number,y:number,source:VectorTile|undefin
     const f=water.feature(i);
     for(const group of classifyRings(f.loadGeometry())){
       const rings=group.map(r=>clipRing(r.map(p=>at15(p,f.extent)),bounds));
-      if(rings[0].length<3||!rings[0].some(owner))continue;
+      if(rings[0].length<3)continue;
       waterAreas.push(rings);
     }
   }
@@ -69,8 +69,8 @@ export function drawGround(mesh:Mesh,x:number,y:number,source:VectorTile|undefin
           const convert=(p:{x:number;y:number})=>near?lonLat(x+p.x/f.extent,y+p.y/f.extent,16):at15(p,f.extent);
           const clipped=clipSegment(convert(line[j-1]),convert(line[j]),bounds);
           if(!clipped)continue;
-          const [a,b]=clipped,p:Point=[(a[0]+b[0])/2,(a[1]+b[1])/2];
-          if(!owner(p))continue;
+          const [a,b]=clipped;
+
           const lift=near?.43:road?.32:.25;
           strip(mesh,xyz(a,ground(a)+lift),xyz(b,ground(b)+lift),width,color);
         }

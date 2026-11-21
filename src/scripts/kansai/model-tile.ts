@@ -43,21 +43,21 @@ async function heights(widget:CesiumWidget,west:number,south:number,east:number,
   };
 }
 
-export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightSources:HeightSources,x:number,y:number,owner:(p:Point)=>string|undefined){
+export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightSources:HeightSources,x:number,y:number){
   const nw=lonLat(x,y,16),se=lonLat(x+1,y+1,16),[west,north]=nw,[east,south]=se;
   const key=(x>>4)+'/'+(y>>4), center:Point=[(west+east)/2,(north+south)/2];
   const slot=(y%16)*16+x%16;
   const corners:Point[]=[nw,se,[west,south],[east,north]];
-  const inHyogo=[center,...corners].some(p=>owner(p)==='28');
+
   const [tile,fields,tags,canopy,ground,surfaces,edges,lidar,heightsByBuilding]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
     sources.canopy(corners),heights(widget,west,south,east,north),sources.surfaces(x>>1,y>>1),sources.edges(x,y),
-    inHyogo?hyogoHeights(x,y):undefined,heightSources(x,y,corners)]);
+    hyogoHeights(x,y),heightSources(x,y,corners)]);
   const cos=Math.cos(center[1]*Math.PI/180),mx=111319.5*cos/Math.sqrt(1-.00669438*(1-cos*cos)),my=110946;
   const local=([lon,lat]:Point):Point=>[(lon-center[0])*mx,(lat-center[1])*my];
   const here=([lon,lat]:Point)=>lon>=west&&lon<east&&lat>south&&lat<=north;
   const xyz=(p:Point,h:number):XYZ=>[...local(p),h];
   const instances:GeometryInstance[]=[],locations:Point[]=[],groundMesh=new Mesh((east-west)*mx,(north-south)*my);
-  const inWater=drawGround(groundMesh,x,y,surfaces,edges,ground,xyz,owner);
+  const inWater=drawGround(groundMesh,x,y,surfaces,edges,ground,xyz);
   const occupied=new Map<number,Ring[][]>();
   const bin=(v:number)=>Math.max(0,Math.min(7,Math.floor(v*8)));
   const col=(p:Point)=>bin((p[0]-west)/(east-west)),row=(p:Point)=>bin((p[1]-south)/(north-south));
@@ -71,7 +71,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
     }
     const style=noise(Math.round(p[0]*1e6),Math.round(p[1]*1e6));
     const mapped=tag?.height&&tag.height>0?tag.height:undefined;
-    const measured=()=>!tag?.part&&owner(p)==='28'?lidar?.(rings):undefined;
+    const measured=()=>tag?.part?undefined:lidar(rings);
     const inferred=solid?Math.min(33,8+Math.sqrt(size)*.24):size>360?8+style*3:5.6+style*2.2;
     const block=heightsByBuilding.block(p);
     const fallback=block&&block>0?Math.max(inferred*.5,Math.min(inferred*2,(inferred+block)/2)):inferred;
@@ -95,7 +95,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
   for(let i=0;i<(buildings?.length??0);i++){
     const f=buildings!.feature(i);
     for(const rings of polygons(f,x,y,16)){
-      const p=midpoint(rings[0]);if(!here(p)||!owner(p))continue;
+      const p=midpoint(rings[0]);if(!here(p))continue;
       const row=outlines.find(r=>inPolygon(p,r.rings)||inPolygon(r.point,rings));
       // Model an attributed outline once, even when GSI split it at a tile edge.
       if(row){matched.add(row.tag.id);continue;}
@@ -104,7 +104,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
     }
   }
   for(const row of relevant){
-    if(!here(row.point)||!owner(row.point))continue;
+    if(!here(row.point))continue;
     // A station outline may repeat the full tower height. Its podium and towers
     // are represented by their individual parts in both near and distant views.
     if(!row.tag.part && parts.some(part=>inPolygon(part.point,row.rings)
@@ -123,7 +123,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
         let distance=0;
         for(let j=1;j<line.length;j++){
           const geo=[line[j-1],line[j]].map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
-          const p=midpoint(geo);if(!here(p)||!owner(p))continue;
+          const p=midpoint(geo);if(!here(p))continue;
           const lift=raised?6.8:name==='RailTrCL'?.8:.55;
           const a=xyz(geo[0],ground(geo[0])+lift),b=xyz(geo[1],ground(geo[1])+lift);
           strip(groundMesh,a,b,width,road?[99,100,98]:[55,52,47],raised?.9:.28);
@@ -146,7 +146,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
   }
   for(const f of fields){
       for(const rings of polygons(f,x>>4,y>>4,12)){
-        const p=midpoint(rings[0]);if(!owner(p))continue;
+
         const color:RGB=f.properties.kind===1?[128,128,84]:[141,119,81];
         // Trace the real bunds above the aerial image so field crops retain their photographed colour.
         for(const ring of rings)for(let j=0;j<ring.length;j++){
@@ -159,7 +159,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
   for(let i=0;i<side;i++)for(let j=0;j<side;j++){
     const ix=x*side+i,iy=y*side+j,seed=noise(ix,iy);
     const p=lonLat(x+(i+.1+.8*noise(ix+17,iy))/side,y+(j+.1+.8*noise(ix,iy+31))/side,16);
-    if(seed>canopy(p)*.96||!owner(p)||inWater(p)||occupied.get(row(p)*8+col(p))?.some(r=>inPolygon(p,r)))continue;
+    if(seed>canopy(p)*.96||inWater(p)||occupied.get(row(p)*8+col(p))?.some(r=>inPolygon(p,r)))continue;
     const [px,py]=local(p);tree(groundMesh,px,py,ground(p),noise(iy,ix+6));
   }
   const terrain=groundMesh.instance();if(terrain)instances.push(terrain);
