@@ -68,3 +68,12 @@ test('the southern survey renders every footprint before travel and hands overla
   assert.ok(boxes.some(o=>o.visible));assert.ok(boxes.some(o=>!o.visible));
   city.setDetailBox(null);assert.ok(city.mesh.children.every(o=>o.visible));
 });
+
+test('the standing Tamba skyline contains both Kameoka and Sonobe station districts',async()=>{
+  const bytes=await readFile(new URL('../public/kyoto/buildings-tamba-lod.json.gz',import.meta.url));
+  const {buildings}=JSON.parse(gunzipSync(bytes));
+  assert.ok(bytes.length<120000);
+  for(const [x,z] of [[-16150,-1440],[-25200,-10900]]){
+    assert.ok(buildings.filter(b=>Math.hypot(b[0]-x,b[1]-z)<700).length>=15);
+  }
+});

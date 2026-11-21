@@ -624,7 +624,9 @@ export function createHero(
     }).catch(error=>{console.warn('Southern survey unavailable; using sampled skyline',error);return false;});
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
-    await Promise.all([cloudProgram,scenePrograms,openingRegion,residentSouth,loadOverview('south')]);
+    const openingTamba=view==='kameokaTerrace';
+    await Promise.all([cloudProgram,scenePrograms,openingRegion,residentSouth,loadOverview('south'),
+      openingTamba?loadOverview('tamba'):undefined]);
     loading.built();
     startGroundRelief=() => idle(() => {
       const ground=(x:number,z:number)=>hf.height(x,z);
@@ -633,7 +635,7 @@ export function createHero(
       cultivated=relief.containsField;
       updateGroundRelief=relief.update;
     });
-    for(const area of ['osaka','north']){
+    for(const area of ['osaka','north',...(openingTamba?[]:['tamba'])]){
       idle(()=>void loadOverview(area));
     }
     async function loadOverview(area:string) {

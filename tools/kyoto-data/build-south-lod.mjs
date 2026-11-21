@@ -35,3 +35,6 @@ const south=await sample('south',120);
 const confluence=await sample('tennozan',240,b=>south.has(key(b,120)));
 await writeOverview('south',[...south.values(),...confluence.values()],[...south.values()].reduce((n,cell)=>n+cell.length,0));
 await writeOverview('north',[...(await sample('north',160)).values()]);
+const kameoka=await sample('kameoka',100);
+const sonobe=await sample('sonobe',100);
+await writeOverview('tamba',[...kameoka.values(),...sonobe.values()]);
