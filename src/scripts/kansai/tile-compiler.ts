@@ -6,6 +6,7 @@ import {drawGround,roadWidth} from './ground';
 import {hyogoHeights} from './lidar';
 import {regionalHeights} from './building-heights';
 import {railStructure} from './rail';
+import {combineTileMeshes,type TileGeometry} from './tile-geometry';
 
 
 function openRing(r:Ring):Ring {
@@ -37,7 +38,7 @@ function terrainSampler(elevations:Float64Array,west:number,south:number,east:nu
 }
 
 export interface TileRequest {id:number;x:number;y:number;elevations:Float64Array<ArrayBuffer>}
-export interface CompiledTile {center:Point;meshes:PackedMesh[];locations:Point[]}
+export interface CompiledTile {center:Point;geometry?:TileGeometry;locations:Point[]}
 
 export function tileCompiler(){
   let data:Promise<[Awaited<ReturnType<typeof modelSources>>,Awaited<ReturnType<typeof regionalHeights>>]>|undefined;
@@ -163,6 +164,6 @@ export function tileCompiler(){
       const [px,py]=local(p);tree(groundMesh,px,py,ground(p),noise(iy,ix+6));
     }
     const terrain=groundMesh.buffers();if(terrain)meshes.push(terrain);
-    return {center,locations,meshes};
+    return {center,locations,geometry:combineTileMeshes(meshes)};
   };
 }

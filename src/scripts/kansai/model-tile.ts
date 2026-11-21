@@ -1,7 +1,7 @@
 import type {Cartographic,CesiumWidget} from 'cesium';
 import {C} from './engine';
 import {lonLat} from './coordinates';
-import type {PackedMesh} from './mesh';
+import type {TileGeometry} from './tile-geometry';
 import type {TileQueue} from './tile-queue';
 import type {Surveys} from './surveys';
 import {localAppearance} from './material';
@@ -15,29 +15,43 @@ async function heights(widget:CesiumWidget,west:number,south:number,east:number,
   return Float64Array.from(points,p=>p.height||0);
 }
 
-function instance(mesh:PackedMesh){
+function instance(mesh:TileGeometry){
   const geometry=new C.Geometry({
     attributes:Object.assign(new C.GeometryAttributes(),{
-      position:new C.GeometryAttribute({componentDatatype:C.ComponentDatatype.DOUBLE,componentsPerAttribute:3,values:mesh.positions}),
+      position:new C.GeometryAttribute({componentDatatype:mesh.positions instanceof Float32Array?C.ComponentDatatype.FLOAT:C.ComponentDatatype.DOUBLE,
+        componentsPerAttribute:3,values:mesh.positions}),
+      featureId:new C.GeometryAttribute({componentDatatype:mesh.ids instanceof Uint16Array?C.ComponentDatatype.UNSIGNED_SHORT:C.ComponentDatatype.FLOAT,
+        componentsPerAttribute:1,values:mesh.ids}),
       normal:new C.GeometryAttribute({componentDatatype:C.ComponentDatatype.FLOAT,componentsPerAttribute:3,values:mesh.normals}),
       color:new C.GeometryAttribute({componentDatatype:C.ComponentDatatype.UNSIGNED_BYTE,componentsPerAttribute:4,normalize:true,values:mesh.colors}),
       st:new C.GeometryAttribute({componentDatatype:C.ComponentDatatype.FLOAT,componentsPerAttribute:2,values:mesh.uv}),
-    }),primitiveType:C.PrimitiveType.TRIANGLES,boundingSphere:C.BoundingSphere.fromVertices(mesh.positions as unknown as number[]),
+    }),primitiveType:C.PrimitiveType.TRIANGLES,boundingSphere:new C.BoundingSphere(C.Cartesian3.fromArray(mesh.center),mesh.radius),
   });
-  return new C.GeometryInstance({geometry,id:mesh.id,attributes:{show:new C.ShowGeometryInstanceAttribute(true)}});
+  return new C.GeometryInstance({geometry});
 }
 
 export async function buildTile(widget:CesiumWidget,queue:TileQueue,x:number,y:number){
   const [west,north]=lonLat(x,y,16),[east,south]=lonLat(x+1,y+1,16);
   const grid=await heights(widget,west,south,east,north);
-  const {center,locations,meshes}=await queue.compile(x,y,grid);
-  const instances=meshes.map(instance);
-  const primitive=instances.length?new C.Primitive({geometryInstances:instances,
+  const {center,locations,geometry}=await queue.compile(x,y,grid);
+  const primitive=geometry?new C.Primitive({geometryInstances:instance(geometry),
     modelMatrix:C.Transforms.eastNorthUpToFixedFrame(C.Cartesian3.fromDegrees(...center)),
-    appearance:localAppearance(x,y,()=>{if(!widget.isDestroyed())widget.scene.requestRender();}),
+    appearance:localAppearance(x,y,geometry.positions instanceof Float32Array,()=>{if(!widget.isDestroyed())widget.scene.requestRender();}),
     asynchronous:false,allowPicking:false,compressVertices:false,vertexCacheOptimize:false}):undefined;
   const shown=new Uint8Array(locations.length).fill(1);
-  let applied=-1,checking=-1,cursor=0;
+  let applied=-1,checking=-1,cursor=0,dirty=false;
+  function publishVisibility(){
+    if(!dirty||!primitive)return;
+    const width=Math.min(256,locations.length+1),height=Math.ceil((locations.length+1)/width);
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d')!;
+    const pixels=ctx.createImageData(width,height);
+    pixels.data.fill(255);
+    for(let i=0;i<shown.length;i++)pixels.data[(i+1)*4]=shown[i]*255;
+    ctx.putImageData(pixels,0,0);
+    primitive.appearance.material.uniforms.visibility=canvas;
+    dirty=false;widget.scene.requestRender();
+  }
   return {primitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys,until:number){
     if(!primitive?.ready||applied===surveys.revision)return;
     if(cursor===0)checking=surveys.revision;
@@ -46,10 +60,9 @@ export async function buildTile(widget:CesiumWidget,queue:TileQueue,x:number,y:n
       if((cursor&31)===0 && performance.now()>=until)return true;
       const i=cursor++,value=surveys.contains(locations[i])?0:1;
       if(shown[i]===value)continue;
-      primitive.getGeometryInstanceAttributes(String(i)).show=new Uint8Array([value]);
-      shown[i]=value;
+      shown[i]=value;dirty=true;
     }
-    applied=checking;cursor=0;
+    publishVisibility();applied=checking;cursor=0;
     return applied!==surveys.revision;
   }};
 }

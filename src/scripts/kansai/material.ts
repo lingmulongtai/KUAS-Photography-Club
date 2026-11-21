@@ -4,8 +4,21 @@ import {lonLat} from './coordinates';
 
 // Roofs use the photographed surface at their own map coordinates. Window pitch
 // is expressed in metres, with derivative filtering before the panes get subpixel.
-export function localAppearance(x:number,y:number,redraw:()=>void){
-  const material=C.Material.fromType('Image');
+export function localAppearance(x:number,y:number,localPosition:boolean,redraw:()=>void){
+  const material=new C.Material({translucent:false,fabric:{
+    type:'KansaiBuildingTile',uniforms:{image:C.Material.DefaultImageId,visibility:C.Material.DefaultImageId},
+    source:`
+      bool tileBuildingHidden(int id){
+        ivec2 size=textureSize(visibility,0);
+        if(id==0||id>=size.x*size.y)return false;
+        return texelFetch(visibility,ivec2(id%size.x,size.y-1-id/size.x),0).r<.5;
+      }
+      czm_material czm_getMaterial(czm_materialInput inputData){
+        czm_material m=czm_getDefaultMaterial(inputData);
+        m.diffuse=texture(image,inputData.st).rgb;
+        return m;
+      }`
+  }});
   void aerialPhoto(16,x,y).then(image=>{
     if(image&&!material.isDestroyed()){material.uniforms.image=image;redraw();}
   }).catch(()=>{/* Keep the base roof tone when offline. */});
@@ -13,8 +26,9 @@ export function localAppearance(x:number,y:number,redraw:()=>void){
   const uniforms={u_tileWidth:Math.cos(latitude)*40075017/65536};
   return Object.assign(new C.Appearance({material,translucent:false,closed:false,renderState:{depthTest:{enabled:true},depthMask:true},
     vertexShaderSource:`
-      in vec3 position3DHigh;
-      in vec3 position3DLow;
+      ${localPosition?'in vec3 position;':'in vec3 position3DHigh;\n      in vec3 position3DLow;'}
+      in float featureId;
+      flat out float v_id;
       in vec3 normal;
       in vec2 st;
       in vec4 color;
@@ -26,12 +40,13 @@ export function localAppearance(x:number,y:number,redraw:()=>void){
       out vec3 v_eye;
       out vec2 v_map;
       void main(){
-        vec4 p=czm_computePosition();
+        vec4 p=${localPosition?'czm_translateRelativeToEye(vec3(0.),position)':'czm_computePosition()'};
+        v_id=featureId;
         v_uv=st;
         v_color=color;
         v_normal=czm_normal*normal;
         v_eye=(czm_modelViewRelativeToEye*p).xyz;
-        v_map=(position3DHigh.xy+position3DLow.xy)/u_tileWidth+.5;
+        v_map=${localPosition?'position.xy':'(position3DHigh.xy+position3DLow.xy)'}/u_tileWidth+.5;
         gl_Position=czm_modelViewProjectionRelativeToEye*p;
       }`,
     fragmentShaderSource:`
@@ -40,7 +55,9 @@ export function localAppearance(x:number,y:number,redraw:()=>void){
       in vec2 v_uv;
       in vec3 v_eye;
       in vec2 v_map;
+      flat in float v_id;
       void main(){
+        if(tileBuildingHidden(int(v_id)))discard;
         vec3 base=v_color.rgb;
         vec3 up=normalize(czm_viewerPositionWC);
         float day=smoothstep(-.14,.10,dot(up,czm_sunDirectionWC));
