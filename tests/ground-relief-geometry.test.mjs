@@ -58,3 +58,12 @@ test('stepped shores face land and cover the same cross-section at a map subdivi
   assert.ok(left.filter(p=>p.kind===SURFACE.grassBank).every(p=>p.z<0));
   assert.ok(left.some(p=>p.kind===SURFACE.gravel && p.z>0 && p.y<ground(p.x,p.z)));
 });
+
+test('insets on opposite sides of a narrow river headland leave room for land between them', () => {
+  const data=new GroundGeometry();
+  addBank(data,{kind:BANK,paths:[new Float32Array([3,9,3,0,0,0,0,9])]},()=>0);
+  const ends=vertices(data).filter(p=>p.kind===SURFACE.grassBank && p.z===9);
+  assert.equal(ends.length,8);
+  assert.ok(ends.slice(0,4).every(p=>p.x>1.5 && p.x<3));
+  assert.ok(ends.slice(4).every(p=>p.x<1.5 && p.x>0));
+});

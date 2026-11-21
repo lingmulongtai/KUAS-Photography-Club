@@ -41,20 +41,63 @@ function right(a: Point, b: Point) {
   return {x: dz/length, z: -dx/length};
 }
 
-/** Sweep a stepped cross-section along the map line. Insert ground samples on
- * long edges so the sides stay embedded as the DEM rises or falls. */
-export function groundRibbon(out: GroundGeometry, path: Point[], closed: boolean, profile: readonly Section[],
-  elevation: Elevation, kind: number, seed: number, rowAxis?: Point) {
+function ribbonOffsets(path: Point[], closed: boolean) {
   const count = path.length;
-  if (count < 2) return;
   const directions = path.map((p,i) => right(p, path[(i+1)%count]));
-  const offsets = path.map((_, i) => {
+  return path.map((_, i) => {
     if (!closed && i === 0) return directions[0];
     if (!closed && i === count-1) return directions[i-1];
     const a = directions[(i+count-1)%count], b = directions[i];
     const divisor = Math.max(.45, 1+a.x*b.x+a.z*b.z);
     return {x: (a.x+b.x)/divisor, z: (a.z+b.z)/divisor};
   });
+}
+
+const bankWidth=4.05;
+
+function bankOffsets(path: Point[]) {
+  const offsets=ribbonOffsets(path,false), count=path.length;
+  // At a tight headland, the inner ends of two mitres can pass one
+  // another along the same shore segment. Taper both shelves together.
+  const scale = offsets.map(() => 1);
+  for (let i=0; i<count-1; i++) {
+    const a=path[i], b=path[i+1], dx=b.x-a.x, dz=b.z-a.z, length=Math.hypot(dx,dz);
+    if (!length) continue;
+    const u=offsets[i], v=offsets[i+1];
+    const fromA=Math.max(0,(u.x*dx+u.z*dz)/length);
+    const fromB=Math.max(0,-(v.x*dx+v.z*dz)/length);
+    const needed=(fromA+fromB)*bankWidth;
+    if (needed<=length*.90) continue;
+    const fit=length*.90/needed;
+    if (fromA>0) scale[i]=Math.min(scale[i],fit);
+    if (fromB>0) scale[i+1]=Math.min(scale[i+1],fit);
+  }
+  // Bound each inset by the opposite shore of a narrow finger of land.
+  for (let i=0; i<count; i++) {
+    const p=path[i], n=offsets[i];
+    for (let j=0; j<count-1; j++) {
+      if(j===i || j===i-1) continue;
+      const a=path[j], b=path[j+1], dx=b.x-a.x, dz=b.z-a.z;
+      const denom=n.x*dz-n.z*dx;
+      if(denom>=-1e-6) continue; // The ray must enter water across this segment.
+      const x=a.x-p.x, z=a.z-p.z;
+      const t=(x*dz-z*dx)/denom, along=(x*n.z-z*n.x)/denom;
+      if(t>0 && along>=0 && along<=1) scale[i]=Math.min(scale[i],t*.43/bankWidth);
+    }
+  }
+  for (let i=0; i<count; i++) {
+    offsets[i].x*=scale[i];
+    offsets[i].z*=scale[i];
+  }
+  return offsets;
+}
+
+/** Sweep a stepped cross-section along the map line. Insert ground samples on
+ * long edges so the sides stay embedded as the DEM rises or falls. */
+export function groundRibbon(out: GroundGeometry, path: Point[], closed: boolean, profile: readonly Section[],
+  elevation: Elevation, kind: number, seed: number, rowAxis?: Point, offsets=ribbonOffsets(path,closed)) {
+  const count=path.length;
+  if (count<2) return;
   let previous = -1;
   const section = (x: number, z: number, nx: number, nz: number) => {
     const first = out.positions.length/3;
@@ -148,12 +191,12 @@ export function addField(out: GroundGeometry, feature: GroundFeature, ground: El
 }
 
 const wetShelf: Section[] = [[-.42,-.58],[-.38,.40],[1.65,.42],[1.9,.15]];
-const upperShelf: Section[] = [[1.45,.18],[1.65,.88],[3.25,.89],[4.05,.04]];
+const upperShelf: Section[] = [[1.45,.18],[1.65,.88],[3.25,.89],[bankWidth,.04]];
 
 /** The positive offsets face land on outer banks as well as on islands. */
 export function addBank(out: GroundGeometry, feature: GroundFeature, ground: Elevation) {
   const path = pathPoints(feature.paths[0]);
-  const seed = .5;
-  groundRibbon(out,path,false,wetShelf,ground,SURFACE.gravel,seed);
-  groundRibbon(out,path,false,upperShelf,ground,SURFACE.grassBank,seed);
+  const offsets=bankOffsets(path);
+  groundRibbon(out,path,false,wetShelf,ground,SURFACE.gravel,.5,undefined,offsets);
+  groundRibbon(out,path,false,upperShelf,ground,SURFACE.grassBank,.5,undefined,offsets);
 }
