@@ -15,7 +15,9 @@ test('southern overview is a bounded sample of measured and confluence buildings
     const tennozan=await loadBuildings('buildings-tennozan.json','buildings-tennozan.bin');
     const source=new Set([...south.boxes,...tennozan.boxes].map(b=>JSON.stringify([Math.round(b.x),Math.round(b.z),Math.round(b.w*2)/2,Math.round(b.d*2)/2,Math.round(b.h*2)/2,Math.round(b.angle*1000)/1000,b.ground])));
     const bytes=await readFile(new URL('buildings-south-lod.json.gz',root));
-    const {buildings}=JSON.parse(gunzipSync(bytes));
+    const {buildings,residentCount}=JSON.parse(gunzipSync(bytes));
+    assert.ok(residentCount>0&&residentCount<buildings.length);
+    assert.ok(buildings.slice(residentCount).some(([x,z])=>x< -9000||z>19000));
     assert.ok(bytes.length<100000);assert.ok(buildings.length>2000&&buildings.length<10000);
     assert.ok(buildings.every(b=>source.has(JSON.stringify(b))),'every overview block comes from the original data');
     assert.ok(buildings.some(([x,z])=>x< -9000||z>19000),'the Osaka approach remains visible at a distance');
@@ -45,4 +47,33 @@ test('detailed south replaces the overview while partial neighbouring coverage r
   overview.setDetailBox([-9000,6200,4600,19000]);assert.equal(overview.mesh.visible,true);
   overview.setDetailBox([0,10000,11000,19000]);assert.equal(overview.mesh.visible,true);
   overview.setDetailBox(null);assert.equal(overview.mesh.visible,true);
+});
+
+test('the southern survey renders every footprint before travel and hands overlapping tiles to a detailed region',async()=>{
+  const compiled=buildSync({stdin:{resolveDir:process.cwd(),contents:"export {buildResidentCity} from './src/scripts/hero/buildings.ts';"},
+    bundle:true,platform:'node',format:'cjs',external:['three'],write:false}).outputFiles[0].text;
+  const module={exports:{}},require=createRequire(import.meta.url);
+  new Function('require','module','exports',compiled)(id=>id==='three'?THREE:require(id),module,module.exports);
+  const box={w:7,d:6,h:5,angle:0,kind:0,ground:0,z:7300};
+  const extent=[-9000,6200,4600,19000];
+  const city=await module.exports.buildResidentCity({},{height:()=>11},{
+    boxes:[{...box,x:-8000},{...box,x:200},{...box,x:222}],
+    polys:[{h:10,kind:1,ground:0,ring:[203,7350,215,7350,215,7365,203,7365]}],
+  },extent);
+  const boxes=city.mesh.children.filter(o=>o.geometry.isInstancedBufferGeometry);
+  assert.equal(boxes.reduce((n,o)=>n+o.geometry.instanceCount,0),3);
+  assert.ok(city.mesh.children.some(o=>!o.geometry.isInstancedBufferGeometry));
+  city.setDetailBox(extent);assert.equal(city.mesh.visible,false);
+  city.setDetailBox([0,7000,1000,7800]);assert.ok(city.mesh.visible);
+  assert.ok(boxes.some(o=>o.visible));assert.ok(boxes.some(o=>!o.visible));
+  city.setDetailBox(null);assert.ok(city.mesh.children.every(o=>o.visible));
+});
+
+test('the standing Tamba skyline contains both Kameoka and Sonobe station districts',async()=>{
+  const bytes=await readFile(new URL('../public/kyoto/buildings-tamba-lod.json.gz',import.meta.url));
+  const {buildings}=JSON.parse(gunzipSync(bytes));
+  assert.ok(bytes.length<120000);
+  for(const [x,z] of [[-16150,-1440],[-25200,-10900]]){
+    assert.ok(buildings.filter(b=>Math.hypot(b[0]-x,b[1]-z)<700).length>=15);
+  }
 });

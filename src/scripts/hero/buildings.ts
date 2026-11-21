@@ -4,7 +4,7 @@ import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
 import { hash1 } from './util';
-import { inCampus } from './geo';
+import { inCampus, type Box } from './geo';
 import { panoramaHouses, type PlacedHouse } from './panorama-blocks';
 import { isDetailed } from './campus';
 import { BUILT_GLSL } from './building-occlusion';
@@ -265,6 +265,9 @@ const BUILDING_FS = /* glsl */ `
   varying vec2 vWall;
   flat varying vec4 vInfo;
   ${WALL_GLSL}
+  #ifdef REGIONAL_OVERVIEW
+    uniform vec4 uDetailBox;
+  #endif
 
   void main(){
     vec3 n = normalize(vNormal);
@@ -275,6 +278,9 @@ const BUILDING_FS = /* glsl */ `
     vec3 across = normalize(vec3(-n.z, 0., n.x) + 1e-5);
     vec2 dWall = vec2(dFdx(vWall.x), dFdy(vWall.x));
     float alongSign = dot(dFdx(vWorld), across) * dWall.x + dot(dFdy(vWorld), across) * dWall.y < 0. ? -1. : 1.;
+    #ifdef REGIONAL_OVERVIEW
+      if(all(greaterThanEqual(vWorld.xz,uDetailBox.xy))&&all(lessThan(vWorld.xz,uDetailBox.zw)))discard;
+    #endif
     // the detailed campus model (campus.ts) stands in for these blocks up close
     if (vInfo.x > 767.5 && uCampusDetail > .5) discard;
     float campus = step(255.5, vInfo.x) * uHighlight;
@@ -368,7 +374,8 @@ const BUILDING_FS = /* glsl */ `
 
       // glass by day: darker panes that pick up a little sky
       float glassRefl = .03 + .18 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);
-      vec3 glass = vec3(.025, .03, .035) + skyColor(reflect(v, n)) * glassRefl * (1. - tiny);
+      vec3 glass = vec3(.025, .03, .035);
+      if(tiny<1.)glass+=skyColor(reflect(v,n))*glassRefl*(1.-tiny);
       glass *= 1. - .55 * head;
       glass = mix(glass, wall * .55, mullion);
       albedo = mix(wall, glass, pane * (.6 - .3 * tiny));
@@ -776,4 +783,54 @@ export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(
     }
     return null;
   } finally {steps.return(undefined as never);}
+}
+
+/** Resident rooflines use the same outlines, roof shapes and night windows as the core.
+ * Only nearby regional models need individual balconies, stepped tiles and shadow-map submissions. */
+export async function buildResidentCity(env:Env,hf:Heightfield,data:CityData,extent?:Box) {
+  const mesh=new THREE.Group();
+  const uniforms={...env,uDetailBox:{value:new THREE.Vector4()}};
+  const material=(vertexShader:string)=>new THREE.ShaderMaterial({
+    uniforms,vertexShader,fragmentShader:BUILDING_FS,defines:extent?{REGIONAL_OVERVIEW:1}:{},
+  });
+  const houses=material(INSTANCE_VS),polygons=material(POLY_VS);
+  const flat=flatShape(),pitched=pitchedShape();
+  type Tile={flat:PlacedHouse[];pitched:PlacedHouse[];polys:{p:PolyBuilding;y:number;seed:number}[]};
+  const tiles=new Map<string,Tile>();
+  const tileAt=(x:number,z:number)=>{
+    const key=Math.floor(x/CHUNK)+','+Math.floor(z/CHUNK);
+    let t=tiles.get(key);
+    if(!t){t={flat:[],pitched:[],polys:[]};tiles.set(key,t);}
+    return t;
+  };
+  let deadline=performance.now()+5;
+  for(const [i,b] of data.boxes.entries()){
+    const tile=tileAt(b.x,b.z);
+    (roofFor(b).type?tile.pitched:tile.flat).push({b,y:hf.height(b.x,b.z)+b.ground,seed:hash1(i*7+3)});
+    if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+  }
+  for(const [i,p] of data.polys.entries()){
+    const x=p.ring[0],z=p.ring[1];
+    tileAt(x,z).polys.push({p,y:hf.height(x,z)+p.ground,seed:hash1(i*13+5)});
+    if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+  }
+  const batches:THREE.Mesh[]=[];
+  for(const t of tiles.values()){
+    if(t.flat.length)batches.push(new THREE.Mesh(instanced(flat,t.flat,false),houses));
+    if(t.pitched.length)batches.push(new THREE.Mesh(instanced(pitched,t.pitched,true),houses));
+    if(t.polys.length)batches.push(new THREE.Mesh(extruded(t.polys),polygons));
+    if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+  }
+  for(const batch of batches){
+    if(!batch.geometry.boundingBox)batch.geometry.computeBoundingBox();
+    mesh.add(batch);
+  }
+  return {mesh,setDetailBox(box:Box|null){
+    uniforms.uDetailBox.value.fromArray(box??[0,0,0,0]);
+    mesh.visible=!(box&&extent&&box[0]<=extent[0]&&box[1]<=extent[1]&&box[2]>=extent[2]&&box[3]>=extent[3]);
+    if(mesh.visible)for(const batch of batches){
+      const bounds=batch.geometry.boundingBox!;
+      batch.visible=!(box&&bounds.min.x>=box[0]&&bounds.min.z>=box[1]&&bounds.max.x<box[2]&&bounds.max.z<box[3]);
+    }
+  }};
 }

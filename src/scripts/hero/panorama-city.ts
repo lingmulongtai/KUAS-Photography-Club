@@ -108,15 +108,19 @@ export function createPanoramaCity(roots: THREE.Group[], origin: Eye, terrain?: 
       worker?.terminate(); worker = undefined;
     }
   }
-  return { group, render(camera: THREE.PerspectiveCamera, draw: () => void) {
-    const eye = camera.position;
-    if (eye.x !== origin.x || eye.y !== origin.y || eye.z !== origin.z) { draw(); return; }
+  function prepareVisible(){
     const active: BuildingMesh[] = [];
     for (const { mesh, ancestors } of entries) {
       if (mesh.visible && mesh.layers.isEnabled(0) && ancestors.every(parent => parent.visible)) active.push(mesh);
     }
     if (terrain?.position.array !== terrainPositions || active.length !== signature.length ||
         active.some((mesh, i) => mesh !== signature[i])) prepare(active);
+    return active;
+  }
+  return { group, prepare:prepareVisible, render(camera: THREE.PerspectiveCamera, draw: () => void) {
+    const eye = camera.position;
+    if (eye.x !== origin.x || eye.y !== origin.y || eye.z !== origin.z) { draw(); return; }
+    const active=prepareVisible();
     if (!ready) { draw(); return; }
     projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(projection);

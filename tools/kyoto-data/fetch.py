@@ -20,7 +20,7 @@ GSI = 'https://cyberjapandata.gsi.go.jp/xyz'
 GSI_SETS = [
     # (name, url pattern, tiles)
     ('dem_png', GSI + '/dem_png/{z}/{x}/{y}.png', R.tiles_for(R.TERRAIN, 12, pad=1)),
-    ('dem_png', GSI + '/dem_png/{z}/{x}/{y}.png', R.tiles_for(R.NEAR, 14, pad=1)),
+    ('dem_png', GSI + '/dem_png/{z}/{x}/{y}.png', R.tiles_for(R.TERRAIN, 14, pad=1)),
     ('dem5a_png', GSI + '/dem5a_png/{z}/{x}/{y}.png', R.tiles_for(R.NEAR, 15, pad=1)),
     ('seamlessphoto', GSI + '/seamlessphoto/{z}/{x}/{y}.jpg', R.tiles_for(R.TERRAIN, 13)),
     ('seamlessphoto', GSI + '/seamlessphoto/{z}/{x}/{y}.jpg', R.tiles_for(R.AERIAL_DETAIL, 15)),

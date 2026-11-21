@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { VIEWS, PANORAMA_VIEWS, spotDestination } from '../src/scripts/hero/views.ts';
+import {readFile} from 'node:fs/promises';
+import {PerspectiveCamera, Vector3} from 'three';
+import { VIEWS, PANORAMA_VIEWS, flightLift, openingPanorama, spotDestination, viewBelowClouds } from '../src/scripts/hero/views.ts';
 import { SPOTS } from '../src/data/spots.ts';
 import { toLocal } from '../src/scripts/hero/geo.ts';
 import { landmarkOrbit } from '../src/scripts/hero/landmark-orbit.ts';
+import {loadHeightfield} from '../src/scripts/hero/heightfield.ts';
+import {LOWEST_CLOUD_BASE} from '../src/scripts/hero/cloud-weather.ts';
 
 test('landmark destinations keep their named model centred through full turns', () => {
   for (const id of ['tower', 'kinkaku']) {
@@ -29,21 +33,67 @@ test('panoramas turn at a fixed observation point', () => {
   assert.equal('funaoka' in VIEWS,false);
 });
 
-test('Tennozan keeps the confluence view and has a separate view aimed at Osaka', () => {
-  const view=VIEWS.tennozan;
-  assert.deepEqual(view.ref,toLocal(34.897931,135.679798));
-  assert.deepEqual(view.eye,view.ref);
-  assert.ok(view.above>=45,'clear the mountain canopy');
-  assert.ok(view.pitch<=-10,'look down over the plain');
-  assert.ok(view.bearing>=145&&view.bearing<=180,'face the confluence and Osaka');
-  assert.ok(PANORAMA_VIEWS.includes('tennozan'));
-  const osaka=VIEWS.osakaSkyline;
-  assert.deepEqual(osaka.eye,view.eye);
-  const station=toLocal(34.702911,135.495896);
-  const bearing=(Math.atan2(station.x-osaka.eye.x,osaka.eye.z-station.z)*180/Math.PI+360)%360;
-  assert.ok(Math.abs(osaka.bearing-bearing)<3,'the Osaka skyline is centred even on narrow screens');
-  assert.ok(PANORAMA_VIEWS.includes('osakaSkyline'));
-  assert.equal('sewaritei' in VIEWS,false);
+test('openings draw uniformly from clear locations and skip the previous location on reload',()=>{
+  const terrain=(x,z)=>x===VIEWS.atago.ref.x && z===VIEWS.atago.ref.z?920:80;
+  const groups=[['shogunzuka'],['inariRidge'],['daimonji'],['arashiyama'],['atago'],['kameokaTerrace'],['tennozan']];
+  for(const previous of [null,...PANORAMA_VIEWS]){
+    const choices=groups.filter(group=>!group.includes(previous));
+    choices.forEach((group,i)=>group.forEach((view,j)=>{
+      const samples=[(i+.5)/choices.length,(j+.5)/group.length];
+      assert.equal(openingPanorama(terrain,1500,previous,null,()=>samples.shift()),view);
+    }));
+  }
+  assert.equal(openingPanorama(terrain,850,'inariRidge','inariRidge',()=>0),'inariRidge');
+  for(const requested of ['atago','inari','invalid']){
+    for(let i=0;i<24;i++)assert.notEqual(openingPanorama(terrain,850,null,requested,()=>i/24),'atago');
+  }
+});
+
+test('flights between viewpoints below the clouds stay below the deck for their entire curve',()=>{
+  for(const [from,to] of [[240,760],[760,240],[740,760],[760,840]]) {
+    const lift=flightLift(from,to,20000,850), cap=Math.max(770,from,to);
+    assert.ok(from*.7+to*.3+lift<=cap);
+    assert.ok(from*.25+to*.75+lift*.7<=cap);
+  }
+  assert.equal(flightLift(120,250,1000,1350),220);
+});
+
+async function surveyedTerrain(t) {
+  const root=new URL('../public/kyoto/',import.meta.url);
+  const meta=JSON.parse(await readFile(new URL('terrain.json',root),'utf8'));
+  const original=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(await readFile(new URL(String(url).split('/').pop(),root)));
+  t.after(()=>{globalThis.fetch=original;});
+  return loadHeightfield(meta);
+}
+
+test('the Yamashina-side panorama frames Inari on the left and clears the lowest cloud deck',async t=>{
+  const hf=await surveyedTerrain(t);
+  const view=VIEWS.inariRidge;
+  assert.ok(PANORAMA_VIEWS.includes('inariRidge'));
+  assert.equal(spotDestination('inari'),'inari');
+  const height=hf.height(view.eye.x,view.eye.z)+view.above;
+  assert.ok(height>680 && height+80<LOWEST_CLOUD_BASE);
+  assert.ok(view.pitch<0 && view.pitch>-12);
+  for(const [id,min,max] of [['inari',-34,-14],['kuas',-14,2],['gosho',0,29]]){
+    const spot=SPOTS.find(s=>s.id===id),p=toLocal(spot.lat,spot.lon);
+    const bearing=Math.atan2(p.x-view.eye.x,view.eye.z-p.z)*180/Math.PI;
+    const offset=(bearing-view.bearing+540)%360-180;
+    assert.ok(offset>min && offset<max,`${id} at ${offset} degrees`);
+    for(let f=.04;f<1;f+=.04) {
+      const target=hf.height(p.x,p.z)+spot.above;
+      assert.ok(hf.height(view.eye.x+(p.x-view.eye.x)*f,view.eye.z+(p.z-view.eye.z)*f)<height+(target-height)*f,'clear view of '+id);
+    }
+  }
+});
+
+test('the single Tennozan view faces Kyoto Station from over the confluence', () => {
+  const view=VIEWS.tennozan, station=toLocal(34.9858,135.7588);
+  const bearing=Math.atan2(station.x-view.eye.x,view.eye.z-station.z)*180/Math.PI;
+  assert.ok(Math.abs(view.bearing-bearing)<4);
+  assert.equal(PANORAMA_VIEWS.length,7);
+  assert.equal(openingPanorama(()=>10,850,null,'osakaSkyline'),'tennozan');
+  assert.ok(view.eye.z>toLocal(34.897931,135.679798).z+900);
 });
 
 test('every map spot has a camera destination and landmarks stay centred', () => {
@@ -67,11 +117,29 @@ test('every map spot has a camera destination and landmarks stay centred', () =>
   assert.equal(VIEWS.arashiyama.orbit,undefined);
 });
 
-test('Daimonji panorama looks out over Kyoto and its map spot looks back at the firebed',()=>{
+test('Daimonji frames the firebed below the western skyline and stays clear of low snow clouds',async t=>{
+  const hf=await surveyedTerrain(t);
   const panorama=VIEWS.daimonji, spot=VIEWS[spotDestination('daimonji')];
   assert.equal(panorama.orbit,undefined);
-  assert.ok(panorama.bearing>210&&panorama.bearing<280,'face west/southwest toward Kyoto');
-  assert.ok(Math.hypot(panorama.eye.x-panorama.ref.x,panorama.eye.z-panorama.ref.z)<30,'stand at the firebed viewpoint');
   assert.deepEqual(spot.orbit.center,toLocal(35.0230738,135.804312));
   assert.ok(spot.eye.x<spot.orbit.center.x-300,'view the west-facing 大 from downslope');
+  const terrain=(x,z)=>hf.height(x,z);
+  const ground=terrain(panorama.ref.x,panorama.ref.z);
+  const anchors=[['daimonji',.61,.92],['kiyomizu',.17,.60],['kuas',.61,.45],['atago',.96,.31]];
+  for(const base of [1500,LOWEST_CLOUD_BASE]){
+    const view=viewBelowClouds('daimonji',ground,base);
+    const eyeHeight=ground+view.above;
+    assert.ok(eyeHeight+80<=base && eyeHeight>terrain(view.eye.x,view.eye.z)+80);
+    assert.equal(openingPanorama(terrain,base,null,'daimonji'),'daimonji');
+    const camera=new PerspectiveCamera(39.58,2000/1067,20,60000);
+    camera.position.set(view.eye.x,eyeHeight,view.eye.z);
+    const rad=Math.PI/180, yaw=view.bearing*rad, pitch=view.pitch*rad;
+    camera.lookAt(camera.position.clone().add(new Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch))));
+    camera.updateMatrixWorld();
+    for(const [id,x,y] of base===1500?anchors:anchors.slice(0,1)){
+      const pin=SPOTS.find(s=>s.id===id), p=toLocal(pin.lat,pin.lon);
+      const ndc=new Vector3(p.x,terrain(p.x,p.z)+pin.above,p.z).project(camera);
+      assert.ok(Math.abs((ndc.x+1)/2-x)<.02 && Math.abs((1-ndc.y)/2-y)<.02,id);
+    }
+  }
 });

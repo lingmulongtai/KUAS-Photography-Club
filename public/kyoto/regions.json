@@ -290,25 +290,25 @@
    },
    "photo": {
     "box": [
-     4600,
+     2250,
      -2500,
      12500,
-     8500
+     10000
     ],
     "file": "aerial-yamashina.webp",
     "size": [
-     1471,
-     2048
+     1469,
+     1792
     ],
-    "bytes": 202198,
-    "zoom": 13,
+    "bytes": 586374,
+    "zoom": 15,
     "mobile": {
      "file": "aerial-yamashina-mobile.webp",
      "size": [
-      736,
-      1024
+      734,
+      896
      ],
-     "bytes": 92316
+     "bytes": 172406
     }
    }
   },

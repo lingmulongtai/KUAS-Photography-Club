@@ -27,6 +27,7 @@ async function refresh() {
     try {
       const data = await loadSchedule(lang);
       for (const node of mine) {
+        if ((node.dataset.lang === 'en' ? 'en' : 'ja') !== lang) continue;
         const room = node.dataset.room ?? '';
         const next = nextMeeting(data.events, kyotoDay(new Date()), room);
         const label = text(next, lang, node.dataset.nextMeeting ?? 'chip', room);
@@ -40,5 +41,12 @@ async function refresh() {
 }
 if (nodes.length) {
   void refresh();
+  document.addEventListener('home:language', () => {
+    for (const node of nodes) {
+      node.dataset.state = 'usual';
+      if (node.hasAttribute('data-hide-usual')) node.hidden = true;
+    }
+    void refresh();
+  });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
 }

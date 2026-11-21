@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { preferredLanguage, languagePath, supportsLanguagePreference, ENGLISH_PAGES, LANGUAGE_KEY } from '../src/lib/i18n.ts';
+import { preferredLanguage, languagePath, supportsLanguagePreference, ENGLISH_PAGES, HOME_LANGUAGE_SWITCH_HASH, LANGUAGE_KEY } from '../src/lib/i18n.ts';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
@@ -30,20 +30,72 @@ test('language pairs round trip and guidelines retain their existing English URL
   assert.equal(languagePath('/trips/spots/gion/', 'en'), '/en/trips/');
 });
 
-test('first visits keep the requested locale; only an explicit preference redirects', () => {
-  const source=readFileSync(new URL('../src/scripts/language.ts',import.meta.url),'utf8').replace(/^import .*?;\s*/,'');
-  const script=stripTypeScriptTypes(source);
-  const redirectFor=(preview, saved=null)=>{
-    let redirected=null;
-    const document={documentElement:{lang:'ja',classList:{contains:name=>preview && name==='screenshot-preview'}},querySelectorAll:()=>[]};
-    const location={search:'',hash:'',pathname:'/',replace:url=>{redirected=url;}};
-    runInNewContext(script,{document,location,navigator:{languages:['en-US'],language:'en-US'},localStorage:{getItem:()=>saved},
-      URLSearchParams,LANGUAGE_KEY,languagePath,preferredLanguage,supportsLanguagePreference});
-    return redirected;
+const source = readFileSync(new URL('../src/scripts/language.ts', import.meta.url), 'utf8').replace(/^import [^\n]+;\s*/gm, '');
+const languageScript = stripTypeScriptTypes(source);
+
+function visit(href, { lang = 'ja', saved = null, storage = true, preview = false, links = [] } = {}) {
+  const document = {
+    documentElement: { lang, classList: { contains: name => preview && name === 'screenshot-preview' } },
+    getElementById: () => null,
+    querySelectorAll: selector => selector === 'a[href^="/"]' ? links : [],
   };
-  assert.equal(redirectFor(true),null);
-  assert.equal(redirectFor(false),null);
-  assert.equal(redirectFor(false, 'en'),'/en/');
-  assert.equal(redirectFor(false, 'ja'),null);
-  assert.equal(redirectFor(true, 'en'),null);
+  const location = new URL(href, 'https://club.example');
+  let redirected = null;
+  location.replace = url => { redirected = url; };
+  const history = {
+    state: { entry: 1 },
+    replaceState(state, _title, url) {
+      assert.equal(state, this.state);
+      location.href = url.href;
+    },
+  };
+  const localStorage = storage ? {
+    getItem: () => saved,
+    setItem(key, value) { assert.equal(key, LANGUAGE_KEY); saved = value; },
+  } : undefined;
+  const navigator = { languages: ['en-US'], language: 'en-US' };
+  runInNewContext(languageScript, { document, location, history, localStorage, navigator, URL, URLSearchParams,
+    HOME_LANGUAGE_SWITCH_HASH, LANGUAGE_KEY, languagePath, preferredLanguage, supportsLanguagePreference });
+  return { redirected, saved, location };
+}
+
+test('first visits keep the requested locale; only an explicit preference redirects', () => {
+  assert.equal(visit('/', { preview: true }).redirected, null);
+  assert.equal(visit('/').redirected, null);
+  assert.equal(visit('/', { saved: 'en' }).redirected, '/en/');
+  assert.equal(visit('/', { saved: 'ja' }).redirected, null);
+  assert.equal(visit('/', { preview: true, saved: 'en' }).redirected, null);
+});
+
+test('either home switch selects the destination once, even when opened in another tab', () => {
+  for (const [path, lang, previous] of [['/', 'ja', 'en'], ['/en/', 'en', 'ja']]) {
+    const href = path + '?view=inariRidge&lang=' + previous + HOME_LANGUAGE_SWITCH_HASH;
+    const result = visit(href, { lang, saved: previous });
+    assert.equal(result.redirected, null);
+    assert.equal(result.saved, lang);
+    assert.equal(result.location.search, '?view=inariRidge');
+    assert.equal(result.location.hash, '');
+
+    const blocked = visit(href, { lang, storage: false });
+    assert.equal(blocked.redirected, null);
+    assert.equal(blocked.location.search, '?view=inariRidge&lang=' + lang);
+    assert.equal(blocked.location.hash, '');
+  }
+  const otherPage = visit('/about/' + HOME_LANGUAGE_SWITCH_HASH);
+  assert.equal(otherPage.saved, null);
+  assert.equal(otherPage.location.hash, HOME_LANGUAGE_SWITCH_HASH);
+});
+
+test('with storage blocked, content links carry the current language and the switch carries its destination', () => {
+  function link(path, language) {
+    return {
+      path, dataset: { language },
+      get href() { return new URL(this.path, 'https://club.example').href; },
+      setAttribute(name, value) { assert.equal(name, 'href'); this.path = value; },
+    };
+  }
+  const content = link('/en/trips/?page=2#photos'), toggle = link('/#switch-language', 'ja');
+  visit('/en/?lang=en', { lang: 'en', storage: false, links: [content, toggle] });
+  assert.equal(content.path, '/en/trips/?page=2&lang=en#photos');
+  assert.equal(toggle.path, '/?lang=ja#switch-language');
 });

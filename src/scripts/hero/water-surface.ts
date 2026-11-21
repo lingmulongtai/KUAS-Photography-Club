@@ -3,9 +3,11 @@ type Point = {x:number;y:number};
 /** Conforming edge splits: shared edges receive the same midpoint, retaining holes/banks.
  * Sample height only after refinement so long bank-to-bank triangles cannot float over a bend.
  */
-export function* refineWaterSurfaceSteps(input:Point[],faces:number[][],maxEdge:number,maxTriangles=40000,focus?:Point) {
+export function* refineWaterSurfaceSteps(input:Point[],faces:number[][],maxEdge:number,maxTriangles=40000,focus?:Point,height?:(x:number,z:number)=>number) {
   const points=input.map(p=>({x:p.x,y:p.y}));
   let triangles=faces;
+  const elevations:number[]=[];
+  const level=(i:number)=>elevations[i]??=(height!(points[i].x,points[i].y));
   for(let pass=0;pass<12;pass++) {
     // This pass only reads the vertices that existed at its start. Packing their
     // indices avoids allocating a string for every shared edge; huge inputs retain
@@ -28,8 +30,13 @@ export function* refineWaterSurfaceSteps(input:Point[],faces:number[][],maxEdge:
         const distance=Math.hypot(pa.x+dx*t-focus.x,pa.y+dy*t-focus.y);
         limit*=1+3*Math.max(0,Math.min(1,(distance-600)/1200));
       }
-      if(Math.hypot(pa.x-pb.x,pa.y-pb.y)>limit) {
-        mid.set(edge,points.length);points.push({x:(pa.x+pb.x)/2,y:(pa.y+pb.y)/2});
+      const length=Math.hypot(pa.x-pb.x,pa.y-pb.y);
+      if(length<=limit && (!height || length<=Math.max(5,limit/4)))continue;
+      const x=(pa.x+pb.x)/2,y=(pa.y+pb.y)/2;
+      // A short chord can still bridge a sharp DEM bend. Refine only where the
+      // surveyed midpoint differs from the interpolated water edge by over a metre.
+      if(length>limit || (height && Math.abs((level(a)+level(b))/2-height(x,y))>1)) {
+        mid.set(edge,points.length);points.push({x,y});
       }
       }
     }

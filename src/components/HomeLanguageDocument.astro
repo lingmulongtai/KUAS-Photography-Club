@@ -1,0 +1,9 @@
+---
+import HomePage from './HomePage.astro';
+import type { SiteLanguage } from '../lib/i18n';
+
+interface Props { lang: SiteLanguage; }
+const { lang } = Astro.props;
+Astro.locals.alternateHome = await Astro.slots.render('default', [lang === 'ja' ? 'en' : 'ja']);
+---
+<HomePage lang={lang} />

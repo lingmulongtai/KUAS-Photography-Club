@@ -68,3 +68,20 @@ test('shipped outer data decodes through the runtime and stays within mobile dow
   for(const [file,budget] of [[meta.outer.file,350000],[meta.aerialOuter.file,600000],[meta.aerialOuter.mobile.file,220000]])
     assert.ok((await stat(new URL(file,root))).size<=budget,file);
 });
+
+test('Sonobe ridge samples survive the normal-map worker snapshot',async t=>{
+  const root=new URL('../public/kyoto/',import.meta.url);
+  const original=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(await readFile(new URL(String(url).split('/').pop(),root)));
+  t.after(()=>{globalThis.fetch=original;});
+  const meta=JSON.parse(await readFile(new URL('terrain.json',root),'utf8'));
+  const hf=await loadHeightfield(meta), worker=Heightfield.fromSnapshot(structuredClone(hf.snapshot()));
+  const coarse=await loadHeightfield({...meta,sonobeElevation:undefined});
+  let difference=0;
+  for(let x=-27400;x< -25000;x+=40){
+    const y=hf.height(x,-13000);
+    assert.equal(worker.height(x,-13000),y);
+    difference=Math.max(difference,Math.abs(y-coarse.height(x,-13000)));
+  }
+  assert.ok(difference>3);
+});

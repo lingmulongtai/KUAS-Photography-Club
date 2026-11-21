@@ -8,6 +8,7 @@ import type {Climate} from './seasons.ts';
  * 5 a winter snow-cloud deck, low and grey.
  */
 export const CLOUD_STYLES=['cumulus','fair','stratocumulus','congestus','cumulonimbus','snow'] as const;
+export const LOWEST_CLOUD_BASE=850;
 
 /** How often each character turns up in each season (weights in CLOUD_STYLES order). */
 const SEASON_STYLES:Record<Climate,number[]>={
@@ -29,7 +30,7 @@ const SHAPES=[
   {cover:[.46,.56],clear:[.3,.55],base:[1250,1500],depth:[450,700]},
   {cover:[.32,.4],clear:[.65,.85],base:[1300,1550],depth:[2200,3400]},
   {cover:[.38,.46],clear:[.75,.9],base:[1200,1450],depth:[5800,6800]},
-  {cover:[.56,.64],clear:[.1,.25],base:[850,1050],depth:[550,850]},
+  {cover:[.56,.64],clear:[.1,.25],base:[LOWEST_CLOUD_BASE,1050],depth:[550,850]},
 ];
 
 const pick=(random:()=>number,weights:number[])=>{

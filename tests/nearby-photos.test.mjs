@@ -4,6 +4,16 @@ import {createNearbyPhotos} from '../src/scripts/hero/nearby-photos.ts';
 const tiles=[0,1,2,3].map(i=>({file:String(i),box:[i*4000,0,(i+1)*4000,4000],mobile:{file:`m${i}`}}));
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
 
+test('the western rail yard can be visited before the Osaka photo index loads',async()=>{
+  const shown=[],local={file:'yard',box:[-7200,5000,-3500,9000],mobile:{file:'yard-small'}};
+  const loader=createNearbyPhotos(async()=>{throw Error('unrelated index');},async s=>s.file,
+    v=>shown.push(v),()=>{},assert.fail,[local]);
+  await loader.prefetch({x:-5000,z:7000});
+  await loader.update({x:-5000,z:7000});
+  await loader.update(null);
+  assert.deepEqual(shown,['yard',null]);
+});
+
 test('close imagery reuses the view prefetch, retains the current image until ready and releases old sheets',async()=>{
   const loaded=[],shown=[],disposed=[];let resume;
   const loader=createNearbyPhotos(async()=>tiles,async s=>{loaded.push(s.file);if(s.file==='1')await new Promise(r=>resume=r);return s.file;},

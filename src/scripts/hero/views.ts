@@ -26,13 +26,14 @@ const ahead = (p: { x: number; z: number }, bearing: number, m: number) => ({
 
 const KIYOMIZU = toLocal(34.9946668, 135.7849382); // 清水寺 本堂舞台
 const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
+const INARI_EAST = toLocal(34.96358,135.79023); // Aerial view from the Yamashina side of Mt. Inari.
 const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
 const ATAGO = toLocal(35.0600453, 135.6342851); // 愛宕山（地図の地点と共通）
 const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
 const KIRI_TERRACE=toLocal(34.9926914,135.5615125); // OSM viewpoint node/6855829264
 // Kyoto Tourism Federation: https://www.kyoto-kankou.or.jp/info_search/9746
-const TENNOZAN=toLocal(34.897931,135.679798); // 青木葉谷展望広場
+const CONFLUENCE=toLocal(34.886,135.684); // Over the mapped river southeast of Mt. Tennozan.
 
 /** Frame the named structure or area using the same centre as its map pin. */
 function spotOrbit(id: SpotId, distance: number, above: number, bearing: number, targetHeight: number): ViewDef {
@@ -46,14 +47,15 @@ function spotOrbit(id: SpotId, distance: number, above: number, bearing: number,
 export const VIEWS = {
   /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
   shogunzuka: { ja: '将軍塚', en: 'Shogunzuka', eye: ahead(PLACES.shogunzuka, 265, 120), ref: PLACES.shogunzuka, above: 44, bearing: 265, pitch: -5 },
+  inariRidge: { ja:'稲荷山・京都一望', en:'Mt. Inari / Kyoto panorama', eye:INARI_EAST, ref:INARI_EAST, above:612, bearing:314.7, pitch:-9.3 },
   /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
   kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, orbit: {center:KIYOMIZU,targetHeight:16}, pitch: -13 },
-  /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
-  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 250, 18), ref: DAIMONJI, above: 8, bearing: 245, pitch: -6 },
+  /** Across the firebed towards the western skyline, with Kiyomizu on the left. */
+  daimonji: { ja: '大文字山', en: 'Mt. Daimonji', eye: ahead(DAIMONJI, 80, 1704), ref: DAIMONJI, above: 834, bearing: 250.74, pitch: -8.55 },
   daimonjiFirebed: spotOrbit('daimonji',430,150,270,0),
   /** An exterior composition: the whole tower against the northern city and mountains. */
   tower: { ja: '京都タワー', en: 'Kyoto Tower', eye: ahead(TOWER, 180, 260), ref: TOWER, above: 112, bearing: 350, orbit: {center:TOWER,targetHeight:70}, pitch: -9 },
-  arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 32, bearing: 100, pitch: -4 },
+  arashiyama: { ja: '嵐山・大悲閣', en: 'Arashiyama', eye: ahead(SENKOJI, 82, 20), ref: SENKOJI, above: 105, bearing: 100, pitch: -7 },
   atago: { ja: '愛宕山', en: 'Mt. Atago', eye: ahead(ATAGO, 130, 60), ref: ATAGO, above: 75, bearing: 130, pitch: -7 },
   kinkaku: { ja: '金閣寺', en: 'Golden Pavilion', eye: ahead(KINKAKU, 220, 105), ref: KINKAKU, above: 27, bearing: 40, orbit: {center:KINKAKU,targetHeight:6}, pitch: -10 },
   station: spotOrbit('station',520,280,0,25),
@@ -71,9 +73,8 @@ export const VIEWS = {
   ryoanji: spotOrbit('ryoanji',110,65,180,7),
   togetsukyo: spotOrbit('arashiyama',330,160,180,8),
   kameoka:spotOrbit('kameoka',820,540,240,15),
-  kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:KIRI_TERRACE,ref:KIRI_TERRACE,above:35,bearing:278,pitch:-9},
-  tennozan:{ja:'天王山・三川合流',en:'Tennozan / Three Rivers',eye:TENNOZAN,ref:TENNOZAN,above:60,bearing:160,pitch:-12},
-  osakaSkyline:{ja:'天王山・大阪遠景',en:'Tennozan / Osaka skyline',eye:TENNOZAN,ref:TENNOZAN,above:60,bearing:218,pitch:-6},
+  kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:ahead(KIRI_TERRACE,180,480),ref:KIRI_TERRACE,above:84,bearing:325,pitch:-9},
+  tennozan:{ja:'天王山',en:'Mt. Tennozan',eye:CONFLUENCE,ref:CONFLUENCE,above:335,bearing:29,pitch:-6},
   sonobe:spotOrbit('sonobe',1100,650,180,8),
   yamashina:spotOrbit('yamashina',1000,650,180,8),
   fushimi:spotOrbit('fushimi',1100,650,180,8),
@@ -84,7 +85,47 @@ export const VIEWS = {
 
 export type HeroView = keyof typeof VIEWS;
 export type HeroDestination = 'campus' | HeroView;
-export const PANORAMA_VIEWS = ['shogunzuka','daimonji','arashiyama','atago','kameokaTerrace','tennozan','osakaSkyline'] as const satisfies readonly HeroView[];
+export const PANORAMA_VIEWS = ['shogunzuka','inariRidge','daimonji','arashiyama','atago','kameokaTerrace','tennozan'] as const satisfies readonly HeroView[];
+export type PanoramaView = (typeof PANORAMA_VIEWS)[number];
+const CLOUD_CLEARANCE=80;
+
+/** Move down the sightline to the firebed pin when a low cloud deck covers the usual eye. */
+export function viewBelowClouds(id:HeroView, ground:number, cloudBase:number):ViewDef {
+  const view=VIEWS[id];
+  if(id!=='daimonji')return view;
+  const above=cloudBase-CLOUD_CLEARANCE-ground;
+  if(above>=view.above)return view;
+  const pinHeight=SPOTS.find(spot=>spot.id==='daimonji')!.above;
+  if(above<=pinHeight)return view;
+  const scale=(above-pinHeight)/(view.above-pinHeight);
+  return {...view,above,eye:{
+    x:view.ref.x+(view.eye.x-view.ref.x)*scale,
+    z:view.ref.z+(view.eye.z-view.ref.z)*scale,
+  }};
+}
+
+/** Select the actual opening eye before any view-centred geometry is prepared. */
+export function openingPanorama(height:(x:number,z:number)=>number,cloudBase:number,previous:string|null,requested:string|null,random=Math.random):PanoramaView {
+  const eligible=PANORAMA_VIEWS.filter(id=>{
+    const v=VIEWS[id];
+    const ground=height(v.ref.x,v.ref.z);
+    return viewBelowClouds(id,ground,cloudBase).above<=cloudBase-CLOUD_CLEARANCE-ground;
+  });
+  // Previously shared Osaka panorama links now open the single Tennozan view.
+  const linked=eligible.find(id=>id===(requested==='osakaSkyline'?'tennozan':requested));
+  if(linked)return linked;
+  const others=eligible.filter(id=>id!==(previous==='osakaSkyline'?'tennozan':previous));
+  const choices=others.length?others:eligible;
+  return choices[Math.floor(random()*choices.length)]??'shogunzuka';
+}
+
+/** Both inner controls of a cubic flight must clear the cloud deck too. */
+export function flightLift(from:number,to:number,distance:number,cloudBase:number) {
+  const lift=160+Math.min(distance*.06,420);
+  if(Math.max(from,to)>=cloudBase)return lift;
+  const ceiling=Math.max(from,to,cloudBase-CLOUD_CLEARANCE);
+  return Math.min(lift,ceiling-(from*.7+to*.3),(ceiling-(from*.25+to*.75))/.7);
+}
 
 export function spotDestination(id: SpotId): HeroDestination {
   if (id==='kuas') return 'campus';

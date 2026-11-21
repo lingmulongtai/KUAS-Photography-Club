@@ -2,13 +2,28 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
-import {railwayPath,trainSections,serviceTrainProgress} from '../src/scripts/hero/railway-path.ts';
+import {createRailGradeIndex,railwayPath,trainSections,serviceTrainProgress} from '../src/scripts/hero/railway-path.ts';
+
+test('surveyed rails on a viaduct approach follow only the adjacent parallel service grade',()=>{
+  const grade=createRailGradeIndex();
+  grade.add({x:40,z:0,y:12},{x:52,z:0,y:18});
+  assert.equal(grade.at(48,2.6,1,0,10),16);
+  assert.equal(grade.at(48,-2.6,-1,0,10),16);
+  assert.equal(grade.at(48,2.6,0,1,10),10);
+  assert.equal(grade.at(48,6,1,0,10),10);
+});
 
 test('the source routes include the Shinkansen, stay continuous and retain hidden tunnel segments',async()=>{
   const data=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/railways.json.gz',import.meta.url))));
-  assert.equal(data.routes.length,8);let stations=0,tunnels=0;
+  assert.equal(new Set(data.routes.map(r=>r.id)).size,data.routes.length);let stations=0,tunnels=0;
+  for(const [id,stationCodes] of [['hankyu-kyoto',['40208000571','40208000759']],['jr-kyoto',['40207004387','40207001535']]]){
+    const route=data.routes.find(r=>r.id===id);
+    for(const code of stationCodes)assert.ok(route?.stations.some(s=>s.code===code),`${id} serves ${code}`);
+    assert.ok(route.points.some(([,z])=>z>12000));
+  }
   const shinkansen=data.routes.find(r=>r.id==='jr-shinkansen');
   assert.ok(shinkansen);assert.equal(shinkansen.cars,8);assert.ok(shinkansen.states.includes(2));
+  assert.ok(shinkansen.points.some(([,z])=>z>12000),'Shinkansen tracks approach Oyamazaki');
   assert.ok(shinkansen.stations.length>=1);
   for(const route of data.routes){
     assert.equal(route.states.length,route.points.length-1);assert.equal(route.tracks.length,route.states.length);
@@ -36,6 +51,32 @@ test('long routes have spaced consists travelling through the whole route',()=>{
     const first=serviceTrainProgress(0,length,span,20,0,1,1),later=serviceTrainProgress(30,length,span,20,0,1,1);
     assert.equal(later.distance-first.distance,600,'no mid-route reversal');
     assert.equal(first.visible,false,'reset happens outside the visible portion');
+  }
+});
+
+test('the two Yamashina viaducts follow surveyed elevated segments and end before the tunnels',async()=>{
+  const pack=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/railways.json.gz',import.meta.url))));
+  const spans=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/transport-spans.json.gz',import.meta.url))));
+  for(const [id,expectedLength,centre] of [['jr-yamashina',1091,[6388,999]],['jr-shinkansen',2558,[4868,2491]]]){
+    const route=pack.routes.find(r=>r.id===id),path=railwayPath(route,()=>50);
+    const {start,end,piers}=route.viaduct;
+    assert.notEqual(route.states[start-1],1);
+    assert.ok(route.states.slice(start,end).every(state=>state===1));
+    assert.notEqual(route.states[end],1);
+    const first=path.distances[start],last=path.distances[end],mid=path.at((first+last)/2);
+    assert.ok(Math.abs(last-first-expectedLength)<5);
+    assert.ok(Math.hypot(mid.x-centre[0],mid.z-centre[1])<5);
+    assert.ok(mid.visible&&mid.y>55);
+    // The same decks must not reappear as standalone bridges with independent approach heights.
+    assert.ok(!spans.paths.some(span=>span.kind==='rail'&&span.points.some(([x,z])=>Math.hypot(x-mid.x,z-mid.z)<80)));
+    const supports=[first,...piers.map(([d])=>d),last];
+    assert.ok(supports.slice(1).every((d,i)=>d>supports[i]&&d-supports[i]<50));
+    if(id==='jr-yamashina'){
+      const tunnel=route.states.findIndex((state,i)=>i>=end&&state===2);
+      assert.ok(tunnel>end && path.distances[tunnel]-last<90);
+      assert.equal(path.at(path.distances[tunnel]+1).visible,false);
+      for(const station of ['40209000399','40207800049'])assert.ok(route.stations.some(s=>s.code===station));
+    }
   }
 });
 

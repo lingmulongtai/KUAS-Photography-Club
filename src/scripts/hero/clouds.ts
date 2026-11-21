@@ -1,12 +1,11 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
-import {cloudWeather} from './cloud-weather';
-import { CLOUD_LATTICE_GLSL, createCloudLattice } from './cloud-lattice';
+import {cloudWeather,LOWEST_CLOUD_BASE} from './cloud-weather';
+import { CLOUD_COLUMN_GLSL, CLOUD_COLUMN_LOOKUP, createCloudColumns, WEATHER_SCALE } from './cloud-columns.ts';
 import type {Climate} from './seasons';
 
-/** Height of the cirrus streaks and the altocumulus field, metres. */
-const CIRRUS_Y = 8200;
-const ALTO_Y = 4600;
+import { CIRRUS_Y, HIGH_CLOUD_GLSL } from './high-clouds.ts';
+
 /** Clouds fade out into the haze before this distance. */
 const FAR = 44000;
 /** Radius of the drum the clouds are drawn on: beyond FAR, inside the camera's far plane. */
@@ -25,14 +24,14 @@ const DRUM = 52000;
  */
 export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),quality=1,climate:Climate='spring') {
   let weather=cloudWeather(seed,climate);
-  const lattice = createCloudLattice();
+
   // Runtime loop bounds keep GPU drivers from duplicating the large noise function at compile time.
   const detail = quality > .75 ? 2 : 1;
   const uniforms = {
     ...env,
-    ...lattice.uniforms,
+
+    uVolumeOnly: { value: false },
     uMarchSteps: { value: detail === 2 ? 40 : 22 },
-    uEdgeRefinements: { value: detail + 2 },
     uCover: { value: weather.cover },
     uClear: { value: weather.clear },
     uStyle: { value: weather.style },
@@ -43,8 +42,9 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     uOffset: { value: new THREE.Vector2(...weather.offset) },
     uWind: { value: new THREE.Vector2() },
   };
+  const columns = createCloudColumns(uniforms);
   const material = new THREE.ShaderMaterial({
-    uniforms,
+    uniforms: { ...uniforms, ...columns.uniforms },
     defines: { DETAIL: detail },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
@@ -56,22 +56,17 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
-      ${CLOUD_LATTICE_GLSL}
-      uniform float uCover;
-      uniform float uClear;
-      uniform float uStyle;
+      ${CLOUD_COLUMN_GLSL}
+      ${CLOUD_COLUMN_LOOKUP}
       uniform float uBase;
       uniform float uTop;
-      uniform float uCirrus;
-      uniform float uAlto;
-      uniform vec2 uOffset;
-      uniform vec2 uWind;
+      uniform bool uVolumeOnly;
       uniform int uMarchSteps;
-      uniform int uEdgeRefinements;
       varying vec3 vWorld;
 
       /** weather-map units per metre: one unit is about 9 km */
-      const float K = .00011;
+      const float K = ${WEATHER_SCALE};
+      ${HIGH_CLOUD_GLSL}
 
       float vnoise3(vec3 p){
         vec3 i = floor(p), f = fract(p);
@@ -80,70 +75,6 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           mix(mix(hash13(i), hash13(i + vec3(1,0,0)), f.x), mix(hash13(i + vec3(0,1,0)), hash13(i + vec3(1,1,0)), f.x), f.y),
           mix(mix(hash13(i + vec3(0,0,1)), hash13(i + vec3(1,0,1)), f.x), mix(hash13(i + vec3(0,1,1)), hash13(i + vec3(1,1,1)), f.x), f.y),
           f.z);
-      }
-
-      // characters (cloud-weather.ts): 0 cumulus, 1 fair, 2 stratocumulus, 3 congestus,
-      // 4 cumulonimbus, 5 snow deck
-      bool isStyle(float s){ return abs(uStyle - s) < .5; }
-      bool deck(){ return isStyle(2.) || isStyle(5.); }
-
-      /**
-       * The low clouds seen from above: x is how cloudy the sky is at p, y the level above which
-       * it is cloud, z how tall the cloud there grows (0..1).
-       */
-      vec3 field(vec2 p){
-        // bend the weather map so the cells never line up in rows or repeat one size
-        p += (vec2(fieldNoise(p * 1.7 + 2.3, 0), fieldNoise(p * 1.7 - 4.1, 0)) - .5) * .4;
-        // a regional swell, so some parts of the sky are busier than others
-        float region = fieldNoise(p * .8 + 7.3, 1);
-        // and wide clear stretches between groups of clouds: these take whole clouds away (the
-        // ones at the edge of a group come out smaller) rather than thinning every cloud
-        float clear = smoothstep(.35, .7, fieldNoise(p * .45 - 3.9, 2)) * uClear;
-        float th = 1. - uCover * (.7 + .6 * region) + clear * .4;
-        // Value noise lies in [0,1]. An upper bound below the threshold proves a ray
-        // sample contributes zero, including the wider anvil at the top of a storm.
-        float emptyBelow = th - (isStyle(4.) ? .07 : 0.) - .00001;
-        const vec3 emptyField = vec3(0., 1., 0.);
-        if (emptyBelow > 1.) return emptyField;
-        float n;
-        if (deck()){
-          // long rolls broken into cells
-          vec2 q = mat2(.87, -.5, .5, .87) * p * (isStyle(5.) ? .7 : 1.);
-          n = fieldNoise(q * vec2(2.6, 7.), 3) * .45 + fieldNoise(p * 13. + 3.1, 4) * .35;
-          if (n + .2 < emptyBelow) return emptyField;
-          n += wideFieldNoise(p * 31. - 1.7, 5) * .2;
-        } else {
-          float f = isStyle(1.) ? 1.7 : isStyle(3.) ? .7 : isStyle(4.) ? .26 : 1.;
-          // big clouds in some parts of the sky, small ones in others: two sizes of cell, blended
-          // (scaling the coordinates by a varying amount would smear the cells into streaks)
-          float big = fieldNoise(p * 4.2 * f + 5.5, 3) * .6 + fieldNoise(p * 9. * f - 2.2, 4) * .4;
-          n = big;
-          if (!isStyle(4.)) {
-            float blend = smoothstep(.3, .7, fieldNoise(p * 1.3 - 9.7, 8));
-            float small = fieldNoise(p * 9.5 * f, 5) * .55;
-            if (mix(small + .45, big, blend) < emptyBelow) return emptyField;
-            small += wideFieldNoise(p * 21. * f + 3.1, 6) * .3;
-            small += wideFieldNoise(p * 43. * f - 1.7, 7) * .15;
-            n = mix(small, big, blend);
-          }
-        }
-        if (n < emptyBelow) return emptyField;
-        // some heads stay flat while their neighbours tower; a thunderhead climbs in turrets
-        float tall = deck() ? 1. : isStyle(4.) ? mix(.5, 1., fieldNoise(p * 6. + 1.9, 9)) : mix(.45, 1., fieldNoise(p * 3.3 + 1.9, 9));
-        if (isStyle(3.) || isStyle(4.)) tall *= mix(.75, 1., fieldNoise(p * 15. - 6.1, 10));
-        return vec3(n, th, tall);
-      }
-
-      /** 0 clear sky, 1 the thickest part of a cloud; spread lets the cloud reach further out. */
-      float cover(vec3 f, float spread){
-        return clamp((f.x - f.y + spread) / max(1. - f.y, .05), 0., 1.);
-      }
-
-      /** How high a cloud with this coverage grows, as a share of the slab. */
-      float crown(float c){
-        // decks have flat tops; heaps grow domes over their thickest parts; thunderheads tower
-        // (a thunderhead is a broad dome of cloud, widest at the base, not a column or a spire)
-        return deck() ? .5 + .5 * sqrt(c) : isStyle(4.) ? sqrt(1. - (1. - c) * (1. - c)) : isStyle(3.) ? pow(c, .5) : pow(c, .6);
       }
 
       /** Cloud shape without the fine detail: for the light that reaches a point. */
@@ -157,14 +88,11 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           vec3 w = pos * .00045;
           xz += (vec2(vnoise3(w), vnoise3(w + 17.3)) - .5) * (uTop - uBase) * .22;
         }
-        vec3 f = field(xz * K - uWind + uOffset);
-        if (f.z == 0.) return 0.;
-        float c = cover(f, 0.);
-        float d = smoothstep(0., .1, crown(c) * f.z - h) * smoothstep(0., .04, h) * smoothstep(0., .25, c);
+        vec3 column = lookupColumn(xz * K - uWind + uOffset);
+        float d = smoothstep(0., .1, column.r - h) * smoothstep(0., .04, h) * column.g;
         if (isStyle(4.)){
-          // the anvil: at the top of the troposphere a thunderhead spreads out into a flat sheet
           float band = smoothstep(.8, .88, h) * (1. - smoothstep(.95, 1., h));
-          d = max(d, band * smoothstep(0., .3, cover(f, .07)) * .7);
+          d = max(d, band * column.b * .7);
         }
         return d;
       }
@@ -204,65 +132,15 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         return erode(base, n);
       }
 
-      /** Henyey-Greenstein phase, times 4π so isotropic scattering is 1. */
-      float hg(float mu, float g){
-        float d = 1. + g * g - 2. * g * mu;
-        return (1. - g * g) / (d * sqrt(d));
+      // The quadratic near spacing joins a uniform far grid with the same slope at the knee.
+      float rayStation(float distanceAlongRay, vec4 grid){
+        return distanceAlongRay < grid.w
+          ? 2.*distanceAlongRay / (grid.x + sqrt(grid.x*grid.x + 2.*distanceAlongRay))
+          : grid.z + (distanceAlongRay - grid.w) / grid.y;
       }
-
-      // High cloud cells share their exact corner values, even when a GPU optimizes
-      // the arithmetic differently across the two sides of a distant cell boundary.
-      float puffHash(ivec2 cell){
-        uint h = uint(cell.x) * 0x9e3779b9u ^ uint(cell.y) * 0x85ebca6bu;
-        h = (h ^ (h >> 16u)) * 0x7feb352du;
-        h = (h ^ (h >> 15u)) * 0x846ca68bu;
-        return float((h ^ (h >> 16u)) >> 8u) * (1. / 16777216.);
-      }
-
-      float puffNoise(vec2 p){
-        ivec2 cell = ivec2(floor(p));
-        vec2 f = fract(p);
-        f = f * f * (3. - 2. * f);
-        return mix(
-          mix(puffHash(cell), puffHash(cell + ivec2(1, 0)), f.x),
-          mix(puffHash(cell + ivec2(0, 1)), puffHash(cell + ivec2(1, 1)), f.x), f.y);
-      }
-
-      /** One of the thin high layers at height y, premultiplied colour + alpha. */
-      vec4 highLayer(vec3 ro, vec3 rd, float y, bool cirrus){
-        if (rd.y < .002 || ro.y > y || (cirrus ? uCirrus : uAlto) <= 0.) return vec4(0.);
-        float t = (y - ro.y) / rd.y;
-        vec3 pos = ro + rd * t;
-        float dist = length(pos.xz - ro.xz);
-        if (dist > 70000.) return vec4(0.);
-        vec2 p = pos.xz * K * .6 - uWind * 1.6 + uOffset * 1.7;
-        float a;
-        if (cirrus){
-          // streaks combed by the jet stream, with hooked ends
-          vec2 w = vec2(vnoise(p * 2.1 + 3.), vnoise(p * 2.1 - 5.));
-          vec2 s = mat2(.92, -.39, .39, .92) * p;
-          float streak = fbm(s * vec2(.9, 9.) + w * .9);
-          float patchy = vnoise(p * 1.3 + 11.);
-          a = smoothstep(.52, .85, streak) * smoothstep(.25, .7, patchy) * uCirrus * .62;
-        } else {
-          // mackerel sky: rows of small puffs, thinning out at the edges of the field
-          vec2 s = mat2(.8, -.6, .6, .8) * p;
-          float field = smoothstep(.35, .75, vnoise(p * 1.7 + 4.));
-          // Rotate the finer detail so its cell edges do not align with the larger puffs.
-          vec2 detail = mat2(.8, .6, -.6, .8) * s;
-          float puffs = puffNoise(s * vec2(48., 30.)) * .7 + puffNoise(detail * 110.) * .3;
-          a = smoothstep(.62 - .25 * field, .9 - .2 * field, puffs) * field * uAlto * .8;
-        }
-        // seen edge-on far away, a sheet thins to nothing in the haze
-        a *= 1. - smoothstep(30000., 70000., dist);
-        if (a < .002) return vec4(0.);
-        float mu = dot(rd, uSunDir);
-        // high clouds stay lit after sunset: the sun lights them from below the horizon
-        vec3 sun = uCloudLight * (.75 + .25 * hg(mu, .5)) * (cirrus ? 1.15 : 1.);
-        vec3 amb = mix(uHorizon, uZenith, .6) * .9 + vec3(.012, .007, .003) * uCity;
-        vec3 col = sun + amb;
-        col = mix(col, hazeColor(rd), smoothstep(12000., 60000., dist) * .7);
-        return vec4(col * a, a);
+      float stationDistance(float station, vec4 grid){
+        float n = min(station, grid.z);
+        return n*(grid.x + .5*n) + max(station-grid.z, 0.)*grid.y;
       }
 
       void main(){
@@ -281,78 +159,88 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         float distSum = 0., wSum = 0.;
 
         // the stretch of this ray inside the low-cloud slab
-        float ta = (uBase - ro.y) / (abs(rd.y) > 1e-5 ? rd.y : 1e-5);
-        float tb = (uTop - ro.y) / (abs(rd.y) > 1e-5 ? rd.y : 1e-5);
-        float t0 = max(min(ta, tb), 0.);
-        float t1 = min(max(ta, tb), ${FAR.toFixed(1)});
-        if (t1 > t0){
-          // steps grow with distance: fine where clouds are big on screen, coarse at the horizon
-          float span = t1 - t0;
-          // a per-pixel offset trades the banding of the steps for a fine grain; kept to half a
-          // step, the grain stays below the film grain of the finish
-          // (interleaved gradient noise: neighbouring pixels take evenly spread offsets, which reads
-          // as a finer, calmer grain than independent random ones)
-          float jitter = .25 + .5 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))));
-          // tall slabs (towering clouds) need more steps to stay solid
-          float steps = min(float(uMarchSteps) * (1. + (uTop - uBase) / 3000.), float(uMarchSteps) * 2.);
-          float tPrev = t0;
-          bool inside = false;
-          for (int i = 0; i < uMarchSteps * 2; i++){
-            if (T < .03 || float(i) >= steps) break;
-            float u0 = float(i) / steps, u1 = (float(i) + 1.) / steps;
-            // a per-pixel offset turns the banding of the steps into fine grain
-            float um = mix(u0, u1, jitter);
-            float t = t0 + span * um * um;
-            float tEnd = t0 + span * u1 * u1;
-            float dt = span * (u1 * u1 - u0 * u0);
-            vec3 pos = ro + rd * t;
-            float d = density(pos, t);
-            vec3 lightPos = pos;
-            if (d > .002 && !inside){
-              // The ray entered a cloud somewhere since the last sample. Find where: shaded at the
-              // step it happened to land on, a cloud's face would be sliced into bands, one per step.
-              float lo = tPrev, hi = t;
-              for (int k = 0; k < uEdgeRefinements; k++){
-                float mid = .5 * (lo + hi);
-                if (density(ro + rd * mid, mid) > .002) hi = mid;
-                else lo = mid;
+        float t0 = 0., t1 = ${FAR.toFixed(1)};
+        if (abs(rd.y) > 1e-7) {
+          float baseHit = (uBase - ro.y) / rd.y, topHit = (uTop - ro.y) / rd.y;
+          t0 = max(0., min(baseHit, topHit));
+          t1 = min(t1, max(baseHit, topHit));
+        } else if (ro.y < uBase || ro.y > uTop) {
+          t1 = 0.;
+        }
+        if (t1 > t0) {
+          // Place samples in metres from the eye. Extending the ray towards the
+          // horizon must not move the samples already inside a nearby cloud.
+          float verticalLimit = (uTop - uBase) / (float(uMarchSteps) * max(abs(rd.y), .001));
+          #if DETAIL > 1
+          float maxStep = min(56., verticalLimit), startStep = min(16., maxStep);
+          #else
+          float maxStep = min(72., verticalLimit), startStep = min(18., maxStep);
+          #endif
+          float knee = maxStep - startStep;
+          vec4 grid = vec4(startStep, maxStep, knee, knee*(startStep + .5*knee));
+          float station = floor(rayStation(t0, grid)) + 1.;
+          float t = t0, d0 = density(ro + rd*t, t);
+          float nextBlock = t0;
+          float layerDepth = uTop-uBase;
+          bool useCeilings = uColumnsReady && !isStyle(3.) && !isStyle(4.);
+          for (int i = 0; i < uMarchSteps * 32; ++i) {
+            if (T < .002 || t >= t1) break;
+            if (useCeilings && t >= nextBlock) {
+              float run;
+              bool empty = emptyColumnRun(uColumnEye + rd.xz*t/outerColumnMetres, rd.xz,
+                (ro.y + rd.y*t-uBase)/layerDepth, rd.y/layerDepth, t1-t, run);
+              nextBlock = t + run + .01;
+              if (empty && d0 <= .002) {
+                if (run >= t1-t) break;
+                float lastEmpty = floor(rayStation(t+run, grid));
+                if (lastEmpty >= station) {
+                  t = stationDistance(lastEmpty, grid);
+                  station = lastEmpty + 1.;
+                  d0 = 0.;
+                }
               }
-              // Shade just inside the surface, but keep the interior sample's density for
-              // absorption. Integrating the almost-empty boundary made each step a thin stripe.
-              lightPos = ro + rd * (hi + min(30., (tEnd - hi) * .5));
-              dt = tEnd - hi;
             }
-            inside = d > .002;
-            tPrev = t;
-            if (d > .002){
-              float h = clamp((lightPos.y - uBase) / (uTop - uBase), 0., 1.);
-              // light from the sun, dimmed by the cloud above and toward it
-              // (bigger clouds shade themselves over a bigger distance)
-              float ls = isStyle(4.) ? 3. : isStyle(3.) ? 1.8 : 1.;
-              #if DETAIL > 1
-              // near the surface the billows shade each other, which models the heads
-              float od = (lumps(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
-              #else
-              float od = (coarse(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
-              #endif
-              // beer's law plus a softer second term for light scattered many times inside
-              float toSun = exp(-od * .006) * .65 + exp(-od * .0014) * .35;
-              // dark edges where light can't scatter back out ("powder"), mostly away from the sun
-              float powder = mix(1. - exp(-d * 6.), 1., .35 + .4 * max(mu, 0.));
-              // a snow deck is thick and grey all through
-              vec3 sun = uCloudLight * phase * toSun * powder * (isStyle(5.) ? .45 : .85);
-              // the sky lights the tops more than the bases; the city lights the bases at night
-              // (at night the sky's own glow is faint: the clouds are lit from below by the city)
-              vec3 sky = amb * (.55 + .75 * h) * (.85 + .15 * d) * (1. - .5 * uCity) * (isStyle(5.) ? .75 : 1.);
-              vec3 below = cityGlow * (1. - h) * (1. - h) * 1.6 + moon * toSun;
-              // snow clouds are thick and grey all the way through
-              vec3 col = (sun + sky + below) * (isStyle(5.) ? .62 : 1.);
-              float a = 1. - exp(-d * .007 * dt);
-              L += T * a * col;
-              distSum += T * a * t;
-              wSum += T * a;
-              T *= 1. - a;
-            }
+            float nextT = min(t1, stationDistance(station, grid));
+            station += 1.;
+            float d1 = density(ro + rd*nextT, nextT);
+            float lo = t, hi = nextT, left = d0, right = d1;
+            t = nextT; d0 = d1;
+            // Simpson integration is continuous as a billow enters or leaves the interval.
+            // Its midpoint also sees thin wisps between two empty endpoints.
+            float midT = .5*(lo+hi);
+            float middle = density(ro+rd*midT, midT);
+            if (max(max(left, right), middle) < .00001) continue;
+            float mass = left + 4.*middle + right;
+            float segmentDensity = mass / 6., dt = hi-lo;
+            float shadeT = mix(lo, hi, (2.*middle + right) / mass);
+            vec3 lightPos = ro + rd*shadeT;
+            float h = clamp((lightPos.y - uBase) / (uTop - uBase), 0., 1.);
+            // light from the sun, dimmed by the cloud above and toward it
+            // (bigger clouds shade themselves over a bigger distance)
+            float ls = isStyle(4.) ? 3. : isStyle(3.) ? 1.8 : 1.;
+            #if DETAIL > 1
+            // near the surface the billows shade each other, which models the heads
+            float od = (lumps(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
+            #else
+            float od = (coarse(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
+            #endif
+            // beer's law plus a softer second term for light scattered many times inside
+            float toSun = exp(-od * .006) * .65 + exp(-od * .0014) * .35;
+            // dark edges where light can't scatter back out ("powder"), mostly away from the sun
+            float powder = mix(1. - exp(-segmentDensity * 6.), 1., .35 + .4 * max(mu, 0.));
+            // a snow deck is thick and grey all through
+            vec3 sun = uCloudLight * phase * toSun * powder * (isStyle(5.) ? .45 : .85);
+            // the sky lights the tops more than the bases; the city lights the bases at night
+            // (at night the sky's own glow is faint: the clouds are lit from below by the city)
+            vec3 sky = amb * (.55 + .75 * h) * (.85 + .15 * segmentDensity) * (1. - .5 * uCity) * (isStyle(5.) ? .75 : 1.);
+            vec3 below = cityGlow * (1. - h) * (1. - h) * 1.6 + moon * toSun;
+            // snow clouds are thick and grey all the way through
+            vec3 col = (sun + sky + below) * (isStyle(5.) ? .62 : 1.);
+            float a = 1. - exp(-segmentDensity * .007 * dt);
+            L += T * a * col;
+            distSum += T * a * shadeT;
+            wSum += T * a;
+            T *= 1. - a;
           }
         }
         float lowA = 1. - T;
@@ -367,9 +255,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           lowA *= fade;
         }
         // behind the low clouds: altocumulus, then cirrus
-        vec4 alto = highLayer(ro, rd, ${ALTO_Y.toFixed(1)}, false);
-        vec4 ci = highLayer(ro, rd, ${CIRRUS_Y.toFixed(1)}, true);
-        vec4 high = alto + ci * (1. - alto.a);
+        vec4 high = uVolumeOnly ? vec4(0.) : highClouds(ro, rd);
         vec3 C = L + high.rgb * (1. - lowA);
         float A = lowA + high.a * (1. - lowA);
         gl_FragColor = vec4(A > .0005 ? C / A : vec3(0.), A);
@@ -383,51 +269,17 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
   // cloud base any character uses. Every point of it stays inside the camera's far plane (60 km):
   // the corners of a box that reached as far along the axes were beyond it, and the clouds toward
   // north-east, south-east and so on were cut off there.
-  const bottom = 850;
+  const bottom = LOWEST_CLOUD_BASE;
   const geometry = new THREE.CylinderGeometry(DRUM, DRUM, CIRRUS_Y + 400 - bottom, 96, 1).translate(0, (CIRRUS_Y + 400 + bottom) / 2, 0);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 2;
   mesh.frustumCulled = false;
   let shown = climate;
-  let warming = false;
-  const warmMaterial = material.clone();
-  warmMaterial.uniforms = uniforms;
-  warmMaterial.defines.FIELD_LATTICE = 1;
-  const warmMesh = new THREE.Mesh(geometry,warmMaterial);
-  function updateLattice(renderer: THREE.WebGLRenderer, eye: THREE.Vector3) {
-    lattice.update(renderer, eye.x*.00011-uniforms.uWind.value.x+weather.offset[0],
-      eye.z*.00011-uniforms.uWind.value.y+weather.offset[1], weather.style);
-  }
   return {
-    mesh, uniforms, restored: lattice.restored,
+    mesh, uniforms, columnMesh: columns.mesh, restored: columns.restored,
     prepareField(renderer: THREE.WebGLRenderer, eye: THREE.Vector3) {
-      if (material.defines.FIELD_LATTICE) {
-        updateLattice(renderer,eye);
-        if (!lattice.uniforms.uLatticeOn.value) {
-          delete material.defines.FIELD_LATTICE;
-          material.needsUpdate = true;
-        }
-      }
-    },
-    warmField(renderer: THREE.WebGLRenderer, eye: THREE.Vector3, prepare: (object: THREE.Object3D) => Promise<unknown>) {
-      if (warming) return;
-      warming = true;
-      if (!renderer.extensions.has('KHR_parallel_shader_compile')) return;
-      // Show the analytic sky on the first frame. Drivers can take seconds to compile
-      // the atlas variant; it may take over only after its program is ready.
-      setTimeout(async () => {
-        try {
-          updateLattice(renderer,eye);
-          if (!lattice.uniforms.uLatticeOn.value) return;
-          await prepare(warmMesh);
-          const state = renderer.properties.get(warmMaterial) as { currentProgram?: { program?: WebGLProgram } };
-          const program = state.currentProgram?.program;
-          const gl = renderer.getContext();
-          if (!program || !gl.getProgramParameter(program,gl.LINK_STATUS)) return;
-          material.defines.FIELD_LATTICE = 1;
-          material.needsUpdate = true;
-        } catch { /* The analytic program remains available. */ }
-      },0);
+      columns.update(renderer, eye.x * WEATHER_SCALE - uniforms.uWind.value.x + weather.offset[0],
+        eye.z * WEATHER_SCALE - uniforms.uWind.value.y + weather.offset[1], weather);
     },
     get weather() { return weather; },
     /** Redraw the sky for another season (the same visit keeps its seed). */

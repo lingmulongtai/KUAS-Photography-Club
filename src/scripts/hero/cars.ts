@@ -6,6 +6,8 @@ import { ROAD_WIDTH } from './roads';
 import { rng } from './util';
 import { trafficSegments, trafficLaneFraction } from './traffic-access';
 import {trafficJunctions,chooseConnection} from './traffic-junctions';
+import { remainingAfterSignal, signalApproaches, signalAspect } from './traffic-signals';
+import { buildSignalHeads } from './traffic-signal-heads';
 import { lightSpriteGeometry, LIGHT_SPRITE_VERTEX, LIGHT_SPRITE_FRAGMENT } from './light-sprites';
 
 /*
@@ -21,6 +23,7 @@ interface Path {
   /** distance from the start to each point */
   cum: Float32Array;
   rank: number;
+  motorway: boolean;
 }
 
 /** Cars per metre of road, each way. */
@@ -60,7 +63,8 @@ function carShape() {
   return { pos, nrm, part };
 }
 
-export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quality: number) {
+export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quality: number,
+  roadHeight?: (x: number, z: number, dx: number, dz: number) => number) {
   const r = rng(131);
   const paths: Path[] = [];
   const weight: number[] = [];
@@ -73,12 +77,19 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
       const cum = new Float32Array(n);
       for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(p[i * 2] - p[i * 2 - 2], p[i * 2 + 1] - p[i * 2 - 1]);
       if (cum[n - 1] < 80) continue;
-      paths.push({ pts: p, cum, rank });
+      paths.push({ pts: p, cum, rank, motorway: (f.attr >> 4) === 3 });
       weight.push(cum[n - 1] * DENSITY[rank] * 2);
     }
   }
   const total = weight.reduce((a, b) => a + b, 0);
   const junctions=trafficJunctions(paths);
+  const approaches = signalApproaches(paths, junctions, ROAD_WIDTH, (x,z,dx,dz) =>
+    !!roadHeight && roadHeight(x,z,dx,dz) > hf.height(x,z) + 1, quality > .75 ? 520 : 260);
+  const controlled = new Int32Array(paths.length * 2).fill(-1);
+  const queues = approaches.map((arm, index) => {
+    controlled[arm.path * 2 + arm.end] = index;
+    return LANES[arm.rank].map(() => [] as number[]);
+  });
   const count = Math.round(Math.min(total, quality > 0.75 ? 12000 : 4000) * Math.min(1, quality * 1.1));
   // pick roads in proportion to how many cars they carry
   const cumW = new Float64Array(weight.length);
@@ -100,6 +111,8 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
   const dist = new Float32Array(count);
   const dir = new Int8Array(count);
   const speed = new Float32Array(count);
+  const velocity = new Float32Array(count), advance = new Float32Array(count);
+  const remaining = new Float32Array(count), laneNumber = new Uint8Array(count);
   const lane = new Float32Array(count);
   const place = (i: number, anywhere: boolean) => {
     const k = pickPath();
@@ -112,8 +125,10 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
     while (segOf[i] < path.cum.length - 2 && path.cum[segOf[i] + 1] < dist[i]) segOf[i]++;
     const [lo, hi] = SPEED[path.rank] as readonly [number, number];
     speed[i] = lo + r() * (hi - lo);
+    velocity[i] = speed[i];
     const lanes = LANES[path.rank];
-    lane[i] = lanes[Math.floor(r() * lanes.length)] * ROAD_WIDTH[path.rank];
+    laneNumber[i] = Math.floor(r() * lanes.length);
+    lane[i] = lanes[laneNumber[i]] * ROAD_WIDTH[path.rank];
   };
   for (let i = 0; i < count; i++) place(i, true);
 
@@ -131,7 +146,8 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
   for (let i = 0; i < count; i++) color.set(COLORS[Math.floor(r() * COLORS.length)], i * 3);
   geo.setAttribute('iPos', iPos);
   geo.setAttribute('iDir', iDir);
-  geo.setAttribute('iColor', new THREE.InstancedBufferAttribute(color, 3));
+  const iColor = new THREE.InstancedBufferAttribute(color.slice(),3).setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('iColor',iColor);
   geo.instanceCount = count;
   const bodyMat = new THREE.ShaderMaterial({
     uniforms: env,
@@ -241,11 +257,46 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
   const fwd = iDir.array as Float32Array;
   const lp = lpos.array as Float32Array;
   const ld = ldir.array as Float32Array;
-  function update(dt: number) {
+  const deckPath = new Int32Array(count).fill(-1), deckDistance = new Float32Array(count);
+  const deckHeight = new Float32Array(count).fill(-Infinity);
+  function planMovement(dt: number) {
+    for (let i = 0; i < count; i++) {
+      advance[i] = Math.min(speed[i], velocity[i] + 2.6 * dt) * dt;
+      const end = dir[i] > 0 ? 1 : 0;
+      const signal = controlled[pathOf[i] * 2 + end];
+      if (signal < 0) continue;
+      const cum = paths[pathOf[i]].cum;
+      remaining[i] = end ? cum[cum.length - 1] - dist[i] : dist[i];
+      queues[signal][laneNumber[i]].push(i);
+    }
+    for (let j = 0; j < approaches.length; j++) {
+      const arm = approaches[j], aspect = signalAspect(env.uTime.value, arm.phase);
+      const stop = arm.line + 2.4; // The front bumper stops just before the paint.
+      for (const queue of queues[j]) {
+        if (!queue.length) continue;
+        queue.sort((a,b) => remaining[a] - remaining[b]);
+        let leader = -Infinity;
+        for (const i of queue) {
+          const before = remaining[i];
+          const move = aspect !== 0 && before >= stop - .03
+            ? Math.min(advance[i], Math.sqrt(7 * Math.max(0,before - stop)) * dt) : advance[i];
+          leader = remainingAfterSignal(before, move, stop, aspect, leader);
+          advance[i] = before - leader;
+        }
+        queue.length = 0;
+      }
+    }
+  }
+  // Traffic continues to simulate around the city. Stream just the bodies and lamps in view.
+  const carBounds=new THREE.Sphere(new THREE.Vector3(),4);
+  function update(dt: number, frustum?:THREE.Frustum, inHorizontalView?:(x:number,z:number,margin:number)=>boolean) {
+    planMovement(dt);
+    let drawn=0;
     for (let i = 0; i < count; i++) {
       let path = paths[pathOf[i]];
       let n = path.cum.length;
-      dist[i] += dir[i] * speed[i] * dt;
+      dist[i] += dir[i] * advance[i];
+      if (dt > 0) velocity[i] = advance[i] / dt;
       if (dist[i] < 0 || dist[i] > path.cum[n - 1]) {
         const end=dir[i]>0?1:0,pts=path.pts,a=end?pts.length-4:2,b=end?pts.length-2:0;
         const dx=pts[b]-pts[a],dz=pts[b+1]-pts[a+1],len=Math.hypot(dx,dz)||1;
@@ -255,8 +306,10 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
           pathOf[i]=next.path;path=paths[next.path];n=path.cum.length;dir[i]=next.end?-1:1;
           dist[i]=next.end?Math.max(0,path.cum[n-1]-overflow):Math.min(path.cum[n-1],overflow);
           segOf[i]=next.end?n-2:0;
-          const lanes=LANES[path.rank].map(f=>f*ROAD_WIDTH[path.rank]);
-          lane[i]=lanes.reduce((best,value)=>Math.abs(value-lane[i])<Math.abs(best-lane[i])?value:best,lanes[0]);
+          const lanes=LANES[path.rank], width=ROAD_WIDTH[path.rank];
+          let best=0;
+          for(let l=1;l<lanes.length;l++)if(Math.abs(lanes[l]*width-lane[i])<Math.abs(lanes[best]*width-lane[i]))best=l;
+          laneNumber[i]=best; lane[i]=lanes[best]*width;
         }else place(i, false);
         path = paths[pathOf[i]];
         n = path.cum.length;
@@ -273,35 +326,54 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
       const uz = ((bz - az) / len) * dir[i];
       // keep left: the left of a heading (ux, uz) is (uz, -ux) with x east and z south
       const cx=ax+(bx-ax)*t,cz=az+(bz-az)*t;
+      if(inHorizontalView&&!inHorizontalView(cx,cz,Math.abs(lane[i])+carBounds.radius))continue;
       const fraction=trafficLaneFraction(cx,cz,uz*lane[i],-ux*lane[i]);
       const x = cx + uz * lane[i]*fraction;
       const z = cz - ux * lane[i]*fraction;
-      const y = hf.height(x, z) + 0.05;
-      pos[i * 3] = x;
-      pos[i * 3 + 1] = y;
-      pos[i * 3 + 2] = z;
-      fwd[i * 2] = ux;
-      fwd[i * 2 + 1] = uz;
-      const o = i * 6;
+      const ground = hf.height(x, z);
+      // On a deck follow its slope every step. On ordinary streets, repeat the
+      // spatial lookup only after the car has moved another two metres.
+      if (roadHeight && (deckHeight[i] > ground || deckPath[i] !== pathOf[i] || Math.abs(deckDistance[i] - dist[i]) > 2)) {
+        const elevation = roadHeight(x,z,ux,uz);
+        deckHeight[i] = Number.isFinite(elevation) && elevation > ground ? elevation : -Infinity;
+        deckDistance[i] = dist[i]; deckPath[i] = pathOf[i];
+      }
+      const y = Math.max(ground, deckHeight[i]) + .05;
+      carBounds.center.set(x,y+.8,z);
+      if(frustum&&!frustum.intersectsSphere(carBounds))continue;
+      const dst=drawn++;
+      iColor.setXYZ(dst,color[3*i],color[3*i+1],color[3*i+2]);
+      pos[dst * 3] = x;
+      pos[dst * 3 + 1] = y;
+      pos[dst * 3 + 2] = z;
+      fwd[dst * 2] = ux;
+      fwd[dst * 2 + 1] = uz;
+      const o = dst * 6;
       lp[o] = x + ux * 2.3;
       lp[o + 1] = y + 0.75;
       lp[o + 2] = z + uz * 2.3;
       lp[o + 3] = x - ux * 2.3;
       lp[o + 4] = y + 0.85;
       lp[o + 5] = z - uz * 2.3;
-      ld[i * 4] = ux;
-      ld[i * 4 + 1] = uz;
-      ld[i * 4 + 2] = ux;
-      ld[i * 4 + 3] = uz;
+      ld[dst * 4] = ux;
+      ld[dst * 4 + 1] = uz;
+      ld[dst * 4 + 2] = ux;
+      ld[dst * 4 + 3] = uz;
     }
-    iPos.needsUpdate = true;
-    iDir.needsUpdate = true;
-    lpos.needsUpdate = true;
-    ldir.needsUpdate = true;
+    geo.instanceCount=drawn;
+    lgeo.instanceCount=drawn*2;
+    for(const [attribute,instances] of [[iPos,drawn],[iDir,drawn],[iColor,drawn],[lpos,drawn*2],[ldir,drawn*2]] as const){
+      attribute.clearUpdateRanges();
+      if(instances){
+        attribute.addUpdateRange(0,instances*attribute.itemSize);
+        attribute.needsUpdate=true;
+      }
+    }
   }
   update(0);
 
   const group = new THREE.Group();
   group.add(bodies, points);
+  group.add(buildSignalHeads(approaches, ROAD_WIDTH, (x,z) => hf.height(x,z), lightMat.uniforms as typeof env & {uScale:{value:number};uDpr:{value:number}}));
   return { group, update, uniforms: lightMat.uniforms as typeof lightMat.uniforms & { uScale: { value: number }; uDpr: { value: number } }, count };
 }

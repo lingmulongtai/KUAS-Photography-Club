@@ -22,16 +22,19 @@ async function sample(area,step,skip=()=>false){
   }
   return cells;
 }
-async function writeOverview(area,cells){
+async function writeOverview(area,cells,residentCount){
   const buildings=cells.flatMap(list=>list.map(({b})=>[
     Math.round(b.x),Math.round(b.z),Math.round(b.w*2)/2,Math.round(b.d*2)/2,Math.round(b.h*2)/2,Math.round(b.angle*1000)/1000,b.ground,
   ]));
-  const data=Buffer.from(JSON.stringify({source:'PLATEAU Kyoto 2025 and GSI building outlines; sampled rectangles for distant view',buildings}));
+  const data=Buffer.from(JSON.stringify({source:'PLATEAU Kyoto 2025 and GSI building outlines; sampled rectangles for distant view',residentCount,buildings}));
   const output=gzipSync(data,{level:9,mtime:0});
   await writeFile(new URL(`../../public/kyoto/buildings-${area}-lod.json.gz`,import.meta.url),output);
   console.log(`${area}: ${buildings.length} representative buildings, ${output.length} bytes`);
 }
 const south=await sample('south',120);
 const confluence=await sample('tennozan',240,b=>south.has(key(b,120)));
-await writeOverview('south',[...south.values(),...confluence.values()]);
+await writeOverview('south',[...south.values(),...confluence.values()],[...south.values()].reduce((n,cell)=>n+cell.length,0));
 await writeOverview('north',[...(await sample('north',160)).values()]);
+const kameoka=await sample('kameoka',100);
+const sonobe=await sample('sonobe',100);
+await writeOverview('tamba',[...kameoka.values(),...sonobe.values()]);

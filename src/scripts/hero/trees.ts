@@ -13,20 +13,21 @@ export function createForest(
   env: Env,
   hf: Heightfield,
   quality: number,
-  photos: { photo: HTMLImageElement | ImageBitmap; box: Box }[],
+  photos: { photo: HTMLImageElement | ImageBitmap; box: Box; uv?:Box }[],
   coverage: (x: number, z: number) => number,
   excluded: (x: number, z: number) => boolean = () => false,
   extra: { x: number; y: number; z: number; cherry?: boolean }[] = [],
   photoFallback = false,
 ) {
-  const samplers = photos.map(({photo, box: photoBox}) => {
-    const W = Math.min(quality > .75 ? 2048 : 1024, photo.width);
-    const H = Math.round(photo.height * W / photo.width);
+  const samplers = photos.map(({photo, box: photoBox, uv=[0,0,1,1]}) => {
+    const sw=Math.round((uv[2]-uv[0])*photo.width), sh=Math.round((uv[3]-uv[1])*photo.height);
+    const W = Math.min(quality > .75 ? 2048 : 1024, sw);
+    const H = Math.round(sh * W / sw);
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
     const g = canvas.getContext('2d', { willReadFrequently: true })!;
-    g.drawImage(photo, 0, 0, W, H);
+    g.drawImage(photo,uv[0]*photo.width,(1-uv[3])*photo.height,sw,sh,0,0,W,H);
     const px = g.getImageData(0, 0, W, H).data;
     return (x: number, z: number) => {
       const u = (x - photoBox[0]) / (photoBox[2] - photoBox[0]);

@@ -26,7 +26,8 @@ export function kyotoStation():Part[]{
     block(p,w+1,1,d+1,x,h+.5,z,[.16,.18,.18]);
   };
   wing(-239,-140,-43,43,59.8);
-  wing(-140,-40,-43,-19,59.8);
+  wing(-140,-85,-43,-19,59.8);
+  wing(-85,-40,13,24,42);
   wing(-140,-40,19,43,43);
   wing(65,239,-43,43,55);
   // Concourse at the south edge; keep the atrium open through the north frontage.
@@ -48,16 +49,47 @@ export function kyotoStation():Part[]{
     geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize()));
     geo.translate(...a.clone().add(b).multiplyScalar(.5).toArray());p.push({geo,color:metal,glow:.08});
   };
-  // A light grid follows the curved roof. Only its central strips are glazed, leaving
-  // the valley and stairs visible between structural members from an elevated view.
-  const height=(x:number)=>49.8+10*Math.sin(Math.PI*(x+140)/260);
-  for(let x=-140;x<=120;x+=10)for(let z=-43;z<43;z+=10.75)
-    beam(new THREE.Vector3(x,height(x),z),new THREE.Vector3(x,height(x),z+10.75));
-  for(let z=-43;z<=43;z+=10.75)for(let x=-140;x<120;x+=10)
-    beam(new THREE.Vector3(x,height(x),z),new THREE.Vector3(x+10,height(x+10),z));
-  for(let x=-130;x<110;x+=20){
-    const geo=new THREE.PlaneGeometry(19.7,10.3);geo.rotateX(-Math.PI/2);geo.translate(x+10,height(x+10)-.13,-36.6);
-    p.push({geo,color:glass,glow:.1});
+  // North entrance and the approximately 150 m space frame above the concourse.
+  // https://www.obayashi.co.jp/chronicle/works/21900.html
+  const v = (x:number,y:number,z:number) => new THREE.Vector3(x,y,z);
+  for(let i=0;i<=15;i++){
+    const x=-85+i*10;
+    for(let j=0;j<6;j++){
+      const z=-43+j*11, y=roofY(x,z), next=roofY(x,z+11);
+      beam(v(x,y,z),v(x,next,z+11),.38);
+      beam(v(x,y-1.8,z),v(x,next,z+11),.24);
+      if(i<15)beam(v(x,y,z),v(x+10,roofY(x+10,z),z),.28);
+    }
+    beam(v(x,7,-43),v(x,roofY(x,-43),-43),.38);
   }
+  for(let y=8;y<47;y+=4.5)block(p,150,.28,.45,-10,y,-43,metal);
+  // Visible from the plaza through the glazing: terraces, galleries and the skyway parapets.
+  for(const y of [12,19,26,33]){
+    block(p,23,1.1,39,54,y,2,stone);
+    block(p,.35,1.4,39,42.5,y+1,2,metal);
+  }
+  for(const z of [19,23])block(p,205,1.3,.18,-32,46,z,metal);
   return p;
+}
+
+// Profile shared by the steel and glass so the panes meet the frame at every bay.
+const roofY=(x:number,z:number)=>47.5+3.2*Math.sin(Math.PI*(x+85)/150)+7.8*Math.sin((z+43)/66*Math.PI*.58);
+
+/** One transparent surface for the north curtain wall and roof, with no duplicate internal faces. */
+export function stationGlazing(){
+  const vertices:number[]=[];
+  type P=[number,number,number];
+  const quad=(a:P,b:P,c:P,d:P)=>vertices.push(...a,...b,...c,...a,...c,...d);
+  for(let i=0;i<15;i++){
+    const x=-85+i*10, end=x+10;
+    quad([x,7,-43.2],[x,roofY(x,-43),-43.2],[end,roofY(end,-43),-43.2],[end,7,-43.2]);
+    for(let j=0;j<6;j++){
+      const z=-43+j*11, next=z+11;
+      quad([x,roofY(x,z),z],[x,roofY(x,next),next],[end,roofY(end,next),next],[end,roofY(end,z),z]);
+    }
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  geometry.computeVertexNormals();
+  return geometry;
 }

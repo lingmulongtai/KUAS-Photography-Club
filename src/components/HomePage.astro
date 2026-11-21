@@ -1,0 +1,111 @@
+---
+import Base from '../layouts/Base.astro';
+import KyotoHero from './KyotoHero.astro';
+import TripCard from './TripCard.astro';
+import ReelHero from './ReelHero.astro';
+import LearnCards from './learn/LearnCards.astro';
+import InstagramSection from './InstagramSection.astro';
+import UpcomingEvents from './UpcomingEvents.astro';
+import FirstSteps from './FirstSteps.astro';
+import HomeIntro from './HomeIntro.astro';
+import StickyJoin from './StickyJoin.astro';
+import { getTrips, reelPhotos } from '../lib/trips';
+import { homeJa } from '../data/home-ja';
+
+interface Props { lang: 'ja' | 'en'; }
+const { lang } = Astro.props;
+const en = lang === 'en';
+const latest = (await getTrips()).slice(0, 3);
+const reel = await reelPhotos(lang);
+---
+<Base lang={lang} canonicalPath={en ? '/en/' : '/'} overlayHeader documentTitle={en ? undefined : homeJa.title}
+  title={en ? 'Photography under Kyoto’s sky' : undefined}
+  description={en ? 'The website operated by the KUAS Photography Club. Visit, join, check confirmed plans and learn photography.' : homeJa.description}>
+  <KyotoHero lang={lang} />
+
+  <HomeIntro lang={lang} />
+
+  <ReelHero
+    lang={lang}
+    id="activity"
+    heading="h2"
+    counter={false}
+    photos={reel.photos}
+    placeholder={reel.placeholder}
+    note={reel.members ? (en ? 'Photos by club members, shown with their permission.' : '部員が撮った写真です。撮影者の許可を得て掲載しています。') : undefined}
+    edge="PHOTO TRIPS ▸ LATEST ROLLS"
+    title={en ? 'Outing records' : '最近の撮影会'}
+    lead={en ? 'Members plan photo outings together, around Kyoto and nearby prefectures.' : '部員で相談しながら、京都の街や近くの府県へ撮影に出かけています。'}
+    link={en ? { href: '/en/trips/', label: 'View outing records →' } : { href: '/trips/', label: 'すべての撮影会 →' }}
+  />
+  {latest.length > 0 && (
+    <section class="section latest" aria-label="最近の撮影会の記録" hidden={en}>
+      <div class="wrap">
+        <div class="list">
+          {latest.map((trip) => <TripCard trip={trip} />)}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <InstagramSection lang={lang} />
+
+  <section class="section soft" aria-labelledby="next-title">
+    <div class="wrap stack">
+      <div class="head-row">
+        <div class="section-head">
+          <p class="edge">SCHEDULE ▸ COMING UP</p>
+          <h2 id="next-title">{en ? 'Coming up' : 'これからの予定'}</h2>
+        </div>
+        <a class="link-arrow" href={en ? '/en/schedule/' : '/schedule/'}>{en ? 'See the schedule →' : 'スケジュールを見る →'}</a>
+      </div>
+      <UpcomingEvents lang={lang} />
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="learn-title">
+    <div class="wrap stack">
+      <div class="head-row">
+        <div class="section-head">
+          <p class="edge">LEARN ▸ FOR BEGINNERS</p>
+          <h2 id="learn-title">{en ? 'Learn photography by trying it.' : '写真を、触って学ぶ。'}</h2>
+          <p class="muted">{en ? 'Shutter speed, aperture, focal length and developing: change the settings in your browser and see what happens.' : 'シャッタースピード、絞り、焦点距離、現像。カメラの設定を、ブラウザの中で動かしながら覚えられます。'}</p>
+        </div>
+        <a class="link-arrow" href={en ? '/en/learn/' : '/learn/'}>{en ? 'Start learning →' : '写真を学ぶ →'}</a>
+      </div>
+      <LearnCards lang={lang} rail />
+    </div>
+  </section>
+
+  <FirstSteps lang={lang} />
+  <StickyJoin lang={lang} />
+</Base>
+
+<style>
+  .soft {
+    background: var(--brand-pale);
+    border-top: 0;
+  }
+
+  .stack {
+    display: grid;
+    gap: 28px;
+  }
+
+  .head-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+  }
+
+  .list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+  }
+
+  @media (max-width: 900px) { .list { grid-template-columns: 1fr; } }
+
+</style>

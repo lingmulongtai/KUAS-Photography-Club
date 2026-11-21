@@ -57,6 +57,9 @@ export function observeFramePanel(panel: HTMLElement, stage: HTMLElement, subscr
     }
     refresh();
   }, options);
+  document.addEventListener('home:language', () => {
+    record.textContent = recording ? record.dataset.stop! : record.dataset.start!;
+  }, options);
   document.addEventListener('visibilitychange', updateActivity, options);
   canvas.addEventListener('webglcontextlost', () => { contextLost = true; updateActivity(); }, options);
   canvas.addEventListener('webglcontextrestored', () => { contextLost = false; updateActivity(); }, options);

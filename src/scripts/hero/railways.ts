@@ -2,15 +2,26 @@ import * as THREE from 'three';
 import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
 import {CampusBuilder,CM} from './campus-architecture';
 import {createCampusMesh} from './campus';
-import {railwayPath,trainSections,serviceTrainProgress,type RailwayRoute} from './railway-path';
+import {createRailGradeIndex,railwayPath,trainSections,serviceTrainProgress,type RailwayRoute} from './railway-path';
 import {SHADOW_LAYER} from './shadow';
+import {LINE,RAIL,type LineFeature} from './lines-data';
+import {RAIL_BALLAST} from './rail-ballast';
+import type {Box} from './geo';
 
 /** Bounded route groups, one static track draw and one instanced vehicle draw.
  * Vehicle speeds, station shelters and vertical alignment are illustrative. */
-export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:RailwayRoute[]){
+export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:RailwayRoute[],katsuraModeled=false,network:LineFeature[]=[],trackBox?:Box){
   const group=new THREE.Group();group.name='kyoto-railways';
-  const positions:number[]=[],sides:number[]=[],along:number[]=[],trackCounts:number[]=[];
+  const positions:number[]=[],sides:number[]=[],along:number[]=[],trackCounts:number[]=[],gauges:number[]=[];
   const structures=new CampusBuilder(0,{x:0,z:0},0);
+  const grades=createRailGradeIndex();
+  type End={x:number;y:number;z:number;dx:number;dz:number};
+  function track(a:End,b:End,start:number,end:number,width:number,count:number,gauge:number){
+    for(const [p,side,distance] of [[a,-1,start],[a,1,start],[b,1,end],[a,-1,start],[b,1,end],[b,-1,end]] as const){
+      positions.push(p.x-p.dz*side*width/2,p.y,p.z+p.dx*side*width/2);
+      sides.push(side*width/2);along.push(distance);trackCounts.push(count);gauges.push(gauge);
+    }
+  }
   const paths=routes.map(route=>railwayPath(route,ground));
   routes.forEach((route,r)=>{
     const path=paths[r];
@@ -18,20 +29,43 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
       const a=path.at(path.distances[i]+.001),b=path.at(path.distances[i+1]-.001);
       if(!a.visible)continue;
       const width=a.tracks===2?5.6:3.1;
-      for(const [p,side,distance] of [[a,-1,path.distances[i]],[a,1,path.distances[i]],[b,1,path.distances[i+1]],
-        [a,-1,path.distances[i]],[b,1,path.distances[i+1]],[b,-1,path.distances[i+1]]] as const){
-        positions.push(p.x-p.dz*side*width/2,p.y,p.z+p.dx*side*width/2);
-        sides.push(side*width/2);along.push(distance);trackCounts.push(a.tracks);
-      }
+      const gauge=route.id.startsWith('jr-')&&route.id!=='jr-shinkansen'?1.067:1.435;
+      // The individual ground tracks also cover the through lines at Mukomachi.
+      // Vehicles still follow their continuous route and elevated decks keep their height.
+      const x=(a.x+b.x)/2,z=(a.z+b.z)/2;
+      const surveyed=a.state===0&&trackBox&&x>=trackBox[0]&&z>=trackBox[1]&&x<trackBox[2]&&z<trackBox[3];
+      if(surveyed)grades.add(a,b);
+      else track(a,b,path.distances[i],path.distances[i+1],width,a.tracks,gauge);
       if(a.state===1){
-        const start:[number,number,number]=[a.x,a.y-.55,a.z],end:[number,number,number]=[b.x,b.y-.55,b.z];
-        structures.beam(start,end,width,.9,CM.concrete);
-        if(Math.floor(path.distances[i]/60)!==Math.floor(path.distances[i+1]/60)){
+        const span=route.viaduct;
+        const framed=span && i>=span.start && i<span.end;
+        const depth=framed?1.3:.9;
+        const start:[number,number,number]=[a.x,a.y-.1-depth/2,a.z],end:[number,number,number]=[b.x,b.y-.1-depth/2,b.z];
+        structures.beam(start,end,framed?span.width:width,depth,framed?CM.weatheredConcrete:CM.concrete);
+        if(framed){
+          for(const side of [-1,1]){
+            const offset=side*(span.width/2-.14);
+            structures.beam([a.x-a.dz*offset,a.y+.24,a.z+a.dx*offset],
+              [b.x-b.dz*offset,b.y+.24,b.z+b.dx*offset],.28,.68,CM.weatheredConcrete);
+          }
+        }else if(Math.floor(path.distances[i]/60)!==Math.floor(path.distances[i+1]/60)){
           const y=ground(a.x,a.z);if(a.y-y>1)structures.box(a.x-.65,a.x+.65,a.z-.65,a.z+.65,y,a.y-.6,CM.concrete);
         }
       }
     }
+    const viaduct=route.viaduct;
+    if(viaduct)for(const [distance,first,second] of viaduct.piers){
+      const p=path.at(distance),top=p.y-1.38;
+      const half=viaduct.width*.47;
+      structures.beam([p.x+p.dz*half,top-.35,p.z-p.dx*half],[p.x-p.dz*half,top-.35,p.z+p.dx*half],1.25,.75,CM.weatheredConcrete);
+      for(const offset of [first,second]){
+        if(offset===undefined)continue;
+        const x=p.x-p.dz*offset,z=p.z+p.dx*offset,foot=ground(x,z)-.25;
+        if(top>foot+.5)structures.box(x-.52,x+.52,z-.52,z+.52,foot,top,CM.weatheredConcrete);
+      }
+    }
     for(const station of route.stations){
+      if(katsuraModeled&&station.code==='40208000759')continue;
       const p=path.at(station.distance),short=route.id.startsWith('randen'),len=short?18:82;
       if(!p.visible)continue;
       for(const side of [-1,1]){
@@ -43,18 +77,49 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
       }
     }
   });
+  // Individual running tracks and sidings share one mesh with the route network.
+  for(const {kind,attr,pts} of network){
+    if(kind!==LINE.rail||!(attr&(RAIL.siding|RAIL.individual))||(attr&RAIL.elevated))continue;
+    let distance=0;
+    for(let i=2;i<pts.length;i+=2){
+      const ax=pts[i-2],az=pts[i-1],vx=pts[i]-ax,vz=pts[i+1]-az,length=Math.hypot(vx,vz);
+      if(!length)continue;
+      const dx=vx/length,dz=vz/length,steps=Math.ceil(length/12);
+      const railHeight=(x:number,z:number)=>{
+        const surface=ground(x,z)+.24;
+        return attr&RAIL.individual?grades.at(x,z,dx,dz,surface):surface;
+      };
+      let a={x:ax,z:az,y:railHeight(ax,az),dx,dz};
+      for(let j=1;j<=steps;j++){
+        const x=ax+vx*j/steps,z=az+vz*j/steps,b={x,z,y:railHeight(x,z),dx,dz};
+        track(a,b,distance+length*(j-1)/steps,distance+length*j/steps,3.1,1,attr&RAIL.standardGauge?1.435:1.067);
+        a=b;
+      }
+      distance+=length;
+    }
+  }
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   geometry.setAttribute('aSide',new THREE.Float32BufferAttribute(sides,1));geometry.setAttribute('aAlong',new THREE.Float32BufferAttribute(along,1));
   geometry.setAttribute('aTracks',new THREE.Float32BufferAttribute(trackCounts,1));geometry.computeBoundingSphere();
-  const trackMaterial=new THREE.ShaderMaterial({uniforms:env,
-    vertexShader:`attribute float aSide;attribute float aAlong;attribute float aTracks;varying float vSide;varying float vAlong;flat varying float vTracks;varying vec3 vWorld;
-      void main(){vSide=aSide;vAlong=aAlong;vTracks=aTracks;vWorld=position;gl_Position=projectionMatrix*viewMatrix*vec4(position,1.);}`,
+  geometry.setAttribute('aGauge',new THREE.Float32BufferAttribute(gauges,1));
+  const trackMaterial=new THREE.ShaderMaterial({uniforms:env,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1,
+    vertexShader:`attribute float aSide;attribute float aAlong;attribute float aTracks;attribute float aGauge;varying float vSide;varying float vAlong;flat varying float vTracks;flat varying float vGauge;varying vec3 vWorld;
+      void main(){vSide=aSide;vAlong=aAlong;vTracks=aTracks;vGauge=aGauge;vWorld=position;gl_Position=projectionMatrix*viewMatrix*vec4(position,1.);}`,
     fragmentShader:`${ENV_GLSL}${SHADOW_GLSL}
-      varying float vSide;varying float vAlong;flat varying float vTracks;varying vec3 vWorld;
-      void main(){float centre=vTracks>1.5?abs(vSide)-1.45:vSide;float rail=abs(abs(centre)-.72);
-        float steel=1.-smoothstep(.045,.045+max(fwidth(vSide),.015),rail);
-        float sleepers=(1.-smoothstep(.13,.13+fwidth(vAlong),abs(fract(vAlong/1.1)-.5)))*(1.-smoothstep(1.2,1.4,abs(centre)));
-        vec3 alb=mix(vec3(.10,.085,.07),vec3(.16,.105,.065),sleepers);alb=mix(alb,vec3(.34,.36,.36),steel);
+      varying float vSide;varying float vAlong;flat varying float vTracks;flat varying float vGauge;varying vec3 vWorld;
+      float stripe(float offset,float halfWidth,float pixel){
+        return max(0.,min(offset+pixel*.5,halfWidth)-max(offset-pixel*.5,-halfWidth))/pixel;
+      }
+      void main(){float centre=vTracks>1.5?abs(vSide)-1.45:vSide;
+        float pixel=max(fwidth(vSide),.015),g=vGauge*.5;
+        float steel=stripe(centre-g,.045,pixel)+stripe(centre+g,.045,pixel);
+        float phase=vAlong/.66,footprint=max(fwidth(phase),.01);
+        float sleepers=mix(stripe(fract(phase)-.5,.17,footprint),.34,smoothstep(.25,1.,footprint));
+        // The exposed shoulder catches more light than the gravel beneath the sleepers.
+        float sleeperSpan=1.-smoothstep(1.,1.25,abs(centre));
+        vec3 ballast=vec3(${RAIL_BALLAST.join(',')})*mix(1.1,.90,sleeperSpan);
+        vec3 alb=mix(ballast,vec3(.12,.094,.072),sleepers*sleeperSpan);
+        alb=mix(alb,vec3(.39,.40,.40),steel);
         gl_FragColor=vec4(applyHaze(shade(alb,vec3(0.,1.,0.),vWorld,sunShadow(vWorld,vec3(0.,1.,0.))),vec3(0.),vWorld),1.);}`});
   const trackMesh=new THREE.Mesh(geometry,trackMaterial),structureMesh=createCampusMesh({...env,uHighlight:{value:1}},structures.geometry());
   trackMesh.layers.enable(SHADOW_LAYER);structureMesh.layers.enable(SHADOW_LAYER);group.add(trackMesh,structureMesh);

@@ -5,6 +5,15 @@ export function ringArea(r: Float32Array) {
   return Math.abs(a) / 2;
 }
 
+export function insideRing(r: Float32Array, x: number, z: number) {
+  let hit = false;
+  for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
+    const ax = r[j], az = r[j + 1], bx = r[i], bz = r[i + 1];
+    if ((az > z) !== (bz > z) && x < (bx - ax) * (z - az) / (bz - az) + ax) hit = !hit;
+  }
+  return hit;
+}
+
 /**
  * Islands are the holes in the water areas. Garden ponds such as Kyoko-chi at the Golden
  * Pavilion hold small planted islands that the aerial photo, half water and half pine, never
@@ -30,13 +39,5 @@ export function islandMask(holes: Float32Array[], minArea = 12, maxArea = 12000)
       }
     }
   }
-  const inside = (r: Float32Array, x: number, z: number) => {
-    let hit = false;
-    for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
-      const ax = r[j], az = r[j + 1], bx = r[i], bz = r[i + 1];
-      if ((az > z) !== (bz > z) && x < (bx - ax) * (z - az) / (bz - az) + ax) hit = !hit;
-    }
-    return hit;
-  };
-  return (x: number, z: number) => cells.get(`${Math.floor(x / 128)},${Math.floor(z / 128)}`)?.some((r) => inside(r, x, z)) ?? false;
+  return (x: number, z: number) => cells.get(`${Math.floor(x / 128)},${Math.floor(z / 128)}`)?.some((r) => insideRing(r, x, z)) ?? false;
 }

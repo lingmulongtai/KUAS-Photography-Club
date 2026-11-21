@@ -143,6 +143,7 @@ export function createCampusMesh(env:Env,geo:THREE.BufferGeometry){
         else if (m == 13){albedo=vec3(.7,.66,.5);emit=vec3(1.,.77,.42)*uCity;}
         else if (m == 14) albedo=vec3(.18,.29,.1)*(.92+.16*vnoise(vCell*1.5));
         else if (m == 16) albedo=vec3(.24,.19,.12)*(.94+.12*vnoise(vCell*.12));
+        else if (m == 17) albedo=vec3(.25,.24,.215);
         vec3 col = shade(seasonalSurface(albedo,n,vWorld), n, vWorld, sh);
         gl_FragColor = vec4(applyHaze(col, emit * uHighlight, vWorld), m==8?.22:1.);
       }

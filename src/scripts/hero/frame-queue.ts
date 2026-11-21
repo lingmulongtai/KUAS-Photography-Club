@@ -12,8 +12,9 @@ export function createFrameQueue(gl: WebGLRenderingContext | WebGL2RenderingCont
     available() {
       if (!context || !enabled || pending.length < 2) return true;
       const age = now() - lastFrame;
-      // Chrome can report two completed fences together. Space their replacement poses apart.
-      if (interval > 24 && age < interval * .5) return false;
+      // Space batched replacements, but poll again by the next 60 Hz refresh.
+      // Half a slow interval can otherwise keep rejecting every other frame after the GPU recovers.
+      if (interval > 24 && age < Math.min(10, interval * .5)) return false;
       while (pending.length >= 2) {
         const status = context.clientWaitSync(pending[0], 0, 0);
         if (status === context.TIMEOUT_EXPIRED) {

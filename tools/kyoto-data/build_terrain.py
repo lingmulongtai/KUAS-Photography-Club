@@ -69,7 +69,7 @@ def mountain_photo():
 
 def main():
     meta = {}
-    far = heights(R.TERRAIN, R.TERRAIN_STEP, [('dem_png', 12)])
+    far = heights(R.TERRAIN, R.TERRAIN_STEP, [('dem_png', 14), ('dem_png', 12)])
     size = write_gz('terrain-far.bin', encode_heights(far))
     meta['far'] = {'box': R.TERRAIN, 'step': R.TERRAIN_STEP, 'nx': far.shape[1], 'nz': far.shape[0], 'file': 'terrain-far.bin'}
     print('far', far.shape, f'{far.min():.1f}..{far.max():.1f} m', size, 'bytes')

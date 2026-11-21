@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { ENV_GLSL } from './env.ts';
+import { HIGH_CLOUD_GLSL } from './high-clouds.ts';
+import { WEATHER_SCALE } from './cloud-columns.ts';
 
 // Update vertical strips so every frame gets a similar share of the expensive sky rays.
 const MIN_STRIPS = 6, MAX_STRIPS = 12;
@@ -25,6 +28,7 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
   scene.add(proxy);
   const images = [skyImage(), skyImage(), skyImage()];
   const uniforms = {
+    ...original.uniforms,
     uCloudPast: { value: images[0].target.texture }, uCloudPresent: { value: images[0].target.texture },
     uPastClip: { value: images[0].clip }, uPresentClip: { value: images[0].clip }, uCloudMix: { value: 0 },
   };
@@ -33,9 +37,11 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
     vertexShader: /* glsl */ `
       uniform mat4 uPastClip, uPresentClip;
       varying vec3 vPast, vPresent;
+      varying vec3 vRay;
       void main(){
         vec4 world = modelMatrix * vec4(position, 1.);
         vec4 ray = vec4(world.xyz - cameraPosition, 0.);
+        vRay = ray.xyz;
         vPast = (uPastClip * ray).xyw;
         vPresent = (uPresentClip * ray).xyw;
         gl_Position = projectionMatrix * viewMatrix * world;
@@ -45,12 +51,17 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
       uniform sampler2D uCloudPast, uCloudPresent;
       uniform float uCloudMix;
       varying vec3 vPast, vPresent;
+      varying vec3 vRay;
+      ${ENV_GLSL}
+      const float K = ${WEATHER_SCALE};
+      ${HIGH_CLOUD_GLSL}
       void main(){
         vec2 past = vPast.xy / vPast.z;
         vec4 a = texture2D(uCloudPast, .5 + .5 * past);
         vec4 b = texture2D(uCloudPresent, .5 + .5 * vPresent.xy / vPresent.z);
         float edge = smoothstep(.96, .995, max(abs(past.x), abs(past.y)));
         vec4 c = mix(a, b, max(uCloudMix, edge));
+        c += (1.-c.a) * highClouds(cameraPosition, normalize(vRay));
         gl_FragColor = vec4(c.a > .00001 ? c.rgb / c.a : vec3(0.), c.a);
       }
     `,
@@ -86,11 +97,6 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
   }
 
   function begin(image: SkyImage, w: number, h: number, tw: number, th: number, paddedW: number, paddedH: number) {
-    if (original.defines.FIELD_LATTICE !== frozen.defines.FIELD_LATTICE) {
-      if (original.defines.FIELD_LATTICE) frozen.defines.FIELD_LATTICE = 1;
-      else delete frozen.defines.FIELD_LATTICE;
-      frozen.needsUpdate = true;
-    }
     if (image.target.width !== tw || image.target.height !== th) { image.target.setSize(tw, th); image.checked = false; }
     const anchorLimit = 1 - .8 * (1 - Math.max(w / paddedW, h / paddedH));
     if (present && coverage(present) < anchorLimit) {
@@ -112,6 +118,7 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
       if (value && !value.isTexture && dest.value?.copy) dest.value.copy(value);
       else dest.value = value;
     }
+    frozen.uniforms.uVolumeOnly.value = true;
   }
 
   function capture(image: SkyImage, part: number, count: number) {
