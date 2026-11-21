@@ -5,7 +5,7 @@ import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { SHADOW_LAYER } from './shadow';
 
-function stationMaterial(source: THREE.MeshStandardMaterial, env: Env) {
+function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: number) {
   const map = source.map;
   const glazing = source.name === 'Atrium glazing';
   map?.updateMatrix();
@@ -15,10 +15,14 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env) {
     transparent: glazing,
     depthWrite: !glazing,
     forceSinglePass: true,
-    defines: { ...(map && { STATION_PHOTO: 1 }), ...(glazing && { ATRIUM_GLASS: 1 }) },
+    defines: {
+      ...(map && { STATION_PHOTO: 1 }),
+      ...(glazing && { ATRIUM_GLASS: 1 }),
+      ...(source.name === 'KYcb0061_org.001' && { STATION_ENVELOPE: 1 }),
+    },
     uniforms: {
       ...env, uPhoto: { value: map }, uUvMatrix: { value: map?.matrix ?? new THREE.Matrix3() },
-      uTint: { value: source.color },
+      uTint: { value: source.color }, uGroundY: { value: groundY },
     },
     vertexShader: `
       uniform mat3 uUvMatrix;
@@ -35,22 +39,37 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env) {
       ${SHADOW_GLSL}
       uniform sampler2D uPhoto;
       uniform vec3 uTint;
+      uniform float uGroundY;
       varying vec2 vUv;
       varying vec3 vWorld, vNormal;
       void main(){
         vec3 base = uTint;
         vec3 n = normalize(vNormal) * (gl_FrontFacing ? 1. : -1.);
+        #ifdef STATION_ENVELOPE
+          // The survey smooths wall vertices across parapets and returns. A flat
+          // curtain wall needs one lighting normal; keep the roof's curved profile.
+          vec3 face = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+          float slope = smoothstep(.14, .42, abs(face.y));
+          n = normalize(mix(face, n, slope));
+        #endif
         vec3 light = vec3(0.);
         #ifdef STATION_PHOTO
           base *= texture2D(uPhoto, vUv).rgb;
           float luminance = dot(base, vec3(.213, .715, .072));
-          float vertical = 1. - smoothstep(.2, .65, abs(n.y));
-          float pane = vertical * smoothstep(.015, .11, base.b - base.r * .85);
+          float vertical = 1. - n.y * n.y;
+          // Use chromaticity so pale stone and neutral window frames do not
+          // become luminous glass simply because the daylight photo is bright.
+          float chroma = (base.b - base.r) / max(base.b + base.r, .08);
+          float pane = vertical * smoothstep(.035, .22, chroma);
           vec3 eye = normalize(cameraPosition - vWorld);
-          light += skyColor(reflect(-eye, n)) * pane * .12;
-          // Keep the dark mullions in the survey texture visible through night bloom.
-          light += uCity * vertical * (base * vec3(.017, .013, .009)
-                 + pane * smoothstep(.09, .45, luminance) * vec3(.092, .068, .039));
+          float reflectance = .045 + .12 * pow(1. - clamp(dot(eye,n), 0., 1.), 4.);
+          light += skyColor(reflect(-eye, n)) * pane * reflectance;
+          // Warm, bright details in the survey mark entrances and interior light.
+          float warm = smoothstep(.04, .28, -chroma) * smoothstep(.09, .45, luminance);
+          light += uCity * vertical * warm * base * vec3(.105, .064, .033);
+          // Soft spill from the north plaza falls off up the facade.
+          float plaza = max(-n.z, 0.) * exp(-max(vWorld.y-uGroundY, 0.) / 32.);
+          light += uCity * plaza * base * vec3(.014, .010, .006);
         #endif
         vec3 col = shade(seasonalSurface(base,n,vWorld), n, vWorld, sunShadow(vWorld,n));
         float opacity = 1.;
@@ -101,7 +120,7 @@ export async function loadStationDetail(env: Env, hf: Heightfield, center: THREE
     }
     let material = materials.get(source);
     if (!material) {
-      material = stationMaterial(source, env);
+      material = stationMaterial(source, env, center.y);
       materials.set(source, material);
       if (source.map) textures.add(source.map);
       source.dispose();

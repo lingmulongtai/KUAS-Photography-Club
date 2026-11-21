@@ -59,4 +59,7 @@ test('surveyed station ships with local geometry, embedded facade photos and nam
   assert.ok(bounds.max.y > 60 && bounds.max.y < 72, 'includes rooftop equipment, excludes Kyoto Tower');
   assert.ok(model.materials.some(material => material.name.startsWith('Plaza-')));
   assert.ok(model.materials.some(material => material.name === 'Atrium glazing'));
+  assert.ok(model.meshes.some(mesh => mesh.primitives.some(primitive =>
+    model.materials[primitive.material].name === 'KYcb0061_org.001'
+  )), 'the opaque station envelope can be selected for planar wall lighting');
 });
