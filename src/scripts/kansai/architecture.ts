@@ -3,7 +3,7 @@ import {C} from './engine';
 import {inBox,inPolygon,type Box,type Point,type Ring} from './coordinates';
 import {json} from './sources';
 
-type Building={id:string;pref:string;lon:number;lat:number;file:string;rings:Ring[]};
+type Building={id:string;pref:string;lon:number;lat:number;ellipsoidHeight?:number;file:string;rings:Ring[]};
 export async function architecturalModels(widget:CesiumWidget){
   const catalogue=await json<Building[]>('landmarks/index.json');
   const records=catalogue.map(b=>({...b,centre:C.Cartesian3.fromDegrees(b.lon,b.lat),
@@ -27,7 +27,8 @@ export async function architecturalModels(widget:CesiumWidget){
     loading.add(b.id);
     try{
       const pt=C.Cartographic.fromDegrees(b.lon,b.lat);
-      if(widget.terrainProvider.availability)await C.sampleTerrainMostDetailed(widget.terrainProvider,[pt]);
+      if(b.ellipsoidHeight!==undefined)pt.height=b.ellipsoidHeight;
+      else if(widget.terrainProvider.availability)await C.sampleTerrainMostDetailed(widget.terrainProvider,[pt]);
       const model=await C.Model.fromGltfAsync({url:b.file,
         modelMatrix:C.Transforms.eastNorthUpToFixedFrame(C.Cartesian3.fromDegrees(b.lon,b.lat,pt.height||0)),
         upAxis:C.Axis.Y,forwardAxis:C.Axis.X,allowPicking:false});

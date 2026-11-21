@@ -14,6 +14,19 @@ const root=new URL('../public/kansai/',import.meta.url);
 const json=file=>JSON.parse(readFileSync(new URL(file,root),'utf8'));
 const owner=prefectureLookup(json('prefectures.json').features);
 
+test('Osaka Castle has a resident textured keep at its surveyed height',()=>{
+  const keep=json('landmarks/index.json').find(b=>b.id==='osaka-keep');
+  const camera=OUTINGS.find(p=>p.id==='osaka-castle');
+  assert.ok(inPolygon([camera.lon,camera.lat],keep.rings));
+  const file=readFileSync(new URL(keep.file.slice('/kansai/'.length),root));
+  const gltf=JSON.parse(file.toString('utf8',20,20+file.readUInt32LE(12)));
+  const textured=gltf.meshes[0].primitives.find(p=>p.attributes.TEXCOORD_0!==undefined);
+  const geometry=gltf.accessors[textured.attributes.POSITION];
+  assert.ok(gltf.materials[textured.material].pbrMetallicRoughness.baseColorTexture);
+  assert.ok(geometry.count>500);
+  assert.ok(Math.abs(keep.ellipsoidHeight+geometry.max[1]-121.685)<.05);
+});
+
 test('both GSI rail representations keep underground lines out of the rose garden',()=>{
   assert.equal(railStructure('RailCL',8201,'地下'),'hidden');
   assert.equal(railStructure('RailTrCL',2804,''),'hidden');

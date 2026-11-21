@@ -90,6 +90,9 @@ try{
   const {templeHall,block}=await load('compound-models'),{roof}=await load('temple-models');
   await save('todaiji',greatBuddhaHall(templeHall),135.83987322,34.68899310,undefined,'29');
   await save('hikone-keep',hikoneKeep(block,roof),136.25184170,35.27645385,undefined,'25');
+  // build_osaka_keep.py retains the source ellipsoid height of the surveyed keep.
+  manifest.push({id:'osaka-keep',pref:'27',lon:135.525856,lat:34.687373,ellipsoidHeight:68.477,
+    file:'/kansai/landmarks/osaka-keep.glb',rings:[rect(135.525608,34.687154,135.526093,34.687592)]});
   const garden=JSON.parse(await fs.readFile(new URL('nakanoshima-beds.json',output)));
   const roseLon=135.50788,roseLat=34.69240;
   await save('nakanoshima-roses',roseGarden(garden.beds,roseLon,roseLat),roseLon,roseLat,[],'27');
