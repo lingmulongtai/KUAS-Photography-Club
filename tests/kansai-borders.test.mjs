@@ -2,18 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import {readFileSync} from 'node:fs';
-import {prefectureLookup} from '../src/scripts/kansai/coordinates.ts';
+import {inRing,prefectureLookup} from '../src/scripts/kansai/coordinates.ts';
 import {MAP_PLACES} from '../src/data/kansai-outings.ts';
 
 const base=new URL('../public/kansai/',import.meta.url);
 const original=prefectureLookup(JSON.parse(readFileSync(new URL('prefectures.json',base))).features);
 async function readImage(name){
   const {data,info}=await sharp(readFileSync(new URL('borders/'+name+'.png',base))).raw().toBuffer({resolveWithObject:true});
-  return (x,y)=>{const at=(y*info.width+x)*info.channels;return data.subarray(at,at+3);};
+  const pixel=(x,y)=>{const at=(y*info.width+x)*info.channels;return data.subarray(at,at+3);};
+  return Object.assign(pixel,{height:info.height});
 }
 
 test('both sides of a prefectural line, the lake and offshore islands survive atlas packing',async()=>{
-  const [coarse,middle,edge]=await Promise.all(['prefectures','districts','edges'].map(readImage));
+  const [coarse,middle,edge,islets]=await Promise.all(['prefectures','districts','edges','islets'].map(readImage));
+  function island(block,x,y){
+    const [count,lo,hi]=islets(block%16*16+Math.floor(x*16),islets.height-(Math.floor(block/16)+1)*16+Math.floor(y*16));
+    if(!count)return lo;
+    const table=i=>islets(i%256,Math.floor(i/256));
+    const coord=i=>{const [a,b,c]=table(i);return (a+(b<<8)+(c<<16)-8388608)*2048/4e9;};
+    for(let j=0;j<count;j++){
+      const [a,b]=table(lo+256*hi+j),header=a+256*b,[owner,n]=table(header);
+      const points=Array.from({length:n},(_,i)=>[coord(header+1+2*i),coord(header+2+2*i)]);
+      if(inRing([x,y],points))return owner;
+    }
+    return 0;
+  }
   const ptr=([r,g,b])=>(r-250)*65536+b*256+g;
   function lookup([lon,lat]){
     const x=(lon-134)*64,y=(lat-33.75)*64;
@@ -21,6 +34,7 @@ test('both sides of a prefectural line, the lake and offshore islands survive at
     if(c[0]<250)return c[0];
     const mid=ptr(c),u=x%1*32,v=y%1*32;
     c=middle((mid%128)*32+Math.floor(u),Math.floor(mid/128)*32+Math.floor(v));
+    if(c[0]===249)return island(c[1]+256*c[2],u%1,v%1);
     if(c[0]<250)return c[0];
     const ix=Math.floor(u%1*16),iy=Math.floor(v%1*16),fine=ptr(c);
     const [r,g,b]=edge((fine%256)*8+(ix>>1),Math.floor(fine/256)*4+(iy>>2));
@@ -30,6 +44,9 @@ test('both sides of a prefectural line, the lake and offshore islands survive at
   const sites=[[135.8332,35.005,26],[135.8348,35.005,25],
     [135.81,34.716,29],[135.81,34.718,26],[135.678,34.678,27],[135.679,34.678,29],
     [134.96,34.5761,0],[134.96,34.5749,28],
+    // Opposite sides of a sub-metre Hyogo rock fall within the same old raster texel.
+    [134.7469631452888,35.66152332,28],[134.746956,35.66152332,0],
+    [135.04437424914636,35.702144712,26],[134.88460869036186,35.65213518,26],
     // Centres of fine cells lost when Kyoto and Osaka were simplified independently.
     [135.5414276123047,34.91520690917969,26],[135.6495819091797,34.92472839355469,27],
     [135.2742156982422,35.73771667480469,26],[135.6248321533203,33.99998474121094,29],

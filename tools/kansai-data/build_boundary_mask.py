@@ -14,6 +14,7 @@ from affine import Affine
 from rasterio.features import rasterize
 from shapely import STRtree, box, get_parts, intersects, prepare, union_all
 from shapely.geometry import shape
+from islet_mask import pack_islets
 
 DATA = Path(__file__).resolve().parents[2] / 'public/kansai'
 WEST, SOUTH, WIDTH, HEIGHT = 134, 33.75, 160, 136
@@ -80,6 +81,7 @@ def main():
     Image.fromarray(coarse).save(out / 'prefectures.png')
     atlas(out / 'districts.png', detail, BLOCKS_PER_ROW)
     atlas(out / 'edges.png', fine, 256)
+    pack_islets(out, parts)
     print(len(detail), 'boundary cells and', len(fine), 'survey edge blocks')
 
 
