@@ -36,6 +36,17 @@ export function surveyMaterial(widget:CesiumWidget){
       vec3 delta=p-u_origin;
       vec2 uv=vec2(dot(delta,u_east),dot(delta,u_north))+0.5;
       vec3 wall=vec3(.58,.55,.50);
+      // Reconstruct window spacing in metres on the untextured survey walls.
+      // Use tile-local positions to keep the pattern attached while the camera moves.
+      vec3 vertical=normalize(p);
+      vec3 horizontal=cross(vertical,czm_inverseViewRotation*n);
+      vec3 tileLocal=mat3(czm_model)*fsInput.attributes.positionMC;
+      vec2 grid=vec2(dot(tileLocal,horizontal/max(.001,length(horizontal)))/3.05,
+                     dot(tileLocal,vertical)/3.12);
+      vec2 pixel=max(fwidth(grid),vec2(.012));
+      vec2 pane=1.-smoothstep(vec2(.25,.19)-pixel,vec2(.25,.19)+pixel,abs(fract(grid)-.5));
+      float visible=1.-smoothstep(.18,.65,max(pixel.x,pixel.y));
+      wall=mix(wall,vec3(.26,.33,.37),pane.x*pane.y*visible*.74);
       vec3 roof=vec3(.28,.29,.29);
       if(all(greaterThanEqual(uv,vec2(0.))) && all(lessThanEqual(uv,vec2(1.)))){
         vec4 photo=texture(u_photo,vec2(uv.x,1.-uv.y));
