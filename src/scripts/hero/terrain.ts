@@ -6,7 +6,7 @@ import { STROKES } from './daimonji';
 import type { Box } from './geo';
 import { toLocal } from './geo';
 import type { Heightfield } from './heightfield';
-import type { GridMeta } from './data';
+import type { BasinSheet, GridMeta } from './data';
 import type {KamoChannel} from './kamo-channel';
 import { terrainPositions, terrainPositionsAsync } from './terrain-grid';
 import { terrainTiles } from './terrain-tiles';
@@ -30,6 +30,7 @@ export interface TerrainTextures {
   aerialWideBox: Box;
   aerialCity: THREE.Texture | null;
   aerialCityBox: Box;
+  sheets?: BasinSheet[];
   normalFar: THREE.Texture;
   normalFarBox: Box;
   normalNear: THREE.Texture;
@@ -53,12 +54,15 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   const kinkaku = toLocal(35.0395092, 135.7284548), kiyomizu = toLocal(34.9946668, 135.7849382);
   const pos = terrainPositions(hf, center, segments);
 
+  const sheets=tex.sheets??[{id:"city",box:tex.aerialCityBox,uv:[0,0,1,1] as Box}];
   const uniforms = {
     ...env,
     uAerialWide: { value: tex.aerialWide },
     uAerialWideBox: { value: v4(tex.aerialWideBox) },
     uAerialCity: { value: tex.aerialCity ?? tex.aerialWide },
-    uAerialCityBox: { value: v4(tex.aerialCityBox) },
+    uSheetBoxes:{value:sheets.map(sheet=>v4(sheet.box))},
+    uSheetUVs:{value:sheets.map(sheet=>v4(sheet.uv))},
+    uRegionClose:{value:0},
     uCityOn: { value: tex.aerialCity ? 1 : 0 },
     uWoodland: { value: tex.aerialWide },
     uWoodlandBox: { value: v4(tex.aerialWideBox) },
@@ -107,7 +111,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform sampler2D uAerialWide;
       uniform vec4 uAerialWideBox;
       uniform sampler2D uAerialCity;
-      uniform vec4 uAerialCityBox;
+      uniform vec4 uSheetBoxes[${sheets.length}];
+      uniform vec4 uSheetUVs[${sheets.length}];
+      uniform float uRegionClose;
       uniform float uCityOn;
       uniform sampler2D uWoodland;
       uniform vec4 uWoodlandBox;
@@ -184,16 +190,27 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         // Do not stretch the outermost photo pixels beyond the mapped area.
         outerPhoto=mix(vec3(.22,.25,.22),outerPhoto,inside(uOuterBox,p,1000.));
         photo=mix(photo,mix(outerPhoto,photo,inside(uAerialWideBox,p,300.)),uOuterOn);
-        vec3 city = blockPhoto(uAerialCity,uAerialCityBox,p,fp);
+        float coverage=0.;
+        vec2 dx=dFdx(p), dy=dFdy(p);
+        vec2 finePoint=mix(p,(floor(p/2.5)+.5)*2.5,1.-smoothstep(.5,2.,fp));
+        for(int i=0;i<${sheets.length};i++){
+          vec4 box=uSheetBoxes[i], rect=uSheetUVs[i];
+          float weight=inside(box,p,160.)*uCityOn;
+          if(weight>0.){
+            vec2 uv=mix(rect.xy,rect.zw,boxUv(box,finePoint)*vec2(1.,-1.)+vec2(0.,1.));
+            vec2 scale=(rect.zw-rect.xy)/(box.zw-box.xy)*vec2(1.,-1.);
+            photo=mix(photo,textureGrad(uAerialCity,uv,dx*scale,dy*scale).rgb,weight);
+            coverage=max(coverage,weight);
+          }
+        }
         vec2 forestUV = (p - uWoodlandBox.xy) / (uWoodlandBox.zw - uWoodlandBox.xy);
         float mappedForest = texture2D(uWoodland, forestUV).r * uWoodlandOn * inside(uWoodlandBox,p,5.);
-        photo = mix(photo, city, inside(uAerialCityBox, p, 400.) * uCityOn);
         // Sharper local photos. Only a uniform condition guards the samples, never a spatial
         // one, so automatic mip derivatives stay defined.
         float detail = 0.;
         ${photos.map((_, i) => `
         if (uPhotoOn${i} > 0.) {
-          float k = inside(uPhotoBox${i}, p, 120.);
+          float k = inside(uPhotoBox${i}, p, 120.) ${i===0?"* (1.-coverage*(1.-uRegionClose))":""};
           photo = mix(photo, blockPhoto(uPhoto${i},uPhotoBox${i},p,fp), k);
           detail = max(detail, k);
         }`).join('')}

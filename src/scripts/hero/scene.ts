@@ -231,7 +231,15 @@ export function createHero(
     // Download the city while normals and terrain are prepared, rather than
     // starting a second network waterfall after that CPU work.
     const waterFiles=[...(meta.arashiyama?[meta.arashiyama.water.file]:[]),'water-kamo.json.gz'];
-    const cityData=Promise.all([loading.track(loadTexture(meta.aerialCity.file, aniso)), loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
+    const atlas=meta.aerialBasin;
+    const variant=atlas && (renderer.capabilities.maxTextureSize < 4096 ? atlas.mobile : opts.quality < .75 ? atlas.compact : atlas);
+    const citySheet={id:'city',box:meta.aerialCity.box,uv:[0,0,1,1] as Box};
+    const basinPhoto=loading.track(variant
+      ? loadTexture(variant.file,aniso).then(texture=>({texture,sheets:variant.sheets})).catch(async()=>{
+          return {texture:await loadTexture(meta.aerialCity.file,aniso),sheets:[citySheet]};
+        })
+      : loadTexture(meta.aerialCity.file,aniso).then(texture=>({texture,sheets:[citySheet]})));
+    const cityData=Promise.all([basinPhoto, loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
     // Join the original promise below; attach a handler now for an early failure.
     void cityData.catch(()=>{});
     travelBounds=hf.bounds;
@@ -257,10 +265,12 @@ export function createHero(
       if (outerNormal) outerNormal.needsUpdate = true;
     });
     await yieldToBrowser();
+    const basin=await basinPhoto;
     const terrain = buildTerrain(env, hf, VIEW.eye, {
       aerialWide: wide,
       aerialWideBox: meta.aerialWide.box,
-      aerialCity: null,
+      aerialCity: basin.texture,
+      sheets: basin.sheets,
       aerialCityBox: meta.aerialCity.box,
       normalFar,
       normalFarBox: meta.far.box,
@@ -310,7 +320,7 @@ export function createHero(
     casts(terrain.mesh);
     shadow.invalidate();
     await yieldToBrowser();
-    const [cityPhoto, buildings, lines, woodlandBytes] = await cityData;
+    const [, buildings, lines, woodlandBytes] = await cityData;
     const channel=createKamoChannel(lines,(x,z)=>hf.height(x,z));
     terrain.setChannel(channel,kamoMask(channel));
     const bridges=buildBridges(env,hf,lines,channel);
@@ -325,8 +335,6 @@ export function createHero(
     terrain.uniforms.uWoodland.value = woodlandRaster.texture;
     terrain.uniforms.uWoodlandBox.value.set(...woodlandRaster.box);
     terrain.uniforms.uWoodlandOn.value = 1;
-    terrain.uniforms.uAerialCity.value = cityPhoto;
-    terrain.uniforms.uCityOn.value = 1;
     const lite = opts.quality < 0.75;
     scene.add(buildKiyomizuBeam(env,(x,z)=>hf.height(x,z)));
     const eyes = Object.values(VIEWS).map((v) => v.eye);
@@ -373,7 +381,7 @@ export function createHero(
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
     let cultivated:((x:number,z:number)=>boolean)|undefined;
     const forest = createForest(env, hf, opts.quality, [
-      { photo: cityPhoto.image as HTMLImageElement, box: meta.aerialCity.box },
+      { photo: basin.texture.image as HTMLImageElement, box: meta.aerialCity.box, uv:basin.sheets[0].uv },
       { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box },
       ...(outer && meta.aerialOuter ? [{ photo: outer.image as HTMLImageElement, box: meta.aerialOuter.box }] : []),
     ], (x,z) => woodlandRaster.sample(x,z) || (island(x,z) ? 1 : 0),
@@ -535,6 +543,7 @@ export function createHero(
       terrain.uniforms.uRegionRoadBox.value.set(...r.box);
       terrain.uniforms.uRegionRoadsOn.value=1;
       terrain.setPhoto(0,data.photo,r.photo.box);
+      terrain.uniforms.uRegionClose.value=(detailedCampus||r.id==='uji-detail')?1:0;
       env.uBuilt.value=built;env.uRegionBuiltBox.value.set(...r.box);
       env.uRegionBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
       outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
