@@ -142,12 +142,12 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       vec2 boxUv(vec4 b, vec2 p){ return (p - b.xy) / (b.zw - b.xy); }
       // World-fixed colour blocks across every photo sheet. Original gradients preserve mip
       // filtering, and subpixel blocks fade out instead of shimmering on the distant slopes.
-      vec3 blockPhoto(sampler2D image, vec4 box, vec2 p, float fp){
-        vec2 uv=boxUv(box,p)*vec2(1.,-1.)+vec2(0.,1.);
+      vec3 blockPhoto(sampler2D image, vec4 box, vec2 p, float fp, vec2 dx, vec2 dy){
+        vec2 scale=vec2(1.,-1.)/(box.zw-box.xy);
         vec2 cell=(floor(p/8.)+.5)*8.;
         vec2 at=mix(p,cell,1.-smoothstep(1.5,5.,fp));
         vec2 blockUv=boxUv(box,at)*vec2(1.,-1.)+vec2(0.,1.);
-        return textureGrad(image,blockUv,dFdx(uv),dFdy(uv)).rgb;
+        return textureGrad(image,blockUv,dx*scale,dy*scale).rgb;
       }
       float segment(vec2 p, vec4 s){
         vec2 ab = s.zw - s.xy;
@@ -184,34 +184,40 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         n=normalize(mix(n,nr,regional));
 
         // aerial photo: the sharper city sheet where we have it
-        vec2 uw = boxUv(uAerialWideBox, p);
-        vec3 photo = blockPhoto(uAerialWide,uAerialWideBox,p,fp);
-        vec3 outerPhoto=blockPhoto(uOuterPhoto,uOuterBox,p,fp);
-        // Do not stretch the outermost photo pixels beyond the mapped area.
-        outerPhoto=mix(vec3(.22,.25,.22),outerPhoto,inside(uOuterBox,p,1000.));
-        photo=mix(photo,mix(outerPhoto,photo,inside(uAerialWideBox,p,300.)),uOuterOn);
-        float coverage=0.;
-        vec2 dx=dFdx(p), dy=dFdy(p);
+        // Composite front to back. An opaque local sheet completely covers the coarser samples.
+        vec3 photo=vec3(0.);
+        float remaining=1.,coverage=0.;
+        vec2 dx=dFdx(p),dy=dFdy(p);
         vec2 finePoint=mix(p,(floor(p/2.5)+.5)*2.5,1.-smoothstep(.5,2.,fp));
-        for(int i=0;i<${sheets.length};i++){
-          vec4 box=uSheetBoxes[i], rect=uSheetUVs[i];
+        for(int i=${sheets.length-1};i>=0;i--){
+          vec4 box=uSheetBoxes[i],rect=uSheetUVs[i];
           float weight=inside(box,p,160.)*uCityOn;
-          if(weight>0.){
+          if(weight>0.&&remaining>0.){
             vec2 uv=mix(rect.xy,rect.zw,boxUv(box,finePoint)*vec2(1.,-1.)+vec2(0.,1.));
             vec2 scale=(rect.zw-rect.xy)/(box.zw-box.xy)*vec2(1.,-1.);
-            photo=mix(photo,textureGrad(uAerialCity,uv,dx*scale,dy*scale).rgb,weight);
+            photo+=remaining*weight*textureGrad(uAerialCity,uv,dx*scale,dy*scale).rgb;
             coverage=max(coverage,weight);
+            remaining*=1.-weight;
+          }
+        }
+        if(remaining>0.){
+          float outer=uOuterOn*(1.-inside(uAerialWideBox,p,300.));
+          if(outer<1.)photo+=remaining*(1.-outer)*blockPhoto(uAerialWide,uAerialWideBox,p,fp,dx,dy);
+          if(outer>0.){
+            float mapped=inside(uOuterBox,p,1000.);
+            vec3 background=vec3(.22,.25,.22);
+            if(mapped>0.)background=mix(background,blockPhoto(uOuterPhoto,uOuterBox,p,fp,dx,dy),mapped);
+            photo+=remaining*outer*background;
           }
         }
         vec2 forestUV = (p - uWoodlandBox.xy) / (uWoodlandBox.zw - uWoodlandBox.xy);
         float mappedForest = texture2D(uWoodland, forestUV).r * uWoodlandOn * inside(uWoodlandBox,p,5.);
-        // Sharper local photos. Only a uniform condition guards the samples, never a spatial
-        // one, so automatic mip derivatives stay defined.
+        // Gradients are taken above so partially covered close sheets use the same mip levels.
         float detail = 0.;
         ${photos.map((_, i) => `
         if (uPhotoOn${i} > 0.) {
           float k = inside(uPhotoBox${i}, p, 120.) ${i===0?"* (1.-coverage*(1.-uRegionClose))":""};
-          photo = mix(photo, blockPhoto(uPhoto${i},uPhotoBox${i},p,fp), k);
+          if(k>0.)photo = mix(photo, blockPhoto(uPhoto${i},uPhotoBox${i},p,fp,dx,dy), k);
           detail = max(detail, k);
         }`).join('')}
 
