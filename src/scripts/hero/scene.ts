@@ -9,6 +9,7 @@ import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
 import { createFrameQueue } from './frame-queue';
 import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
+import {createGroundRelief} from './ground-relief';
 import { initialNormals } from './initial-normals';
 import { normalMapBytes } from './normal-map';
 import { applySouthernNightLights } from './southern-night-lights';
@@ -584,13 +585,11 @@ export function createHero(
     await Promise.all([cloudProgram, scenePrograms]);
     loading.built();
     startGroundRelief=() => idle(() => {
-      void import('./ground-relief').then(({createGroundRelief}) => {
-        const ground=(x:number,z:number)=>hf.height(x,z);
-        const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,ground(x,z)),refreshForest);
-        scene.add(relief.group);
-        cultivated=relief.containsField;
-        updateGroundRelief=relief.update;
-      }).catch(error=>console.warn('Ground detail unavailable',error));
+      const ground=(x:number,z:number)=>hf.height(x,z);
+      const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,ground(x,z)),refreshForest);
+      scene.add(relief.group);
+      cultivated=relief.containsField;
+      updateGroundRelief=relief.update;
     });
     for(const area of ['south','osaka','north'])idle(()=>{
       void loadBinary(`buildings-${area}-lod.json.gz`).then(async bytes=>{
