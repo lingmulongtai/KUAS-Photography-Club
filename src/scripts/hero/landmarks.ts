@@ -10,7 +10,7 @@ import {templeHall} from './compound-models';
 import {heianShrine,HEIAN_CENTER} from './heian-shrine';
 import {imperialPalace} from './imperial-palace';
 import {nijoCastle} from './nijo-castle';
-import {kyotoStation,STATION_CENTER} from './kyoto-station';
+import {kyotoStation,stationGlazing,STATION_CENTER} from './kyoto-station';
 import {fushimiInari} from './fushimi-inari';
 import {byodoinParts} from './byodoin';
 
@@ -170,7 +170,24 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
     `,
   });
   const mesh = new THREE.Mesh(geo, material);
-  return { mesh, positions };
+  // Keep the city and stairs visible through the glazing in a single sorted draw.
+  const glazing=new THREE.Mesh(stationGlazing(),new THREE.ShaderMaterial({
+    uniforms:env,transparent:true,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true,
+    vertexShader:`varying vec3 vWorld; varying vec3 vNormal;
+      void main(){vWorld=(modelMatrix*vec4(position,1.)).xyz; vNormal=mat3(modelMatrix)*normal;
+        gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`,
+    fragmentShader:`${ENV_GLSL}
+      varying vec3 vWorld; varying vec3 vNormal;
+      void main(){vec3 view=normalize(cameraPosition-vWorld);
+        vec3 n=faceforward(normalize(vNormal),-view,normalize(vNormal));
+        float grazing=pow(1.-clamp(dot(n,view),0.,1.),3.);
+        vec3 reflection=skyColor(reflect(-view,n));
+        vec3 color=vec3(.035,.078,.107)+reflection*(.30+.45*grazing);
+        gl_FragColor=vec4(applyHaze(color,vec3(.075,.049,.023)*uCity,vWorld),.38+.42*grazing);}`,
+  }));
+  glazing.name='kyoto-station-glazing';
+  glazing.position.copy(positions.kyotoStation);
+  return { mesh, glazing, positions };
 }
 
 /** Red aviation lights blinking on the tallest structures. */

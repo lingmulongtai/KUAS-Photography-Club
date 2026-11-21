@@ -399,7 +399,7 @@ export function createHero(
     campusModel = buildCampus(env, hf).mesh;
     scene.add(campusModel);
     casts(campusModel);
-    scene.add(city.group, landmarks.mesh);
+    scene.add(city.group, landmarks.mesh, landmarks.glazing);
     if (city.overview) scene.add(city.overview);
     panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
       eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });

@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {readFile} from 'node:fs/promises';
-import {kyotoStation,replacesKyotoStation} from '../src/scripts/hero/kyoto-station.ts';
+import {kyotoStation,stationGlazing,replacesKyotoStation} from '../src/scripts/hero/kyoto-station.ts';
 import {loadBuildings} from '../src/scripts/hero/buildings-data.ts';
 
 test('Kyoto Station has an open atrium and a grand stair rising west',()=>{
@@ -22,4 +22,16 @@ test('only the station main block is replaced; platform roofs are retained',asyn
   t.after(()=>{globalThis.fetch=original;});const data=await loadBuildings();
   assert.equal(data.polys.filter(p=>replacesKyotoStation(p.ring)).length,1);
   assert.ok(data.polys.some(p=>p.ring[0]>-250&&p.ring[0]<180&&p.ring[1]>2080&&p.ring[1]<2140&&!replacesKyotoStation(p.ring)));
+});
+
+test('glass encloses the north facade and roof above an open concourse',()=>{
+  const geometry=stationGlazing(), material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geometry,material);
+  const ray=(x,y,z,dx,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(x,y,z),new THREE.Vector3(dx,dy,dz)).intersectObject(mesh);
+  for(const x of [-73,-17,23,58]){
+    assert.ok(ray(x,24,-90,0,0,1)[0].point.z < -42);
+    assert.ok(ray(x,70,1,0,-1,0)[0].point.y > 49);
+    assert.equal(ray(x,4,-90,0,0,1).length,0);
+  }
+  geometry.dispose(); material.dispose();
 });
