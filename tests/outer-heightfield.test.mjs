@@ -19,21 +19,34 @@ test('outer terrain extends the bounds while preserving the original basin and l
   assert.deepEqual(old.bounds,far.meta.box);
 });
 
-test('height sampling keeps both outer and basin results while sampling the far grid only once',()=>{
+test('only the terrain layers contributing at the sampled point are read',()=>{
   let samples=0;
   const far=grid([-1000,-1000,1000,1000],40),sample=far.sample;
   far.sample=(x,z)=>{samples++;return sample(x,z);};
   const near=grid([-400,-400,400,400],80),outer=grid([-3000,-3000,3000,3000],260);
   const extended=new Heightfield(far,near,undefined,outer),basin=new Heightfield(far,near);
-  assert.equal(extended.height(0,0),80);assert.equal(samples,1);
+  assert.equal(extended.height(0,0),80);assert.equal(samples,0);
   samples=0;
   assert.equal(extended.height(-850,0),150);assert.equal(samples,1);
   samples=0;
   assert.equal(extended.height(-2000,0),260);assert.equal(samples,0,'outside the far grid, blending needs no sample');
   samples=0;
-  assert.equal(basin.height(0,0),80);assert.equal(samples,1);
+  assert.equal(basin.height(0,0),80);assert.equal(samples,0);
   samples=0;
   assert.equal(basin.height(-2000,0),0);assert.equal(samples,1);
+});
+
+test('overlapping feathered edges and gaps retain the lower terrain',()=>{
+  const far=grid([-2000,-2000,2000,2000],20),near=grid([-400,-400,400,400],80);
+  const regional=grid([-310,-310,310,310],140),campus=grid([-280,-280,280,280],200);
+  const hf=new Heightfield(far,near,regional,undefined,campus);
+  const mix=(a,b,t)=>a+(b-a)*(t*t*(3-2*t));
+  assert.equal(hf.height(250,0),mix(mix(mix(20,80,.5),140,.5),200,30/80));
+  assert.equal(hf.height(0,0),200);
+  campus.sample=()=>NaN;
+  assert.equal(hf.height(0,0),140);
+  regional.sample=()=>NaN;
+  assert.equal(hf.height(0,0),80);
 });
 
 test('shipped outer data decodes through the runtime and stays within mobile download budgets',async(t)=>{

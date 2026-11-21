@@ -87,6 +87,16 @@ The existing 2048-pixel wide image remains the lightweight mobile variant.
 Elevation, building and road binaries are unchanged by these commands.
 # 森林の輪郭
 
+広域の樹林分布は [ESA WorldCover 2021 v200（Zanaga et al., 2022）](https://doi.org/10.5281/zenodo.7254221) から生成します。
+[N33E135](https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N33E135_Map.tif) を取得し、NumPy と rasterio が使える Python 3.11 以降で次のコマンドを実行します。
+
+```sh
+python build_tree_cover.py ESA_WorldCover_10m_2021_v200_N33E135_Map.tif
+```
+
+元データの樹木クラス（10）の面積割合を、地形全域の20 m格子に集計し、`tree-cover.bin` に格納します。値は0〜15で、樹木がほぼなく農地・恒久水域が90%以上を占める区画は16です。2021年の衛星分類に基づく被覆で、一本ずつの実測位置や樹種は含みません。
+© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
 `build_woodland.py` の冒頭にあるOverpassクエリで `natural=wood` / `landuse=forest` のwayとrelationを取得し、ローカルに保存したJSONを渡します。
 
 ```sh
@@ -95,7 +105,7 @@ python build_woodland.py /path/to/overpass.json
 
 relationの外周・穴は元の形状を保持し、単独wayだけ2m許容で簡略化して `public/kyoto/woodland.json.gz` を生成します。独立した森林タグを持つinner wayも保持します。1MiBを上限とし、2026-10-14のデータは405,535 bytes。描画時にAPIを呼び出しません。© OpenStreetMap contributors / ODbL。一部は2006年の森林データ由来なので、PLATEAUの建物と国土地理院の道路・水域（島の穴を保持）で植樹を除外します。
 
-2048pxの森林ラスタを一度だけ作り、地面の森の色と木の配置が同じalphaを参照します。樹形は距離で簡略化し、PCの詳細な枝葉は240m、スマホは160mまで。遠景の疎な森林群は10kmまで続きます。最近の3視点だけ配置バッファを保持し、古い配置は解放します。
+地面の森の色と木の配置は、衛星分類と森林ポリゴンを重ねた同じ分布を参照します。手前の枝葉はPCで240 m、スマホで160 mまで細かく描きます。距離が開くにつれて4区画から代表木を1本ずつ選ぶので、接近すると同じ木のまわりに隣の木が現れます。山並みまで森が続き、最近の3視点だけ配置バッファを保持します。
 
 ## 嵐山の局所データ
 
