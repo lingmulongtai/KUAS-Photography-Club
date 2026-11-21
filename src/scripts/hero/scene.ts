@@ -342,7 +342,8 @@ export function createHero(
     if (!city) throw new Error('Initial city preparation cancelled');
     await yieldToBrowser();
     const builtSize = lite ? 1024 : 2048;
-    env.uBuilt.value = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
+    const coreBuilt = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
+    env.uBuilt.value = coreBuilt;
     env.uBuiltBox.value.set(...BUILDINGS_BOX);
     env.uBuiltTexel.value = (BUILDINGS_BOX[2] - BUILDINGS_BOX[0]) / builtSize;
     env.uBuiltOn.value = 1;
@@ -417,7 +418,6 @@ export function createHero(
     const scenePrograms = prepare(scene);
     // Neighbouring basins are intentionally absent from the initial transfer. At most
     // one additional city is alive, and switching destinations never queues all four.
-    const coreBuilt=env.uBuilt.value;
     let regionalDrive:((dt:number)=>void)|null=null;
     let railDrive:((dt:number)=>void)|null=null;
     void loadBinary('railways.json.gz').then(bytes=>{
@@ -484,7 +484,7 @@ export function createHero(
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
       await step();
-      built=buildOcclusion(data.buildings,r.box,builtSize);
+      built=buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
       await step();
       mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
       infrastructure=infrastructureMask(data.lines,r.box);
@@ -505,8 +505,7 @@ export function createHero(
         terrain.uniforms.uRegionRoadsOn.value=0;
         terrain.uniforms.uRegionRoads.value=wide;
         terrain.setPhoto(0,null);
-        env.uBuilt.value=coreBuilt;env.uBuiltBox.value.set(...BUILDINGS_BOX);
-        env.uBuiltTexel.value=(BUILDINGS_BOX[2]-BUILDINGS_BOX[0])/builtSize;
+        env.uBuilt.value=coreBuilt;env.uRegionBuiltTexel.value=0;
         outerExcluded=()=>false;
         if(forestMaskChanged)refreshForest();
         road.dispose();built.dispose();if(releaseData)data.dispose();shadow.invalidate();
@@ -520,8 +519,8 @@ export function createHero(
       terrain.uniforms.uRegionRoadBox.value.set(...r.box);
       terrain.uniforms.uRegionRoadsOn.value=1;
       terrain.setPhoto(0,data.photo,r.photo.box);
-      env.uBuilt.value=built;env.uBuiltBox.value.set(...r.box);
-      env.uBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
+      env.uBuilt.value=built;env.uRegionBuiltBox.value.set(...r.box);
+      env.uRegionBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
       outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
       forestMaskChanged=true;
       refreshForest();
