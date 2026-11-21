@@ -57,6 +57,8 @@ Both credits are shown in the site footer.
 
 国土地理院由来の建物は、天王山の展望地点から3.5km以内は20m²以上の輪郭を保持し、それより遠くは120m²以上に絞って形状も簡素にします。これは広い地域の転送量と表示負荷を抑えるための省略であり、遠方にある小さな建物の網羅はしていません。
 
+`python build_regions.py north` は岩倉から鞍馬・大原までの京都北部16.3 × 13 kmに、建物、道路、鉄道、水域と地理院のシームレス写真（ズーム14）を追加します。PLATEAUの実測建物を優先し、収録範囲を外れる集落には地理院の建物輪郭を補います。地理院の輪郭だけで作った建物の高さは6 mまたは10 mの概略値です。地域を生成した後は `python build_tunnels.py` で道路トンネルを更新します。
+
 `python build_tennozan_photo.py` は展望地点と合流部周辺の5km四方に、国土地理院のシームレス写真 z16を使ったより鮮明な写真を作ります。PC用760,000 bytes、スマホ用260,000 bytesが上限で、天王山への移動時に読み込みます。遠景の建物は `node --experimental-strip-types tools/kyoto-data/build-south-lod.mjs` で京都南部と三川地域から少数の代表建物を選び、詳細地域と重なる部分を隠します。
 
 `python build_outer_terrain.py` は100m格子と広域写真を大阪方面まで延ばします。地図タイルの取得は生成時のみで、公開ページは地理院に直接アクセスしません。地域追加後は `python build_tunnels.py` で道路トンネルも更新します。
