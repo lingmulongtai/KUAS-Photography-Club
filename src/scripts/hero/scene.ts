@@ -144,7 +144,7 @@ export function createHero(
   const clouds = buildClouds(env, Number.isInteger(cloudSeed)&&cloudSeed>0?cloudSeed:undefined, opts.quality, climateOf('auto',jstParts(opts.now()).month));
   const cloudClock=createCloudClock();
   const cloudMotion=createCloudMotion();
-  const cloudBlur=createCloudBlur(renderer,camera,clouds.mesh);
+  const cloudBlur=createCloudBlur(renderer,camera,clouds.mesh,opts.quality);
   const cloudHistory = createCloudHistory(renderer, camera, clouds.mesh);
   renderer.domElement.addEventListener('webglcontextrestored', clouds.restored);
   renderer.domElement.addEventListener('webglcontextrestored', cloudHistory.restored);
@@ -1169,9 +1169,7 @@ export function createHero(
       if (!steadySky) cloudHistory.invalidate();
       if (!steadySky || !cloudHistory.render(Math.round(width * pixelRatio), Math.round(height * pixelRatio),
         clouds.weather, travel, date.getTime(), draw, dt)) {
-        const outsideLayer=Math.max(clouds.weather.base-camera.position.y,camera.position.y-clouds.weather.top,0);
-        const proximity=1-THREE.MathUtils.smoothstep(outsideLayer,0,300);
-        cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw, proximity);
+        cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw);
       }
       frameQueue.submitted();
       opts.onFrameSubmitted?.();
