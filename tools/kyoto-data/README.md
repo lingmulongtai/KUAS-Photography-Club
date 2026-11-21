@@ -51,6 +51,24 @@ See [the model/night quality audit](../../docs/model-night-quality-2026-10-17.md
 
 Both credits are shown in the site footer.
 
+## Field parcels and riverbanks
+
+The ground relief uses the 2026 MAFF parcel shapes and their land-use classification
+(100 for paddy and 200 for dry field). The height of a bund, the direction of
+cultivation and the seasonal appearance are illustrative. The banks follow the
+shipped GSI water polygons, including the more detailed Kamo and Arashiyama
+shorelines. Linework is joined before deriving the banks, to keep map-sheet edges
+out of the river. The site footer credits the processed agricultural data.
+
+Download all parts for prefectures 25–29 from the
+[MAFF 2026 FlatGeobuf distribution](https://www.maff.go.jp/j/tokei/census/shuraku_data/2025/mb/index.html)
+and extract one FlatGeobuf per prefecture. With Fiona, Shapely 2 and NumPy installed,
+run the following in this directory. Only the local half-metre contours are shipped.
+
+```sh
+python build_ground_relief.py cache/fields/MB0001_2026_2025_{25,26,27,28,29}.fgb
+```
+
 ## 天王山・三川合流域
 
 `python build_regions.py tennozan` は天王山から大山崎・八幡・島本方面にかけての建物輪郭、道路、鉄道、水域と広域写真を生成します。京都市内と重なる部分はPLATEAUの実測建物を優先し、残る国土地理院の輪郭には高さ6mまたは10mを割り当てます。国土地理院由来の高さは実測値ではありません。建物・道路・水面は一度に一地域だけ詳細表示します。京都南部の元データがキャッシュになければPLATEAUを取得してから重複を除きます。
