@@ -26,7 +26,7 @@ const ahead = (p: { x: number; z: number }, bearing: number, m: number) => ({
 
 const KIYOMIZU = toLocal(34.9946668, 135.7849382); // 清水寺 本堂舞台
 const DAIMONJI = toLocal(35.0230738, 135.804312); // 大文字山 火床
-const INARI_EAST = toLocal(34.9621,135.79716); // Aerial view from the Yamashina side of Mt. Inari.
+const INARI_EAST = toLocal(34.96358,135.79023); // Aerial view from the Yamashina side of Mt. Inari.
 const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
 const ATAGO = toLocal(35.0600453, 135.6342851); // 愛宕山（地図の地点と共通）
@@ -47,7 +47,7 @@ function spotOrbit(id: SpotId, distance: number, above: number, bearing: number,
 export const VIEWS = {
   /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
   shogunzuka: { ja: '将軍塚', en: 'Shogunzuka', eye: ahead(PLACES.shogunzuka, 265, 120), ref: PLACES.shogunzuka, above: 44, bearing: 265, pitch: -5 },
-  inariRidge: { ja:'稲荷山・京都一望', en:'Mt. Inari / Kyoto panorama', eye:INARI_EAST, ref:INARI_EAST, above:635, bearing:315.5, pitch:-7 },
+  inariRidge: { ja:'稲荷山・京都一望', en:'Mt. Inari / Kyoto panorama', eye:INARI_EAST, ref:INARI_EAST, above:612, bearing:314.7, pitch:-9.3 },
   /** The stage of Kiyomizu-dera, over the Otowa valley toward Kyoto Tower. */
   kiyomizu: { ja: '清水の舞台', en: 'Kiyomizu Stage', eye: ahead(KIYOMIZU, 130, 110), ref: KIYOMIZU, above: 48, bearing: 303, orbit: {center:KIYOMIZU,targetHeight:16}, pitch: -13 },
   /** The fire bed of the great 大 on Daimonji-yama, the whole basin to the south-west. */
