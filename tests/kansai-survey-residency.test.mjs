@@ -3,8 +3,33 @@ import assert from 'node:assert/strict';
 import {buildSync} from 'esbuild';
 import {runInNewContext} from 'node:vm';
 import {readFile} from 'node:fs/promises';
+import {SurveyCoverage} from '../src/scripts/kansai/survey-coverage.ts';
 
 const script=buildSync({entryPoints:['src/scripts/kansai/surveys.ts'],platform:'node',format:'cjs',bundle:true,write:false}).outputFiles[0].text;
+test('partially overlapping surveys restore the next visible building in priority order',()=>{
+  const footprints=new SurveyCoverage(),base=135.75;
+  const first=(lo,hi)=>content([base+lo/100000,34.99,base+hi/100000,34.991]);
+  const high=first(0,50),mid=first(40,56),twin=first(40,56),low=first(52,60),last=first(58,65);
+  const flags=arr=>arr.map(t=>t.getFeature(0).show);
+  const apply=(items,rings,landmark=()=>false)=>footprints.apply(new Map(items),rings,landmark);
+  apply([[mid,3],[twin,3],[low,2],[last,1]],[]);
+  assert.deepEqual(flags([mid,twin,low,last]),[true,true,false,true]);
+  apply([[high,4],[mid,3],[twin,3],[low,2],[last,1]]);
+  assert.deepEqual(flags([high,mid,twin,low,last]),[true,false,false,true,true]);
+  high.evict();apply([[mid,3],[twin,3],[low,2],[last,1]]);
+  assert.deepEqual(flags([mid,twin,low,last]),[true,true,false,true]);
+  const revision=footprints.revision;
+  mid.evict();apply([[twin,3],[low,2],[last,1]]);
+  assert.equal(footprints.revision,revision,'a remaining owner covers the same footprint');
+  const ring=[[base+.00046,34.99],[base+.00050,34.99],[base+.00050,34.991],[base+.00046,34.991]];
+  apply([[twin,3],[low,2],[last,1]],[ring],p=>p[0]>=ring[0][0]&&p[0]<=ring[1][0]);
+  assert.deepEqual(flags([twin,low,last]),[false,true,true]);
+  apply([[twin,3],[low,2],[last,1]],[]);
+  assert.deepEqual(flags([twin,low,last]),[true,false,true]);
+  twin.evict();low.evict();last.evict();apply([]);
+  assert.equal(footprints.contains([base+.00047,34.9905]),false);
+});
+
 function event(){
   const handlers=new Set();
   return {addEventListener(f){handlers.add(f);return ()=>handlers.delete(f);},
