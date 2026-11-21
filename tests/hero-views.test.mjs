@@ -119,6 +119,21 @@ test('Tennozan and Atago frame opposite sides of Kyoto and clear winter clouds',
   }
 });
 
+test('Kameoka Terrace keeps the campus roofs below the open basin',async t=>{
+  const hf=await surveyedTerrain(t), view=VIEWS.kameokaTerrace;
+  const height=hf.height(view.ref.x,view.ref.z)+view.above;
+  assert.ok(height+80<LOWEST_CLOUD_BASE);
+  const camera=panoramaCamera(view,height);
+  // Northwest roof corner of the bio building and southwest corner of Hobunkan.
+  for(const [x,y,z,screenX,screenY] of [
+    [-18989.89,159.83,1000.35,.364,.671],
+    [-18692.39,155.58,967.85,.517,.685],
+  ]){
+    const p=new Vector3(x,y,z).project(camera);
+    assert.ok(Math.abs((p.x+1)/2-screenX)<.015 && Math.abs((1-p.y)/2-screenY)<.015);
+  }
+});
+
 test('every map spot has a camera destination and landmarks stay centred', () => {
   for (const spot of SPOTS) {
     const id=spotDestination(spot.id);

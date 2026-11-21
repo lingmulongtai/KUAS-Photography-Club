@@ -31,7 +31,7 @@ const TOWER = toLocal(34.9875524, 135.7593295); // 京都タワー
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
 const ATAGO_RIDGE = toLocal(35.052699, 135.655073); // On the eastern flank, above the Katsura valley.
 const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
-const KIRI_TERRACE=toLocal(34.9926914,135.5615125); // OSM viewpoint node/6855829264
+const KAMEOKA_RIDGE=toLocal(34.98287,135.55802); // South of the terrace, overlooking the campus and basin.
 const CONFLUENCE=toLocal(34.873831,135.676099); // Look upstream over the three rivers towards Kyoto.
 
 /** Frame the named structure or area using the same centre as its map pin. */
@@ -72,7 +72,7 @@ export const VIEWS = {
   ryoanji: spotOrbit('ryoanji',110,65,180,7),
   togetsukyo: spotOrbit('arashiyama',330,160,180,8),
   kameoka:spotOrbit('kameoka',820,540,240,15),
-  kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:ahead(KIRI_TERRACE,180,480),ref:KIRI_TERRACE,above:84,bearing:325,pitch:-9},
+  kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:KAMEOKA_RIDGE,ref:KAMEOKA_RIDGE,above:168,bearing:345.95,pitch:-7.72},
   tennozan:{ja:'天王山',en:'Mt. Tennozan',eye:CONFLUENCE,ref:CONFLUENCE,above:894,bearing:22.14,pitch:-8.34},
   sonobe:spotOrbit('sonobe',1100,650,180,8),
   yamashina:spotOrbit('yamashina',1000,650,180,8),
