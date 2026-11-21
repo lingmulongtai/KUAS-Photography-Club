@@ -74,6 +74,7 @@ import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
 import {buildKiyomizuBeam} from './kiyomizu-beam';
 import {replacesInari,inariClearing} from './fushimi-inari';
+import {createTrafficView} from './traffic-view';
 import {katsuraStation} from './katsura-station';
 import {replacesByodoin,BYODOIN_CENTER} from './byodoin';
 
@@ -468,15 +469,16 @@ export function createHero(
       const railways=buildRailways(env,(x,z)=>hf.height(x,z),(JSON.parse(new TextDecoder().decode(bytes)) as {routes:RailwayRoute[]}).routes,katsura.complete);
       scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
     }).catch(error=>console.warn('Railway scenery unavailable',error));
-    const trafficView=new THREE.Frustum(),trafficProjection=new THREE.Matrix4();
+    const trafficView=new THREE.Frustum(),trafficProjection=new THREE.Matrix4(),streetView=createTrafficView();
     driveCars=(dt)=>{
       camera.updateMatrixWorld();
       trafficProjection.copy(camera.projectionMatrix);
       // Include the glow of headlights centred just outside the viewport.
       trafficProjection.elements[0]/=1+24/Math.max(1,width);
       trafficProjection.elements[5]/=1+24/Math.max(1,height);
+      streetView.update(camera,trafficProjection);
       trafficView.setFromProjectionMatrix(trafficProjection.multiply(camera.matrixWorldInverse));
-      cars.update(dt,trafficView);regionalDrive?.(dt,trafficView);railDrive?.(dt);
+      cars.update(dt,trafficView,streetView.contains);regionalDrive?.(dt,trafficView,streetView.contains);railDrive?.(dt);
     };
     const overviews:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void}[]=[];
     const installOverview=(item:(typeof overviews)[number])=>{

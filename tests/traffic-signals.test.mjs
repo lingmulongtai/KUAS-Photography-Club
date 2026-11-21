@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {createTrafficView} from '../src/scripts/hero/traffic-view.ts';
 import {buildSync} from 'esbuild';
 import {createRequire} from 'node:module';
 import { readFile } from 'node:fs/promises';
@@ -98,4 +100,19 @@ test('culling packs the same moving bodies, paint and lamps and preserves traffi
   }
   full.update(.1);clipped.update(.1);
   assert.deepEqual(bodies.getAttribute('iPos').array,original.getAttribute('iPos').array);
+});
+
+test('early map culling retains traffic throughout the lens at every elevation',()=>{
+  const camera=new THREE.PerspectiveCamera(60,1.5,1,50000),view=createTrafficView();
+  camera.position.set(300,570,1300);
+  for(const pitch of [-1.56,-.55,.22]){
+    camera.rotation.set(pitch,.6,.1,'YXZ');camera.updateMatrixWorld();
+    view.update(camera,camera.projectionMatrix);
+    for(const depth of [1.1,100,5000])for(const a of [-1,0,1])for(const b of [-1,0,1]){
+      const p=new THREE.Vector3(a*depth/camera.projectionMatrix.elements[0],b*depth/camera.projectionMatrix.elements[5],-depth).applyMatrix4(camera.matrixWorld);
+      assert.ok(view.contains(p.x,p.z,4));
+    }
+  }
+  const rear=new THREE.Vector3(0,0,700).applyMatrix4(camera.matrixWorld);
+  assert.equal(view.contains(rear.x,rear.z,4),false);
 });

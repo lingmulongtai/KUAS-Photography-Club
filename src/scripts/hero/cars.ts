@@ -289,7 +289,7 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
   }
   // Traffic continues to simulate around the city. Stream just the bodies and lamps in view.
   const carBounds=new THREE.Sphere(new THREE.Vector3(),4);
-  function update(dt: number, frustum?:THREE.Frustum) {
+  function update(dt: number, frustum?:THREE.Frustum, inHorizontalView?:(x:number,z:number,margin:number)=>boolean) {
     planMovement(dt);
     let drawn=0;
     for (let i = 0; i < count; i++) {
@@ -326,6 +326,7 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
       const uz = ((bz - az) / len) * dir[i];
       // keep left: the left of a heading (ux, uz) is (uz, -ux) with x east and z south
       const cx=ax+(bx-ax)*t,cz=az+(bz-az)*t;
+      if(inHorizontalView&&!inHorizontalView(cx,cz,Math.abs(lane[i])+carBounds.radius))continue;
       const fraction=trafficLaneFraction(cx,cz,uz*lane[i],-ux*lane[i]);
       const x = cx + uz * lane[i]*fraction;
       const z = cz - ux * lane[i]*fraction;
