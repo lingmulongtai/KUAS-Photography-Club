@@ -3,8 +3,9 @@ import {loadBinary, loadJSON} from './data';
 import {ENV_GLSL, SHADOW_GLSL, type Env} from './env';
 import {ROAD_GLSL} from './roads';
 import type {buildTerrain} from './terrain';
-import {BANK, RELIEF_CELL, groundSheet, readGroundSheet, type GroundIndex} from './ground-relief-data';
+import {BANK, RELIEF_CELL, groundSheet, readGroundSheet, type GroundFeature, type GroundIndex} from './ground-relief-data';
 import {addBank, addField, GroundGeometry, type Elevation} from './ground-relief-geometry';
+import {createFieldInteriors} from './field-interiors';
 import {yieldTask} from './task-yield';
 
 type RoadUniforms = Pick<ReturnType<typeof buildTerrain>['uniforms'],
@@ -89,12 +90,14 @@ interface Cell {
 
 /** A camera can cross sheets during a fetch. Keep only current cells, keep
  * their inputs in a bounded cache, and build them in short main-thread tasks. */
-export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevation, bankGround: Elevation) {
+export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevation, bankGround: Elevation, fieldsChanged: () => void) {
   const group = new THREE.Group();
   group.name = 'ground-relief';
   const material = groundMaterial(env,roads);
   const sheets = new Map<string, ReturnType<typeof readGroundSheet>>();
   const failed = new Map<string,number>();
+  const fields=createFieldInteriors();
+  let notifyFields: ReturnType<typeof setTimeout> | undefined;
   const visible = new Map<string, THREE.Mesh|null>();
   let index: GroundIndex | undefined, desired = new Map<string,Cell>(), running=false;
   let lastX=Infinity,lastZ=Infinity, retryAt=Infinity, manifestRetry=0;
@@ -108,11 +111,15 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     if (sheets.size>12) sheets.delete(sheets.keys().next().value!);
     if (!desired.has(cell.key)) return;
     const out = new GroundGeometry();
+    const parcels:GroundFeature['paths'][]=[];
     let deadline = performance.now()+4;
     for (const feature of data.features(sheet.cell)) {
       if (feature.kind===BANK) {
         if (!cell.detail) addBank(out,feature,bankGround);
-      } else addField(out,feature,ground,cell.detail);
+      } else {
+        addField(out,feature,ground,cell.detail);
+        if(!cell.detail) parcels.push(feature.paths);
+      }
       if (performance.now()>=deadline) {
         await yieldTask();
         if (!desired.has(cell.key)) return;
@@ -127,6 +134,10 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
       group.add(mesh);
     }
     visible.set(cell.key,mesh);
+    if(!cell.detail && fields.addCell(cell.key,parcels)){
+      clearTimeout(notifyFields);
+      notifyFields=setTimeout(fieldsChanged,350);
+    }
   }
 
   async function pump() {
@@ -187,5 +198,5 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     }
     void pump();
   }
-  return {group,update};
+  return {group,update,containsField:fields.contains};
 }

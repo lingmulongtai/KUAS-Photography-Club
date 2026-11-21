@@ -362,12 +362,13 @@ export function createHero(
     const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
+    let cultivated:((x:number,z:number)=>boolean)|undefined;
     const forest = createForest(env, hf, opts.quality, [
       { photo: cityPhoto.image as HTMLImageElement, box: meta.aerialCity.box },
       { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box },
       ...(outer && meta.aerialOuter ? [{ photo: outer.image as HTMLImageElement, box: meta.aerialOuter.box }] : []),
     ], (x,z) => woodlandRaster.sample(x,z) || (island(x,z) ? 1 : 0),
-    (x,z) => buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
+    (x,z) => !!cultivated?.(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
       replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
     [...campusTreeSpots(hf),...cherries], !cover);
     const refreshForest = () => {
@@ -588,8 +589,9 @@ export function createHero(
         const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>{
           const h=ground(x,z);
           return channel.contains(x,z)?Math.min(h,channel.surface(x,z,h)-.12):h;
-        });
+        },refreshForest);
         scene.add(relief.group);
+        cultivated=relief.containsField;
         updateGroundRelief=relief.update;
       }).catch(error=>console.warn('Ground detail unavailable',error));
     });
