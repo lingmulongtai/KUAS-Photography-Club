@@ -10,6 +10,7 @@ import {outingPins} from './pins';
 import {architecturalModels} from './architecture';
 import {regionalHeights} from './building-heights';
 import {fireworks} from './fireworks';
+import {prefectureCutout} from './borders';
 
 export async function startMap(root:HTMLElement){
   const en=root.lang==='en',status=root.querySelector<HTMLElement>('[role=status]')!;
@@ -43,6 +44,7 @@ export async function startMap(root:HTMLElement){
   widget.clock.currentTime=C.JulianDate.fromIso8601('2026-05-15T04:30:00Z');
   const display=fireworks(widget,root.querySelector<HTMLButtonElement>('[data-fireworks]')!,en);
   let selected=byId(new URLSearchParams(location.search).get('view')??'26')??byId('26')!;
+  const showPrefecture=prefectureCutout(widget,selected.pref);
   function frame(place:typeof selected,height:number){
     const focus=height+('targetHeight' in place?place.targetHeight:0);
     scene.camera.lookAt(C.Cartesian3.fromDegrees(place.lon,place.lat,focus),new C.HeadingPitchRange(
@@ -52,6 +54,7 @@ export async function startMap(root:HTMLElement){
   async function visit(place:typeof selected){
     selected=place;userMoved=false;const token=++sequence;
     expoLink.hidden=place.id!==EXPO.id;
+    showPrefecture(place.pref);
     display.select(place.id);
     prefecture.value=place.pref;outing.value=place.id===place.pref?'':place.id;
     const url=new URL(location.href);url.searchParams.set('view',place.id);history.replaceState(null,'',url);
@@ -88,14 +91,7 @@ export async function startMap(root:HTMLElement){
     attachSurveys(widget,()=>{surveyFailed=true;},selected.pref,architecture)]);
   if(widget.isDestroyed())return;
   const owner=prefectureLookup(boundaries.features);
-  void outingPins(widget,en,id=>{const place=byId(id);if(place)void visit(place);});
-  scene.camera.moveEnd.addEventListener(()=>{
-    if(!userMoved)return;
-    const ray=scene.camera.getPickRay(new C.Cartesian2(container.clientWidth/2,container.clientHeight/2));
-    const hit=ray&&scene.globe.pick(ray,scene);if(!hit)return;
-    const p=C.Cartographic.fromCartesian(hit),code=owner([C.Math.toDegrees(p.longitude),C.Math.toDegrees(p.latitude)]);
-    if(code&&code!==prefecture.value){prefecture.value=code;outing.value='';expoLink.hidden=true;display.select(code);}
-  });
+  void outingPins(widget,en,id=>{const place=byId(id);if(place)void visit(place);},()=>selected.pref);
   const distant=await distantModels(widget,surveys);
   if(widget.isDestroyed()){distant.dispose();return;}
   close=attachModels(widget,sources,heightSources,surveys,distant,owner,count=>{

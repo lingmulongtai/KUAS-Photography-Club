@@ -2,7 +2,7 @@ import type {CesiumWidget} from 'cesium';
 import {C} from './engine';
 import {MAP_PLACES} from '../../data/kansai-outings';
 
-export async function outingPins(widget:CesiumWidget,en:boolean,visit:(id:string)=>void){
+export async function outingPins(widget:CesiumWidget,en:boolean,visit:(id:string)=>void,prefecture:()=>string){
   const labels=new C.LabelCollection({scene:widget.scene});
   const points=MAP_PLACES.map(place=>C.Cartographic.fromDegrees(place.lon,place.lat));
   if(widget.terrainProvider.availability){
@@ -19,6 +19,12 @@ export async function outingPins(widget:CesiumWidget,en:boolean,visit:(id:string
       pixelOffset:new C.Cartesian2(0,-5),distanceDisplayCondition:new C.DistanceDisplayCondition(0,5000),
       disableDepthTestDistance:3500});
   }
+  let previous='';
+  widget.scene.preRender.addEventListener(()=>{
+    const selected=prefecture();if(selected===previous)return;
+    previous=selected;
+    for(let i=0;i<MAP_PLACES.length;i++)labels.get(i).show=MAP_PLACES[i].pref===selected;
+  });
   widget.screenSpaceEventHandler.setInputAction((e:{position:InstanceType<typeof C.Cartesian2>})=>{
     const id=widget.scene.pick(e.position)?.id;
     if(typeof id==='string'&&MAP_PLACES.some(p=>p.id===id))visit(id);
