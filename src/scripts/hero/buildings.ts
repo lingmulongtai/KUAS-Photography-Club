@@ -398,15 +398,11 @@ const BUILDING_FS = /* glsl */ `
       float lit1 = step(hash12(floor(id / k1) * vec2(1.7, 3.1) + seed * 31. + (k1.x - 1.) * .37), rate);
       float lit = mix(lit0, lit1, fract(lod));
       lit = mix(lit, rate * .4, smoothstep(1.4, 2.8, cells));
-      vec3 warm = vec3(1., .58, .26);
-      vec3 cool = vec3(.95, .85, .7);
-      vec3 lampCol = mix(warm, cool, (use == 4. ? .8 : .15) * mix(step(.4, hash12(id + seed)), .6, tiny));
-      // bright enough to glow through the haze from the hills, not so bright they burn out up close
-      float strength = wooden ? .75 : 1.05;
-      emit += lampCol * lit * pane * (1. - mullion) * strength * uCity;
+      float coolMix = (use == 4. ? .8 : .15) * mix(step(.4, hash12(id + seed)), .6, tiny);
+      emit += cityWindowRadiance(coolMix, wooden) * lit * pane * (1. - mullion);
       // shopfronts glow along the street
       float groundFloor=1.-smoothstep(floorH-fwWall.y,floorH+fwWall.y,vWall.y-.5);
-      if (use == 3. || use == 5.) emit += warm * groundFloor * mix(smoothstep(.1,.5,f.y),.7,tiny) * valid * mix(1.2,.05,tiny) * uCity;
+      if (use == 3. || use == 5.) emit += WARM_WINDOW * groundFloor * mix(smoothstep(.1,.5,f.y),.7,tiny) * valid * mix(1.2,.05,tiny) * uCity;
       emit *= cityLightShimmer(vWorld);
     }
 

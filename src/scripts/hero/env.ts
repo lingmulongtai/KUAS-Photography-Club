@@ -164,6 +164,11 @@ float cityLightShimmer(vec3 wp){
   return 1.+(.012+.09*distant)*wave;
 }
 
+const vec3 WARM_WINDOW = vec3(1., .58, .26);
+vec3 cityWindowRadiance(float coolMix, bool wooden){
+  return mix(WARM_WINDOW, vec3(.95, .85, .7), coolMix) * (wooden ? .75 : 1.05) * uCity;
+}
+
 /* lit: reflected light, emit: self-lit (windows, lamps). */
 vec3 applyHaze(vec3 lit, vec3 emit, vec3 wp){
   float tr = hazeTransmittance(wp);

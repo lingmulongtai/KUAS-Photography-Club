@@ -84,10 +84,14 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
             vec2 inset = .5 - abs(fract(rooms) - .5);
             vec2 frame = smoothstep(vec2(.14,.21)-.5*pixel, vec2(.14,.21)+.5*pixel, inset);
             float occupancy = .18+.44*uLit;
+            float cells = max(pixel.x,pixel.y);
+            float detail = 1. - smoothstep(.22,.67,cells);
             float occupied = step(hash12(floor(rooms / vec2(2.,1.))), occupancy);
-            float lamp = .35+.65*hash12(floor(rooms)+vec2(9.,47.));
-            float detail = 1. - smoothstep(.22,.67,max(pixel.x,pixel.y));
-            float windows = mix(occupancy*.28, occupied*lamp*frame.x*frame.y, detail);
+            // Like the rest of the city, keep small groups of windows resolved
+            // until an entire group falls below a pixel.
+            float groupLit = step(hash12(floor(rooms / vec2(4.,2.))), occupancy*.55);
+            float lit = mix(groupLit, occupied, detail);
+            float lamp = mix(.72,1.,hash12(floor(rooms)+vec2(9.,47.)));
             float gray = 1.-smoothstep(.08,.24,abs(chroma));
             float darkGlass = gray * smoothstep(.018,.09,luminance) * (1.-smoothstep(.20,.42,luminance));
             // A darker pane surrounded by lighter framing in the survey photo
@@ -95,11 +99,23 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
             float neighborhood = dot(textureLod(uPhoto,vUv,4.).rgb*uTint,vec3(.213,.715,.072));
             float recess = smoothstep(.10,.48,(neighborhood-luminance)/(neighborhood+.015));
             float photoPane = vertical*recess*smoothstep(.001,.014,luminance);
-            float transmission = max(photoPane, max(pane, vertical*darkGlass*.52)*.42);
+            float transmission = max(photoPane, max(pane, vertical*darkGlass*.85));
             float levels = smoothstep(1.,4.,height);
-            float interior = mix(windows,.12+occupied*lamp*.88,photoPane*detail);
+            // The fixture occupies a narrow band behind the glass. A close
+            // curtain wall can cover most of the screen; keep the rest of
+            // each pane softly lit even when its fixture reaches city radiance.
+            float fixture = abs(fract(rooms.y)-.65);
+            float band = 1.-smoothstep(.075-.5*pixel.y,.075+.5*pixel.y,fixture);
+            float resolved = mix(frame.x,1.,photoPane) * (.14*frame.y + .86*band);
+            float aperture = mix(.20, resolved, detail);
+            float interior = lit * mix(.85,lamp,detail) * aperture;
+            interior = mix(interior, occupancy*.18, smoothstep(1.4,2.8,cells));
+            #ifdef KYOTO_TOWER
+              // Occupied rooms belong to the hotel below the illuminated shaft.
+              interior *= 1.-smoothstep(36.,42.,height);
+            #endif
+            light += cityWindowRadiance(.34, false) * interior * transmission * levels;
             #ifdef DISTRICT_BUILDING
-              light += uCity * interior * levels * transmission * vec3(.25,.18,.105);
               float street = vertical * exp(-abs(height-3.)/9.);
               light += uCity * street * (.08+base) * vec3(.047,.035,.024);
             #else
@@ -110,9 +126,7 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
                 float bays = .5+.5*cos(along*.085 + floorSeed*6.);
                 float ceiling = 1.-smoothstep(.06,.54,abs(fract(rooms.y)-.68));
                 float floorLight = mix(.30, (.14+.86*ceiling)*(.22+.78*bays), detail);
-                light += uCity * levels * transmission * mix(interior,floorLight,.62) * vec3(.127,.091,.057);
-              #else
-                light += uCity * interior * levels * transmission * vec3(.15,.104,.060);
+                light += uCity * levels * transmission * floorLight * vec3(.064,.045,.028);
               #endif
               // Pools of warm light at the entrance continue softly up the north wall.
               float pool = .72+.28*cos((vWorld.x+45.)*.13);
