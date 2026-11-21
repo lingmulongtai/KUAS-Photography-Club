@@ -28,11 +28,6 @@ class Grid {
 type GridData = Pick<Grid, 'meta' | 'h'>;
 type HeightfieldData = [GridData, GridData, GridData?, GridData?, GridData?];
 
-const smooth = (e0: number, e1: number, v: number) => {
-  const t = Math.min(1, Math.max(0, (v - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
-};
-
 /**
  * Ground elevation for the whole scene: the 10 m grid around Higashiyama blended into the
  * 30 m grid of the whole basin over a 300 m band at the edge of the detailed area.
@@ -43,8 +38,13 @@ export class Heightfield {
   private regional?:Grid;
   private outer?:Grid;
   private campus?:Grid;
+  private layers: { grid: Grid; margin: number }[] = [];
   constructor(far:Grid,near:Grid,regional?:Grid,outer?:Grid,campus?:Grid) {
     this.far=far;this.near=near;this.regional=regional;this.outer=outer;this.campus=campus;
+    if (outer) this.layers.push({ grid: far, margin: 300 });
+    this.layers.push({ grid: near, margin: 300 });
+    if (regional) this.layers.push({ grid: regional, margin: 120 });
+    if (campus) this.layers.push({ grid: campus, margin: 80 });
   }
 
   /** Structured cloning copies the elevation arrays to the worker without detaching the live terrain. */
@@ -62,26 +62,26 @@ export class Heightfield {
   }
 
   height(x: number, z: number) {
-    const outer=this.outer?.sample(x,z) ?? NaN;
-    const base=Number.isNaN(outer)?0:outer;
-    // With an outer grid, blend samples the far grid itself. Do not sample it
-    // once more before discarding that duplicate value on every car/frame.
-    let far:number;
-    if(this.outer) far=this.blend(this.far,x,z,base,300);
-    else { const f=this.far.sample(x,z);far=Number.isNaN(f)?0:f; }
-    const near = this.blend(this.near,x,z,far,300);
-    const regional=this.regional ? this.blend(this.regional,x,z,near,120) : near;
-    return this.campus?this.blend(this.campus,x,z,regional,80):regional;
+    return this.sampleLayers(x, z, this.layers.length - 1);
   }
 
-  private blend(grid:Grid,x:number,z:number,base:number,margin:number) {
-    const b = grid.meta.box;
-    const edge = Math.min(x - b[0], b[2] - x, z - b[1], b[3] - z);
-    if (edge <= 0) return base;
-    const n = grid.sample(x, z);
-    if (Number.isNaN(n)) return base;
-    const w = smooth(0, margin, edge);
-    return base + (n - base) * w;
+  private sampleLayers(x: number, z: number, top: number): number {
+    // A road in the interior of a detailed grid needs one bilinear sample.
+    // Only its transition band needs the lower layers to contribute.
+    for (let i = top; i >= 0; i--) {
+      const { grid, margin } = this.layers[i];
+      const b = grid.meta.box;
+      if (x <= b[0] || x >= b[2] || z <= b[1] || z >= b[3]) continue;
+      const height = grid.sample(x, z);
+      if (Number.isNaN(height)) continue;
+      const edge = Math.min(x - b[0], b[2] - x, z - b[1], b[3] - z);
+      if (edge >= margin) return height;
+      const base = this.sampleLayers(x, z, i - 1);
+      const t = edge / margin;
+      return base + (height - base) * (t * t * (3 - 2 * t));
+    }
+    const base = (this.outer ?? this.far).sample(x, z);
+    return Number.isNaN(base) ? 0 : base;
   }
 
   /** Unit normal from central differences, `e` metres apart. */

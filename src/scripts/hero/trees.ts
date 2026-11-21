@@ -8,26 +8,19 @@ import { forestCells, woodland, seasonalWoodland } from './forest-layout';
 import { treeProfile, standDensity } from './tree-profile';
 import { SHADOW_LAYER } from './shadow';
 
-/**
- * Real trees on the slopes in front of the viewpoint, where the aerial photo shows forest.
- * Each tree takes its colour from the photo under it, so the canopy matches the real woods:
- * broadleaf crowns (shii and kashi) mixed with conical cedars. plant() re-plants them around
- * another viewpoint; the extra trees (the campus edge) always stay.
- */
+/** Ground photographs tint the crowns. The planting map is independent of the visited views. */
 export function createForest(
   env: Env,
   hf: Heightfield,
-  photo: HTMLImageElement | ImageBitmap,
-  photoBox: Box,
   quality: number,
-  /** extra broadleaf trees, e.g. along the campus edge */
-  extra: { x: number; y: number; z: number;cherry?:boolean }[] = [],
-  fallback?: { photo: HTMLImageElement | ImageBitmap; box: Box },
+  photos: { photo: HTMLImageElement | ImageBitmap; box: Box }[],
+  coverage: (x: number, z: number) => number,
   excluded: (x: number, z: number) => boolean = () => false,
-  forestArea: (x: number, z: number) => boolean = () => false,
+  extra: { x: number; y: number; z: number; cherry?: boolean }[] = [],
+  photoFallback = false,
 ) {
-  const sampler = (photo: HTMLImageElement | ImageBitmap, photoBox: Box, maxWidth = photo.width) => {
-    const W = Math.min(maxWidth, photo.width);
+  const samplers = photos.map(({photo, box: photoBox}) => {
+    const W = Math.min(quality > .75 ? 2048 : 1024, photo.width);
     const H = Math.round(photo.height * W / photo.width);
     const canvas = document.createElement('canvas');
     canvas.width = W;
@@ -42,21 +35,22 @@ export function createForest(
       const o = (Math.floor(v * H) * W + Math.floor(u * W)) * 4;
       return [px[o] / 255, px[o + 1] / 255, px[o + 2] / 255];
     };
+  });
+  const sample = (x: number, z: number) => {
+    for (const read of samplers) {
+      const colour = read(x, z);
+      if (colour) return colour;
+    }
+    return null;
   };
-  const citySample = sampler(photo, photoBox);
-  const wideSample = fallback ? sampler(fallback.photo, fallback.box, quality > .75 ? 4096 : 2048) : null;
-  /** sharper local photos (setRegionalPhoto), which take precedence over the city sheet */
-  const regions:{box:Box;sample:ReturnType<typeof sampler>;seasonal:boolean;temporary?:boolean}[]=[];
-  const inBox=(b:Box,x:number,z:number)=>x>=b[0]&&x<b[2]&&z>=b[1]&&z<b[3];
-  const regionAt=(x:number,z:number)=>regions.find(r=>inBox(r.box,x,z));
-  const sample = (x: number, z: number) => regionAt(x,z)?.sample(x,z) ?? citySample(x, z) ?? wideSample?.(x, z) ?? null;
   const slopeNormal={x:0,y:1,z:0};
-  const wooded=(c:number[],x:number,z:number) => woodland(c)||forestArea(x,z)||
-    (!!regionAt(x,z)?.seasonal&&seasonalWoodland(c,hf.normal(x,z,10,slopeNormal).y));
-  const contains = (x:number,z:number) => {
-    const c=sample(x,z);
-    return !!c && !excluded(x,z) && wooded(c,x,z);
+  const density = (x: number, z: number) => {
+    const mapped = coverage(x,z);
+    if (mapped || !photoFallback) return mapped;
+    const c = sample(x,z);
+    return c && (woodland(c) || seasonalWoodland(c,hf.normal(x,z,10,slopeNormal).y)) ? .75 : 0;
   };
+  const contains = (x:number,z:number) => density(x,z) > .25 && !excluded(x,z);
 
   function* trees(eye: { x: number; z: number }) {
     const r = rng(4242);
@@ -67,20 +61,26 @@ export function createForest(
     const lods: number[] = [];
     const shapes: number[] = [];
     const season:number[]=[];
-    const detailed=regions.some(r=>inBox(r.box,eye.x,eye.z));
     let scanned=0;
-    for (const { x, z, lod, seed } of forestCells(eye, quality,detailed)) {
+    const spread = [1.25, 1.55, 2.1, 3.1, 4.3, 5.5];
+    for (const { x, z, lod, level, seed } of forestCells(eye, quality, hf.bounds)) {
         if (++scanned % 512 === 0) yield;
-        const c = sample(x, z);
-        if (!c || excluded(x, z) || !wooded(c,x,z)) continue;
-        if (lod<2 && seed>standDensity(x,z)) continue;
+        const cover = density(x,z);
+        if (seed >= cover || seed >= cover * (.55 + .45 * standDensity(x,z)) || excluded(x,z)) continue;
         const y = hf.height(x, z);
         const profile = treeProfile(x,z);
         const cedar = profile.cedar;
         pos.push(x, y - 0.5, z);
-        // Broader far clusters fill distant wooded slopes without adding tree instances.
-        const cluster = lod === 3 ? quality>.75 ? 9 : 12 : lod === 2 ? 2.4 : lod === 1 ? 1.35 : 1;
-        size.push((cedar ? 2.6 : 4.2) * profile.width * cluster, (cedar ? 15 : 10.5) * profile.height);
+        const radius = (cedar ? 2.6 : 4.2) * profile.width;
+        let cluster = lod === 0 ? 1 : spread[level];
+        if (lod >= 2) {
+          // Large representative crowns are for stand interiors. Keep the scale of an
+          // individual tree beside open water, fields or a narrow mountain clearing.
+          const edge = radius * cluster;
+          if (density(x-edge,z) < .3 || density(x+edge,z) < .3 || density(x,z-edge) < .3 || density(x,z+edge) < .3) cluster = 1;
+        }
+        size.push(radius * cluster, (cedar ? 15 : 10.5) * profile.height);
+        const c = sample(x,z) ?? profile.tint;
         tint.push(...profile.tint.map((v,i)=>v*.8+Math.min(c[i],.45)*.2));
         kind.push(cedar ? 1 : 0);
         season.push(cedar?0:1,0);
@@ -101,18 +101,22 @@ export function createForest(
     return { pos, size, tint, kind, lods, shapes,season };
   }
 
-  // Keep block silhouettes in every ring. Beyond the close trees, two boxes then one replace
-  // the old round crowns; distant clusters cost 12 triangles instead of 20 and cannot sparkle
-  // with subpixel voxels. Population density, chunk culling and cache budgets stay the same.
+  // Keep the stepped silhouette through the middle distance. Only the horizon
+  // reduces whole stands to a single block, with the mapped canopy below them.
   const closeCrown = voxelCrown();
   const midCrown = blocksGeometry([
     {c:[0,.56,0],s:[.9,.48,.88],shade:.4,bark:0},
     {c:[.15,.85,.08],s:[.58,.32,.56],shade:.7,bark:0},
   ]);
   const farCrown = blocksGeometry([{c:[0,.66,0],s:[.86,.65,.86],shade:.5,bark:0}]);
+  const standCrown = blocksGeometry([
+    {c:[-.13,.59,.02],s:[.67,.55,.78],shade:.42,bark:0},
+    {c:[.20,.73,-.08],s:[.52,.50,.60],shade:.68,bark:0},
+  ]);
   const closeCedar=voxelCedar();
   const midCedar=voxelCedar(2);
-  const farCedar=blocksGeometry([{c:[0,.625,0],s:[.65,.75,.65],shade:.5,bark:0}]);
+  const crownLods = [closeCrown, midCrown, standCrown, farCrown, farCrown];
+  const cedarLods = [closeCedar, midCedar, midCedar, farCrown, farCrown];
 
   const vertexShader = /* glsl */ `
       attribute vec3 iPos;
@@ -217,8 +221,10 @@ export function createForest(
   const populations=new Map<string,{meshes:THREE.Mesh[];count:number}>();
   // Invalidated meshes remain visible until their replacement is complete.
   const retired=new Set<THREE.Mesh>();
-  const replace = (meshes:THREE.Mesh[]) => {
+  let visibleCenter: { x: number; z: number } | undefined;
+  const replace = (meshes:THREE.Mesh[], eye: { x: number; z: number }) => {
     group.clear();group.add(...meshes);
+    visibleCenter = { x: eye.x, z: eye.z };
     for(const mesh of retired)mesh.geometry.dispose();
     retired.clear();
   };
@@ -232,14 +238,18 @@ export function createForest(
     const cached=populations.get(key);
     if(cached) {
       populations.delete(key);populations.set(key,cached);
-      replace(cached.meshes);count=cached.count;return;
+      replace(cached.meshes,eye);count=cached.count;return;
     }
     const { pos, size, tint, kind, lods, shapes,season } = yield* trees(eye);
     const chunks = new Map<string, number[]>();
+    // Small near tiles cull whole high-detail crowns behind the eye. Sparse outer
+    // trees can share larger draws without changing their shapes or positions.
+    const tileWidth = [96, 384, 1536, 3072, 8192];
     for(let i=0;i<kind.length;i++) {
       if(i && i%2048===0) yield;
-      const k=kind[i];
-      const key = `${Math.floor(pos[i * 3] / 768)},${Math.floor(pos[i * 3 + 2] / 768)},${k},${lods[i]}`;
+      const k=lods[i] < 3 ? kind[i] : 0;
+      const width = tileWidth[lods[i]];
+      const key = `${Math.floor(pos[i * 3] / width)},${Math.floor(pos[i * 3 + 2] / width)},${k},${lods[i]}`;
       if (!chunks.has(key)) chunks.set(key, []);
       chunks.get(key)!.push(i);
     }
@@ -249,7 +259,7 @@ export function createForest(
     for (const idx of chunks.values()) {
       if(++chunkCount%12===0) yield;
       const first = idx[0];
-      const shapesByLod = kind[first] === 1 ? [closeCedar,midCedar,farCedar,farCedar] : [closeCrown,midCrown,farCrown,farCrown];
+      const shapesByLod = kind[first] === 1 ? cedarLods : crownLods;
       const shape = shapesByLod[lods[first]];
       const geo = new THREE.InstancedBufferGeometry();
       geo.setIndex(shape.index);
@@ -281,7 +291,7 @@ export function createForest(
       mesh.userData.depthMaterial = depthMaterial;
       meshes.push(mesh);
     }
-    replace(meshes);count=kind.length;
+    replace(meshes,eye);count=kind.length;
     populations.set(key,{meshes,count});committed=true;
     if(populations.size>3) {
       const oldest=populations.keys().next().value!;
@@ -308,31 +318,24 @@ export function createForest(
     } finally { steps.return(); }
   }
   const cancelPlant = () => { generation++; };
-  const invalidatePhotos = () => {
+  let following = false;
+  function follow(eye: {x:number;z:number}, bearing: number) {
+    const spacing = quality > .75 ? 160 : 110;
+    if (following || (visibleCenter && Math.hypot(eye.x-visibleCenter.x,eye.z-visibleCenter.z) < spacing)) return;
+    // While travelling, finish one population before sampling the latest camera
+    // position on the next frame. Fast movement must not starve visible updates.
+    following = true;
+    return plantAsync(eye,bearing).finally(() => { following = false; });
+  }
+  const refreshExclusions = () => {
     cancelPlant();
     for(const population of populations.values()) for(const mesh of population.meshes) {
       if(mesh.parent===group)retired.add(mesh);else mesh.geometry.dispose();
     }
     populations.clear();
-  };
-  /** Use a sharper photo over `box`. `seasonal` imagery (leafless or autumn) also accepts muted
-   * canopy on slopes; summer imagery doesn't need that and would catch cemeteries on the hills. */
-  const setRegionalPhoto = (photo:HTMLImageElement | ImageBitmap,box:Box,seasonal=false) => {
-    const region={box,sample:sampler(photo,box),seasonal};
-    const i=regions.findIndex(r=>r.box.every((v,k)=>v===box[k]));
-    if(i<0) regions.push(region); else regions[i]=region;
-    invalidatePhotos();
     return planted ? plantAsync(planted.eye,planted.bearing) : Promise.resolve();
   };
-  /** Replace the one outer-city photo, releasing its CPU pixels and cached populations. */
-  const setOuterPhoto=(photo:HTMLImageElement|ImageBitmap|null,box:Box)=>{
-    const i=regions.findIndex(r=>r.temporary);
-    if(i>=0)regions.splice(i,1);
-    if(photo)regions.unshift({box,sample:sampler(photo,box),seasonal:false,temporary:true});
-    invalidatePhotos();
-    return planted ? plantAsync(planted.eye,planted.bearing) : Promise.resolve();
-  };
-  return { group, plant, plantAsync, cancelPlant, contains, setRegionalPhoto, setOuterPhoto, get count() { return count; } };
+  return { group, plant, plantAsync, follow, cancelPlant, contains, refreshExclusions, get count() { return count; } };
 }
 
 /** An axis-aligned block: centre, size, and a shade (0..1, 0 for none) shared by its faces. */
