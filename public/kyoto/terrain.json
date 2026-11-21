@@ -527,5 +527,28 @@
   "q": 0.5,
   "bytes": 245105,
   "features": 37547
+ },
+ "otokuni": {
+  "box": [
+   -7950,
+   4250,
+   -2500,
+   10350
+  ],
+  "zoom": 16,
+  "mobile": {
+   "file": "aerial-otokuni-mobile.webp",
+   "size": [
+    1024,
+    1024
+   ],
+   "bytes": 262350
+  },
+  "file": "aerial-otokuni.webp",
+  "size": [
+   2048,
+   2048
+  ],
+  "bytes": 913190
  }
 }

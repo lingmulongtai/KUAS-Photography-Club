@@ -7,6 +7,19 @@ const file = name => new URL('../public/kyoto/' + name, import.meta.url);
 const { aerialBasin: atlas, aerialCity: city } = JSON.parse(await readFile(file('terrain.json'), 'utf8'));
 const inside = (box, x, z) => x > box[0] && x < box[2] && z > box[1] && z < box[3];
 
+test('Otokuni street and rail approaches have a registered close sheet for each texture tier',async()=>{
+  const {otokuni}=JSON.parse(await readFile(file('terrain.json'),'utf8'));
+  for(const [x,z] of [[-3567,9428],[-4853,7612],[-6163,7660],[-5779,5615]]){
+    assert.ok(inside(otokuni.box,x,z));
+  }
+  for(const variant of [otokuni,otokuni.mobile]){
+    const bytes=await readFile(file(variant.file));
+    assert.equal(bytes.length,variant.bytes);
+    assert.deepEqual([bytes.readUInt16LE(26)&0x3fff,bytes.readUInt16LE(28)&0x3fff],variant.size);
+  }
+  assert.ok((otokuni.box[3]-otokuni.box[1])/otokuni.size[1]<3);
+});
+
 test('resident photos cover the south and both sides of the Yagi approach before entering a detail region', () => {
   const boxes = Object.fromEntries(atlas.sheets.map(s => [s.id, s.box]));
   const stations = [

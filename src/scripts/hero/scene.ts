@@ -67,7 +67,7 @@ import {buildRailways} from './railways';
 import {buildAircraft} from './aircraft';
 import {buildSouthOverview,type OverviewBuilding} from './south-overview';
 import type {RailwayRoute} from './railway-path';
-import {createNearbyPhotos,type PhotoSheet} from './nearby-photos';
+import {containsPhoto,createNearbyPhotos,type PhotoSheet} from './nearby-photos';
 import {moveExplorer} from './free-explore';
 import {climateOf,seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
@@ -317,11 +317,12 @@ export function createHero(
         else terrain.setPhoto(i+1,photo,r.meta.box);
       }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
     });
-    const osakaPhotos=createNearbyPhotos(
+    const closePhotos=createNearbyPhotos(
       async()=> (await loadJSON<{photos:PhotoSheet[]}>('photos-osaka.json')).photos,
       async sheet=>({photo:await loadTexture(opts.quality<.75?sheet.mobile.file:sheet.file,aniso),box:sheet.box}),
       photo=>sharedSlot?.setOverride(photo),value=>value.photo.dispose(),
-      error=>console.warn('Close Osaka imagery unavailable; retaining regional photo',error),
+      error=>console.warn('Close transport imagery unavailable; retaining regional photo',error),
+      meta.otokuni?[meta.otokuni]:[],
     );
     const ensurePhotos=ensureRegionalPhoto;
     ensureRegionalPhoto = v => {
@@ -608,7 +609,7 @@ export function createHero(
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
     const regionManifest=await cityRegions;
     let lastAreaRequest:{id:string|null;retry?:ReturnType<typeof setTimeout>}|undefined;
-    let lastPhotoX=0,lastPhotoZ=0;
+    let lastPhotoX=0,lastPhotoZ=0,lastCloseArea:string|null=null;
     ensureCityRegion=(center,bearing)=>{
       let region=bearing===undefined?regionAt(regionManifest.regions,center):regionInView(regionManifest.regions,center,bearing);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
@@ -617,9 +618,11 @@ export function createHero(
         region={...region,id:'uji-detail',photo:meta.byodoin};
       const id=region?.id??null;
       const changed=lastAreaRequest?.id!==id;
-      if(changed || bearing===undefined || (id==='osaka' && Math.hypot(center.x-lastPhotoX,center.z-lastPhotoZ)>=600)){
+      const closeArea=meta.otokuni&&containsPhoto(meta.otokuni.box,center)?'otokuni':id==='osaka'?'osaka':null;
+      if(changed || closeArea!==lastCloseArea || bearing===undefined || (closeArea && Math.hypot(center.x-lastPhotoX,center.z-lastPhotoZ)>=600)){
         sharedSlot?.select(id==='tennozan');
-        void osakaPhotos.update(id==='osaka'?center:null);
+        void closePhotos.update(closeArea?center:null);
+        lastCloseArea=closeArea;
         lastPhotoX=center.x;lastPhotoZ=center.z;
       }
       if(!changed)return;
@@ -643,7 +646,7 @@ export function createHero(
     prefetchCityRegion=(center)=>{
       const next=regionAt(regionManifest.regions,center);
       if(next)regionLoader.prefetch(next);
-      if(next?.id==='osaka')void osakaPhotos.prefetch(center);
+      if(next?.id==='osaka'||(meta.otokuni&&containsPhoto(meta.otokuni.box,center)))void closePhotos.prefetch(center);
     };
     const residentSouth=southSurvey.then(async survey=>{
       if(!survey)return false;
