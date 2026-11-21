@@ -46,7 +46,7 @@ import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
 import { createIntroCameraMotion } from './intro-camera';
 import { createSharedPhotoSlot } from './shared-photo';
-import { VIEWS, type ViewDef, type HeroView } from './views';
+import { VIEWS, openingPanorama, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
 import { buildOcclusion } from './building-occlusion';
@@ -85,6 +85,8 @@ export interface HeroStatus {
 
 export interface HeroOptions extends HeroLoadingCallbacks {
   lang?: 'ja' | 'en';
+  requestedOpening?: string | null;
+  previousOpening?: string | null;
   /** Date to render for this frame. */
   now: () => Date;
   /** Cumulative minutes explicitly travelled by a time preset, excluding the live clock. */
@@ -231,7 +233,10 @@ export function createHero(
     void cityData.catch(()=>{});
     travelBounds=hf.bounds;
     groundAt = (x, z) => hf.height(x, z);
+    view=openingPanorama(groundAt,clouds.weather.base,opts.previousOpening??null,opts.requestedOpening??null);
+    VIEW=VIEWS[view];
     eye.copy(eyeOf(VIEW));
+    if(view!=='shogunzuka')shadow.setRegion(shadowRegion(VIEW,eye));
     campus.y = hf.height(campus.x, campus.z) + 14;
     const regions = REGIONAL_PHOTOS.flatMap((r) => {
       const m = meta[r.key];

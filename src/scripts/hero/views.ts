@@ -87,6 +87,20 @@ export const VIEWS = {
 export type HeroView = keyof typeof VIEWS;
 export type HeroDestination = 'campus' | HeroView;
 export const PANORAMA_VIEWS = ['shogunzuka','inariRidge','daimonji','arashiyama','atago','kameokaTerrace','tennozan','osakaSkyline'] as const satisfies readonly HeroView[];
+export type PanoramaView = (typeof PANORAMA_VIEWS)[number];
+
+/** Select the actual opening eye before any view-centred geometry is prepared. */
+export function openingPanorama(height:(x:number,z:number)=>number,cloudBase:number,previous:string|null,requested:string|null,random=Math.random):PanoramaView {
+  const eligible=PANORAMA_VIEWS.filter(id=>{
+    const v=VIEWS[id];
+    return height(v.ref.x,v.ref.z)+v.above+80<=cloudBase;
+  });
+  const linked=eligible.find(id=>id===requested);
+  if(linked)return linked;
+  const other=eligible.filter(id=>id!==previous);
+  const choices=other.length?other:eligible;
+  return choices[Math.floor(random()*choices.length)]??'shogunzuka';
+}
 
 export function spotDestination(id: SpotId): HeroDestination {
   if (id==='kuas') return 'campus';

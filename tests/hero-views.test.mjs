@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import { VIEWS, PANORAMA_VIEWS, spotDestination } from '../src/scripts/hero/views.ts';
+import { VIEWS, PANORAMA_VIEWS, openingPanorama, spotDestination } from '../src/scripts/hero/views.ts';
 import { SPOTS } from '../src/data/spots.ts';
 import { toLocal } from '../src/scripts/hero/geo.ts';
 import { landmarkOrbit } from '../src/scripts/hero/landmark-orbit.ts';
@@ -30,6 +30,19 @@ test('panoramas turn at a fixed observation point', () => {
   const atago=SPOTS.find(s=>s.id==='atago');
   assert.deepEqual(VIEWS.atago.ref,toLocal(atago.lat,atago.lon));
   assert.equal('funaoka' in VIEWS,false);
+});
+
+test('openings draw uniformly from clear panoramas and skip the previous opening on reload',()=>{
+  const terrain=(x,z)=>x===VIEWS.atago.ref.x && z===VIEWS.atago.ref.z?920:80;
+  for(const previous of [null,...PANORAMA_VIEWS]){
+    const choices=PANORAMA_VIEWS.filter(id=>id!==previous);
+    for(let i=0;i<choices.length;i++)
+      assert.equal(openingPanorama(terrain,1500,previous,null,()=>(i+.5)/choices.length),choices[i]);
+  }
+  assert.equal(openingPanorama(terrain,850,'inariRidge','inariRidge',()=>0),'inariRidge');
+  for(const requested of ['atago','inari','invalid']){
+    for(let i=0;i<24;i++)assert.notEqual(openingPanorama(terrain,850,null,requested,()=>i/24),'atago');
+  }
 });
 
 test('the Yamashina-side panorama frames Inari on the left and clears the lowest cloud deck',async t=>{

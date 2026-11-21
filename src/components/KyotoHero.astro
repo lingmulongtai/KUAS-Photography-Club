@@ -35,7 +35,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <span class="views-label">VIEW</span>
       <div class="view-options">
         <span class="view-lens" aria-hidden="true"></span>
-        {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed={view==='shogunzuka'} disabled>{VIEWS[view][lang]}</button>)}
+        {PANORAMA_VIEWS.map(view => <button type="button" data-view={view} aria-pressed="false" disabled>{VIEWS[view][lang]}</button>)}
       </div>
     </nav>
   </div>
@@ -288,16 +288,19 @@ const pinTrips = completeSpotPreviews((await getTrips())
       viewLens.style.transform = `translateX(${button.offsetLeft}px)`;
       if (immediate) requestAnimationFrame(() => viewLens.classList.remove('no-motion'));
     };
-    const revealView = (button: HTMLButtonElement | undefined) => {
+    const revealView = (button: HTMLButtonElement | undefined, immediate=false) => {
       if (!button) return;
       const view = button.getBoundingClientRect(), bar = viewBar.getBoundingClientRect();
       const offset = view.right > bar.right ? view.right - bar.right + 8 : view.left < bar.left ? view.left - bar.left - 8 : 0;
-      if (offset) viewBar.scrollBy({ left: offset, behavior: motion.matches ? 'instant' : 'smooth' });
+      if (offset) viewBar.scrollBy({ left: offset, behavior: immediate || motion.matches ? 'instant' : 'smooth' });
     };
     viewOptions.classList.add('is-enhanced');
-    moveLens(viewButtons[0], true);
+    moveLens(undefined,true);
     new ResizeObserver(() => moveLens(viewButtons.find(b => b.getAttribute('aria-pressed') === 'true'), true)).observe(viewOptions);
     let panorama: HeroView='shogunzuka';
+    const openingKey='kuas-last-opening-view';
+    let previousOpening:string|null=null;
+    try { previousOpening=localStorage.getItem(openingKey); } catch { /* Storage is optional. */ }
 
     const hhmm = (m: number) => {
       const v = ((Math.floor(m) % 1440) + 1440) % 1440;
@@ -367,7 +370,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       if (rect.bottom >= 0 && rect.top <= window.innerHeight) showTimeStatus(jstMinutes(new Date()));
     }, 30_000);
 
-    const setView = (mode: HeroMode, arrived: boolean) => {
+    const setView = (mode: HeroMode, arrived: boolean, opening=false) => {
       hero.dataset.view = mode;
       const atPanorama=mode==='city' && PANORAMA_VIEWS.some(id=>id===demo?.view);
       if (atPanorama && demo) panorama=demo.view;
@@ -382,8 +385,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
         : (en ? 'Moving to the selected place.' : '選んだ地点へ移動しています。');
       viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(mode==='city' && b.dataset.view===demo?.view)));
       const activeView = viewButtons.find(b => b.getAttribute('aria-pressed') === 'true');
-      moveLens(activeView);
-      revealView(activeView);
+      moveLens(activeView,opening);
+      revealView(activeView,opening);
       cameraHint.textContent = demo?.orbiting && mode==='city'
         ? (en ? 'Drag or swipe to orbit this place.' : 'ドラッグでスポットを中心に360°回れます。スマホは横スワイプ。')
         : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
@@ -391,6 +394,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
         card.hidden = false;
         if (arrived) back.focus({ preventScroll: true });
       } else if (!arrived) card.hidden = true;
+      if (opening) return;
       if (arrived && !atPanorama && mode==='city') spotSelect.focus({preventScroll:true});
       if (arrived && atPanorama && !hero.querySelector('.time-control')?.contains(document.activeElement)) viewButtons.find(b=>b.dataset.view===panorama)?.focus({preventScroll:true});
     };
@@ -451,6 +455,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       stage,
       (renderer, el) =>
         (demo = createHero(renderer, el, {
+          previousOpening, requestedOpening:new URLSearchParams(location.search).get('view'),
           now: () => (sky.live && !sky.transitioning ? new Date() : jstDateAt(new Date(), wrapDay(shown()))),
           cloudTravelMinutes: () => sky.clouds(performance.now()),
           quality,
@@ -464,6 +469,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
           onReady: () => {
             hero.classList.add('is-ready'); spotSelect.disabled=false;exploreToggle.disabled=false;timeSlider.disabled=false;
             viewButtons.forEach(b=>b.disabled=false);
+            setView('city',true,true);
+            try { localStorage.setItem(openingKey,panorama); } catch { /* Random selection still works. */ }
             if (!stopRefraction.length) stopRefraction = [mountGlassRefraction(viewBar), mountGlassRefraction(hero.querySelector<HTMLElement>('.time-thumb')!)];
             document.dispatchEvent(new Event('hero:ready'));
             sceneReady=true; offerSwipeHint();
