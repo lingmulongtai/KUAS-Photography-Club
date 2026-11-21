@@ -5,6 +5,24 @@ import {runInNewContext} from 'node:vm';
 import {gzipSync} from 'node:zlib';
 import {buildSync} from 'esbuild';
 import {terrainPrograms} from '../tools/kansai-data/terrain-programs.mjs';
+import {readFileSync} from 'node:fs';
+import {boundEnvironmentLoops} from '../tools/kansai-data/cesium-assets.mjs';
+import irradiance from '@cesium/engine/Source/Shaders/ComputeIrradianceFS.js';
+import specular from '@cesium/engine/Source/Shaders/ConvolveSpecularMapFS.js';
+
+test('environment lighting preserves native sample counts and the WebGL1 shader path',()=>{
+  const native=readFileSync(new URL('../node_modules/cesium/Build/Cesium/Cesium.js',import.meta.url),'utf8');
+  const bounded=boundEnvironmentLoops(native);
+  assert.ok(bounded.includes('const int samples = 256;'));
+  assert.ok(bounded.includes('const int samples = 128;'));
+  for(const [source,sampler] of [[irradiance,'u_radianceMap'],[specular,'u_radianceTexture']]){
+    assert.ok(native.includes(source));
+    assert.ok(!bounded.includes(source));
+    assert.ok(bounded.includes(`textureSize(${sampler}, 0).x + samples`));
+  }
+  assert.equal(bounded.split('#else\n    const int sampleCount = samples;').length-1,2);
+  assert.equal(boundEnvironmentLoops('unrecognised shader bundle'),'unrecognised shader bundle');
+});
 
 test('terrain warm-up uses the installed engine sources and covers each aerial layer count',()=>{
   const catalogue=terrainPrograms();
