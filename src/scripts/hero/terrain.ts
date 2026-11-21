@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import { ROAD_GLSL } from './roads';
+import { RAIL_BALLAST } from './rail-ballast';
 import { BUILT_GLSL } from './building-occlusion';
 import { STROKES } from './daimonji';
 import type { Box } from './geo';
@@ -298,7 +299,9 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         float onRoad = 1. - smoothstep(-aa, aa, rd.edge);
         float onAve = 1. - smoothstep(-aa, aa, rd.avenue);
         float walk = (1. - smoothstep(-aa, aa, rd.avenue - 3.2)) * (1. - onAve);
-        float onRail = 1. - smoothstep(-aa, aa, rd.rail);
+        // A grazing view can span many metres along a track, but its ballast stays narrow.
+        float railAA = clamp(fwidth(rd.rail) * .6, .12, 6.);
+        float onRail = 1. - smoothstep(-railAA, railAA, rd.rail);
         float fine = 1. - smoothstep(.6, 2.5, fp);
         // asphalt, a touch lighter and patched on the avenues
         float patchy = mix(.5, vnoise(p * .07), 1. - smoothstep(4., 12., fp));
@@ -333,7 +336,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         albedo = mix(albedo, paving * (.9 + .2 * patchy), walk * .85);
         albedo = mix(albedo, street, onRoad * .93);
         // railway ballast
-        albedo = mix(albedo, vec3(.16, .145, .13), onRail * .9);
+        albedo = mix(albedo, vec3(${RAIL_BALLAST.join(',')}), onRail * .9);
         // ambient occlusion: the ground along walls and in narrow alleys gets little sky
         float contact = builtAt(p, 9.);
         albedo *= 1. - .5 * smoothstep(.05, .6, contact) - .22 * urban;

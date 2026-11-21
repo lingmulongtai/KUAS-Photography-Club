@@ -5,6 +5,7 @@ import {createCampusMesh} from './campus';
 import {createRailGradeIndex,railwayPath,trainSections,serviceTrainProgress,type RailwayRoute} from './railway-path';
 import {SHADOW_LAYER} from './shadow';
 import {LINE,RAIL,type LineFeature} from './lines-data';
+import {RAIL_BALLAST} from './rail-ballast';
 import type {Box} from './geo';
 
 /** Bounded route groups, one static track draw and one instanced vehicle draw.
@@ -94,8 +95,11 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
         float steel=stripe(centre-g,.045,pixel)+stripe(centre+g,.045,pixel);
         float phase=vAlong/.66,footprint=max(fwidth(phase),.01);
         float sleepers=mix(stripe(fract(phase)-.5,.17,footprint),.34,smoothstep(.25,1.,footprint));
-        sleepers*=1.-smoothstep(1.,1.25,abs(centre));
-        vec3 alb=mix(vec3(.16,.155,.145),vec3(.095,.07,.052),sleepers);alb=mix(alb,vec3(.39,.40,.40),steel);
+        // The exposed shoulder catches more light than the gravel beneath the sleepers.
+        float sleeperSpan=1.-smoothstep(1.,1.25,abs(centre));
+        vec3 ballast=vec3(${RAIL_BALLAST.join(',')})*mix(1.1,.90,sleeperSpan);
+        vec3 alb=mix(ballast,vec3(.12,.094,.072),sleepers*sleeperSpan);
+        alb=mix(alb,vec3(.39,.40,.40),steel);
         gl_FragColor=vec4(applyHaze(shade(alb,vec3(0.,1.,0.),vWorld,sunShadow(vWorld,vec3(0.,1.,0.))),vec3(0.),vWorld),1.);}`});
   const trackMesh=new THREE.Mesh(geometry,trackMaterial),structureMesh=createCampusMesh({...env,uHighlight:{value:1}},structures.geometry());
   trackMesh.layers.enable(SHADOW_LAYER);structureMesh.layers.enable(SHADOW_LAYER);group.add(trackMesh,structureMesh);

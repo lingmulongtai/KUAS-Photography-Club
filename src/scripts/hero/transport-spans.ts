@@ -3,6 +3,7 @@ import type {Env} from './env';
 import {ENV_GLSL} from './env';
 import {yieldTask} from './task-yield';
 import {bridgeFrame, type Bridge} from './bridges';
+import {RAIL_BALLAST} from './rail-ballast';
 
 export interface TransportSpan {kind:'road'|'rail';width:number;level:number;points:[number,number][]}
 interface Segment {x:number;z:number;ux:number;uz:number;length:number;width:number;y:number;rise:number}
@@ -35,7 +36,7 @@ function roadIndex(){
 }
 
 type Batch={position:number[];color:number[];index:number[]};
-const slate=[.105,.116,.126], concrete=[.25,.24,.215], steel=[.16,.165,.163], railTop=[.28,.26,.21];
+const slate=[.105,.116,.126], concrete=[.25,.24,.215], railTop=[.28,.26,.21];
 /** One geographic batch per visible tile. Heights approximate the alignment between surveyed plan positions. */
 export async function buildTransportSpans(env:Env,source:TransportSpan[],ground:(x:number,z:number)=>number,custom:Bridge[]){
   const group=new THREE.Group(); group.name='mapped-bridges-and-viaducts';
@@ -85,7 +86,7 @@ export async function buildTransportSpans(env:Env,source:TransportSpan[],ground:
           }
           index.push(k,k+1,k+2,k+2,k+1,k+3);
         };
-        strip(-w,0,w,0,rail?steel:slate);
+        strip(-w,0,w,0,rail?RAIL_BALLAST:slate);
         for(const side of [-1,1]){
           strip(side*w,-.85,side*w,.65,concrete);
           strip(side*w,.65,side*(w-.22),.65,concrete);
