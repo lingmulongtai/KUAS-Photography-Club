@@ -2,10 +2,11 @@ import type {Cesium3DTile, Cesium3DTileFeature, CesiumWidget} from 'cesium';
 import {C} from './engine';
 import type {Point, Box} from './coordinates';
 import {inBox} from './coordinates';
+import type {Architecture} from './architecture';
+import {surveyMaterial} from './survey-material';
 
 type SurveyLayer={kind:string;lod:number;pref:string;file:string};
 type RecordBox={box:Box;point:Point;feature?:Cesium3DTileFeature};
-const rad=180/Math.PI;
 const cell=(x:number,y:number)=>x*100000+y;
 
 class Footprints {
@@ -27,19 +28,15 @@ function footprintRecords(tile:Cesium3DTile): RecordBox[] {
     if(!b.every(Number.isFinite)||b[2]-b[0]>.08||b[3]-b[1]>.08)continue;
     records.push({box:b,point:[(b[0]+b[2])/2,(b[1]+b[3])/2],feature:f});
   }
-  // Some newer tiles omit per-building bounds. Only use locally detailed tiles
-  // for fallback suppression, never the broad bounding volume of a whole city.
-  if(!records.length && tile.boundingSphere.radius<450){
-    const s=tile.boundingSphere,p=C.Cartographic.fromCartesian(s.center),dy=s.radius/111320,dx=dy/Math.cos(p.latitude);
-    const lon=p.longitude*rad,lat=p.latitude*rad;
-    records.push({box:[lon-dx,lat-dy,lon+dx,lat+dy],point:[lon,lat]});
-  }
+  // A survey tile may contain only a few buildings. Its bounding volume cannot
+  // determine which mapped houses in the same neighbourhood it replaces.
   return records;
 }
 
-export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initialPref:string){
+export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initialPref:string,architecture:Architecture){
   const res=await fetch('/kansai/surveys/index.json'); if(!res.ok)throw Error('Survey catalogue');
   const {layers}=await res.json() as {layers:SurveyLayer[]};
+  const material=surveyMaterial(widget);
   const scene=widget.scene, records=new WeakMap<Cesium3DTile,RecordBox[]>();
   let visible=new Map<Cesium3DTile,number>(),last=new Map<Cesium3DTile,number>(),mask=new Footprints(),revision=0;
   const remove=scene.postRender.addEventListener(()=>{
@@ -71,13 +68,16 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
         maximumScreenSpaceError:3,enableCollision:true,
       });
       if(widget.isDestroyed()) {tiles.destroy();return;}
+      if(layer.kind==='bldg'&&layer.lod===1)tiles.customShader=material.shader;
       if(layer.kind==='bldg')tiles.tileVisible.addEventListener((tile:Cesium3DTile)=>visible.set(tile,layer.lod));
+      if(layer.kind==='bldg'||layer.kind==='brid')architecture.register(tiles,layer.pref);
       tiles.tileFailed.addEventListener(onFailure);
       scene.primitives.add(tiles);
     }catch{onFailure();}
     }
   }
   const ready=Promise.all(Array.from({length:3},loadNext));
-  return {contains:(p:Point)=>mask.contains(p),get revision(){return revision;},ready,dispose:remove};
+  return {contains:(p:Point)=>mask.contains(p)||architecture.contains(p),get revision(){return revision+architecture.revision;},ready,
+    updatePhoto:material.update,dispose(){remove();architecture.dispose();material.dispose();}};
 }
 export type Surveys=Awaited<ReturnType<typeof attachSurveys>>;
