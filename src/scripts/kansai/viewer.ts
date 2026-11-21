@@ -37,7 +37,7 @@ export async function startMap(root:HTMLElement){
     }).catch(()=>{/* The base aerial continues to cover Yumeshima. */});
   scene.globe.depthTestAgainstTerrain=true;scene.globe.maximumScreenSpaceError=1.5;
   scene.globe.baseColor=C.Color.fromCssColorString('#6b8479');
-  scene.screenSpaceCameraController.minimumZoomDistance=12;
+  scene.screenSpaceCameraController.minimumZoomDistance=1.7;
   scene.screenSpaceCameraController.maximumZoomDistance=460000;
   widget.clock.currentTime=C.JulianDate.fromIso8601('2026-05-15T04:30:00Z');
   const display=fireworks(widget,root.querySelector<HTMLButtonElement>('[data-fireworks]')!,en);
