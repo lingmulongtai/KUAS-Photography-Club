@@ -31,3 +31,20 @@ test('individual track axes replace the generic surface while keeping the passen
   assert.ok(render([{...route,states:[1]}],axes,[-10,-10,130,10]).children[0].geometry.getAttribute('position').count
     >onlyAxes.children[0].geometry.getAttribute('position').count);
 });
+
+test('framed viaducts share the train grade and honour the mapped clear sites for supports',()=>{
+  const route={id:'jr-yamashina',states:[1,1,1,1],tracks:[2,2,2,2],
+    points:[[0,0],[30,0],[60,0],[90,0],[120,0]],stations:[],color:'#8c9eae',cars:4,carLength:20,
+    viaduct:{start:0,end:4,width:8.4,piers:[[30,-2.6,2.6],[90,-2.6]]}};
+  const {group}=mod.exports.buildRailways({},()=>50,[route]);
+  const [track,structure]=group.children;
+  const positions=structure.geometry.getAttribute('position'),top=track.geometry.getAttribute('position').getY(0);
+  const vertices=Array.from({length:positions.count},(_,i)=>[positions.getX(i),positions.getY(i),positions.getZ(i)]);
+  assert.ok(vertices.some(([,y,z])=>Math.abs(z-4.2)<.01&&Math.abs(y-(top-.1))<.01),'deck spans both tracks');
+  const feet=vertices.filter(([,y])=>y<50);
+  for(const [x,z] of [[30,-2.6],[30,2.6],[90,-2.6]]){
+    assert.ok(feet.some(([a,,b])=>Math.abs(a-x)<.6&&Math.abs(b-z)<.6));
+  }
+  assert.ok(!feet.some(([x,,z])=>x>80&&z>0),'leave the carriageway beneath the cantilever clear');
+  assert.ok(!feet.some(([x])=>Math.abs(x-60)<2),'no generic centre pier on the framed span');
+});
