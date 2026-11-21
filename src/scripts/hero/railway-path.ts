@@ -1,6 +1,7 @@
 export interface RailwayRoute {
   id:string;points:[number,number][];states:number[];tracks:number[];
   stations:{code:string;distance:number}[];color:string;cars:number;carLength:number;
+  viaduct?:{start:number;end:number;width:number;piers:[number,number,number?][]};
 }
 
 type RailPoint={x:number;y:number;z:number};

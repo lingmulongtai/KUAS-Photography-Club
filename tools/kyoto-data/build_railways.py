@@ -2,6 +2,8 @@
 
 GSI vector attribute reference: https://maps.gsi.go.jp/help/pdf/vector/attribute.pdf
 1 single, 2 double+, 3 siding, 4 station; railState 2/3 are hidden connections.
+For the visible framed deck at Higashino, see the construction survey (photo 1, figure 1):
+https://jcmanet.or.jp/bunken/wp-content/uploads/2004/jcma-2004_03.pdf
 Run after fetch.py/build_regions.py. Only the named route codes within this box are read.
 """
 import heapq
@@ -10,7 +12,9 @@ import math
 from pathlib import Path
 
 import mapbox_vector_tile as mvt
-from shapely.geometry import box, shape
+from shapely import STRtree
+from shapely.geometry import LineString, Point, box, shape
+from shapely.ops import transform
 
 import region as R
 from build_lines import parts, to_local_fn
@@ -18,6 +22,13 @@ from common import CACHE, write_gz
 from fetch import get, GSI
 
 AREA = (-26000, -12000, 7000, 12700)
+KOSEI = (4800, -3000, 9300, 1600)  # Yamashina junction, Nagara tunnel and Otsukyo station
+# Points on the two long, surveyed viaducts. Follow each contiguous GSI elevated
+# run to its actual ends, including the portals and embankments either side.
+VIADUCTS = {
+    'jr-shinkansen': ((34.98112, 135.81502), 10.8),
+    'jr-yamashina': ((34.994, 135.82852), 8.4),
+}
 # Endpoints: GSI/OSM station positions; route extents deliberately stop at named stations.
 ROUTES = [
     ('randen-main', ['40202000123','40204800008'], (35.0032407,135.7484168), (35.0153367,135.6780678), '#704489', 1, 14.5),
@@ -26,7 +37,7 @@ ROUTES = [
     ('hankyu-arashiyama', ['40202000265'], (34.9790124,135.7031679), (35.0098491,135.6823003), '#702c31', 4, 19),
     ('kintetsu', ['40202000070'], (34.9848,135.7567), (34.9561575,135.7561415), '#bb6251', 4, 20),
     ('jr-sagano', ['40201000086'], (34.985135,135.7589257), (35.1023071,135.4833287), '#719783', 4, 20),
-    ('jr-yamashina', ['40201000126','40201000069'], (34.985135,135.7589257), (34.9925975,135.8166736), '#8c9eae', 4, 20),
+    ('jr-yamashina', ['40201000126','40201000069'], (34.985135,135.7589257), (35.02500,135.85800), '#8c9eae', 4, 20),
     ('jr-kyoto', ['40201000126'], (34.985135,135.7589257), (34.8918691,135.6778703), '#8c9eae', 6, 20),
     ('jr-shinkansen', ['40201888888'], (34.8907153,135.6811513), (34.979060,135.834962), '#245a9a', 8, 25),
 ]
@@ -35,14 +46,29 @@ ROUTES = [
 def extract():
     routes = {code for _, codes, *_ in ROUTES for code in codes}
     features = []
+    obstacles = []
+    structure_tiles = set(R.tiles_for((3300, 550, 7100, 2900), 14))
     clip = box(0,0,4096,4096)
-    for z,x,y in R.tiles_for(AREA,14):
+    for z,x,y in sorted(set(R.tiles_for(AREA,14)) | set(R.tiles_for(KOSEI,14))):
         path = Path(CACHE)/'gsi'/'bvmap'/str(z)/str(x)/f'{y}.pbf'
         # The regional builds normally cached these; fetch only this bounded set if absent.
         if not path.exists():
             get(f'{GSI}/experimental_bvmap/{z}/{x}/{y}.pbf',str(path))
         data = mvt.decode(path.read_bytes(), default_options={'y_coord_down':True})
         loc = to_local_fn(z,x,y)
+        if (z,x,y) in structure_tiles:
+            for layer in ('road','railway','waterarea'):
+                for ft in data.get(layer,{}).get('features',[]):
+                    p=ft['properties']
+                    if layer=='road':
+                        if p.get('ftCode') not in (2701,2711,2721,2731):continue
+                        width=(3,4.5,9,16,24)[min(4,p.get('rnkWidth',0))]
+                    elif layer=='railway':
+                        if p.get('railState')!=0:continue
+                        width=5.6 if p.get('snglDbl')==2 else 3.1
+                    else:width=0
+                    footprint=transform(loc,shape(ft['geometry']).intersection(clip))
+                    if not footprint.is_empty:obstacles.append(footprint.buffer(width/2+1.25))
         for ft in data.get('railway',{}).get('features',[]):
             p=ft['properties']; codes=set(str(p.get('rtCode','')).split(','))
             if not codes.intersection(routes) or p.get('snglDbl')==3:continue
@@ -50,7 +76,45 @@ def extract():
                 if g.geom_type!='LineString' or g.length<.1:continue
                 pts=[tuple(round(v*2)/2 for v in loc(*q)) for q in g.coords]
                 features.append((codes,pts,int(p.get('railState',0)),int(p.get('snglDbl',1)),p.get('staCode')))
-    return features
+    return features,STRtree(obstacles)
+
+
+def add_viaduct(route, obstacles):
+    probe,width=VIADUCTS[route['id']]
+    mark=Point(*R.to_local(*probe))
+    pts,states=route['points'],route['states']
+    start=min((i for i,s in enumerate(states) if s==1),
+              key=lambda i:LineString(pts[i:i+2]).distance(mark))
+    if LineString(pts[start:start+2]).distance(mark)>80:
+        raise ValueError(f"No elevated source line at the {route['id']} viaduct")
+    end=start+1
+    while start and states[start-1]==1:start-=1
+    while end<len(states) and states[end]==1:end+=1
+    span=LineString(pts[start:end+1])
+    origin=sum(math.dist(p,q) for p,q in zip(pts[:start],pts[1:start+1]))
+    # These are representative frames, not surveyed pier positions. Keep both feet
+    # off mapped surface streets, ground tracks and rivers; leave the crossing open.
+    piers=[]
+    for nominal in range(16, int(span.length)-8, 28):
+        frame=None
+        # A viaduct beside or over a parallel carriageway may need a single
+        # cantilevered head in place of a pair of columns straddling the tracks.
+        paired=round(width*.31,2)
+        for offsets in ((-paired,paired),(0,),(-paired,),(paired,),(-width*.5,),(width*.5,)):
+            for shift in (0,4,-4,8,-8):
+                at=nominal+shift
+                p=span.interpolate(at)
+                a,b=span.interpolate(at-.5),span.interpolate(at+.5)
+                length=a.distance(b)
+                if length<.1:continue
+                nx,nz=(a.y-b.y)/length,(b.x-a.x)/length
+                feet=(Point(p.x+offset*nx,p.y+offset*nz) for offset in offsets)
+                if all(not len(obstacles.query(foot,predicate='intersects')) for foot in feet):
+                    frame=[round(origin+at,2),*offsets];break
+            if frame:break
+        if frame:piers.append(frame)
+    if not piers:raise ValueError(f"No clear pier sites on {route['id']}")
+    route['viaduct']={'start':start,'end':end,'width':width,'piers':piers}
 
 
 def route(spec,features):
@@ -110,7 +174,9 @@ def route(spec,features):
 
 
 def main():
-    features=extract();routes=[route(s,features) for s in ROUTES]
+    features,obstacles=extract();routes=[route(s,features) for s in ROUTES]
+    for r in routes:
+        if r['id'] in VIADUCTS:add_viaduct(r,obstacles)
     out=json.dumps({'source':'GSI experimental vector map; illustrative elevations, trains and station architecture','routes':routes},separators=(',',':')).encode()
     print('gzip bytes',write_gz('railways.json.gz',out))
 

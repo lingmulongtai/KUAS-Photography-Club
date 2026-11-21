@@ -54,6 +54,32 @@ test('long routes have spaced consists travelling through the whole route',()=>{
   }
 });
 
+test('the two Yamashina viaducts follow surveyed elevated segments and end before the tunnels',async()=>{
+  const pack=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/railways.json.gz',import.meta.url))));
+  const spans=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/transport-spans.json.gz',import.meta.url))));
+  for(const [id,expectedLength,centre] of [['jr-yamashina',1091,[6388,999]],['jr-shinkansen',2558,[4868,2491]]]){
+    const route=pack.routes.find(r=>r.id===id),path=railwayPath(route,()=>50);
+    const {start,end,piers}=route.viaduct;
+    assert.notEqual(route.states[start-1],1);
+    assert.ok(route.states.slice(start,end).every(state=>state===1));
+    assert.notEqual(route.states[end],1);
+    const first=path.distances[start],last=path.distances[end],mid=path.at((first+last)/2);
+    assert.ok(Math.abs(last-first-expectedLength)<5);
+    assert.ok(Math.hypot(mid.x-centre[0],mid.z-centre[1])<5);
+    assert.ok(mid.visible&&mid.y>55);
+    // The same decks must not reappear as standalone bridges with independent approach heights.
+    assert.ok(!spans.paths.some(span=>span.kind==='rail'&&span.points.some(([x,z])=>Math.hypot(x-mid.x,z-mid.z)<80)));
+    const supports=[first,...piers.map(([d])=>d),last];
+    assert.ok(supports.slice(1).every((d,i)=>d>supports[i]&&d-supports[i]<50));
+    if(id==='jr-yamashina'){
+      const tunnel=route.states.findIndex((state,i)=>i>=end&&state===2);
+      assert.ok(tunnel>end && path.distances[tunnel]-last<90);
+      assert.equal(path.at(path.distances[tunnel]+1).visible,false);
+      for(const station of ['40209000399','40207800049'])assert.ok(route.stations.some(s=>s.code===station));
+    }
+  }
+});
+
 test('a visible consist advances continuously in either direction',()=>{
   for(const dir of [-1,1]){
     let previous=serviceTrainProgress(0,3000,84,20,0,1,dir);
