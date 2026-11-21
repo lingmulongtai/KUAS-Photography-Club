@@ -19,3 +19,24 @@ test('road field restores renderer state even if GPU rendering fails',()=>{
   assert.equal(renderer.target,originalTarget);assert.ok(renderer.color.equals(originalColor));assert.equal(renderer.alpha,.4);
   assert.equal(renderer.autoClear,false);assert.equal(renderer.toneMapping,THREE.ACESFilmicToneMapping);
 });
+
+test('resident streets retain core texel density with overlapping pages on a 4096-limited GPU',()=>{
+  const box=[-9000,-7000,4600,13300],images=[];
+  const renderer={capabilities:{maxTextureSize:4096,getMaxAnisotropy:()=>1},
+    getRenderTarget:()=>null,getClearColor:c=>c,getClearAlpha:()=>1,setClearColor(){},
+    setRenderTarget(target,page){this.page=page;},
+    render(scene){images.push({page:this.page,box:scene.children[0].material.uniforms.uBox.value.toArray()});}};
+  const field=module.exports.buildRoadField(renderer,[],4096,box,true);
+  try {
+    assert.equal(field.texture.image.depth,2);
+    assert.equal(field.texture.image.width,4096);
+    const height=field.texture.image.height;
+    assert.ok(height<=4096);
+    assert.deepEqual(images.map(i=>i.page),[0,1]);
+    const [a,b]=images.map(i=>i.box);
+    const metres=(a[3]-a[1])/height;
+    assert.ok(metres<=13200/4096);
+    assert.ok(Math.abs(a[3]-b[1]-8*metres)<1e-6);
+    assert.ok(a[1]<box[1]&&b[3]>box[3]);
+  } finally {field.dispose();}
+});

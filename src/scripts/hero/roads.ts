@@ -116,7 +116,7 @@ export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature
   // Keep the original metres per texel when extending south. Short texture-array
   // pages fit a 2048/4096 limit without shrinking the Kyoto streets or adding a sampler.
   const rows=resident?Math.ceil(size*(maxZ-minZ)/(BUILDINGS_BOX[3]-BUILDINGS_BOX[1])):size;
-  const pages=Math.ceil(rows/renderer.capabilities.maxTextureSize);
+  const pages=resident?Math.ceil(rows/renderer.capabilities.maxTextureSize):1;
   const pad=pages>1?4:0;
   const pageRows=Math.ceil(rows/pages);
   const options = {
