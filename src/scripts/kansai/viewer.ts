@@ -29,7 +29,8 @@ export async function startMap(root:HTMLElement){
   widget.clock.currentTime=C.JulianDate.fromIso8601('2026-05-15T04:30:00Z');
   let selected=byId(new URLSearchParams(location.search).get('view')??'26')??byId('26')!;
   function frame(place:typeof selected,height:number){
-    scene.camera.lookAt(C.Cartesian3.fromDegrees(place.lon,place.lat,height),new C.HeadingPitchRange(
+    const focus=height+('targetHeight' in place?place.targetHeight:0);
+    scene.camera.lookAt(C.Cartesian3.fromDegrees(place.lon,place.lat,focus),new C.HeadingPitchRange(
       C.Math.toRadians(place.heading),C.Math.toRadians(-25),place.range));
     scene.camera.lookAtTransform(C.Matrix4.IDENTITY);scene.requestRender();
   }
