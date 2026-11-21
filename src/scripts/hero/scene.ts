@@ -537,26 +537,38 @@ export function createHero(
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
     const regionManifest=await loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
       .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
-    let lastAreaRequest:{id:string|null;retryAfter:number}|undefined;
+    let lastAreaRequest:{id:string|null;retry?:ReturnType<typeof setTimeout>}|undefined;
+    let lastPhotoX=0,lastPhotoZ=0;
     ensureCityRegion=(center,bearing)=>{
       let region=bearing===undefined?regionAt(regionManifest.regions,center):regionInView(regionManifest.regions,center,bearing);
-      sharedSlot?.select(region?.id==='tennozan');
-      if(region?.id==='osaka')void osakaPhotos.update(center);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
       if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)
         region={...region,id:'uji-detail',photo:meta.byodoin};
       const id=region?.id??null;
-      if(lastAreaRequest?.id===id && (regionLoader.id===id || performance.now()<lastAreaRequest.retryAfter))return;
-      if(id!=='osaka')void osakaPhotos.update(null);
-      const request={id,retryAfter:Infinity};
+      const changed=lastAreaRequest?.id!==id;
+      if(changed || bearing===undefined || (id==='osaka' && Math.hypot(center.x-lastPhotoX,center.z-lastPhotoZ)>=600)){
+        sharedSlot?.select(id==='tennozan');
+        void osakaPhotos.update(id==='osaka'?center:null);
+        lastPhotoX=center.x;lastPhotoZ=center.z;
+      }
+      if(!changed)return;
+      clearTimeout(lastAreaRequest?.retry);
+      const request:NonNullable<typeof lastAreaRequest>={id};
       lastAreaRequest=request;
-      opts.onAreaLoading?.(!!region&&id!==regionLoader.id);
-      void regionLoader.request(region).finally(()=>{
-        if(request!==lastAreaRequest)return;
-        request.retryAfter=performance.now()+5000;
-        opts.onAreaLoading?.(false);
-      });
+      let delay=5000;
+      const attempt=()=>{
+        opts.onAreaLoading?.(!!region&&id!==regionLoader.id);
+        void regionLoader.request(region).finally(()=>{
+          if(request!==lastAreaRequest)return;
+          opts.onAreaLoading?.(false);
+          if(region && regionLoader.id!==id){
+            request.retry=setTimeout(attempt,delay);
+            delay=Math.min(30000,delay*2);
+          }
+        });
+      };
+      attempt();
     };
     prefetchCityRegion=(center,target)=>{
       const next=target==='tennozan'||target==='osakaSkyline'
