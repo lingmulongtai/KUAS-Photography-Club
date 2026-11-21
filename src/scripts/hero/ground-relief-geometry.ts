@@ -160,7 +160,7 @@ const bund: Section[] = [[-.75,.13],[-.5,.72],[.42,.72],[.72,.08]];
 const furrow: Section[] = [[-.64,.21],[-.38,.62],[.35,.62],[.64,.21]];
 const rice: Section[] = [[-.46,.18],[-.37,.53],[.37,.53],[.46,.18]];
 
-export function addField(out: GroundGeometry, feature: GroundFeature, ground: Elevation, detail: boolean) {
+export function addField(out: GroundGeometry, feature: GroundFeature, ground: Elevation, detail: boolean, withBund = true) {
   const rings = feature.paths.map(pathPoints), outer = rings[0], axis = longAxis(outer);
   const noise = Math.sin(outer[0].x*.61+outer[0].z*.37)*43758.5453;
   const seed = noise-Math.floor(noise), paddy = feature.kind === PADDY;
@@ -187,7 +187,13 @@ export function addField(out: GroundGeometry, feature: GroundFeature, ground: El
     } else out.indices.push(ids[c],ids[b],ids[a]);
   };
   for (const [a,b,c] of triangles) split(a,b,c,0);
-  if (paddy) for (const ring of rings) groundRibbon(out,ring,true,bund,ground,SURFACE.bund,seed);
+  if (paddy && withBund) for (const ring of rings) groundRibbon(out,ring,true,bund,ground,SURFACE.bund,seed);
+}
+
+export function addPaddyBanks(out: GroundGeometry, feature: GroundFeature, ground: Elevation) {
+  const outer=feature.paths[0];
+  const noise=Math.sin(outer[0]*.61+outer[1]*.37)*43758.5453;
+  for(const path of feature.paths)groundRibbon(out,pathPoints(path),true,bund,ground,SURFACE.bund,noise-Math.floor(noise));
 }
 
 const wetShelf: Section[] = [[-.42,-.58],[-.38,.40],[1.65,.42],[1.9,.15]];

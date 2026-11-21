@@ -3,8 +3,8 @@ import {loadBinary, loadJSON} from './data';
 import {ENV_GLSL, SHADOW_GLSL, type Env} from './env';
 import {ROAD_GLSL} from './roads';
 import type {buildTerrain} from './terrain';
-import {BANK, RELIEF_CELL, groundSheet, readGroundSheet, type GroundFeature, type GroundIndex} from './ground-relief-data';
-import {addBank, addField, GroundGeometry, type Elevation} from './ground-relief-geometry';
+import {BANK, PADDY, RELIEF_CELL, groundSheet, readGroundSheet, type GroundFeature, type GroundIndex} from './ground-relief-data';
+import {addBank, addField, addPaddyBanks, GroundGeometry, type Elevation} from './ground-relief-geometry';
 import {createFieldInteriors} from './field-interiors';
 import {yieldTask} from './task-yield';
 
@@ -43,7 +43,7 @@ function groundMaterial(env: Env, roads: RoadUniforms) {
         float shadow=sunShadow(vWorld,n);
         Road rd=roadAt(p);
         float coverage=smoothstep(.12,.9,min(rd.edge,rd.rail));
-        float farFade=1.-smoothstep(960.,1320.,dist);
+        float farFade=kind<2.5 ? 1.-smoothstep(1800.,2350.,dist) : 1.-smoothstep(960.,1320.,dist);
         float ridgeFade=1.-smoothstep(225.,360.,dist);
         bool row=kind>3.5 && kind<4.5;
         float alpha=coverage*((row||kind>6.5)?ridgeFade:farFade);
@@ -99,7 +99,7 @@ interface Cell {
   key: string;
   cx: number;
   cz: number;
-  detail: boolean;
+  layer: 'surface'|'edges'|'rows';
   distance: number;
   sheet: ReturnType<typeof groundSheet>;
 }
@@ -130,11 +130,12 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     const parcels:GroundFeature['paths'][]=[];
     let deadline = performance.now()+4;
     for (const feature of data.features(sheet.cell)) {
-      if (feature.kind===BANK) {
-        if (!cell.detail) addBank(out,feature,bankGround);
-      } else {
-        addField(out,feature,ground,cell.detail);
-        if(!cell.detail) parcels.push(feature.paths);
+      if(cell.layer==='edges') {
+        if(feature.kind===BANK)addBank(out,feature,bankGround);
+        if(feature.kind===PADDY)addPaddyBanks(out,feature,ground);
+      } else if(feature.kind!==BANK) {
+        addField(out,feature,ground,cell.layer==='rows',false);
+        if(cell.layer==='surface')parcels.push(feature.paths);
       }
       if (performance.now()>=deadline) {
         await yieldTask();
@@ -145,13 +146,13 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     const geometry=out.geometry();
     const mesh=geometry ? new THREE.Mesh(geometry,material) : null;
     if(mesh) {
-      mesh.name=cell.detail?'field-furrows':'fields-and-riverbanks';
+      mesh.name='ground-'+cell.layer;
       // Ground writes depth before additive lights and falling snow are blended.
-      mesh.renderOrder=cell.detail?-1:-2;
+      mesh.renderOrder=cell.layer==='surface'?-3:cell.layer==='edges'?-2:-1;
       group.add(mesh);
     }
     visible.set(cell.key,mesh);
-    if(!cell.detail && fields.addCell(cell.key,parcels)){
+    if(cell.layer==='surface' && fields.addCell(cell.key,parcels)){
       clearTimeout(notifyFields);
       notifyFields=setTimeout(fieldsChanged,350);
     }
@@ -192,7 +193,7 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     }
     lastX=x; lastZ=z;
     const cells: Cell[]=[];
-    const radius=1400;
+    const radius=2450;
     for(let cx=Math.floor((x-radius)/RELIEF_CELL); cx<=Math.floor((x+radius)/RELIEF_CELL); cx++){
       for(let cz=Math.floor((z-radius)/RELIEF_CELL); cz<=Math.floor((z+radius)/RELIEF_CELL); cz++){
         const sheet=groundSheet(cx,cz);
@@ -202,8 +203,9 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
         const distance=Math.hypot(dx,dz);
         if (distance>radius) continue;
         const key=cx+','+cz;
-        cells.push({key,cx,cz,sheet,distance,detail:false});
-        if (distance<445) cells.push({key:key+'/rows',cx,cz,sheet,distance:distance+32,detail:true});
+        cells.push({key,cx,cz,sheet,distance,layer:'surface'});
+        if (distance<1400) cells.push({key:key+'/edges',cx,cz,sheet,distance:distance+16,layer:'edges'});
+        if (distance<445) cells.push({key:key+'/rows',cx,cz,sheet,distance:distance+32,layer:'rows'});
       }
     }
     cells.sort((a,b)=>a.distance-b.distance);
