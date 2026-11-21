@@ -1,4 +1,5 @@
 import { cp, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import {writeTerrainPrograms} from './terrain-programs.mjs';
 
 const distribution = new URL('../../node_modules/cesium/Build/Cesium/', import.meta.url);
 const output = new URL('../../public/kansai-engine/', import.meta.url);
@@ -7,8 +8,9 @@ const output = new URL('../../public/kansai-engine/', import.meta.url);
 export async function prepareCesiumAssets() {
   const {version} = JSON.parse(await readFile(new URL('../../package.json', distribution), 'utf8'));
   const stamp = new URL('version.txt', output);
-  if (await readFile(stamp, 'utf8').catch(() => '') === version && await stat(new URL('Cesium.js', output)).catch(() => null)) return;
   await mkdir(output, {recursive:true});
+  await writeTerrainPrograms(new URL('terrain-programs.json.gz',output));
+  if (await readFile(stamp, 'utf8').catch(() => '') === version && await stat(new URL('Cesium.js', output)).catch(() => null)) return;
   for (const asset of ['Assets', 'ThirdParty', 'Widgets', 'Workers', 'Cesium.js']) {
     await cp(new URL(asset, distribution), new URL(asset, output), {recursive:true});
   }

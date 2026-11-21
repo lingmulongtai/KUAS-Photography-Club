@@ -9,6 +9,7 @@ import {outingPins} from './pins';
 import {architecturalModels} from './architecture';
 import {fireworks} from './fireworks';
 import {prefectureCutout} from './borders';
+import {primeTerrainPrograms} from './terrain-programs';
 
 export async function startMap(root:HTMLElement){
   const en=root.lang==='en',status=root.querySelector<HTMLElement>('[role=status]')!;
@@ -22,7 +23,7 @@ export async function startMap(root:HTMLElement){
     rectangle:C.Rectangle.fromDegrees(133.7,33.4,137,36.4),minimumLevel:2,maximumLevel:18,credit:'国土地理院（全国最新写真）'});
   const widget=new C.CesiumWidget(container,{baseLayer:new C.ImageryLayer(imagery),scene3DOnly:true,requestRenderMode:true,
     maximumRenderTimeChange:Infinity,shouldAnimate:false,showRenderLoopErrors:false});
-  const scene=widget.scene;
+  const scene=widget.scene,terrainPrograms=primeTerrainPrograms(scene.canvas);
   // The Expo archive captures the six surveyed ground sheets during the fair.
   void json<{bounds:[number,number,number,number];columns:number;rows:number;width:number;height:number;maximumLevel:number}>('expo-imagery/index.json')
     .then(photo=>{
@@ -54,6 +55,7 @@ export async function startMap(root:HTMLElement){
     expoLink.hidden=place.id!==EXPO.id;
     showPrefecture(place.pref);
     display.select(place.id);
+    terrainPrograms.select(scene.globe.enableLighting);
     prefecture.value=place.pref;outing.value=place.id===place.pref?'':place.id;
     const url=new URL(location.href);url.searchParams.set('view',place.id);history.replaceState(null,'',url);
     const point=C.Cartographic.fromDegrees(place.lon,place.lat);
@@ -71,7 +73,7 @@ export async function startMap(root:HTMLElement){
   const dispose=()=>{
     sequence++;
     const release=close;close=undefined;
-    try{display.dispose();release?.();}finally{if(!widget.isDestroyed())widget.destroy();}
+    try{terrainPrograms.dispose();display.dispose();release?.();}finally{if(!widget.isDestroyed())widget.destroy();}
   };
   window.addEventListener('pagehide',event=>{if(!event.persisted)dispose();});
   scene.renderError.addEventListener((_scene:unknown,error:unknown)=>{
