@@ -2,13 +2,14 @@
 import {readFile} from 'node:fs/promises';
 import {loadBuildings} from '../../src/scripts/hero/buildings-data.ts';
 
-const [west,north,east,south]=process.argv.slice(2).map(Number);
+const [west,north,east,south]=process.argv.slice(2,6).map(Number);
+const surveys=process.argv.slice(6);
 const root=new URL('../../public/kyoto/',import.meta.url);
 globalThis.fetch=async url=>new Response(await readFile(new URL(String(url).slice('/kyoto/'.length),root)));
 const intersects=(ring)=>ring.some(([x])=>x>=west)&&ring.some(([x])=>x<=east)
   &&ring.some(([,z])=>z>=north)&&ring.some(([,z])=>z<=south);
 const layers={};
-for(const name of ['core','south','tennozan']){
+for(const name of surveys.length?surveys:['core','south','tennozan']){
   const stem=name==='core'?'buildings':`buildings-${name}`;
   const {boxes,polys}=await loadBuildings(stem+'.json',stem+'.bin');
   const rings=[];
