@@ -213,80 +213,86 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         float distSum = 0., wSum = 0.;
 
         // the stretch of this ray inside the low-cloud slab
-        float ta = (uBase - ro.y) / (abs(rd.y) > 1e-5 ? rd.y : 1e-5);
-        float tb = (uTop - ro.y) / (abs(rd.y) > 1e-5 ? rd.y : 1e-5);
-        float t0 = max(min(ta, tb), 0.);
-        float t1 = min(max(ta, tb), ${FAR.toFixed(1)});
-        if (t1 > t0){
-          // steps grow with distance: fine where clouds are big on screen, coarse at the horizon
-          float span = t1 - t0;
-          // Spread four neighbouring rays across each interval. Shuffle their order
-          // per quad, then rotate the phase down the ray; there is no screen-wide
-          // repeating grid or unsampled half-interval between horizontal slices.
-          ivec2 pixel = ivec2(gl_FragCoord.xy);
-          float quad = puffHash(pixel / 2);
-          int lane = (pixel.x & 1) + 2 * (pixel.y & 1);
-          float phaseOffset = .25 * float(lane ^ int(quad * 4.)) + fract(quad * 64.);
-          // tall slabs (towering clouds) need more steps to stay solid
-          float steps = ceil(min(float(uMarchSteps) * (1. + (uTop - uBase) / 3000.), float(uMarchSteps) * 2.));
-          float tPrev = t0;
-          bool inside = false;
-          for (int i = 0; i < uMarchSteps * 2; i++){
-            if (T < .03 || float(i) >= steps) break;
-            float u0 = float(i) / steps, u1 = (float(i) + 1.) / steps;
-            float jitter = fract(phaseOffset + float(i) * .618033989);
-            float tStart = t0 + span * u0 * u0;
-            float tEnd = t0 + span * u1 * u1;
-            float t = mix(tStart, tEnd, jitter);
-            float dt = tEnd - tStart;
-            vec3 pos = ro + rd * t;
-            float d = density(pos, t);
-            vec3 lightPos = pos;
-            if (d > .002 && !inside){
-              // The ray entered a cloud somewhere since the last sample. Find where: shaded at the
-              // step it happened to land on, a cloud's face would be sliced into bands, one per step.
-              float lo = tPrev, hi = t;
-              for (int k = 0; k < uEdgeRefinements; k++){
-                float mid = .5 * (lo + hi);
-                if (density(ro + rd * mid, mid) > .002) hi = mid;
-                else lo = mid;
+        float t0 = 0., t1 = ${FAR.toFixed(1)};
+        if (abs(rd.y) > 1e-7) {
+          float baseHit = (uBase - ro.y) / rd.y, topHit = (uTop - ro.y) / rd.y;
+          t0 = max(0., min(baseHit, topHit));
+          t1 = min(t1, max(baseHit, topHit));
+        } else if (ro.y < uBase || ro.y > uTop) {
+          t1 = 0.;
+        }
+        if (t1 > t0) {
+          // Place samples in metres from the eye. Extending the ray towards the
+          // horizon must not move the samples already inside a nearby cloud.
+          float verticalLimit = (uTop - uBase) / (float(uMarchSteps) * max(abs(rd.y), .001));
+          #if DETAIL > 1
+          float maxStep = min(76., verticalLimit), startStep = min(16., maxStep);
+          #else
+          float maxStep = min(96., verticalLimit), startStep = min(20., maxStep);
+          #endif
+          const float growth = .5;
+          float knee = (maxStep - startStep) / (2. * growth);
+          float kneeDist = knee * (startStep + growth * knee);
+          float first = t0 < kneeDist ? 2.*t0 / (startStep + sqrt(startStep*startStep + 4.*growth*t0))
+                                     : knee + (t0 - kneeDist) / maxStep;
+          float station = floor(first) + 1.;
+          float t = t0, d0 = density(ro + rd*t, t);
+          for (int i = 0; i < uMarchSteps * 32; ++i) {
+            if (T < .012 || t >= t1) break;
+            float n = min(station, knee);
+            float nextT = min(t1, n * (startStep + growth*n) + max(station-knee, 0.) * maxStep);
+            station += 1.;
+            float d1 = density(ro + rd*nextT, nextT);
+            float lo = t, hi = nextT, left = d0, right = d1;
+            t = nextT; d0 = d1;
+            if (max(left, right) <= .002) continue;
+            if ((left > .002) != (right > .002)) {
+              // Locate both entrances and exits. Only the occupied part absorbs light.
+              float a = lo, b = hi;
+              for (int k = 0; k < uEdgeRefinements; ++k) {
+                float m = .5*(a+b);
+                if ((density(ro+rd*m, m) > .002) == (right > .002)) b=m; else a=m;
               }
-              // Shade just inside the surface, but keep the interior sample's density for
-              // absorption. Integrating the almost-empty boundary made each step a thin stripe.
-              lightPos = ro + rd * (hi + min(30., (tEnd - hi) * .5));
-              dt = tEnd - hi;
+              if (left <= .002) lo=a; else hi=b;
             }
-            inside = d > .002;
-            tPrev = t;
-            if (d > .002){
-              float h = clamp((lightPos.y - uBase) / (uTop - uBase), 0., 1.);
-              // light from the sun, dimmed by the cloud above and toward it
-              // (bigger clouds shade themselves over a bigger distance)
-              float ls = isStyle(4.) ? 3. : isStyle(3.) ? 1.8 : 1.;
-              #if DETAIL > 1
-              // near the surface the billows shade each other, which models the heads
-              float od = (lumps(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
-              #else
-              float od = (coarse(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
-              #endif
-              // beer's law plus a softer second term for light scattered many times inside
-              float toSun = exp(-od * .006) * .65 + exp(-od * .0014) * .35;
-              // dark edges where light can't scatter back out ("powder"), mostly away from the sun
-              float powder = mix(1. - exp(-d * 6.), 1., .35 + .4 * max(mu, 0.));
-              // a snow deck is thick and grey all through
-              vec3 sun = uCloudLight * phase * toSun * powder * (isStyle(5.) ? .45 : .85);
-              // the sky lights the tops more than the bases; the city lights the bases at night
-              // (at night the sky's own glow is faint: the clouds are lit from below by the city)
-              vec3 sky = amb * (.55 + .75 * h) * (.85 + .15 * d) * (1. - .5 * uCity) * (isStyle(5.) ? .75 : 1.);
-              vec3 below = cityGlow * (1. - h) * (1. - h) * 1.6 + moon * toSun;
-              // snow clouds are thick and grey all the way through
-              vec3 col = (sun + sky + below) * (isStyle(5.) ? .62 : 1.);
-              float a = 1. - exp(-d * .007 * dt);
-              L += T * a * col;
-              distSum += T * a * t;
-              wSum += T * a;
-              T *= 1. - a;
+            // Integrate extinction over the segment, and shade at its optical-depth centroid.
+            // A middle sample resolves steep changes; nearly uniform interiors integrate linearly.
+            float middle = .5*(left+right);
+            if (abs(left-right) > .12) {
+              float m = .5*(lo+hi);
+              middle = density(ro+rd*m, m);
             }
+            float mass = left + 4.*middle + right;
+            float segmentDensity = mass / 6., dt = hi-lo;
+            float shadeT = mix(lo, hi, (2.*middle + right) / mass);
+            vec3 lightPos = ro + rd*shadeT;
+            float h = clamp((lightPos.y - uBase) / (uTop - uBase), 0., 1.);
+            // light from the sun, dimmed by the cloud above and toward it
+            // (bigger clouds shade themselves over a bigger distance)
+            float ls = isStyle(4.) ? 3. : isStyle(3.) ? 1.8 : 1.;
+            #if DETAIL > 1
+            // near the surface the billows shade each other, which models the heads
+            float od = (lumps(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
+            #else
+            float od = (coarse(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
+            #endif
+            // beer's law plus a softer second term for light scattered many times inside
+            float toSun = exp(-od * .006) * .65 + exp(-od * .0014) * .35;
+            // dark edges where light can't scatter back out ("powder"), mostly away from the sun
+            float powder = mix(1. - exp(-segmentDensity * 6.), 1., .35 + .4 * max(mu, 0.));
+            // a snow deck is thick and grey all through
+            vec3 sun = uCloudLight * phase * toSun * powder * (isStyle(5.) ? .45 : .85);
+            // the sky lights the tops more than the bases; the city lights the bases at night
+            // (at night the sky's own glow is faint: the clouds are lit from below by the city)
+            vec3 sky = amb * (.55 + .75 * h) * (.85 + .15 * segmentDensity) * (1. - .5 * uCity) * (isStyle(5.) ? .75 : 1.);
+            vec3 below = cityGlow * (1. - h) * (1. - h) * 1.6 + moon * toSun;
+            // snow clouds are thick and grey all the way through
+            vec3 col = (sun + sky + below) * (isStyle(5.) ? .62 : 1.);
+            float a = 1. - exp(-segmentDensity * .007 * dt);
+            L += T * a * col;
+            distSum += T * a * shadeT;
+            wSum += T * a;
+            T *= 1. - a;
           }
         }
         float lowA = 1. - T;
@@ -300,14 +306,6 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           L *= fade;
           lowA *= fade;
         }
-        // Neighbours in a fragment quad sampled different parts of the same ray
-        // intervals. Resolve the low layer before compositing the sharper high clouds.
-        vec4 low = vec4(L, lowA);
-        vec2 parity = mod(floor(gl_FragCoord.xy), 2.);
-        vec2 towardCenter = (1. - 2. * parity) * vec2(dFdx(parity.x), dFdy(parity.y));
-        vec4 resolved = low + (towardCenter.x * dFdx(low) + towardCenter.y * dFdy(low)) / 3.;
-        L = max(resolved.rgb, vec3(0.));
-        lowA = clamp(resolved.a, 0., 1.);
         // behind the low clouds: altocumulus, then cirrus
         vec4 alto = highLayer(ro, rd, ${ALTO_Y.toFixed(1)}, false);
         vec4 ci = highLayer(ro, rd, ${CIRRUS_Y.toFixed(1)}, true);
