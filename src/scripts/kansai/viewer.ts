@@ -49,10 +49,20 @@ export async function startMap(root:HTMLElement){
   const boundary=prefectureCutout(widget,selected.pref).then(select=>{
     if(!widget.isDestroyed()){showPrefecture=select;select(selected.pref);}
   });
-  function frame(place:typeof selected,height:number){
+  function frame(place:typeof selected,height:number,eyeGround?:number){
     const focus=height+('targetHeight' in place?place.targetHeight:0);
-    scene.camera.lookAt(C.Cartesian3.fromDegrees(place.lon,place.lat,focus),new C.HeadingPitchRange(
-      C.Math.toRadians(place.heading),C.Math.toRadians('pitch' in place?place.pitch:-25),place.range));
+    const target=C.Cartesian3.fromDegrees(place.lon,place.lat,focus);
+    const offset=new C.HeadingPitchRange(C.Math.toRadians(place.heading),
+      C.Math.toRadians('pitch' in place?place.pitch:-25),place.range);
+    scene.camera.lookAt(target,offset);
+    if(eyeGround!==undefined){
+      const lift=eyeGround+scene.screenSpaceCameraController.minimumZoomDistance-scene.camera.positionCartographic.height;
+      if(lift>0){
+        const horizontal=Math.cos(offset.pitch)*offset.range,vertical=lift-Math.sin(offset.pitch)*offset.range;
+        offset.pitch=-Math.atan2(vertical,horizontal);offset.range=Math.hypot(horizontal,vertical);
+        scene.camera.lookAt(target,offset);
+      }
+    }
     scene.camera.lookAtTransform(C.Matrix4.IDENTITY);scene.requestRender();
   }
   async function visit(place:typeof selected){
@@ -64,19 +74,31 @@ export async function startMap(root:HTMLElement){
     prefecture.value=place.pref;outing.value=place.id===place.pref?'':place.id;
     const url=new URL(location.href);url.searchParams.set('view',place.id);history.replaceState(null,'',url);
     const point=C.Cartographic.fromDegrees(place.lon,place.lat);
+    // A coarse terrain tile can temporarily put the eye on a hill hundreds of metres
+    // above this spot. The built-in controller only raises the camera; it never lowers it again.
+    scene.screenSpaceCameraController.enableCollisionDetection=false;
     frame(place,scene.globe.getHeight(point)??0);
     if(ready && widget.terrainProvider.availability){
-      try{const [sample]=await C.sampleTerrainMostDetailed(widget.terrainProvider,[point]);
-        if(token===sequence&&!userMoved&&!widget.isDestroyed())frame(place,sample.height??0);
-      }catch{/* The current terrain mesh still supplies a navigation height. */}
+      const eye=C.Cartographic.clone(scene.camera.positionCartographic);
+      try{
+        const [sample,ground]=await C.sampleTerrainMostDetailed(widget.terrainProvider,[point,eye]);
+        if(token===sequence&&!userMoved&&!widget.isDestroyed())frame(place,sample.height??0,ground.height);
+      }catch{
+        if(token===sequence&&!widget.isDestroyed())scene.screenSpaceCameraController.enableCollisionDetection=true;
+      }
     }
   }
   prefecture.onchange=()=>{const place=byId(prefecture.value);if(place)void visit(place);};
   outing.onchange=()=>{const place=byId(outing.value);if(place)void visit(place);};
-  for(const event of ['pointerdown','wheel'])container.addEventListener(event,()=>{userMoved=true;},{passive:true});
+  function beginNavigation(){
+    userMoved=true;
+    scene.screenSpaceCameraController.enableCollisionDetection=true;
+  }
+  for(const event of ['pointerdown','wheel'])container.addEventListener(event,beginNavigation,{passive:true});
   void visit(selected);
   const dispose=()=>{
     sequence++;
+    for(const event of ['pointerdown','wheel'])container.removeEventListener(event,beginNavigation);
     const release=close;close=undefined;
     try{terrainPrograms.dispose();display.dispose();release?.();}finally{if(!widget.isDestroyed())widget.destroy();}
   };
@@ -87,7 +109,7 @@ export async function startMap(root:HTMLElement){
     console.error(error);status.textContent=en?'The 3D view could not be rendered.':'3D描画を続けられませんでした。';
   });
   const terrain=C.CesiumTerrainProvider.fromUrl('https://tile.plateauview.mlit.go.jp/terrain',{requestVertexNormals:true})
-    .then(provider=>{if(widget.isDestroyed())return;widget.terrainProvider=provider;ready=true;void visit(selected);})
+    .then(provider=>{if(widget.isDestroyed())return;widget.terrainProvider=provider;ready=true;if(!userMoved)void visit(selected);})
     .catch(()=>{status.textContent=en?'Elevation is unavailable. Showing aerial imagery.':'標高を取得できません。航空写真を表示しています。';});
   let surveyFailed=false;
   try{await Promise.all([terrain,boundary]);}
