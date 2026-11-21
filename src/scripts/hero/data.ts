@@ -44,6 +44,7 @@ export interface TerrainMeta {
   aerialBasin?: BasinAtlas & {compact:BasinAtlas; mobile:BasinAtlas};
   /** Coarser outer mountains; the original basin grids retain priority. */
   outer?: GridMeta;
+  sonobeElevation?: GridMeta;
   aerialOuter?: RegionalPhotoMeta;
   far: GridMeta;
   near: GridMeta;

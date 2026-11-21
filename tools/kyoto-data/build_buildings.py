@@ -72,6 +72,8 @@ def heightfield():
 
     outer_meta=meta.get('outer')
     outer=sampler(outer_meta,load(outer_meta)) if outer_meta else None
+    west=meta.get('sonobeElevation')
+    west_height=sampler(west,load(west)) if west else None
     far = sampler(meta['far'], load(meta['far']))
     near = sampler(meta['near'], load(meta['near']))
     regional_meta = meta.get('arashiyama', {}).get('elevation')
@@ -91,6 +93,8 @@ def heightfield():
 
     def height(x, z):
         base=(outer(x,z) or 0.0) if outer else 0.0
+        if west:
+            base=blend(west,west_height,x,z,base,400)
         f = blend(meta['far'],far,x,z,base,300) if outer else far(x,z) or 0.0
         n = blend(meta['near'], near, x, z, f, 300)
         return blend(regional_meta, regional, x, z, n, 120) if regional else n

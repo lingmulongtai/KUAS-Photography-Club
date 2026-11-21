@@ -26,7 +26,7 @@ class Grid {
 }
 
 type GridData = Pick<Grid, 'meta' | 'h'>;
-type HeightfieldData = [GridData, GridData, GridData?, GridData?, GridData?];
+type HeightfieldData = [GridData, GridData, GridData?, GridData?, GridData?, GridData?];
 
 /**
  * Ground elevation for the whole scene: the 10 m grid around Higashiyama blended into the
@@ -38,9 +38,12 @@ export class Heightfield {
   private regional?:Grid;
   private outer?:Grid;
   private campus?:Grid;
+  private sonobe?:Grid;
   private layers: { grid: Grid; margin: number }[] = [];
-  constructor(far:Grid,near:Grid,regional?:Grid,outer?:Grid,campus?:Grid) {
+  constructor(far:Grid,near:Grid,regional?:Grid,outer?:Grid,campus?:Grid,sonobe?:Grid) {
     this.far=far;this.near=near;this.regional=regional;this.outer=outer;this.campus=campus;
+    this.sonobe=sonobe;
+    if (sonobe) this.layers.push({grid:sonobe,margin:400});
     if (outer) this.layers.push({ grid: far, margin: 300 });
     this.layers.push({ grid: near, margin: 300 });
     if (regional) this.layers.push({ grid: regional, margin: 120 });
@@ -49,12 +52,12 @@ export class Heightfield {
 
   /** Structured cloning copies the elevation arrays to the worker without detaching the live terrain. */
   snapshot(): HeightfieldData {
-    return [this.far, this.near, this.regional, this.outer, this.campus];
+    return [this.far, this.near, this.regional, this.outer, this.campus, this.sonobe];
   }
 
-  static fromSnapshot([far, near, regional, outer, campus]: HeightfieldData) {
+  static fromSnapshot([far, near, regional, outer, campus, sonobe]: HeightfieldData) {
     const grid = ({ meta, h }: GridData) => new Grid(meta, h);
-    return new Heightfield(grid(far), grid(near), regional && grid(regional), outer && grid(outer), campus && grid(campus));
+    return new Heightfield(grid(far), grid(near), regional && grid(regional), outer && grid(outer), campus && grid(campus), sonobe && grid(sonobe));
   }
 
   get bounds(): Box {
@@ -99,7 +102,7 @@ export class Heightfield {
 }
 
 export async function loadHeightfield(meta: TerrainMeta) {
-  const [far, near, regional, outer, campus] = await Promise.all([loadGrid(meta.far), loadGrid(meta.near),
+  const [far, near, regional, outer, campus, sonobe] = await Promise.all([loadGrid(meta.far), loadGrid(meta.near),
     meta.arashiyama ? loadGrid(meta.arashiyama.elevation).catch(error=>{
       console.warn('Arashiyama elevation unavailable; using basin terrain',error);
       return null;
@@ -107,9 +110,12 @@ export async function loadHeightfield(meta: TerrainMeta) {
       console.warn('Outer elevation unavailable; retaining Kyoto basin',error);return null;
     }) : null,meta.kameokaCampus?loadGrid(meta.kameokaCampus.elevation).catch(error=>{
       console.warn('Kameoka campus elevation unavailable; retaining outer terrain',error);return null;
+     }):null, meta.sonobeElevation ? loadGrid(meta.sonobeElevation).catch(error=>{
+      console.warn('Sonobe elevation unavailable; using outer terrain',error); return null;
     }):null]);
   return new Heightfield(new Grid(meta.far, far), new Grid(meta.near, near),
     regional && meta.arashiyama ? new Grid(meta.arashiyama.elevation,regional) : undefined,
     outer && meta.outer ? new Grid(meta.outer,outer) : undefined,
-    campus&&meta.kameokaCampus?new Grid(meta.kameokaCampus.elevation,campus):undefined);
+    campus&&meta.kameokaCampus?new Grid(meta.kameokaCampus.elevation,campus):undefined,
+    sonobe&&meta.sonobeElevation?new Grid(meta.sonobeElevation,sonobe):undefined);
 }

@@ -503,5 +503,17 @@
     }
    ]
   }
+ },
+ "sonobeElevation": {
+  "box": [
+   -30600,
+   -16000,
+   -20400,
+   -4800
+  ],
+  "step": 40,
+  "nx": 256,
+  "nz": 281,
+  "file": "terrain-sonobe.bin"
  }
 }
