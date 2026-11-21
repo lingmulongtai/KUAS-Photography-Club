@@ -1,17 +1,35 @@
 import type {CesiumWidget} from 'cesium';
 import {C} from './engine';
-import {lonLat,tileXY,type Point} from './coordinates';
+import {aerialPhoto} from './aerial';
+import {lonLat,tileXY,type Point,type Ring} from './coordinates';
 
 // Only the untextured LOD1 survey shells use this material. Actual textured meshes keep their imagery.
 export function surveyMaterial(widget:CesiumWidget){
   const uniform=(bytes:Uint8Array,width:number)=>new C.TextureUniform({typedArray:bytes,width,height:width,repeat:false});
+  const maskUniforms={
+    u_mask:{type:C.UniformType.SAMPLER_2D,value:uniform(new Uint8Array(4),1)},
+    u_centre:{type:C.UniformType.VEC3,value:new C.Cartesian3()},
+    u_maskE:{type:C.UniformType.VEC3,value:new C.Cartesian3()},
+    u_maskN:{type:C.UniformType.VEC3,value:new C.Cartesian3()},
+  };
+  const clip=`
+    vec3 local=fsInput.attributes.positionWC-u_centre;
+    vec2 m=vec2(dot(local,u_maskE),dot(local,u_maskN))+.5;
+    if(all(greaterThan(m,vec2(0.))) && all(lessThan(m,vec2(1.)))){
+      vec3 ink=texture(u_mask,m).rgb;
+      if(ink.r-ink.g>.5) discard;
+    }`;
+  const detailed=new C.CustomShader({uniforms:{...maskUniforms},fragmentShaderText:
+    'void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material){'+clip+'}'});
   const shader=new C.CustomShader({uniforms:{
+    ...maskUniforms,
     u_photo:{type:C.UniformType.SAMPLER_2D,value:uniform(new Uint8Array([0,0,0,0]),1)},
     u_origin:{type:C.UniformType.VEC3,value:new C.Cartesian3()},
     u_east:{type:C.UniformType.VEC3,value:new C.Cartesian3(1,0,0)},
     u_north:{type:C.UniformType.VEC3,value:new C.Cartesian3(0,1,0)},
   },fragmentShaderText:`
     void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material){
+      ${clip}
       vec3 p=fsInput.attributes.positionWC;
       vec3 n=normalize(cross(dFdx(fsInput.attributes.positionEC),dFdy(fsInput.attributes.positionEC)));
       float up=abs(dot(n,normalize(czm_viewRotation*normalize(p))));
@@ -26,6 +44,36 @@ export function surveyMaterial(widget:CesiumWidget){
       material.diffuse*=mix(wall,roof,smoothstep(.55,.85,up));
     }`});
   let signature='',abort:AbortController|undefined;
+  // A single raster for all active replacements. Allocate according to their
+  // footprint extent, instead of a 4096-square float distance field per tileset.
+  function setMasks(rings:Ring[]){
+    let texture=uniform(new Uint8Array(4),1);
+    if(rings.length){
+      const points=rings.flat(),xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
+      const w=Math.min(...xs)-.00003,e=Math.max(...xs)+.00003,s=Math.min(...ys)-.00003,n=Math.max(...ys)+.00003;
+      const mid:Point=[(w+e)/2,(s+n)/2],origin=C.Cartesian3.fromDegrees(...mid);
+      const enu=C.Transforms.eastNorthUpToFixedFrame(origin);
+      const dx=C.Cartesian3.distance(C.Cartesian3.fromDegrees(w,mid[1]),C.Cartesian3.fromDegrees(e,mid[1]));
+      const dy=C.Cartesian3.distance(C.Cartesian3.fromDegrees(mid[0],s),C.Cartesian3.fromDegrees(mid[0],n));
+      const side=Math.min(2048,Math.max(64,2**Math.ceil(Math.log2(Math.max(dx,dy)/2))));
+      const canvas=document.createElement('canvas');canvas.width=canvas.height=side;
+      const ctx=canvas.getContext('2d',{willReadFrequently:true})!;ctx.fillStyle='#f00';
+      for(const ring of rings){
+        ctx.beginPath();ring.forEach(([lon,lat],i)=>{
+          const x=(lon-w)/(e-w)*side,y=(lat-s)/(n-s)*side;
+          if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);
+        });ctx.closePath();ctx.fill();
+      }
+      texture=uniform(new Uint8Array(ctx.getImageData(0,0,side,side).data.buffer),side);
+      for(const sh of [shader,detailed]){
+        sh.setUniform('u_centre',origin);
+        sh.setUniform('u_maskE',new C.Cartesian3(enu[0]/dx,enu[1]/dx,enu[2]/dx));
+        sh.setUniform('u_maskN',new C.Cartesian3(enu[4]/dy,enu[5]/dy,enu[6]/dy));
+      }
+    }
+    for(const sh of [shader,detailed])sh.setUniform('u_mask',texture);
+    widget.scene.requestRender();
+  }
   async function update(target:Point,altitude:number){
     const zoom=altitude<1200?16:14,[x,y]=tileXY(...target,zoom).map(Math.floor),key=[zoom,x,y].join('/');
     if(signature===key)return;
@@ -35,10 +83,8 @@ export function surveyMaterial(widget:CesiumWidget){
     await Promise.all(Array.from({length:9},async(_,i)=>{
       const col=i%3,row=Math.floor(i/3);
       try{
-        const res=await fetch('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/'+zoom+'/'+(x+col-1)+'/'+(y+row-1)+'.jpg',{signal:controller.signal});
-        if(!res.ok)return;
-        const img=await createImageBitmap(await res.blob());
-        ctx.drawImage(img,col*256,row*256);img.close();
+        const img=await aerialPhoto(zoom,x+col-1,y+row-1);
+        if(img&&!controller.signal.aborted)ctx.drawImage(img,col*256,row*256);
       }catch{/* The calibrated roof tone covers missing aerial photographs. */}
     }));
     if(controller.signal.aborted||widget.isDestroyed())return;
@@ -55,5 +101,7 @@ export function surveyMaterial(widget:CesiumWidget){
     shader.setUniform('u_photo',uniform(new Uint8Array(rgba.buffer),768));
     widget.scene.requestRender();
   }
-  return {shader,update,dispose(){abort?.abort();if(!shader.isDestroyed())shader.destroy();}};
+  return {shader,detailed,setMasks,update,dispose(){
+    abort?.abort();for(const sh of [shader,detailed])if(!sh.isDestroyed())sh.destroy();
+  }};
 }

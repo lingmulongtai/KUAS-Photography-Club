@@ -1,4 +1,4 @@
-import type {CesiumWidget,Cesium3DTileset,Model} from 'cesium';
+import type {CesiumWidget,Model} from 'cesium';
 import {C} from './engine';
 import {inBox,inPolygon,type Box,type Point,type Ring} from './coordinates';
 import {json} from './sources';
@@ -10,19 +10,8 @@ export async function architecturalModels(widget:CesiumWidget){
     masks:b.rings.map(r=>{const xs=r.map(p=>p[0]),ys=r.map(p=>p[1]);
       return {r,box:[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)] as Box};})}));
   const models=new Map<string,Model>(),active=new Set<string>(),loading=new Set<string>(),retry=new Map<string,number>();
-  const layers=new Map<Cesium3DTileset,string>();
   const bins=new Map<string,typeof records[number]['masks']>();
-  const hasMasks=new Set(records.filter(b=>b.masks.length).map(b=>b.pref));
-  let revision=0,timer=0,alive=true;
-  function syncMasks(){
-    if(!alive||!C.ClippingPolygonCollection.isSupported(widget.scene))return;
-    for(const [tiles,pref] of layers){
-      const polygons=records.filter(b=>active.has(b.id)&&b.pref===pref)
-        .flatMap(b=>b.masks.map(mask=>new C.ClippingPolygon({positions:C.Cartesian3.fromDegreesArray(mask.r.flat())})));
-      tiles.clippingPolygons=new C.ClippingPolygonCollection({polygons});
-    }
-    widget.scene.requestRender();
-  }
+  let revision=0,alive=true;
   function changed(){
     revision++;
     bins.clear();
@@ -32,7 +21,7 @@ export async function architecturalModels(widget:CesiumWidget){
           const k=x+'/'+y;if(!bins.has(k))bins.set(k,[]);bins.get(k)!.push(m);
         }
     }
-    clearTimeout(timer);timer=window.setTimeout(syncMasks,180);widget.scene.requestRender();
+    widget.scene.requestRender();
   }
   async function load(b:typeof records[number]){
     loading.add(b.id);
@@ -60,10 +49,10 @@ export async function architecturalModels(widget:CesiumWidget){
     }
   });
   return {
-    register(tiles:Cesium3DTileset,pref:string){if(hasMasks.has(pref)){layers.set(tiles,pref);if(active.size)changed();}},
+    rings(){return records.filter(b=>active.has(b.id)).flatMap(b=>b.rings);},
     get revision(){return revision;},
     contains(p:Point){return bins.get(Math.floor(p[0]*250)+'/'+Math.floor(p[1]*250))?.some(m=>inBox(p,m.box)&&inPolygon(p,[m.r]))??false;},
-    dispose(){alive=false;clearTimeout(timer);stop();}
+    dispose(){alive=false;stop();}
   };
 }
 export type Architecture=Awaited<ReturnType<typeof architecturalModels>>;
