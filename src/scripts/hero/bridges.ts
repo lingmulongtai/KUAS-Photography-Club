@@ -120,15 +120,17 @@ export function buildBridges(env:Env,hf:Heightfield,lines:LineFeature[],channel:
     }
   }
   const minX=minCellX*100,maxX=(maxCellX+1)*100,minZ=minCellZ*100,maxZ=(maxCellZ+1)*100;
-  const heightAt=(x:number,z:number)=>{
-    if(x<minX||x>=maxX||z<minZ||z>=maxZ)return hf.height(x,z);
+  const deckAt=(x:number,z:number,ux?:number,uz?:number)=>{
+    if(x<minX||x>=maxX||z<minZ||z>=maxZ)return -Infinity;
     for(const {bridge:b,cos,sin,halfLength,halfWidth} of cells.get(Math.floor(x/100))?.get(Math.floor(z/100))??[]) {
+      if(ux!==undefined && uz!==undefined && Math.abs(ux*cos+uz*sin)<.88)continue;
       const dx=x-b.x,dz=z-b.z,along=dx*cos+dz*sin,across=-dx*sin+dz*cos;
       if(Math.abs(across)>halfWidth||Math.abs(along)>halfLength+8)continue;
       const t=THREE.MathUtils.clamp((Math.abs(along)-halfLength)/8,0,1);
       return b.deck+(b.ramps[along<0?0:1]-b.deck)*t;
     }
-    return hf.height(x,z);
+    return -Infinity;
   };
-  return {mesh,bridges,heightAt};
+  const heightAt=(x:number,z:number)=>{const y=deckAt(x,z);return Number.isFinite(y)?y:hf.height(x,z);};
+  return {mesh,bridges,heightAt,deckAt};
 }

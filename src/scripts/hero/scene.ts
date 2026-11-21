@@ -37,6 +37,7 @@ import {createCloudClock,createCloudMotion} from './cloud-weather';
 import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio } from './look-controls';
 import {createKamoChannel,kamoMask} from './kamo-channel';
 import {buildBridges} from './bridges';
+import {buildTransportSpans,type TransportSpan} from './transport-spans';
 import { createBuildingMask } from './vegetation-mask';
 import type { Woodland } from './woodland';
 import { buildWoodlandTexture } from './woodland-texture';
@@ -239,6 +240,8 @@ export function createHero(
           return {texture:await loadTexture(meta.aerialCity.file,aniso),sheets:[citySheet]};
         })
       : loadTexture(meta.aerialCity.file,aniso).then(texture=>({texture,sheets:[citySheet]})));
+    const elevatedData=loadBinary('transport-spans.json.gz');
+    void elevatedData.catch(()=>{});
     const cityData=Promise.all([basinPhoto, loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
     // Join the original promise below; attach a handler now for an early failure.
     void cityData.catch(()=>{});
@@ -328,6 +331,15 @@ export function createHero(
     await yieldToBrowser();
     const streetGround=Object.create(hf) as Heightfield;
     streetGround.height=bridges.heightAt;
+    const spans=await elevatedData.then(bytes=>{
+      const {paths}=JSON.parse(new TextDecoder().decode(bytes)) as {paths:TransportSpan[]};
+      return buildTransportSpans(env,paths,(x,z)=>hf.height(x,z),bridges.bridges);
+    }).catch(error=>{console.warn('Mapped elevated transport unavailable',error);return null;});
+    if(spans)scene.add(spans.group);
+    const roadHeight=(x:number,z:number,dx:number,dz:number)=>{
+      const mapped=spans?.heightAt(x,z,dx,dz)??-Infinity;
+      return Math.max(mapped,bridges.deckAt(x,z,dx,dz));
+    };
     const woodlandData = JSON.parse(new TextDecoder().decode(woodlandBytes)) as {polygons: Woodland[]};
     const cover = await treeCover;
     const woodlandRaster = buildWoodlandTexture(woodlandData.polygons, meta.aerialWide.box, cover, renderer.capabilities.maxTextureSize);
@@ -428,7 +440,7 @@ export function createHero(
     scene.add(buildIslands(env, hf, lines));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, labelLanguage);
     const lamps = buildLamps(env, streetGround, lines, opts.quality);
-    const cars = buildCars(env, streetGround, lines, opts.quality);
+    const cars = buildCars(env, hf, lines, opts.quality,roadHeight);
     driveCars = cars.update;
     pointLayers.push(lamps.uniforms, cars.uniforms);
     scene.add(lamps.points, cars.group);
@@ -504,7 +516,7 @@ export function createHero(
       }
       await step();
       lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7,true);group.add(lamps.points);
-      traffic=buildCars(env,hf,data.lines,lite ? .25 : .45);group.add(traffic.group);
+      traffic=buildCars(env,hf,data.lines,lite ? .25 : .45,roadHeight);group.add(traffic.group);
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
       await step();
