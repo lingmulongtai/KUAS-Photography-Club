@@ -658,9 +658,9 @@ export function createHero(
       installOverview(skyline);
       return true;
     }).catch(error=>{console.warn('Southern survey unavailable; using sampled skyline',error);return false;});
-    const residentWest=Promise.all(westSurveys.map(async({name,buildings})=>{
-      const data=await buildings;
+    const residentWest=Promise.all(westSurveys.map(({name,buildings})=>buildings.then(async data=>{
       if(!data)return null;
+      const sampledRoofMask=name==='otokuni-tennozan'?createBuildingMask(data.boxes,data.polys):null;
       const skyline=await buildResidentCity(env,hf,data);
       skyline.mesh.name=name;
       await prepare(skyline.mesh);
@@ -671,8 +671,11 @@ export function createHero(
         update(detailRegion);overviews.push(update);
       }
       scene.add(skyline.mesh);
-      return name==='otokuni-tennozan'?createBuildingMask(data.boxes,data.polys):null;
-    }));
+      return sampledRoofMask;
+    }).catch(error=>{
+      console.warn(`Western basin roofs unavailable: ${name}`,error);
+      return null;
+    })));
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
     const openingTamba=view==='kameokaTerrace';
