@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {FIELD, PADDY} from '../src/scripts/hero/ground-relief-data.ts';
-import {addField,GroundGeometry,SURFACE} from '../src/scripts/hero/ground-relief-geometry.ts';
+import {BANK,FIELD, PADDY} from '../src/scripts/hero/ground-relief-data.ts';
+import {addBank,addField,GroundGeometry,SURFACE} from '../src/scripts/hero/ground-relief-geometry.ts';
 
 const outer=new Float32Array([0,0,80,0,80,36,0,36]);
 const hole=new Float32Array([30,10,30,26,50,26,50,10]);
@@ -35,4 +35,17 @@ test('nearby furrows stop at the headlands and on each side of an interior hole'
     const x=tri.reduce((s,p)=>s+p.x,0)/3, z=tri.reduce((s,p)=>s+p.z,0)/3;
     assert.ok(!(x>30 && x<50 && z>10.7 && z<25.3),'row crossed a hole');
   }
+});
+
+test('stepped shores face land and cover the same cross-section at a map subdivision', () => {
+  const make=coords=>{
+    const data=new GroundGeometry();
+    addBank(data,{kind:BANK,paths:[new Float32Array(coords)]},ground);
+    return vertices(data);
+  };
+  const left=make([0,0,16,0,32,0]),right=make([32,0,52,0]);
+  const joint=points=>points.filter(p=>p.x===32).map(p=>[p.z,p.y]).sort();
+  assert.deepEqual(joint(left),joint(right));
+  assert.ok(left.filter(p=>p.kind===SURFACE.grassBank).every(p=>p.z<0));
+  assert.ok(left.some(p=>p.kind===SURFACE.gravel && p.z>0 && p.y<ground(p.x,p.z)));
 });

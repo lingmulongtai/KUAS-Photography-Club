@@ -143,3 +143,14 @@ export function addField(out: GroundGeometry, feature: GroundFeature, ground: El
   for (const [a,b,c] of triangles) split(a,b,c,0);
   if (paddy) for (const ring of rings) groundRibbon(out,ring,true,bund,ground,SURFACE.bund,seed);
 }
+
+const wetShelf: Section[] = [[-.42,-.58],[-.38,.40],[1.65,.42],[1.9,.15]];
+const upperShelf: Section[] = [[1.45,.18],[1.65,.88],[3.25,.89],[4.05,.04]];
+
+/** The positive offsets face land on outer banks as well as on islands. */
+export function addBank(out: GroundGeometry, feature: GroundFeature, ground: Elevation) {
+  const path = pathPoints(feature.paths[0]);
+  const seed = .5;
+  groundRibbon(out,path,false,wetShelf,ground,SURFACE.gravel,seed);
+  groundRibbon(out,path,false,upperShelf,ground,SURFACE.grassBank,seed);
+}

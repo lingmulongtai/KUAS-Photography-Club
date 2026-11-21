@@ -129,6 +129,8 @@ def bank_lines():
                 continue
             # Preserve direction and split long rivers into independently culled runs.
             coords = list(ring.coords)
+            first_mid = tuple((a+b)/2 for a, b in zip(coords[0], coords[1]))
+            coords = [first_mid, *coords[1:], first_mid]
             run, length = [], 0
             for a, b in zip(coords, coords[1:]):
                 distance = math.dist(a, b)
@@ -142,11 +144,16 @@ def bank_lines():
                 for i in range(1, steps+1):
                     if not run:
                         run.append((a[0]+(b[0]-a[0])*(i-1)/steps, a[1]+(b[1]-a[1])*(i-1)/steps))
-                    run.append((a[0]+(b[0]-a[0])*i/steps, a[1]+(b[1]-a[1])*i/steps))
+                    end = (a[0]+(b[0]-a[0])*i/steps, a[1]+(b[1]-a[1])*i/steps)
                     length += distance/steps
-                    if length >= 72:
+                    # Both independently drawn runs must have the same tangent
+                    # at their join. Split inside a straight edge, never at a bend.
+                    if length >= 72 and distance/steps >= 3:
+                        middle = tuple((p+q)/2 for p, q in zip(run[-1], end))
+                        run.append(middle)
                         yield BANK, *run[len(run)//2], [run]
-                        run, length = [], 0
+                        run, length = [middle], distance/steps/2
+                    run.append(end)
             if run:
                 yield BANK, *run[len(run)//2], [run]
 
