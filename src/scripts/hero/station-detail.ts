@@ -8,6 +8,8 @@ import { SHADOW_LAYER } from './shadow';
 function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: number) {
   const map = source.map;
   const glazing = source.name === 'Atrium glazing';
+  const district = source.name.startsWith('District ');
+  const tower = source.name.startsWith('District tower ');
   map?.updateMatrix();
   if (map) map.anisotropy = 4;
   return new THREE.ShaderMaterial({
@@ -18,7 +20,9 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
     defines: {
       ...(map && { STATION_PHOTO: 1 }),
       ...(glazing && { ATRIUM_GLASS: 1 }),
-      ...(source.name === 'KYcb0061_org.001' && { STATION_ENVELOPE: 1 }),
+      ...((source.name === 'KYcb0061_org.001' || (district && !tower)) && { STATION_ENVELOPE: 1 }),
+      ...(district && { DISTRICT_BUILDING: 1 }),
+      ...(tower && { KYOTO_TOWER: 1 }),
     },
     uniforms: {
       ...env, uPhoto: { value: map }, uUvMatrix: { value: map?.matrix ?? new THREE.Matrix3() },
@@ -70,6 +74,51 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
           // Soft spill from the north plaza falls off up the facade.
           float plaza = max(-n.z, 0.) * exp(-max(vWorld.y-uGroundY, 0.) / 32.);
           light += uCity * plaza * base * vec3(.014, .010, .006);
+          if (uCity > .001) {
+            float height = vWorld.y - uGroundY;
+            // Resolve groups of occupied rooms behind glazed or moderately dark
+            // panes. Fade the individual frames towards their average in the distance.
+            float along = abs(n.z) >= abs(n.x) ? vWorld.x : vWorld.z;
+            vec2 rooms = vec2(along / 2.7, height / 3.7);
+            vec2 pixel = max(fwidth(rooms), vec2(.001));
+            vec2 inset = .5 - abs(fract(rooms) - .5);
+            vec2 frame = smoothstep(vec2(.14,.21)-.5*pixel, vec2(.14,.21)+.5*pixel, inset);
+            float occupancy = .18+.44*uLit;
+            float occupied = step(hash12(floor(rooms / vec2(2.,1.))), occupancy);
+            float lamp = .35+.65*hash12(floor(rooms)+vec2(9.,47.));
+            float detail = 1. - smoothstep(.22,.67,max(pixel.x,pixel.y));
+            float windows = mix(occupancy*.28, occupied*lamp*frame.x*frame.y, detail);
+            float gray = 1.-smoothstep(.08,.24,abs(chroma));
+            float darkGlass = gray * smoothstep(.018,.09,luminance) * (1.-smoothstep(.20,.42,luminance));
+            // A darker pane surrounded by lighter framing in the survey photo
+            // is a better emitter than a blank, uniformly coloured stone panel.
+            float neighborhood = dot(textureLod(uPhoto,vUv,4.).rgb*uTint,vec3(.213,.715,.072));
+            float recess = smoothstep(.10,.48,(neighborhood-luminance)/(neighborhood+.015));
+            float photoPane = vertical*recess*smoothstep(.001,.014,luminance);
+            float transmission = max(photoPane, max(pane, vertical*darkGlass*.52)*.42);
+            float levels = smoothstep(1.,4.,height);
+            float interior = mix(windows,.12+occupied*lamp*.88,photoPane*detail);
+            #ifdef DISTRICT_BUILDING
+              light += uCity * interior * levels * transmission * vec3(.25,.18,.105);
+              float street = vertical * exp(-abs(height-3.)/9.);
+              light += uCity * street * (.08+base) * vec3(.047,.035,.024);
+            #else
+              light += uCity * interior * levels * transmission * vec3(.15,.104,.060);
+              // Pools of warm light at the entrance continue softly up the north wall.
+              float pool = .72+.28*cos((vWorld.x+45.)*.13);
+              light += uCity * plaza * pool * (.22+base) * vec3(.092,.065,.042);
+            #endif
+          }
+        #endif
+        #ifdef KYOTO_TOWER
+          // The two tower atlases include the hotel below the shaft. Highlight
+          // the surveyed shaft and original observation-deck colours above its roof.
+          float heightAGL = vWorld.y-uGroundY;
+          float shaft = smoothstep(37.,47.,heightAGL);
+          float deck = smoothstep(95.,98.,heightAGL)*(1.-smoothstep(103.,106.,heightAGL));
+          vec3 flood = vec3(.060,.052,.044) + base*vec3(.094,.083,.071);
+          flood = mix(flood, vec3(.026,.013,.007)+base*vec3(.13,.077,.042), deck);
+          light += uCity * shaft * flood;
         #endif
         vec3 col = shade(seasonalSurface(base,n,vWorld), n, vWorld, sunShadow(vWorld,n));
         float opacity = 1.;
@@ -85,6 +134,7 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
           float grazing = pow(1. - abs(dot(incident,n)), 3.);
           col = mix(col * .36 + skyColor(reflect(incident,n)) * .22, col * .52, bars);
           opacity = mix(.16 + .34*grazing, .88, bars);
+          light += uCity * mix(vec3(.055,.036,.021),vec3(.018,.014,.009),bars);
         #endif
         gl_FragColor = vec4(applyHaze(col, light, vWorld), opacity);
       }`,
