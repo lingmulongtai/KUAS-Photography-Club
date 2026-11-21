@@ -30,6 +30,9 @@ test('shipped surface lights continue past Takeda on both terrain grids without 
     const north = mean(-1500,6030,900,6200), south = mean(-1500,6200,900,6500);
     assert.ok(north > 15 && south/north > .65 && south/north < 1.5, 'no artificial drop at the core data boundary');
     assert.ok(mean(1000,11000,3400,14000) > 10, 'the Uji area remains lit at a distance');
+    assert.ok(mean(1950,-8000,2930,-7100) > 15, 'Iwakura streets remain visible from the central basin');
+    assert.ok(mean(900,-12260,1480,-11730) > 1 && mean(6020,-13200,6530,-12700) > 4, 'northern valley settlements have lights');
+    assert.equal(mean(-3500,-11200,-3000,-10900),0,'a wooded northern ridge stays dark');
     assert.equal(mean(-1500,1800,900,2600), 0, 'the core retains its existing lighting');
     assert.ok(data.every((value,i) => i%4 === 3 || value === 255));
   }
