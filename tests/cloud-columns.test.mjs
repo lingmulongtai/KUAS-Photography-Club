@@ -38,6 +38,7 @@ test('a failed column bake uses procedural density and rebuilds after context re
   gl.checkFramebufferStatus = () => 0;
   columns.update(renderer, 0, 0, weather);
   assert.equal(columns.uniforms.uColumnsReady.value, false);
+  assert.equal(columns.uniforms.uCloudColumns.value, null);
   assert.equal(renderer.getRenderTarget(), original);
   assert.equal(renderer.debug.onShaderError, handler);
   gl.checkFramebufferStatus = () => 2;
@@ -47,6 +48,7 @@ test('a failed column bake uses procedural density and rebuilds after context re
   columns.update(renderer, 0, 0, weather);
   assert.equal(columns.uniforms.uColumnsReady.value, true);
   columns.restored();
+  assert.equal(columns.uniforms.uColumnCeilings.value, null);
   renderer.render = () => renderer.debug.onShaderError();
   columns.update(renderer, 0, 0, weather);
   assert.equal(columns.uniforms.uColumnsReady.value, false);

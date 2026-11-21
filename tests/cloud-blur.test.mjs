@@ -69,5 +69,8 @@ test('shader failure redraws sharp clouds and restores the previous error handle
   assert.equal(h.mesh.material,h.original);
   h.blur.render([.03,0],100,100,1,()=>{draws++;assert.equal(h.mesh.material,h.original);});
   assert.equal(h.counts().offscreen,1);
+  h.blur.restored();
+  h.blur.render([0,0],100,100,1,()=>assert.notEqual(h.mesh.material,h.original));
+  assert.equal(h.counts().offscreen,2);
   h.blur.dispose();
 });

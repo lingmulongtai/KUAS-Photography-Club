@@ -56,6 +56,7 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
   const viewRotation = new THREE.Matrix3();
   let failed = false, verified = false;
   return {
+    restored() { failed = verified = false; },
     render(blur: readonly [number, number], width: number, height: number, dpr: number, draw: () => void) {
       const strength = Math.hypot(...blur);
       if (failed || !Number.isFinite(strength)) { draw(); return; }

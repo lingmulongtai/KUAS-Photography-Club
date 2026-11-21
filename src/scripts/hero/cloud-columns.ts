@@ -136,7 +136,8 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
   });
   const uniforms = {
     uColumnAnchor: { value: anchor }, uColumnEye: { value: new THREE.Vector2() },
-    uCloudColumns: { value: target.texture }, uColumnCeilings: { value: ceilings.texture }, uColumnsReady: { value: false },
+    uCloudColumns: { value: null as THREE.Texture | null }, uColumnCeilings: { value: null as THREE.Texture | null },
+    uColumnsReady: { value: false },
   };
   const material = new THREE.ShaderMaterial({
     uniforms: { uStyle: shape.uStyle, uClear: shape.uClear, uCover: shape.uCover, uColumnAnchor: uniforms.uColumnAnchor },
@@ -157,7 +158,7 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
   const maxMaterial = new THREE.ShaderMaterial({
-    uniforms: { uCloudColumns: uniforms.uCloudColumns }, depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+    uniforms: { uCloudColumns: {value:target.texture} }, depthTest: false, depthWrite: false, blending: THREE.NoBlending,
     vertexShader: material.vertexShader,
     fragmentShader: /* glsl */ `
       uniform sampler2D uCloudColumns;
@@ -179,7 +180,11 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
   let lastWeather: object | undefined, failed = false;
   return {
     uniforms, mesh,
-    restored() { uniforms.uColumnsReady.value = failed = false; lastWeather = undefined; },
+    restored() {
+      uniforms.uColumnsReady.value = failed = false;
+      uniforms.uCloudColumns.value = uniforms.uColumnCeilings.value = null;
+      lastWeather = undefined;
+    },
     update(renderer: THREE.WebGLRenderer, x: number, z: number, weather: object) {
       const cx = x * GRID, cz = z * GRID;
       uniforms.uColumnEye.value.set(cx - anchor.x, cz - anchor.y);
@@ -206,6 +211,8 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
         renderer.debug.onShaderError = onError;
         renderer.setRenderTarget(previous);
         uniforms.uColumnsReady.value = !failed;
+        uniforms.uCloudColumns.value = failed ? null : target.texture;
+        uniforms.uColumnCeilings.value = failed ? null : ceilings.texture;
         if (failed) { target.dispose(); ceilings.dispose(); }
       }
     },

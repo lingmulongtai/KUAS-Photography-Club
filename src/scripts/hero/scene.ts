@@ -147,6 +147,7 @@ export function createHero(
   const cloudBlur=createCloudBlur(renderer,camera,clouds.mesh,opts.quality);
   const cloudHistory = createCloudHistory(renderer, camera, clouds.mesh);
   renderer.domElement.addEventListener('webglcontextrestored', clouds.restored);
+  renderer.domElement.addEventListener('webglcontextrestored', cloudBlur.restored);
   renderer.domElement.addEventListener('webglcontextrestored', cloudHistory.restored);
   scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
   const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
