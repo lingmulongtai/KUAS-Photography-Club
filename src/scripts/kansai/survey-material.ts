@@ -4,7 +4,8 @@ import {aerialPhoto} from './aerial';
 import {cityGlass,reflectionCity} from './glass';
 import {lonLat,tileXY,type Point,type Ring} from './coordinates';
 
-// Only the untextured LOD1 survey shells use this material. Actual textured meshes keep their imagery.
+// Municipal catalogues with detailed landmarks also contain plain survey shells.
+// Choose a surface treatment for each glTF primitive, independent of catalogue LOD.
 export function surveyMaterial(widget:CesiumWidget){
   const uniform=(bytes:Uint8Array,width:number)=>new C.TextureUniform({typedArray:bytes,width,height:width,repeat:false});
   const maskUniforms=()=>({
@@ -22,16 +23,18 @@ export function surveyMaterial(widget:CesiumWidget){
       vec3 ink=texture(u_mask,m).rgb;
       if(ink.r-ink.g>.5) discard;
     }`;
-  const detailed=new C.CustomShader({uniforms:{...maskUniforms()},fragmentShaderText:`
-    ${cityGlass}
-    void fragmentMain(FragmentInput fsInput,inout czm_modelMaterial material){
-      ${clip}
+  const authoredGlass=`
       vec3 p=fsInput.attributes.positionWC,eye=fsInput.attributes.positionEC;
       vec3 n=normalize(cross(dFdx(eye),dFdy(eye)));
       float vertical=1.-smoothstep(.2,.65,abs(dot(n,czm_viewRotation*normalize(p))));
       vec3 color=material.diffuse;
       float glass=vertical*smoothstep(.025,.13,color.b-color.r)*(1.-smoothstep(.45,.82,material.roughness));
-      if(glass>.01)material.diffuse=mix(color,paneReflection(p,eye,n),glass*.32);
+      if(glass>.01)material.diffuse=mix(color,paneReflection(p,eye,n),glass*.32);`;
+  const detailed=new C.CustomShader({uniforms:{...maskUniforms()},fragmentShaderText:`
+    ${cityGlass}
+    void fragmentMain(FragmentInput fsInput,inout czm_modelMaterial material){
+      ${clip}
+      ${authoredGlass}
     }`});
   const shader=new C.CustomShader({uniforms:{
     ...maskUniforms(),
@@ -43,6 +46,11 @@ export function surveyMaterial(widget:CesiumWidget){
     ${cityGlass}
     void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material){
       ${clip}
+      #if defined(HAS_BASE_COLOR_TEXTURE) || defined(HAS_DIFFUSE_TEXTURE) || defined(HAS_COLOR_0)
+      ${authoredGlass}
+      #else
+      vec3 source=material.diffuse;
+      if(max(source.r,max(source.g,source.b))-min(source.r,min(source.g,source.b))>.045)return;
       vec3 p=fsInput.attributes.positionWC;
       vec3 n=normalize(cross(dFdx(fsInput.attributes.positionEC),dFdy(fsInput.attributes.positionEC)));
       float up=abs(dot(n,normalize(czm_viewRotation*normalize(p))));
@@ -67,6 +75,7 @@ export function surveyMaterial(widget:CesiumWidget){
         roof=mix(roof,czm_gammaCorrect(photo.rgb),.93*photo.a);
       }
       material.diffuse*=mix(wall,roof,smoothstep(.55,.85,up));
+      #endif
     }`});
   let signature='',abort:AbortController|undefined;
   // A single raster for all active replacements. Allocate according to their

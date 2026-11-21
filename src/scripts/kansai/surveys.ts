@@ -73,7 +73,7 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
         maximumScreenSpaceError:4,enableCollision:false,cacheBytes:24*1024*1024,maximumCacheOverflowBytes:24*1024*1024,
       });
       if(!alive||widget.isDestroyed()||!wanted.has(layer)) {tiles.destroy();return;}
-      if(layer.kind==='bldg'||layer.kind==='brid')tiles.customShader=layer.kind==='bldg'&&layer.lod===1?material.shader:material.detailed;
+      if(layer.kind==='bldg'||layer.kind==='brid')tiles.customShader=layer.kind==='bldg'?material.shader:material.detailed;
       if(layer.kind==='bldg'){
         tiles.tileVisible.addEventListener((tile:Cesium3DTile)=>{
           if(!tile.content.ready)return;
@@ -118,7 +118,7 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
     updatePhoto(target:Point,altitude:number){
       material.selectCity(target);
       void plan(target,altitude);
-      if(altitude<10500&&[...last.values()].includes(1))void material.update(target,altitude);
+      if(altitude<10500&&last.size>0)void material.update(target,altitude);
     },
     dispose(){alive=false;remove();architecture.dispose();material.dispose();}};
 }
