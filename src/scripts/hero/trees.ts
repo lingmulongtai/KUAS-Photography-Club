@@ -221,8 +221,10 @@ export function createForest(
   const populations=new Map<string,{meshes:THREE.Mesh[];count:number}>();
   // Invalidated meshes remain visible until their replacement is complete.
   const retired=new Set<THREE.Mesh>();
-  const replace = (meshes:THREE.Mesh[]) => {
+  let visibleCenter: { x: number; z: number } | undefined;
+  const replace = (meshes:THREE.Mesh[], eye: { x: number; z: number }) => {
     group.clear();group.add(...meshes);
+    visibleCenter = { x: eye.x, z: eye.z };
     for(const mesh of retired)mesh.geometry.dispose();
     retired.clear();
   };
@@ -236,7 +238,7 @@ export function createForest(
     const cached=populations.get(key);
     if(cached) {
       populations.delete(key);populations.set(key,cached);
-      replace(cached.meshes);count=cached.count;return;
+      replace(cached.meshes,eye);count=cached.count;return;
     }
     const { pos, size, tint, kind, lods, shapes,season } = yield* trees(eye);
     const chunks = new Map<string, number[]>();
@@ -289,7 +291,7 @@ export function createForest(
       mesh.userData.depthMaterial = depthMaterial;
       meshes.push(mesh);
     }
-    replace(meshes);count=kind.length;
+    replace(meshes,eye);count=kind.length;
     populations.set(key,{meshes,count});committed=true;
     if(populations.size>3) {
       const oldest=populations.keys().next().value!;
@@ -316,6 +318,15 @@ export function createForest(
     } finally { steps.return(); }
   }
   const cancelPlant = () => { generation++; };
+  let following = false;
+  function follow(eye: {x:number;z:number}, bearing: number) {
+    const spacing = quality > .75 ? 160 : 110;
+    if (following || (visibleCenter && Math.hypot(eye.x-visibleCenter.x,eye.z-visibleCenter.z) < spacing)) return;
+    // While travelling, finish one population before sampling the latest camera
+    // position on the next frame. Fast movement must not starve visible updates.
+    following = true;
+    return plantAsync(eye,bearing).finally(() => { following = false; });
+  }
   const refreshExclusions = () => {
     cancelPlant();
     for(const population of populations.values()) for(const mesh of population.meshes) {
@@ -324,7 +335,7 @@ export function createForest(
     populations.clear();
     return planted ? plantAsync(planted.eye,planted.bearing) : Promise.resolve();
   };
-  return { group, plant, plantAsync, cancelPlant, contains, refreshExclusions, get count() { return count; } };
+  return { group, plant, plantAsync, follow, cancelPlant, contains, refreshExclusions, get count() { return count; } };
 }
 
 /** An axis-aligned block: centre, size, and a shade (0..1, 0 for none) shared by its faces. */
