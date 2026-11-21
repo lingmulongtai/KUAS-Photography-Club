@@ -165,7 +165,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,heightS
   const terrain=groundMesh.instance();if(terrain)instances.push(terrain);
   const primitive=instances.length?new C.Primitive({geometryInstances:instances,
     modelMatrix:C.Transforms.eastNorthUpToFixedFrame(C.Cartesian3.fromDegrees(...center)),
-    appearance:localAppearance(x,y),
+    appearance:localAppearance(x,y,()=>{if(!widget.isDestroyed())widget.scene.requestRender();}),
     asynchronous:false,allowPicking:false,compressVertices:false,vertexCacheOptimize:false}):undefined;
   let applied=-1;
   return {primitive,waterPrimitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys){

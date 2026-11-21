@@ -1,11 +1,13 @@
 import {C} from './engine';
+import {aerialPhoto} from './aerial';
 
 // Roofs use the photographed surface at their own map coordinates. Window pitch
 // is expressed in metres, with derivative filtering before the panes get subpixel.
-export function localAppearance(x:number,y:number){
-  const material=C.Material.fromType('Image',{
-    image:'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/16/'+x+'/'+y+'.jpg',
-  });
+export function localAppearance(x:number,y:number,redraw:()=>void){
+  const material=C.Material.fromType('Image');
+  void aerialPhoto(16,x,y).then(image=>{
+    if(image&&!material.isDestroyed()){material.uniforms.image=image;redraw();}
+  }).catch(()=>{/* Keep the base roof tone when offline. */});
   return new C.Appearance({material,translucent:false,closed:false,renderState:{depthTest:{enabled:true},depthMask:true},
     vertexShaderSource:`
       in vec3 position3DHigh;
