@@ -12,7 +12,7 @@ test('each shipped region decodes within its bounds and bounded download budget'
   globalThis.fetch=async(url)=>new Response(await readFile(new URL(String(url).split('/').pop(),root)));
   t.after(()=>{globalThis.fetch=original;});
   const {regions}=JSON.parse(await readFile(new URL('regions.json',root),'utf8'));
-  assert.deepEqual(regions.map(r=>r.id).sort(),['kameoka','osaka','sonobe','south','tennozan','uji','yamashina']);
+  assert.deepEqual(regions.map(r=>r.id).sort(),['kameoka','north','osaka','sonobe','south','tennozan','uji','yamashina']);
   assert.equal(regionAt(regions,toLocal(34.897931,135.679798))?.id,'tennozan','the panorama loads confluence data');
   assert.equal(regionAt(regions,toLocal(34.702911,135.495896))?.id,'osaka','central Osaka loads its own detailed region');
   assert.equal(regionAt(regions,toLocal(34.88928359,135.80767787))?.id,'uji','Uji data takes priority over overlapping Kyoto ward data');
@@ -28,6 +28,17 @@ test('each shipped region decodes within its bounds and bounded download budget'
     assert.ok(buildings.boxes.every(b=>valid(b.x,b.z)&&b.h>0&&b.w>0&&b.d>0));
     for(const p of buildings.polys)for(let i=0;i<p.ring.length;i+=2)assert.ok(valid(p.ring[i],p.ring[i+1]),region.id);
     const lines=await loadLines(undefined,region.lines.file,region.box,region.lines.q);
+    if(region.id==='north'){
+      // Check settlements both inside and beyond the measured PLATEAU footprint.
+      for(const [name,lat,lon] of [['Iwakura',35.071,135.786],['Kurama',35.1123,135.7729],['Ohara',35.1201,135.8266]]){
+        const p=toLocal(lat,lon);
+        const near=(x,z)=>Math.hypot(x-p.x,z-p.z)<500;
+        assert.equal(regionAt(regions,p),region,name);
+        assert.ok(buildings.boxes.filter(b=>near(b.x,b.z)).length>80,name+' has streets lined with homes');
+        assert.ok(lines.some(f=>f.kind===0 && f.pts.some((x,i)=>!(i%2) && near(x,f.pts[i+1]))),name+' has mapped roads');
+      }
+      assert.match(region.heightSource,/PLATEAU measured and GSI outlines/);
+    }
     assert.ok(lines.some(f=>f.kind===1),'rail network is included');
     assert.ok(lines.filter(f=>f.kind===0).length>100);
     for(const f of lines)for(let i=0;i<f.pts.length;i+=2)assert.ok(valid(f.pts[i],f.pts[i+1]),region.id);
