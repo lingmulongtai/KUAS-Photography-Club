@@ -32,12 +32,15 @@ test('panoramas turn at a fixed observation point', () => {
   assert.equal('funaoka' in VIEWS,false);
 });
 
-test('openings draw uniformly from clear panoramas and skip the previous opening on reload',()=>{
+test('openings draw uniformly from clear locations and skip the previous location on reload',()=>{
   const terrain=(x,z)=>x===VIEWS.atago.ref.x && z===VIEWS.atago.ref.z?920:80;
+  const groups=[['shogunzuka'],['inariRidge'],['daimonji'],['arashiyama'],['atago'],['kameokaTerrace'],['tennozan','osakaSkyline']];
   for(const previous of [null,...PANORAMA_VIEWS]){
-    const choices=PANORAMA_VIEWS.filter(id=>id!==previous);
-    for(let i=0;i<choices.length;i++)
-      assert.equal(openingPanorama(terrain,1500,previous,null,()=>(i+.5)/choices.length),choices[i]);
+    const choices=groups.filter(group=>!group.includes(previous));
+    choices.forEach((group,i)=>group.forEach((view,j)=>{
+      const samples=[(i+.5)/choices.length,(j+.5)/group.length];
+      assert.equal(openingPanorama(terrain,1500,previous,null,()=>samples.shift()),view);
+    }));
   }
   assert.equal(openingPanorama(terrain,850,'inariRidge','inariRidge',()=>0),'inariRidge');
   for(const requested of ['atago','inari','invalid']){

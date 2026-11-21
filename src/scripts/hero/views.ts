@@ -98,9 +98,21 @@ export function openingPanorama(height:(x:number,z:number)=>number,cloudBase:num
   });
   const linked=eligible.find(id=>id===requested);
   if(linked)return linked;
-  const other=eligible.filter(id=>id!==previous);
-  const choices=other.length?other:eligible;
-  return choices[Math.floor(random()*choices.length)]??'shogunzuka';
+  // Tennozan has two bearings at one observation point. Give each place one
+  // chance and avoid returning to the same mountain on consecutive visits.
+  const places=new Map<string,PanoramaView[]>();
+  for(const id of eligible){
+    const eye=VIEWS[id].eye, key=`${eye.x},${eye.z}`;
+    const views=places.get(key);
+    if(views)views.push(id);
+    else places.set(key,[id]);
+  }
+  const all=[...places.values()];
+  const other=all.filter(group=>!group.some(id=>id===previous));
+  const choices=other.length?other:all;
+  if(!choices.length)return 'shogunzuka';
+  const group=choices[Math.floor(random()*choices.length)];
+  return group.length===1?group[0]:group[Math.floor(random()*group.length)];
 }
 
 /** Both inner controls of a cubic flight must clear the cloud deck too. */
