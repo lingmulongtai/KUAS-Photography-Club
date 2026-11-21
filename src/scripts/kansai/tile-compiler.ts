@@ -6,6 +6,7 @@ import {drawGround,roadWidth} from './ground';
 import {hyogoHeights} from './lidar';
 import {regionalHeights} from './building-heights';
 import {railStructure} from './rail';
+import {drawSetaBridges,isSetaDeck} from './seta-bridge';
 import {combineTileMeshes,type TileGeometry} from './tile-geometry';
 
 
@@ -113,6 +114,8 @@ export function tileCompiler(){
         && taggedHeight(part.tag)>=.95*taggedHeight(row.tag)))continue;
       appendBuilding(row.rings,row.point,row.tag,matched.has(row.tag.id)&&row.tag.levels!==undefined&&row.tag.levels>3);
     }
+    const karahashi=y===25964&&(x===57508||x===57509);
+    if(karahashi)drawSetaBridges(groundMesh,[west,south,east,north],local);
     for(const name of ['RdCL','RailCL','RailTrCL']){
       const layer=tile?.layers[name];if(!layer)continue;
       for(let i=0;i<layer.length;i++){
@@ -126,6 +129,7 @@ export function tileCompiler(){
           for(let j=1;j<line.length;j++){
             const geo=[line[j-1],line[j]].map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
             const p=midpoint(geo);if(!here(p))continue;
+            if(karahashi&&road&&Number(props.vt_code)===2703&&isSetaDeck(p))continue;
             const lift=raised?6.8:name==='RailTrCL'?.8:.55;
             const a=xyz(geo[0],ground(geo[0])+lift),b=xyz(geo[1],ground(geo[1])+lift);
             strip(groundMesh,a,b,width,road?[99,100,98]:[55,52,47],raised?.9:.28);
