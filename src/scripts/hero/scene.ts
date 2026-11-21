@@ -525,15 +525,29 @@ export function createHero(
       });
       geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
     };
+    // Reuse the regional photo slot for the eastern basin between detailed regions.
+    // Keep its texture alive while a different region temporarily owns that slot.
+    let eastTexture:Promise<THREE.Texture>|undefined;
+    let eastBackdrop:{photo:THREE.Texture;box:Box}|null=null;
+    const loadRegionalPhoto=(r:CityRegion)=>{
+      const file=lite?r.photo.mobile.file:r.photo.file;
+      if(r.id!=='yamashina')return loadTexture(file,aniso);
+      return eastTexture??=loadTexture(file,aniso).then(photo=>{
+        eastBackdrop={photo,box:r.photo.box};
+        if(!detailRegion)terrain.setPhoto(0,photo,r.photo.box);
+        return photo;
+      }).catch(error=>{eastTexture=undefined;throw error;});
+    };
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
       const results=await Promise.allSettled([loadRegionalBuildings(r),
-        withoutTunnels(loadLines(undefined,r.lines.file,r.lines.box,r.lines.q)),loadTexture(lite?r.photo.mobile.file:r.photo.file,aniso)] as const);
+        withoutTunnels(loadLines(undefined,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r)] as const);
       const [b,l,p]=results;
+      const disposePhoto=()=>{if(p.status==='fulfilled'&&r.id!=='yamashina')p.value.dispose();};
       if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){
-        if(p.status==='fulfilled')p.value.dispose();
+        disposePhoto();
         throw results.find(result=>result.status==='rejected')!.reason;
       }
-      return {buildings:b.value,lines:l.value,photo:p.value,dispose:()=>p.value.dispose()};
+      return {buildings:b.value,lines:l.value,photo:p.value,dispose:disposePhoto};
     },async(r,data,current,releasePrevious)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
       const step=async()=>{await yieldToBrowser();if(!current())throw new Error('Region superseded');};
@@ -593,7 +607,8 @@ export function createHero(
         for(const layer of [lamps.uniforms,traffic.uniforms]){const i=pointLayers.indexOf(layer);if(i>=0)pointLayers.splice(i,1);}
         terrain.uniforms.uRegionRoadsOn.value=0;
         terrain.uniforms.uRegionRoads.value=wide;
-        terrain.setPhoto(0,null);
+        terrain.uniforms.uRegionClose.value=0;
+        terrain.setPhoto(0,eastBackdrop?.photo??null,eastBackdrop?.box);
         env.uBuilt.value=coreBuilt;env.uRegionBuiltTexel.value=0;
         outerExcluded=()=>false;
         if(forestMaskChanged)refreshForest();
@@ -622,6 +637,8 @@ export function createHero(
       return ()=>release();
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
     const regionManifest=await cityRegions;
+    const easternBasin=regionManifest.regions.find(r=>r.id==='yamashina');
+    if(easternBasin)void loadRegionalPhoto(easternBasin).catch(error=>console.warn('Eastern basin imagery unavailable',error));
     let lastAreaRequest:{id:string|null;retry?:ReturnType<typeof setTimeout>}|undefined;
     let lastPhotoX=0,lastPhotoZ=0,lastCloseArea:string|null=null;
     ensureCityRegion=(center,bearing)=>{

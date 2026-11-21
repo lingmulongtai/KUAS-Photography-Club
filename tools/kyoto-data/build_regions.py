@@ -34,7 +34,8 @@ REGIONS = {
     'tennozan': {'box': (-14000,8500,500,23000), 'ja':'天王山・三川合流域', 'en':'Tennozan / Three Rivers'},
     'kameoka': {'box': (-24000,-8000,-9000,4000), 'ja':'亀岡・保津峡', 'en':'Kameoka / Hozukyo'},
     'sonobe': {'box': (-33000,-18000,-21000,-8000), 'ja':'園部・八木', 'en':'Sonobe / Yagi'},
-    'yamashina': {'box': (4600,-2500,12500,8500), 'ja':'山科', 'en':'Yamashina', 'wards':['26110_yamashina-ku']},
+    'yamashina': {'box': (4600,-2500,12500,8500), 'ja':'山科', 'en':'Yamashina', 'wards':['26110_yamashina-ku'],
+                  'photoBox': (2250,-2500,12500,10000), 'photoZoom':15},
     'south': {'box': (-9000,6200,4600,19000), 'ja':'京都南部', 'en':'Southern Kyoto', 'wards':['26107_minami-ku','26109_fushimi-ku']},
     'north': {'box': (-8200,-20000,8100,-7000), 'ja':'京都北部・洛北', 'en':'Northern Kyoto / Rakuhoku',
               'wards':['26101_kita-ku','26103_sakyo-ku'], 'fillOutlines':True, 'photoZoom':14},
@@ -48,7 +49,8 @@ def fetch_sources(region):
     if not region.get('wards') or region.get('fillOutlines'):
         sets.append(('bvmap','experimental_bvmap',15,'pbf'))
     for name,remote,zoom,ext in sets:
-        for z,x,y in R.tiles_for(box,zoom):
+        bounds=region.get('photoBox',box) if name=='seamlessphoto' else box
+        for z,x,y in R.tiles_for(bounds,zoom):
             path=os.path.join(CACHE,'gsi',name,str(z),str(x),f'{y}.{ext}')
             jobs.append((f'{GSI}/{remote}/{z}/{x}/{y}.{ext}',path))
     with ThreadPoolExecutor(max_workers=3) as pool:
@@ -255,6 +257,25 @@ def export_lines(key,box,*,track_box=None,tracks=()):
     return {'file':name,'box':box,'q':.5,'bytes':size,'features':len(feats)}
 
 
+def build_photo(key,region):
+    box=region.get('photoBox',region['box'])
+    width,depth=box[2]-box[0],box[3]-box[1]
+    longest=1792 if key=='yamashina' else 2048
+    dims=(round(longest*width/max(width,depth)),round(longest*depth/max(width,depth)))
+    zoom=region.get('photoZoom',13)
+    if key=='yamashina':
+        from build_basin_atlas import photo, balance, neutral_ground
+        with Image.open(os.path.join(OUT,'aerial-city.webp')) as city:
+            image=balance(photo(box,zoom,dims),neutral_ground(city.convert('RGB')))
+    else:
+        image=render(box,dims,zoom,oversample=1)
+    _,size=save(image,f'aerial-{key}.webp',600_000)
+    mobile=image.resize(tuple(round(v/2) for v in dims),Image.Resampling.LANCZOS)
+    _,mobile_size=save(mobile,f'aerial-{key}-mobile.webp',220_000)
+    return {'box':box,'file':f'aerial-{key}.webp','size':dims,'bytes':size,'zoom':zoom,
+            'mobile':{'file':f'aerial-{key}-mobile.webp','size':mobile.size,'bytes':mobile_size}}
+
+
 def build(key,region):
     fetch_sources(region)
     buildings=clipped_buildings(key,region)
@@ -282,19 +303,11 @@ def build(key,region):
     building_bytes=os.path.getsize(os.path.join(OUT,f'buildings-{key}.bin'))
     if building_bytes+lines['bytes']>1.5*1024*1024:
         raise RuntimeError('Regional vector assets exceed 1.5 MiB budget')
-    width=region['box'][2]-region['box'][0];depth=region['box'][3]-region['box'][1]
-    dims=(2048,round(2048*depth/width)) if width>=depth else (round(2048*width/depth),2048)
-    photo_zoom=region.get('photoZoom',13)
-    photo=render(region['box'],dims,photo_zoom,oversample=1)
-    _,size=save(photo,f'aerial-{key}.webp',600_000)
-    mobile=photo.resize(tuple(round(v/2) for v in dims),Image.Resampling.LANCZOS)
-    _,mobile_size=save(mobile,f'aerial-{key}-mobile.webp',220_000)
     return {'id':key,'ja':region['ja'],'en':region['en'],'box':region['box'],
         'heightSource':('PLATEAU measured and GSI outlines; illustrative heights (6 m / 10 m)' if key in ('tennozan','osaka') or region.get('fillOutlines')
                         else 'PLATEAU measured' if region.get('wards') else 'GSI outlines; illustrative heights (6 m / 10 m)'),
         'buildings':{'meta':f'buildings-{key}.json','file':f'buildings-{key}.bin','bytes':building_bytes},'lines':lines,
-        'photo':{'box':region['box'],'file':f'aerial-{key}.webp','size':dims,'bytes':size,'zoom':photo_zoom,
-                 'mobile':{'file':f'aerial-{key}-mobile.webp','size':mobile.size,'bytes':mobile_size}}}
+        'photo':build_photo(key,region)}
 
 
 def main():
