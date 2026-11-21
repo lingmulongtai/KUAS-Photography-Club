@@ -58,8 +58,10 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       const moving = strength >= .0015 && lateral >= .05;
       if (!moving && !proximity) { draw(); return; }
       const w = Math.max(1, Math.round(width * dpr)), h = Math.max(1, Math.round(height * dpr));
+      // Nearby clouds are reconstructed from neighbouring samples. A smaller target
+      // avoids marching rays finer than this filter can resolve.
       const scale = moving ? Math.min(.75, Math.sqrt(1_000_000 / (w * h)))
-        : Math.min(1, Math.sqrt(2_000_000 / (w * h)));
+        : Math.min(.8, Math.sqrt(2_000_000 / (w * h)));
       const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
       const resized = target.width !== tw || target.height !== th;
       if (resized) target.setSize(tw, th);

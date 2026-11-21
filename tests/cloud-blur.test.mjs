@@ -34,6 +34,8 @@ test('a camera inside the layer resolves still clouds with finite, symmetric sam
   h.blur.render([0,0],1200,800,1,()=>{
     assert.notEqual(h.mesh.material,h.original);
     const {uCloudRadius,uStep,uCloud}=h.mesh.material.uniforms;
+    assert.equal(uCloud.value.image.width,960);
+    assert.equal(uCloud.value.image.height,640);
     assert.deepEqual(uStep.value.toArray(),[0,0]);
     const radius=uCloudRadius.value.x*uCloud.value.image.width;
     assert.ok(radius>1&&radius<2);
