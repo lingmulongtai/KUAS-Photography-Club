@@ -18,7 +18,7 @@ import { createPost } from './post';
 import { createPanoramaCity } from './panorama-city';
 import { loadBuildings } from './buildings-data';
 import { buildingCutout } from './building-cutout';
-import { buildCity, buildCityAsync } from './buildings';
+import { buildCity, buildCityAsync, buildResidentCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import { buildLamps } from './lights';
 import { buildCars } from './cars';
@@ -240,6 +240,13 @@ export function createHero(
           return {texture:await loadTexture(meta.aerialCity.file,aniso),sheets:[citySheet]};
         })
       : loadTexture(meta.aerialCity.file,aniso).then(texture=>({texture,sheets:[citySheet]})));
+    // Share the decoded survey with the regional street scene when the visitor later flies south.
+    const southRegion=cityRegions.then(index=>index.regions.find(r=>r.id==='south'));
+    let southBuildings:ReturnType<typeof loadBuildings>|undefined;
+    const loadSouthBuildings=(region:CityRegion)=>southBuildings??=loadBuildings(region.buildings.meta,region.buildings.file)
+      .catch(error=>{southBuildings=undefined;throw error;});
+    const southSurvey=southRegion.then(async region=>region?{region,buildings:await loadSouthBuildings(region)}:null);
+    void southSurvey.catch(()=>{});
     const elevatedData=loadBinary('transport-spans.json.gz');
     void elevatedData.catch(()=>{});
     const cityData=Promise.all([basinPhoto, loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
@@ -457,7 +464,10 @@ export function createHero(
       scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
     }).catch(error=>console.warn('Railway scenery unavailable',error));
     driveCars=(dt)=>{cars.update(dt);regionalDrive?.(dt);railDrive?.(dt);};
-    const overviews:Awaited<ReturnType<typeof buildSouthOverview>>[]=[];
+    const overviews:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void}[]=[];
+    const installOverview=(item:(typeof overviews)[number])=>{
+      item.setDetailBox(detailBox);overviews.push(item);scene.add(item.mesh);
+    };
     let detailBox:Box|null=null;
     const setOverviewDetail=(box:Box|null)=>{
       detailBox=box;
@@ -473,7 +483,7 @@ export function createHero(
       geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
     };
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
-      const results=await Promise.allSettled([loadBuildings(r.buildings.meta,r.buildings.file),
+      const results=await Promise.allSettled([r.id==='south'?loadSouthBuildings(r):loadBuildings(r.buildings.meta,r.buildings.file),
         withoutTunnels(loadLines(undefined,r.lines.file,r.lines.box,r.lines.q)),loadTexture(lite?r.photo.mobile.file:r.photo.file,aniso)] as const);
       const [b,l,p]=results;
       if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){
@@ -607,9 +617,14 @@ export function createHero(
       if(next)regionLoader.prefetch(next);
       if(next?.id==='osaka')void osakaPhotos.prefetch(center);
     };
+    const residentSouth=southSurvey.then(async survey=>{
+      if(!survey)return false;
+      installOverview(await buildResidentCity(env,hf,survey.buildings,survey.region.box));
+      return true;
+    }).catch(error=>{console.warn('Southern survey unavailable; using sampled skyline',error);return false;});
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
-    await Promise.all([cloudProgram,scenePrograms,openingRegion,loadOverview('south')]);
+    await Promise.all([cloudProgram,scenePrograms,openingRegion,residentSouth,loadOverview('south')]);
     loading.built();
     startGroundRelief=() => idle(() => {
       const ground=(x:number,z:number)=>hf.height(x,z);
@@ -624,10 +639,11 @@ export function createHero(
     async function loadOverview(area:string) {
       try {
         const bytes=await loadBinary(`buildings-${area}-lod.json.gz`);
-        const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers?:OverviewBuilding[]};
-        const overview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
+        const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers?:OverviewBuilding[];residentCount?:number};
+        const buildings=area==='south'&&data.residentCount&&await residentSouth ? data.buildings.slice(data.residentCount) : data.buildings;
+        const overview=await buildSouthOverview(env,buildings,(x,z)=>hf.height(x,z));
         overview.mesh.name=`${area}-overview`;
-        overview.setDetailBox(detailBox);overviews.push(overview);scene.add(overview.mesh);
+        installOverview(overview);
         if(data.towers){
           // Osaka's tallest measured towers exceed the detailed city's height encoding.
           const skyline=await buildSouthOverview(env,data.towers,(x,z)=>hf.height(x,z));
