@@ -124,7 +124,7 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
       const g = paint(part);
       if (l.rotY) g.rotateY(l.rotY);
       g.translate(p.x, y, p.z);
-      (name === 'kyotoStation' ? stationGeos : geos).push(g);
+      (name === 'kyotoStation' || name === 'kyotoTower' ? stationGeos : geos).push(g);
     }
   }
   const stationStart = geos.reduce((n,g) => n + g.getAttribute('position').count, 0);

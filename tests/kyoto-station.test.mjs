@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {kyotoStation,stationGlazing,replacesKyotoStation} from '../src/scripts/hero/kyoto-station.ts';
 import {loadBuildings} from '../src/scripts/hero/buildings-data.ts';
 
@@ -37,7 +38,7 @@ test('glass encloses the north facade and roof above an open concourse',()=>{
 });
 
 test('surveyed station ships with local geometry, embedded facade photos and named plaza surfaces', async () => {
-  const file = await readFile(new URL('../public/kyoto/kyoto-station.glb', import.meta.url));
+  const file = await readFile(new URL('../public/kyoto/kyoto-station-district.glb', import.meta.url));
   assert.equal(file.toString('ascii', 0, 4), 'glTF');
   assert.equal(file.readUInt32LE(8), file.length);
   const model = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
@@ -54,12 +55,23 @@ test('surveyed station ships with local geometry, embedded facade photos and nam
       }
     }
   }
-  assert.ok(bounds.min.x < -230 && bounds.max.x > 230 && bounds.max.x < 265);
-  assert.ok(bounds.min.z < -145 && bounds.max.z < 55);
-  assert.ok(bounds.max.y > 60 && bounds.max.y < 72, 'includes rooftop equipment, excludes Kyoto Tower');
+  assert.ok(bounds.min.x < -460 && bounds.max.x > 370 && bounds.max.x < 385);
+  assert.ok(bounds.min.z < -350 && bounds.max.z < 55);
+  assert.ok(bounds.max.y > 130 && bounds.max.y < 134, 'includes the surveyed Kyoto Tower');
+  assert.ok(model.materials.some(material => material.name.startsWith('District tower ')));
+  assert.ok(model.materials.some(material => material.name.startsWith('District facade ')));
   assert.ok(model.materials.some(material => material.name.startsWith('Plaza-')));
   assert.ok(model.materials.some(material => material.name === 'Atrium glazing'));
   assert.ok(model.meshes.some(mesh => mesh.primitives.some(primitive =>
     model.materials[primitive.material].name === 'KYcb0061_org.001'
   )), 'the opaque station envelope can be selected for planar wall lighting');
+});
+
+test('the station replacement indices match the shipped city footprints', async () => {
+  const matches = JSON.parse(await readFile(new URL('../src/data/kyoto-station-replacements.json', import.meta.url), 'utf8'));
+  const file = await readFile(new URL('../public/kyoto/buildings.bin', import.meta.url));
+  assert.equal(createHash('sha256').update(file).digest('hex'), matches.buildingsSha256);
+  assert.equal(matches.boxes.length + matches.polys.length, 211);
+  assert.ok(matches.boxes.some(([,survey]) => survey === 26));
+  assert.ok(matches.polys.some(([,survey]) => survey === 95));
 });

@@ -59,6 +59,7 @@ import {createRegionalLoader,regionAt,regionInView,type CityRegion} from './regi
 import {replacesHeianFootprint} from './heian-shrine';
 import {replacesNijoFootprint,replacesNijoBox} from './nijo-castle';
 import {replacesKyotoStation} from './kyoto-station';
+import stationMatches from '../../data/kyoto-station-replacements.json';
 import {kawaramachiFacades} from './kawaramachi-facades';
 import {gionStreetscape} from './gion-streetscape';
 import {buildKameokaCampus,isKameokaBuilding,KAMEOKA_CENTER} from './kameoka-campus';
@@ -405,8 +406,10 @@ export function createHero(
       () => true,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
       VIEWS.shogunzuka.eye,
+      new Set([...stationMatches.boxes.map(([i]) => buildings.boxes[i]), ...stationMatches.polys.map(([i]) => buildings.polys[i])]),
     );
     if (!city) throw new Error('Initial city preparation cancelled');
+    city.fallback.name = 'Station district fallback';
     panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
       eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });
     scene.add(panoramaCity.group);
@@ -476,6 +479,7 @@ export function createHero(
         if (visible !== group.visible) {
           group.visible = visible;
           landmarks.showStationFallback(!visible);
+          city.fallback.visible = !visible;
           shadow.invalidate();
         }
         if (distanceSq > 2600 * 2600) {

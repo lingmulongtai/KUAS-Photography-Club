@@ -93,7 +93,7 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
 
 export async function loadStationDetail(env: Env, hf: Heightfield, center: THREE.Vector3) {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const {scene: group} = await loader.loadAsync('/kyoto/kyoto-station.glb');
+  const {scene: group} = await loader.loadAsync('/kyoto/kyoto-station-district.glb');
   const materials = new Map<THREE.MeshStandardMaterial, THREE.ShaderMaterial>();
   const geometries = new Set<THREE.BufferGeometry>();
   const textures = new Set<THREE.Texture>();

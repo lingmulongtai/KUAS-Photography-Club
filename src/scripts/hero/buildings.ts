@@ -572,8 +572,10 @@ function instanceShape(shape: THREE.InstancedBufferGeometry, source: THREE.Insta
   return geometry;
 }
 
-function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, keep: (b: BoxBuilding) => boolean, quality: number, dressed: (b: BoxBuilding | PolyBuilding) => boolean, panoramaEye?: PanoramaEye) {
+function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>) {
   const group = new THREE.Group();
+  const fallback = new THREE.Group();
+  if (replaceable) group.add(fallback);
   const detailMat = detailMaterial(env, VOXEL);
   // beyond these the parts are thinner than a pixel
   const detailMid = quality > 0.75 ? 950 : 650;
@@ -597,12 +599,13 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
   /** Pairs of the same houses: stepped roofs for chunks near the camera, plain slopes beyond. */
   const roofLods: { near: THREE.Mesh; far: THREE.Mesh; x: number; z: number }[] = [];
 
-  type Chunk = { x: number; z: number; flat: PlacedHouse[]; pitched: PlacedHouse[]; polys: { p: PolyBuilding; y: number; seed: number }[] };
+  type Chunk = { x: number; z: number; parent: THREE.Group; flat: PlacedHouse[]; pitched: PlacedHouse[]; polys: { p: PolyBuilding; y: number; seed: number }[] };
   const chunks = new Map<string, Chunk>();
-  const chunkOf = (x: number, z: number) => {
-    const key = `${Math.floor(x / CHUNK)},${Math.floor(z / CHUNK)}`;
+  const chunkOf = (x: number, z: number, building: BoxBuilding | PolyBuilding) => {
+    const proxy = replaceable?.has(building);
+    const key = `${Math.floor(x / CHUNK)},${Math.floor(z / CHUNK)}${proxy ? ':fallback' : ''}`;
     let c = chunks.get(key);
-    if (!c) chunks.set(key, (c = { x: (Math.floor(x / CHUNK) + .5) * CHUNK, z: (Math.floor(z / CHUNK) + .5) * CHUNK, flat: [], pitched: [], polys: [] }));
+    if (!c) chunks.set(key, (c = { x: (Math.floor(x / CHUNK) + .5) * CHUNK, z: (Math.floor(z / CHUNK) + .5) * CHUNK, parent: proxy ? fallback : group, flat: [], pitched: [], polys: [] }));
     return c;
   };
   for(let i=0;i<data.boxes.length;i++) {
@@ -611,7 +614,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
     if (!keep(b)) continue;
     const y = hf.height(b.x, b.z) + b.ground;
     const seed = hash1(i * 7 + 3);
-    const c = chunkOf(b.x, b.z);
+    const c = chunkOf(b.x, b.z, b);
     if (roofFor(b).type > 0) c.pitched.push({ b, y, seed });
     else c.flat.push({ b, y, seed });
   }
@@ -621,7 +624,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
     const cx = p.ring[0];
     const cz = p.ring[1];
     const y = hf.height(cx, cz) + p.ground;
-    chunkOf(cx, cz).polys.push({ p, y, seed: hash1(i * 13 + 5) });
+    chunkOf(cx, cz, p).polys.push({ p, y, seed: hash1(i * 13 + 5) });
   }
 
   /**
@@ -629,22 +632,22 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
    * small parts (ledges, balconies) show close to the camera, the rest a little further out.
    * The parts are under a metre thick, finer than a texel of the sun's shadow map, so none casts one.
    */
-  type Tile = { x: number; y: number; z: number; flat: Chunk['flat']; polys: Chunk['polys']; done: boolean; near: THREE.Mesh | null; mid: THREE.Mesh | null };
+  type Tile = { x: number; y: number; z: number; parent: THREE.Group; flat: Chunk['flat']; polys: Chunk['polys']; done: boolean; near: THREE.Mesh | null; mid: THREE.Mesh | null };
   const tiles = new Map<string, Tile>();
-  const tileOf = (x: number, z: number) => {
+  const tileOf = (x: number, z: number, parent: THREE.Group) => {
     const kx = Math.floor(x / DETAIL_TILE), kz = Math.floor(z / DETAIL_TILE);
-    const key = `${kx},${kz}`;
+    const key = `${kx},${kz}${parent === fallback ? ':fallback' : ''}`;
     let t = tiles.get(key);
     if (!t) {
       const cx = (kx + 0.5) * DETAIL_TILE, cz = (kz + 0.5) * DETAIL_TILE;
-      tiles.set(key, (t = { x: cx, y: hf.height(cx, cz), z: cz, flat: [], polys: [], done: false, near: null, mid: null }));
+      tiles.set(key, (t = { x: cx, y: hf.height(cx, cz), z: cz, parent, flat: [], polys: [], done: false, near: null, mid: null }));
     }
     return t;
   };
   let tiled=0;
   for (const c of chunks.values()) {
-    for (const e of c.flat) { if(++tiled%512===0)yield; if (!inCampus(e.b.x, e.b.z) && !dressed(e.b)) tileOf(e.b.x, e.b.z).flat.push(e); }
-    for (const e of c.polys) { if(++tiled%512===0)yield; if (!inCampus(e.p.ring[0], e.p.ring[1]) && !dressed(e.p)) tileOf(e.p.ring[0], e.p.ring[1]).polys.push(e); }
+    for (const e of c.flat) { if(++tiled%512===0)yield; if (!inCampus(e.b.x, e.b.z) && !dressed(e.b)) tileOf(e.b.x, e.b.z, c.parent).flat.push(e); }
+    for (const e of c.polys) { if(++tiled%512===0)yield; if (!inCampus(e.p.ring[0], e.p.ring[1]) && !dressed(e.p)) tileOf(e.p.ring[0], e.p.ring[1], c.parent).polys.push(e); }
   }
   const modelDetails = (t: Tile) => {
     const lists = { near: new DetailList(), mid: new DetailList() };
@@ -657,7 +660,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
       if (!list.count) return null;
       const m = detailMesh(list, detailMat);
       m.visible = false;
-      group.add(m);
+      t.parent.add(m);
       return m;
     };
     t.near = mesh(lists.near);
@@ -674,11 +677,11 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
     const add = (geo: THREE.BufferGeometry, mat: THREE.ShaderMaterial, depth: THREE.ShaderMaterial) => {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.userData.depthMaterial = depth;
-      group.add(mesh);
+      c.parent.add(mesh);
       return mesh;
     };
     let block: (typeof blocks)[number] | undefined;
-    if (panoramaEye && overview && (c.flat.length || c.pitched.length)) {
+    if (panoramaEye && overview && c.parent !== fallback && (c.flat.length || c.pitched.length)) {
       const west = panoramaEye.x - c.x, across = Math.abs(panoramaEye.z - c.z);
       const distance = Math.hypot(Math.max(0, west - CHUNK / 2), Math.max(0, across - CHUNK / 2));
       if (west > CHUNK / 2 && across < west * 1.25 && distance >= 850) {
@@ -713,7 +716,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
   }
   complete=true;
   return {
-    group, overview,
+    group, overview, fallback,
     /**
      * Swap stepped and plain roofs, and show facade details, by distance from the camera; call once
      * a frame. True when the roofs changed (the sun's shadow map needs redrawing).
@@ -738,6 +741,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: { boxes: BoxBuilding[]
       // one tile's details are modelled per frame, the nearest first, so flying into a new area never stalls
       let next: Tile | null = null, nextD = detailMid;
       for (const t of tiles.values()) {
+        if (!t.parent.visible) continue;
         const d = Math.hypot(t.x - eye.x, t.y - eye.y, t.z - eye.z);
         if (!t.done && d < nextD) {
           next = t;
@@ -773,8 +777,8 @@ export function buildCity(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuildi
 }
 
 /** Keep the renderer responsive while a neighbouring region builds its city. */
-export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye) {
-  const steps=buildCitySteps(env,hf,data,keep,quality,dressed,panoramaEye);
+export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye,replaceable?:ReadonlySet<BoxBuilding | PolyBuilding>) {
+  const steps=buildCitySteps(env,hf,data,keep,quality,dressed,panoramaEye,replaceable);
   try {
     while(current()){
       const deadline=performance.now()+5;
