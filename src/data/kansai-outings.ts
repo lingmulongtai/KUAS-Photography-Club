@@ -26,7 +26,7 @@ export const OUTINGS = [
   {id:'shimogamo', pref:'26', ja:'下鴨神社', en:'Shimogamo Shrine', lon:135.773, lat:35.0389, range:720, heading:2},
   {id:'delta', pref:'26', ja:'鴨川デルタ', en:'Kamo River delta', lon:135.771727, lat:35.030196, range:720, heading:4},
   {id:'biwa-museum', pref:'25', ja:'琵琶湖博物館', en:'Lake Biwa Museum', lon:135.935198, lat:35.074304, range:620, heading:325},
-  {id:'mizunomori', pref:'25', ja:'水生植物公園みずの森', en:'Mizunomori Water Botanical Garden', lon:135.940344, lat:35.074029, range:650, heading:320},
+  {id:'mizunomori', pref:'25', ja:'水生植物公園みずの森', en:'Mizunomori Water Botanical Garden', lon:135.940385, lat:35.073821, targetHeight:4, pitch:-26, range:150, heading:312},
   {id:'sagano', pref:'26', ja:'嵯峨野トロッコ（トロッコ保津峡駅）', en:'Sagano Scenic Railway · Torokko Hozukyo', lon:135.646278, lat:35.02611, range:600, heading:290},
   {id:'hozukyo', pref:'26', ja:'保津峡', en:'Hozukyo Gorge', lon:135.6392, lat:35.0233, range:1150, heading:285},
   {id:'nara-park', pref:'29', ja:'奈良公園', en:'Nara Park', lon:135.8431, lat:34.6851, range:1050, heading:83},

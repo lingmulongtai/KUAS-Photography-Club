@@ -30,6 +30,22 @@ test('Nara Park places four Kasuga sanctuaries and the open dance hall on their 
   }
 });
 
+test('Mizunomori preserves the six pavilion footprints and transparent planted atrium',()=>{
+  const model=json('landmarks/index.json').find(b=>b.id==='lotus-pavilion');
+  const outlines=json('landmarks/lotus-pavilion.geojson').features;
+  assert.equal(model.pref,'25');
+  assert.equal(model.rings.length,6);
+  assert.deepEqual(model.rings,outlines.map(f=>f.geometry.coordinates[0]));
+  const bytes=readFileSync(new URL('landmarks/lotus-pavilion.glb',root));
+  const doc=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
+  const glass=doc.meshes.find(m=>m.name==='Glazing').primitives[0];
+  const material=doc.materials[glass.material];
+  assert.equal(material.alphaMode,'BLEND');
+  assert.ok(material.pbrMetallicRoughness.baseColorFactor[3]<.65);
+  for(const name of ['Steel','Water','Leaves','Lilies'])assert.ok(doc.meshes.some(m=>m.name===name));
+  assert.ok(doc.accessors[glass.attributes.POSITION].max[1]>10);
+});
+
 test('Osaka Castle has a resident textured keep at its surveyed height',()=>{
   const keep=json('landmarks/index.json').find(b=>b.id==='osaka-keep');
   const camera=OUTINGS.find(p=>p.id==='osaka-castle');
