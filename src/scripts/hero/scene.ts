@@ -477,7 +477,7 @@ export function createHero(
     let regionalDrive:typeof cars.update|null=null;
     let railDrive:((dt:number)=>void)|null=null;
     void loadBinary('railways.json.gz').then(bytes=>{
-      const railways=buildRailways(env,(x,z)=>hf.height(x,z),(JSON.parse(new TextDecoder().decode(bytes)) as {routes:RailwayRoute[]}).routes,katsura.complete);
+      const railways=buildRailways(env,(x,z)=>hf.height(x,z),(JSON.parse(new TextDecoder().decode(bytes)) as {routes:RailwayRoute[]}).routes,katsura.complete,transportLines);
       scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
     }).catch(error=>console.warn('Railway scenery unavailable',error));
     const trafficView=new THREE.Frustum(),trafficProjection=new THREE.Matrix4(),streetView=createTrafficView();
