@@ -22,7 +22,7 @@ const AUTO_SPIN = 0.07;
 const START_RATIO = 0.3;
 
 export function mountReel(root: HTMLElement) {
-  const photos = JSON.parse(root.dataset.photos ?? '[]') as ReelCard[];
+  let photos = JSON.parse(root.dataset.photos ?? '[]') as ReelCard[];
   const stage = root.querySelector<HTMLElement>('[data-reel-stage]')!;
   const ring = root.querySelector<HTMLElement>('[data-reel-ring]')!;
   const slots = Array.from(ring.querySelectorAll<HTMLAnchorElement>('[data-slot]'));
@@ -43,8 +43,8 @@ export function mountReel(root: HTMLElement) {
 
   /* ---- what each slot shows ---- */
   const shown = slots.map(() => -1);
-  const show = (slot: number, index: number) => {
-    if (shown[slot] === index) return;
+  const show = (slot: number, index: number, refresh = false) => {
+    if (!refresh && shown[slot] === index) return;
     shown[slot] = index;
     const p = photos[index];
     const el = slots[slot];
@@ -53,7 +53,7 @@ export function mountReel(root: HTMLElement) {
     el.classList.toggle('is-art', !p.src);
     if (p.src) {
       img.hidden = false;
-      img.src = p.src;
+      if (img.getAttribute('src') !== p.src) img.src = p.src;
       img.alt = p.alt;
       art.hidden = true;
     } else {
@@ -70,6 +70,15 @@ export function mountReel(root: HTMLElement) {
     else el.removeAttribute('href');
     el.setAttribute('aria-label', `${p.title} ${p.meta}`);
   };
+
+  document.addEventListener('home:language', () => {
+    const translated = JSON.parse(root.dataset.photos ?? '[]') as ReelCard[];
+    if (!translated.length) return;
+    photos = translated;
+    shown.forEach((index, slot) => {
+      if (index >= 0) show(slot, index % photos.length, true);
+    });
+  });
 
   /* ---- loading progress: the first photos on the ring ---- */
   let loaded = 0;
