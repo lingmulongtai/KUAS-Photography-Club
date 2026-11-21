@@ -2,7 +2,16 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
-import {railwayPath,trainSections,serviceTrainProgress} from '../src/scripts/hero/railway-path.ts';
+import {createRailGradeIndex,railwayPath,trainSections,serviceTrainProgress} from '../src/scripts/hero/railway-path.ts';
+
+test('surveyed rails on a viaduct approach follow only the adjacent parallel service grade',()=>{
+  const grade=createRailGradeIndex();
+  grade.add({x:40,z:0,y:12},{x:52,z:0,y:18});
+  assert.equal(grade.at(48,2.6,1,0,10),16);
+  assert.equal(grade.at(48,-2.6,-1,0,10),16);
+  assert.equal(grade.at(48,2.6,0,1,10),10);
+  assert.equal(grade.at(48,6,1,0,10),10);
+});
 
 test('the source routes include the Shinkansen, stay continuous and retain hidden tunnel segments',async()=>{
   const data=JSON.parse(gunzipSync(await readFile(new URL('../public/kyoto/railways.json.gz',import.meta.url))));

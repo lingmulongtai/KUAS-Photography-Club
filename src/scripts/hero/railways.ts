@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
 import {CampusBuilder,CM} from './campus-architecture';
 import {createCampusMesh} from './campus';
-import {railwayPath,trainSections,serviceTrainProgress,type RailwayRoute} from './railway-path';
+import {createRailGradeIndex,railwayPath,trainSections,serviceTrainProgress,type RailwayRoute} from './railway-path';
 import {SHADOW_LAYER} from './shadow';
 import {LINE,RAIL,type LineFeature} from './lines-data';
 import type {Box} from './geo';
@@ -13,6 +13,7 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
   const group=new THREE.Group();group.name='kyoto-railways';
   const positions:number[]=[],sides:number[]=[],along:number[]=[],trackCounts:number[]=[],gauges:number[]=[];
   const structures=new CampusBuilder(0,{x:0,z:0},0);
+  const grades=createRailGradeIndex();
   type End={x:number;y:number;z:number;dx:number;dz:number};
   function track(a:End,b:End,start:number,end:number,width:number,count:number,gauge:number){
     for(const [p,side,distance] of [[a,-1,start],[a,1,start],[b,1,end],[a,-1,start],[b,1,end],[b,-1,end]] as const){
@@ -32,7 +33,8 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
       // Vehicles still follow their continuous route and elevated decks keep their height.
       const x=(a.x+b.x)/2,z=(a.z+b.z)/2;
       const surveyed=a.state===0&&trackBox&&x>=trackBox[0]&&z>=trackBox[1]&&x<trackBox[2]&&z<trackBox[3];
-      if(!surveyed)track(a,b,path.distances[i],path.distances[i+1],width,a.tracks,gauge);
+      if(surveyed)grades.add(a,b);
+      else track(a,b,path.distances[i],path.distances[i+1],width,a.tracks,gauge);
       if(a.state===1){
         const start:[number,number,number]=[a.x,a.y-.55,a.z],end:[number,number,number]=[b.x,b.y-.55,b.z];
         structures.beam(start,end,width,.9,CM.concrete);
@@ -62,9 +64,13 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
       const ax=pts[i-2],az=pts[i-1],vx=pts[i]-ax,vz=pts[i+1]-az,length=Math.hypot(vx,vz);
       if(!length)continue;
       const dx=vx/length,dz=vz/length,steps=Math.ceil(length/12);
-      let a={x:ax,z:az,y:ground(ax,az)+.24,dx,dz};
+      const railHeight=(x:number,z:number)=>{
+        const surface=ground(x,z)+.24;
+        return attr&RAIL.individual?grades.at(x,z,dx,dz,surface):surface;
+      };
+      let a={x:ax,z:az,y:railHeight(ax,az),dx,dz};
       for(let j=1;j<=steps;j++){
-        const x=ax+vx*j/steps,z=az+vz*j/steps,b={x,z,y:ground(x,z)+.24,dx,dz};
+        const x=ax+vx*j/steps,z=az+vz*j/steps,b={x,z,y:railHeight(x,z),dx,dz};
         track(a,b,distance+length*(j-1)/steps,distance+length*j/steps,3.1,1,attr&RAIL.standardGauge?1.435:1.067);
         a=b;
       }

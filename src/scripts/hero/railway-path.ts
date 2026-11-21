@@ -3,6 +3,41 @@ export interface RailwayRoute {
   stations:{code:string;distance:number}[];color:string;cars:number;carLength:number;
 }
 
+type RailPoint={x:number;y:number;z:number};
+
+/** Match individual running tracks to the adjacent train's approach grade. */
+export function createRailGradeIndex(){
+  type Segment={a:RailPoint;b:RailPoint;vx:number;vz:number;length:number};
+  const cells=new Map<string,Segment[]>(),reach=5,cell=48;
+  return {
+    add(a:RailPoint,b:RailPoint){
+      const vx=b.x-a.x,vz=b.z-a.z,length=Math.hypot(vx,vz);
+      if(!length)return;
+      const segment={a,b,vx,vz,length};
+      for(let i=Math.floor((Math.min(a.x,b.x)-reach)/cell);i<=Math.floor((Math.max(a.x,b.x)+reach)/cell);i++){
+        for(let j=Math.floor((Math.min(a.z,b.z)-reach)/cell);j<=Math.floor((Math.max(a.z,b.z)+reach)/cell);j++){
+          const key=i+','+j,list=cells.get(key);
+          if(list)list.push(segment);else cells.set(key,[segment]);
+        }
+      }
+    },
+    at(x:number,z:number,dx:number,dz:number,ground:number){
+      const lines=cells.get(Math.floor(x/cell)+','+Math.floor(z/cell));
+      let nearest=reach,y=ground;
+      if(lines)for(const {a,b,vx,vz,length} of lines){
+        if(Math.abs(dx*vx+dz*vz)<length*.95)continue;
+        const t=Math.max(0,Math.min(1,((x-a.x)*vx+(z-a.z)*vz)/(length*length)));
+        const distance=Math.hypot(x-a.x-t*vx,z-a.z-t*vz);
+        if(distance>=nearest)continue;
+        nearest=distance;
+        const weight=Math.min(1,(reach-distance)/1.5);
+        y=ground+(a.y+t*(b.y-a.y)-ground)*weight;
+      }
+      return y;
+    },
+  };
+}
+
 /** Shared geometry/vehicle alignment; source states never become guessed tunnel shortcuts. */
 export function railwayPath(route:RailwayRoute,ground:(x:number,z:number)=>number){
   const distances=[0];
