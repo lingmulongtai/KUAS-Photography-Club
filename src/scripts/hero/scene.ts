@@ -249,6 +249,11 @@ export function createHero(
       .catch(error=>{southBuildings=undefined;throw error;});
     const southSurvey=southRegion.then(async region=>region?{region,buildings:await loadSouthBuildings(region)}:null);
     void southSurvey.catch(()=>{});
+    const westSurveys=(['otokuni','otokuni-tennozan'] as const).map(name=>({
+      name,buildings:loadBuildings(`buildings-${name}.json`,`buildings-${name}.bin`).catch(error=>{
+        console.warn(`Western basin survey unavailable: ${name}`,error);return null;
+      }),
+    }));
     const elevatedData=loadBinary('transport-spans.json.gz');
     void elevatedData.catch(()=>{});
     const cityData=Promise.all([basinPhoto, loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
@@ -480,14 +485,15 @@ export function createHero(
       trafficView.setFromProjectionMatrix(trafficProjection.multiply(camera.matrixWorldInverse));
       cars.update(dt,trafficView,streetView.contains);regionalDrive?.(dt,trafficView,streetView.contains);railDrive?.(dt);
     };
-    const overviews:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void}[]=[];
-    const installOverview=(item:(typeof overviews)[number])=>{
-      item.setDetailBox(detailBox);overviews.push(item);scene.add(item.mesh);
+    const overviews:((region:CityRegion|null)=>void)[]=[];
+    let detailRegion:CityRegion|null=null;
+    const installOverview=(item:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void})=>{
+      const update=(region:CityRegion|null)=>item.setDetailBox(region?.box??null);
+      update(detailRegion);overviews.push(update);scene.add(item.mesh);
     };
-    let detailBox:Box|null=null;
-    const setOverviewDetail=(box:Box|null)=>{
-      detailBox=box;
-      for(const overview of overviews)overview.setDetailBox(box);
+    const setOverviewDetail=(region:CityRegion|null)=>{
+      detailRegion=region;
+      for(const update of overviews)update(region);
     };
     const disposeGroup=(group:THREE.Object3D)=>{
       const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
@@ -521,7 +527,7 @@ export function createHero(
       }):data.buildings.polys;
       const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
       await step();
-      const preparedCity=await buildCityAsync(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||b.w*b.d>65||b.h>10),opts.quality,current);
+      const preparedCity=await buildCityAsync(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||r.id==='tennozan'||b.w*b.d>65||b.h>10),opts.quality,current);
       if(!preparedCity)throw new Error('Region superseded');
       city=preparedCity;
       group.add(city.group);
@@ -590,7 +596,7 @@ export function createHero(
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
       scene.add(group);casts(city.group);cityLods.add(city);shadow.invalidate();
-      setOverviewDetail(r.box);
+      setOverviewDetail(r);
       } catch(error) {release(false);throw error;}
       return ()=>release();
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
@@ -636,14 +642,30 @@ export function createHero(
     const residentSouth=southSurvey.then(async survey=>{
       if(!survey)return false;
       const skyline=await buildResidentCity(env,hf,survey.buildings,survey.region.box);
+      skyline.mesh.name='southern-basin-buildings';
       await prepare(skyline.mesh);
       installOverview(skyline);
       return true;
     }).catch(error=>{console.warn('Southern survey unavailable; using sampled skyline',error);return false;});
+    const residentWest=Promise.all(westSurveys.map(async({name,buildings})=>{
+      const data=await buildings;
+      if(!data)return null;
+      const skyline=await buildResidentCity(env,hf,data);
+      skyline.mesh.name=name;
+      await prepare(skyline.mesh);
+      if(name==='otokuni-tennozan'){
+        // Only these footprints have a counterpart in the detailed confluence survey.
+        // The southern ward rectangle also covers Muko but supplies no houses there.
+        const update=(region:CityRegion|null)=>{skyline.mesh.visible=region?.id!=='tennozan';};
+        update(detailRegion);overviews.push(update);
+      }
+      scene.add(skyline.mesh);
+      return name==='otokuni-tennozan'?createBuildingMask(data.boxes,data.polys):null;
+    }));
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
     const openingTamba=view==='kameokaTerrace';
-    await Promise.all([cloudProgram,scenePrograms,openingRegion,residentSouth,loadOverview('south'),
+    await Promise.all([cloudProgram,scenePrograms,openingRegion,residentSouth,residentWest,loadOverview('south'),
       openingTamba?loadOverview('tamba'):undefined]);
     loading.built();
     startGroundRelief=() => idle(() => {
@@ -660,7 +682,12 @@ export function createHero(
       try {
         const bytes=await loadBinary(`buildings-${area}-lod.json.gz`);
         const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers?:OverviewBuilding[];residentCount?:number};
-        const buildings=area==='south'&&data.residentCount&&await residentSouth ? data.buildings.slice(data.residentCount) : data.buildings;
+        let buildings=data.buildings;
+        if(area==='south'){
+          if(data.residentCount&&await residentSouth)buildings=buildings.slice(data.residentCount);
+          const masks=(await residentWest).filter(mask=>mask!==null);
+          buildings=buildings.filter(([x,z])=>!masks.some(mask=>mask(x,z)));
+        }
         const overview=await buildSouthOverview(env,buildings,(x,z)=>hf.height(x,z));
         overview.mesh.name=`${area}-overview`;
         installOverview(overview);

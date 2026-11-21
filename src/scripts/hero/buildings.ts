@@ -785,14 +785,13 @@ export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(
   } finally {steps.return(undefined as never);}
 }
 
-/** Permanent southern rooflines use the same measured outlines, roof shapes and night windows as the core.
+/** Resident rooflines use the same outlines, roof shapes and night windows as the core.
  * Only nearby regional models need individual balconies, stepped tiles and shadow-map submissions. */
-export async function buildResidentCity(env:Env,hf:Heightfield,data:CityData,extent:Box) {
+export async function buildResidentCity(env:Env,hf:Heightfield,data:CityData,extent?:Box) {
   const mesh=new THREE.Group();
-  mesh.name='southern-basin-buildings';
   const uniforms={...env,uDetailBox:{value:new THREE.Vector4()}};
   const material=(vertexShader:string)=>new THREE.ShaderMaterial({
-    uniforms,vertexShader,fragmentShader:BUILDING_FS,defines:{REGIONAL_OVERVIEW:1},
+    uniforms,vertexShader,fragmentShader:BUILDING_FS,defines:extent?{REGIONAL_OVERVIEW:1}:{},
   });
   const houses=material(INSTANCE_VS),polygons=material(POLY_VS);
   const flat=flatShape(),pitched=pitchedShape();
@@ -828,7 +827,7 @@ export async function buildResidentCity(env:Env,hf:Heightfield,data:CityData,ext
   }
   return {mesh,setDetailBox(box:Box|null){
     uniforms.uDetailBox.value.fromArray(box??[0,0,0,0]);
-    mesh.visible=!(box&&box[0]<=extent[0]&&box[1]<=extent[1]&&box[2]>=extent[2]&&box[3]>=extent[3]);
+    mesh.visible=!(box&&extent&&box[0]<=extent[0]&&box[1]<=extent[1]&&box[2]>=extent[2]&&box[3]>=extent[3]);
     if(mesh.visible)for(const batch of batches){
       const bounds=batch.geometry.boundingBox!;
       batch.visible=!(box&&bounds.min.x>=box[0]&&bounds.min.z>=box[1]&&bounds.max.x<box[2]&&bounds.max.z<box[3]);
