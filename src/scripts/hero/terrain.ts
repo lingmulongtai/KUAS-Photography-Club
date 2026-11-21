@@ -361,7 +361,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // Reuse the two already-filtered normal samples. Detailed streets take over near the camera.
           float distantLight = (1.-basinSurface.a)*basin
             + (1.-outerSurface.a)*(1.-basin)*uOuterOn*inside(uOuterBox,p,120.);
-          float coreInset = boxInset(uRoadBox,p);
+          float coreInset = boxInset(uBuiltBox,p);
           float core = uRoadsOn*smoothstep(0.,180.,coreInset);
           // Both detailed fields include their edge. Feather outside by one basin texel,
           // so the two neighbouring areas cannot expose a strip of coarse light between them.

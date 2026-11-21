@@ -21,7 +21,7 @@ const CENTRE_SPAN = 32;
  *   b  distance to the centre line of the nearest avenue
  *   a  signed distance to the edge of the nearest railway
  */
-export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature[], size: number, box:Box=BUILDINGS_BOX) {
+export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature[], size: number, box:Box=BUILDINGS_BOX, resident=false) {
   const [minX, minZ, maxX, maxZ] = box;
   const segs: number[] = [];
   for (const f of lines) {
@@ -29,8 +29,8 @@ export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature
     let kind: number;
     if (f.kind === LINE.road) {
       const rank = f.attr & 15;
-      if (rank < 1) continue;
-      half = ROAD_WIDTH[rank] / 2;
+      if (rank >= ROAD_WIDTH.length) continue;
+      half = rank===0 ? 1.15 : ROAD_WIDTH[rank] / 2;
       kind = rank >= 3 ? 1 : 0;
     } else if (f.kind === LINE.rail) {
       // ballast for one or two tracks; elevated lines are drawn as structures elsewhere
@@ -113,12 +113,20 @@ export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature
   scene.add(mesh);
   const camera = new THREE.Camera();
 
-  const target = new THREE.WebGLRenderTarget(size, size, {
+  // Keep the original metres per texel when extending south. Short texture-array
+  // pages fit a 2048/4096 limit without shrinking the Kyoto streets or adding a sampler.
+  const rows=resident?Math.ceil(size*(maxZ-minZ)/(BUILDINGS_BOX[3]-BUILDINGS_BOX[1])):size;
+  const pages=Math.ceil(rows/renderer.capabilities.maxTextureSize);
+  const pad=pages>1?4:0;
+  const pageRows=Math.ceil(rows/pages);
+  const options = {
     minFilter: THREE.LinearMipmapLinearFilter,
     magFilter: THREE.LinearFilter,
     generateMipmaps: true,
     depthBuffer: false,
-  });
+  } as const;
+  const target=resident?new THREE.WebGLArrayRenderTarget(size,pageRows+2*pad,pages,options):
+    new THREE.WebGLRenderTarget(size,size,options);
   target.texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const prevTarget = renderer.getRenderTarget();
   const prevColor = renderer.getClearColor(new THREE.Color());
@@ -126,11 +134,15 @@ export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature
   const prevAuto = renderer.autoClear;
   const prevTone = renderer.toneMapping;
   try {
-    renderer.setRenderTarget(target);
     renderer.setClearColor(0xffffff, 1);
     renderer.autoClear = true;
     renderer.toneMapping = THREE.NoToneMapping;
-    renderer.render(scene, camera);
+    const pageSpan=(maxZ-minZ)/pages,margin=pad*pageSpan/pageRows;
+    for(let i=0;i<pages;i++){
+      material.uniforms.uBox.value.set(minX,minZ+i*pageSpan-margin,maxX,minZ+(i+1)*pageSpan+margin);
+      renderer.setRenderTarget(target,i);
+      renderer.render(scene,camera);
+    }
   } catch (error) {
     target.dispose();
     throw error;
@@ -147,7 +159,7 @@ export function buildRoadField(renderer: THREE.WebGLRenderer, lines: LineFeature
 
 /** GLSL to read the field: declares uRoads / uRoadBox and roadAt(). */
 export const ROAD_GLSL = /* glsl */ `
-uniform sampler2D uRoads;
+uniform highp sampler2DArray uRoads;
 uniform vec4 uRoadBox;
 uniform float uRoadsOn;
 uniform sampler2D uRegionRoads;
@@ -159,7 +171,12 @@ struct Road { float edge; float avenue; float centre; float rail; };
 Road roadAt(vec2 p){
   vec2 uv = (p - uRoadBox.xy) / (uRoadBox.zw - uRoadBox.xy);
   // sample first, then decide: a texture read inside a branch would have no well-defined mip level
-  vec4 f = texture2D(uRoads, vec2(uv.x, 1. - uv.y));
+  ivec3 grid=textureSize(uRoads,0);
+  float pages=float(grid.z),page=clamp(floor(uv.y*pages),0.,pages-1.);
+  float interior=grid.z>1?1.-8./float(grid.y):1.;
+  vec2 st=vec2(uv.x,.5+(.5-(uv.y*pages-page))*interior);
+  vec2 scale=vec2(1.,-pages*interior);
+  vec4 f=textureGrad(uRoads,vec3(st,page),dFdx(uv)*scale,dFdy(uv)*scale);
   if (uRoadsOn < .5 || uv.x <= 0. || uv.x >= 1. || uv.y <= 0. || uv.y >= 1.) f = vec4(1.);
   if(uRegionRoadsOn>.5){
     vec2 ru=(p-uRegionRoadBox.xy)/(uRegionRoadBox.zw-uRegionRoadBox.xy);

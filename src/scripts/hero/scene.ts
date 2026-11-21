@@ -255,6 +255,8 @@ export function createHero(
       }),
     }));
     const elevatedData=loadBinary('transport-spans.json.gz');
+    const basinTransport=meta.basinTransport?loadLines(undefined,meta.basinTransport.file,meta.basinTransport.box,meta.basinTransport.q)
+      .catch(error=>{console.warn('Basin street network unavailable',error);return [];}):Promise.resolve([]);
     void elevatedData.catch(()=>{});
     const cityData=Promise.all([basinPhoto, loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
     // Join the original promise below; attach a handler now for an early failure.
@@ -450,9 +452,13 @@ export function createHero(
     const tops = [landmarks.positions.kyotoTower.clone().setY(landmarks.positions.kyotoTower.y + 131.5)];
     scene.add(buildBeacons(env, tops));
 
-    terrain.uniforms.uRoads.value = buildRoadField(renderer, lines, opts.quality > 0.75 ? 4096 : 2048).texture;
+    const transportLines=await basinTransport;
+    const roadBox:Box=[...BUILDINGS_BOX];
+    if(transportLines.length&&meta.basinTransport)roadBox[3]=meta.basinTransport.box[3];
+    const fieldSize=Math.min(renderer.capabilities.maxTextureSize,lite?2048:4096);
+    terrain.uniforms.uRoads.value=buildRoadField(renderer,lines.concat(transportLines),fieldSize,roadBox,true).texture;
     await yieldToBrowser();
-    terrain.uniforms.uRoadBox.value.set(...BUILDINGS_BOX);
+    terrain.uniforms.uRoadBox.value.set(...roadBox);
     terrain.uniforms.uRoadsOn.value = 1;
     const water = await buildWaterAsync(env, hf, lines, terrain.uniforms,lite?28:18,channel,false,()=>true);
     if (water) scene.add(water);

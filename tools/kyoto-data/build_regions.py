@@ -177,6 +177,8 @@ def merge_osaka_measured(buildings, region):
 def export_lines(key,box):
     feats=[]
     clip=sbox(*box)
+    transport=key=='basin-transport'
+    south_of_core=sbox(box[0],R.BUILDINGS[3],box[2],box[3]) if transport else None
     origin=np.array(box[:2])
     osaka_centre=Point(*R.to_local(34.702911,135.495896)) if key=='osaka' else None
     def add(kind,attr,coords):
@@ -190,11 +192,15 @@ def export_lines(key,box):
             feats.append((kind,attr,q))
     for data,project in tiles(box,14):
         for layer,kind in [('road',0),('railway',1),('waterarea',2)]:
+            if transport and kind>=2:
+                continue
             for ft in data.get(layer,{}).get('features',[]):
                 p=ft['properties'];attr=0
                 if kind==0:
                     rank=int(p.get('rnkWidth') or 0)
-                    if rank<1:
+                    if transport and (p.get('ftCode')!=2701 or p.get('rnkWidth') not in range(5)):
+                        continue  # No tunnels, bridge decks or pedestrian trails painted on the ground.
+                    if not transport and rank<1:
                         continue
                     category=int(p['rdCtg']) if p.get('rdCtg') is not None else 2
                     attr=rank|(category<<4)
@@ -203,7 +209,14 @@ def export_lines(key,box):
                     if state not in (0,1):
                         continue
                     attr=(1 if state==1 else 0)|(2 if p.get('snglDbl')==2 else 0)
+                    if transport:
+                        if state!=0 or p.get('snglDbl') not in (1,2,3,4):
+                            continue
+                        if p.get('snglDbl')==3:
+                            attr|=4  # A surveyed siding, separate from passenger routes.
                 g=transform(project,make_valid(shape(ft['geometry'])).intersection(sbox(0,0,4096,4096))).intersection(clip)
+                if transport and ((kind==0 and rank>0) or (kind==1 and not attr&4)):
+                    g=g.intersection(south_of_core)  # The resident core already has these.
                 # Keep local streets near Umeda; use wider roads farther out.
                 if kind==0 and osaka_centre is not None and rank==1 and g.distance(osaka_centre)>2500:
                     continue

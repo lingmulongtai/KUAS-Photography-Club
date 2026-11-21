@@ -515,5 +515,17 @@
   "nx": 256,
   "nz": 281,
   "file": "terrain-sonobe.bin"
+ },
+ "basinTransport": {
+  "file": "lines-basin-transport.bin",
+  "box": [
+   -9000,
+   2650,
+   4600,
+   13300
+  ],
+  "q": 0.5,
+  "bytes": 245105,
+  "features": 37547
  }
 }
