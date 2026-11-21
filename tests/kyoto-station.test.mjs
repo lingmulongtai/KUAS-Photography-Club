@@ -58,4 +58,5 @@ test('surveyed station ships with local geometry, embedded facade photos and nam
   assert.ok(bounds.min.z < -145 && bounds.max.z < 55);
   assert.ok(bounds.max.y > 60 && bounds.max.y < 72, 'includes rooftop equipment, excludes Kyoto Tower');
   assert.ok(model.materials.some(material => material.name.startsWith('Plaza-')));
+  assert.ok(model.materials.some(material => material.name === 'Atrium glazing'));
 });

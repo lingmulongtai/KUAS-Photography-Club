@@ -3,14 +3,19 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
+import { SHADOW_LAYER } from './shadow';
 
 function stationMaterial(source: THREE.MeshStandardMaterial, env: Env) {
   const map = source.map;
+  const glazing = source.name === 'Atrium glazing';
   map?.updateMatrix();
   if (map) map.anisotropy = 4;
   return new THREE.ShaderMaterial({
     side: source.side,
-    defines: map ? { STATION_PHOTO: 1 } : {},
+    transparent: glazing,
+    depthWrite: !glazing,
+    forceSinglePass: true,
+    defines: { ...(map && { STATION_PHOTO: 1 }), ...(glazing && { ATRIUM_GLASS: 1 }) },
     uniforms: {
       ...env, uPhoto: { value: map }, uUvMatrix: { value: map?.matrix ?? new THREE.Matrix3() },
       uTint: { value: source.color },
@@ -48,7 +53,21 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env) {
                  + pane * smoothstep(.09, .45, luminance) * vec3(.092, .068, .039));
         #endif
         vec3 col = shade(seasonalSurface(base,n,vWorld), n, vWorld, sunShadow(vWorld,n));
-        gl_FragColor = vec4(applyHaze(col, light, vWorld), 1.);
+        float opacity = 1.;
+        #ifdef ATRIUM_GLASS
+          // Follow the vaulted section across its crown. Filter the frame lines
+          // over the pixel footprint so they stay quiet at the LOD boundary.
+          vec2 paneUV = vec2(vWorld.x / 2.8, atan(vWorld.y - 59., vWorld.z - 1945.) * 6.);
+          vec2 pixel = max(fwidth(paneUV), vec2(.001));
+          vec2 seam = abs(fract(paneUV + .5) - .5);
+          vec2 frame = 1. - smoothstep(vec2(.025) - pixel*.5, vec2(.025) + pixel*.5, seam);
+          float bars = max(frame.x, frame.y);
+          vec3 incident = normalize(vWorld - cameraPosition);
+          float grazing = pow(1. - abs(dot(incident,n)), 3.);
+          col = mix(col * .36 + skyColor(reflect(incident,n)) * .22, col * .52, bars);
+          opacity = mix(.16 + .34*grazing, .88, bars);
+        #endif
+        gl_FragColor = vec4(applyHaze(col, light, vWorld), opacity);
       }`,
   });
 }
@@ -88,6 +107,7 @@ export async function loadStationDetail(env: Env, hf: Heightfield, center: THREE
       source.dispose();
     }
     obj.material = material;
+    if (!material.transparent) obj.layers.enable(SHADOW_LAYER);
   });
   group.name = 'Kyoto station detail';
   group.position.copy(center);

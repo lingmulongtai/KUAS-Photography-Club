@@ -489,7 +489,6 @@ export function createHero(
           stationDetail = detail;
           detail.group.visible = false;
           scene.add(detail.group);
-          casts(detail.group);
           updateStation?.();
         }).catch(error => {
           retryStationAt = performance.now() + 30000;

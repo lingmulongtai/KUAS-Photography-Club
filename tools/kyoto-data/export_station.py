@@ -33,6 +33,18 @@ for path, is_plaza in [(building, False), (plaza, True)]:
         if obj.data.users > 1:
             obj.data = obj.data.copy()
         obj.data.transform(transform)
+        if not is_plaza and obj.name == "Object.203":
+            # The FBX bakes the central barrel vault and the masonry wings into
+            # the same opaque atlas. Its long strips span the surveyed atrium.
+            glazing = obj.data.materials[0].copy()
+            glazing.name = "Atrium glazing"
+            obj.data.materials.append(glazing)
+            for face in obj.data.polygons:
+                points = [obj.data.vertices[i].co for i in face.vertices]
+                x, north, height = zip(*points)
+                if (min(x) > -16 and max(x) < 118 and max(x) - min(x) > 50
+                        and min(north) > -4 and max(north) < 24 and min(height) > 23):
+                    face.material_index = len(obj.data.materials) - 1
         obj.parent = None
         obj.matrix_world = Matrix.Identity(4)
         obj.select_set(True)
