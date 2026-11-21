@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { KANSAI } from '../data/kansai';
-import { OUTINGS } from '../data/kansai-outings';
+import { EXPO, OUTINGS } from '../data/kansai-outings';
 interface Props {lang:'ja'|'en'}
 const {lang}=Astro.props;
 const en=lang==='en';
@@ -13,13 +13,15 @@ const title=en?'Kansai in 3D':'関西の撮影地を3Dで巡る';
     <div class="controls">
       <h1>{title}</h1>
       <label>{en?'Prefecture':'府県'}<select id="map-prefecture">{KANSAI.map(p=><option value={p.code} selected={p.code==='26'}>{p[lang]}</option>)}</select></label>
-      <label>{en?'Club outings':'これまでの撮影地'}<select id="map-outing">
+      <label>{en?'Outings and exhibits':'撮影地・展示'}<select id="map-outing">
         <option value="">{en?'Choose a place':'場所を選ぶ'}</option>
         {KANSAI.map(p=><optgroup label={p[lang]}>{OUTINGS.filter(o=>o.pref===p.code).map(o=><option value={o.id}>{o[lang]}</option>)}</optgroup>)}
+        <optgroup label={en?'Exhibits':'特別展示'}><option value={EXPO.id}>{EXPO[lang]}</option></optgroup>
       </select></label>
     </div>
     <div class="globe" aria-label={title}></div>
     <div class="caption"><span role="status">{en?'Loading the map…':'地図を読み込んでいます…'}</span>
+      <a data-expo-view hidden href="https://plateauview.mlit.go.jp/?share=01kk0nchk9snn6w374ethhbvb8">{en?'Open the official Expo 2025 3D archive':'万博会場の公式3Dアーカイブを開く'}</a>
       <span>{en?'Drag to pan · Wheel to zoom · Ctrl + drag or two fingers to tilt':'ドラッグで移動・ホイールで拡大・Ctrl＋ドラッグまたは2本指で傾ける'}</span></div>
     <details><summary>{en?'Model detail and map sources':'モデルの精度・地図の出典'}</summary>
       <p>{en?'Published PLATEAU surveys supply detailed buildings and bridges. Elsewhere we model the mapped footprints, using recorded height, floor count and roof shape when available. Other heights and individual trees are estimates. Camera targets mark representative views of the outing areas.':'建物・橋は公開されているPLATEAUの実測モデルを優先しています。ほかの地域では建物の実際の外形に、記録のある高さ・階数・屋根形状を反映しています。高さの記録がない建物と森林内の個々の木は推定です。撮影地を選ぶと、その周辺を見渡せる代表地点に移動します。'}</p>
@@ -29,6 +31,9 @@ const title=en?'Kansai in 3D':'関西の撮影地を3Dで巡る';
       <p><a href="https://doi.org/10.6084/m9.figshare.28906499">Che et al., 3D-GloBFP (2020)</a> · <a href="https://doi.org/10.2905/85005901-3a49-48dd-9d19-6261354f56fe">Pesaresi &amp; Politis, GHS-BUILT-H R2023A (European Commission, JRC)</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. {en?'The source polygons and height grids were clipped to the five prefectures. Unsurveyed buildings use matched predictions or a neighbourhood estimate.':'5府県分を抽出・加工。建物の個別資料がない場合は、外形と一致する予測高、または街区の平均高と建物面積からの推定値を使っています。'}</p>
       <p><a href="https://doi.org/10.5281/zenodo.7254221">© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors (ODbL)</a> · <a href="/kansai/building-attributes/index.json">{en?'Download building attributes':'建物属性データの配布索引'}</a></p>
       <p><a href="https://www.todaiji.or.jp/information/daibutsuden/">東大寺大仏殿</a> · <a href="https://www.city.hikone.lg.jp/material/files/group/4/Hikonejo_Kenzobutsu_HozonKatsuyo_Keikaku.pdf">彦根城建造物保存活用計画</a> · <a href="https://www.kobe-orientalhotel.co.jp/about/">神戸メリケンパークオリエンタルホテル</a> · <a href="/kansai/landmarks/nakanoshima-beds.json">{en?'Mapped rose beds (OSM, ODbL)':'中之島の花壇輪郭（OSM・ODbL）'}</a></p>
+      <p><a href="https://www.geospatial.jp/ckan/dataset/plateau-27999-osaka-shi-2025">2025年大阪・関西万博会場 3D都市モデル（国土交通省都市局・Project PLATEAU）</a>
+        {en?' · Noncommercial exhibit using the 2025 site imagery, pavilions and Grand Ring. ':' · 2025年の会場航空写真・パビリオン・大屋根リングを使用した非営利展示。'}
+        <a href="https://gic-plateau.s3.ap-northeast-1.amazonaws.com/2025/expo-doc/3d-license/license.pdf">{en?'Expo dataset terms':'万博データの専用利用規約'}</a></p>
     </details>
   </section>
   <script is:inline src="/kansai-engine/Cesium.js"></script>

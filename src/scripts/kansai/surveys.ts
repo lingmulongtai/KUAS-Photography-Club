@@ -74,7 +74,12 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
       if(widget.isDestroyed()) {tiles.destroy();return;}
       if(layer.kind==='bldg'||layer.kind==='brid')tiles.customShader=layer.kind==='bldg'&&layer.lod===1?material.shader:material.detailed;
       if(layer.kind==='bldg'){
-        tiles.tileVisible.addEventListener((tile:Cesium3DTile)=>{if(tile.content.ready)visible.set(tile.content,layer.lod);});
+        tiles.tileVisible.addEventListener((tile:Cesium3DTile)=>{
+          if(!tile.content.ready)return;
+          // The Expo archive depicts the fair itself; municipal shells can predate construction.
+          const archived=tile.content.url?.includes('/27999_osaka-shi_city_2025_');
+          visible.set(tile.content,archived?4:layer.lod);
+        });
         tiles.tileUnload.addEventListener((tile:Cesium3DTile)=>visible.delete(tile.content));
       }
       tiles.tileFailed.addEventListener(onFailure);

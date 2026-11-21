@@ -1,5 +1,5 @@
 import {KANSAI} from '../../data/kansai';
-import {OUTINGS} from '../../data/kansai-outings';
+import {EXPO,MAP_PLACES} from '../../data/kansai-outings';
 import {C} from './engine';
 import {prefectureLookup,type Boundary} from './coordinates';
 import {json,modelSources} from './sources';
@@ -14,7 +14,8 @@ export async function startMap(root:HTMLElement){
   const en=root.lang==='en',status=root.querySelector<HTMLElement>('[role=status]')!;
   const prefecture=root.querySelector<HTMLSelectElement>('#map-prefecture')!,outing=root.querySelector<HTMLSelectElement>('#map-outing')!;
   const container=root.querySelector<HTMLElement>('.globe')!;
-  const cameraTargets=[...KANSAI.map(p=>({...p,id:p.code,pref:p.code})),...OUTINGS];
+  const expoLink=root.querySelector<HTMLAnchorElement>('[data-expo-view]')!;
+  const cameraTargets=[...KANSAI.map(p=>({...p,id:p.code,pref:p.code})),...MAP_PLACES];
   const byId=(id:string)=>cameraTargets.find(p=>p.id===id);
   let sequence=0,ready=false,renderFailed=false,userMoved=false,close:undefined|(()=>void);
   const imagery=new C.UrlTemplateImageryProvider({url:'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',
@@ -22,6 +23,18 @@ export async function startMap(root:HTMLElement){
   const widget=new C.CesiumWidget(container,{baseLayer:new C.ImageryLayer(imagery),scene3DOnly:true,requestRenderMode:true,
     maximumRenderTimeChange:Infinity,shouldAnimate:false,showRenderLoopErrors:false});
   const scene=widget.scene;
+  // The Expo archive captures the six surveyed ground sheets during the fair.
+  void json<{bounds:[number,number,number,number];columns:number;rows:number;width:number;height:number;maximumLevel:number}>('expo-imagery/index.json')
+    .then(photo=>{
+      if(widget.isDestroyed())return;
+      const rectangle=C.Rectangle.fromDegrees(...photo.bounds);
+      widget.imageryLayers.addImageryProvider(new C.UrlTemplateImageryProvider({
+        rectangle,tilingScheme:new C.GeographicTilingScheme({rectangle,numberOfLevelZeroTilesX:photo.columns,numberOfLevelZeroTilesY:photo.rows}),
+        tileWidth:photo.width,tileHeight:photo.height,maximumLevel:photo.maximumLevel,
+        url:'/kansai/expo-imagery/{z}/{x}/{y}.webp',credit:'2025年大阪・関西万博会場（国土交通省都市局・Project PLATEAU）',
+      }));
+      scene.requestRender();
+    }).catch(()=>{/* The base aerial continues to cover Yumeshima. */});
   scene.globe.depthTestAgainstTerrain=true;scene.globe.maximumScreenSpaceError=1.5;
   scene.globe.baseColor=C.Color.fromCssColorString('#6b8479');
   scene.screenSpaceCameraController.minimumZoomDistance=12;
@@ -36,6 +49,7 @@ export async function startMap(root:HTMLElement){
   }
   async function visit(place:typeof selected){
     selected=place;userMoved=false;const token=++sequence;
+    expoLink.hidden=place.id!==EXPO.id;
     prefecture.value=place.pref;outing.value=place.id===place.pref?'':place.id;
     const url=new URL(location.href);url.searchParams.set('view',place.id);history.replaceState(null,'',url);
     const point=C.Cartographic.fromDegrees(place.lon,place.lat);
@@ -77,7 +91,7 @@ export async function startMap(root:HTMLElement){
     const ray=scene.camera.getPickRay(new C.Cartesian2(container.clientWidth/2,container.clientHeight/2));
     const hit=ray&&scene.globe.pick(ray,scene);if(!hit)return;
     const p=C.Cartographic.fromCartesian(hit),code=owner([C.Math.toDegrees(p.longitude),C.Math.toDegrees(p.latitude)]);
-    if(code&&code!==prefecture.value){prefecture.value=code;outing.value='';}
+    if(code&&code!==prefecture.value){prefecture.value=code;outing.value='';expoLink.hidden=true;}
   });
   const distant=await distantModels(widget,surveys);
   if(widget.isDestroyed()){distant.dispose();return;}

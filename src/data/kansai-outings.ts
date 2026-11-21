@@ -35,3 +35,8 @@ export const OUTINGS = [
   {id:'osaka-castle', pref:'27', ja:'大阪城', en:'Osaka Castle', lon:135.525856, lat:34.687373, targetHeight:35, range:265, heading:18},
   {id:'nakanoshima', pref:'27', ja:'中之島バラ園', en:'Nakanoshima Rose Garden', lon:135.507847, lat:34.6924, range:160, heading:286},
 ] as const;
+
+// The Expo is an archive exhibit. The outings list records places the club visited.
+export const EXPO = {id:'expo-2025', pref:'27', ja:'大阪・関西万博（2025年・夢洲）',
+  en:'Expo 2025 Osaka, Kansai · Yumeshima', lon:135.383485, lat:34.649017, range:1550, heading:27} as const;
+export const MAP_PLACES = [...OUTINGS, EXPO];
