@@ -5,6 +5,7 @@ export const WEATHER_SCALE = .00011;
 const SIZE = 1024, CELL_METRES = 96;
 const GRID = 1 / (CELL_METRES * WEATHER_SCALE);
 const RECENTER = 16; // outer texels; leaves room for storm overhangs and light probes.
+const BLOCK = 8;
 
 export const CLOUD_COLUMN_GLSL = /* glsl */ `
   uniform float uStyle, uCover, uClear;
@@ -84,8 +85,10 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
 
 export const CLOUD_COLUMN_LOOKUP = /* glsl */ `
   uniform sampler2D uCloudColumns;
+  uniform sampler2D uColumnCeilings;
   uniform vec2 uColumnAnchor, uColumnEye;
   uniform bool uColumnsReady;
+  const float outerColumnMetres = ${CELL_METRES}.;
   vec3 lookupColumn(vec2 p){
     vec2 local = p * ${GRID} - uColumnAnchor;
     if (uColumnsReady && max(abs(local.x), abs(local.y)) < ${SIZE / 2 - .5}) {
@@ -100,6 +103,24 @@ export const CLOUD_COLUMN_LOOKUP = /* glsl */ `
     }
     return cloudColumn(p);
   }
+  // The maximum includes the bilinear footprint on all four sides of the block.
+  // Use only unmixed pages. Towers displace their sample coordinates with height.
+  bool emptyColumnRun(vec2 local, vec2 dir, float height, float slope, float remaining, out float run){
+    vec2 fromEye = abs(local-uColumnEye);
+    float r = max(fromEye.x, fromEye.y);
+    run = min(remaining, 384.);
+    bool nearPage = r < 128. - ${BLOCK}./3.;
+    if ((!nearPage && r < 148. + ${BLOCK}.) || max(abs(local.x),abs(local.y)) >= ${SIZE / 2 - BLOCK - 1}.) return false;
+    float scale = nearPage ? 3. : 1.;
+    vec2 blockPos = (local * scale + ${SIZE / 2}.) / ${BLOCK}.;
+    vec2 cell = floor(blockPos), f = fract(blockPos);
+    vec2 edge = mix(f, 1.-f, step(vec2(0.), dir));
+    vec2 metres = edge * ${CELL_METRES * BLOCK}. / (scale * max(abs(dir), vec2(1e-9)));
+    run = min(remaining, min(dir.x == 0. ? remaining : metres.x, dir.y == 0. ? remaining : metres.y));
+    ivec2 tile = ivec2(cell) + ivec2(nearPage ? 0 : ${SIZE / BLOCK}, 0);
+    float ceiling = texelFetch(uColumnCeilings, tile, 0).r;
+    return ceiling == 0. || min(height, height + slope*run) > ceiling + 1./255.;
+  }
 `;
 
 /** Store the cloud crown, edge coverage and anvil coverage in the moving weather field.
@@ -110,9 +131,12 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
     depthBuffer: false, stencilBuffer: false, generateMipmaps: false,
   });
   const anchor = new THREE.Vector2();
+  const ceilings = new THREE.WebGLRenderTarget(2 * SIZE / BLOCK, SIZE / BLOCK, {
+    minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false, stencilBuffer: false,
+  });
   const uniforms = {
     uColumnAnchor: { value: anchor }, uColumnEye: { value: new THREE.Vector2() },
-    uCloudColumns: { value: target.texture }, uColumnsReady: { value: false },
+    uCloudColumns: { value: target.texture }, uColumnCeilings: { value: ceilings.texture }, uColumnsReady: { value: false },
   };
   const material = new THREE.ShaderMaterial({
     uniforms: { uStyle: shape.uStyle, uClear: shape.uClear, uCover: shape.uCover, uColumnAnchor: uniforms.uColumnAnchor },
@@ -132,6 +156,23 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
     `,
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+  const maxMaterial = new THREE.ShaderMaterial({
+    uniforms: { uCloudColumns: uniforms.uCloudColumns }, depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+    vertexShader: material.vertexShader,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D uCloudColumns;
+      void main(){
+        ivec2 first = ivec2(gl_FragCoord.xy) * ${BLOCK};
+        int page = first.x / ${SIZE} * ${SIZE};
+        float top = 0.;
+        for (int y=-1; y<=${BLOCK}; ++y) for (int x=-1; x<=${BLOCK}; ++x) {
+          ivec2 p = clamp(first + ivec2(x,y), ivec2(page,0), ivec2(page+${SIZE-1},${SIZE-1}));
+          top = max(top, texelFetch(uCloudColumns, p, 0).r);
+        }
+        gl_FragColor = vec4(top,0.,0.,1.);
+      }
+    `,
+  });
   mesh.frustumCulled = false;
   const scene = new THREE.Scene(), camera = new THREE.Camera();
   scene.add(mesh);
@@ -153,13 +194,19 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
         if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
         renderer.debug.onShaderError = (...args) => { failed = true; onError?.(...args); };
         renderer.render(scene, camera);
+        if (failed) return;
+        renderer.setRenderTarget(ceilings);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
+        mesh.material = maxMaterial;
+        renderer.render(scene, camera);
         lastWeather = weather;
       } catch { failed = true; }
       finally {
+        mesh.material = material;
         renderer.debug.onShaderError = onError;
         renderer.setRenderTarget(previous);
         uniforms.uColumnsReady.value = !failed;
-        if (failed) target.dispose();
+        if (failed) { target.dispose(); ceilings.dispose(); }
       }
     },
   };

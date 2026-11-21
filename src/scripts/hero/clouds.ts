@@ -197,6 +197,17 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         return vec4(col * a, a);
       }
 
+      // The quadratic near spacing joins a uniform far grid with the same slope at the knee.
+      float rayStation(float distanceAlongRay, vec4 grid){
+        return distanceAlongRay < grid.w
+          ? 2.*distanceAlongRay / (grid.x + sqrt(grid.x*grid.x + 2.*distanceAlongRay))
+          : grid.z + (distanceAlongRay - grid.w) / grid.y;
+      }
+      float stationDistance(float station, vec4 grid){
+        float n = min(station, grid.z);
+        return n*(grid.x + .5*n) + max(station-grid.z, 0.)*grid.y;
+      }
+
       void main(){
         vec3 ro = cameraPosition;
         vec3 rd = normalize(vWorld - ro);
@@ -230,17 +241,31 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           #else
           float maxStep = min(96., verticalLimit), startStep = min(20., maxStep);
           #endif
-          const float growth = .5;
-          float knee = (maxStep - startStep) / (2. * growth);
-          float kneeDist = knee * (startStep + growth * knee);
-          float first = t0 < kneeDist ? 2.*t0 / (startStep + sqrt(startStep*startStep + 4.*growth*t0))
-                                     : knee + (t0 - kneeDist) / maxStep;
-          float station = floor(first) + 1.;
+          float knee = maxStep - startStep;
+          vec4 grid = vec4(startStep, maxStep, knee, knee*(startStep + .5*knee));
+          float station = floor(rayStation(t0, grid)) + 1.;
           float t = t0, d0 = density(ro + rd*t, t);
+          float nextBlock = t0;
+          float layerDepth = uTop-uBase;
+          bool useCeilings = uColumnsReady && !isStyle(3.) && !isStyle(4.);
           for (int i = 0; i < uMarchSteps * 32; ++i) {
             if (T < .012 || t >= t1) break;
-            float n = min(station, knee);
-            float nextT = min(t1, n * (startStep + growth*n) + max(station-knee, 0.) * maxStep);
+            if (useCeilings && t >= nextBlock) {
+              float run;
+              bool empty = emptyColumnRun(uColumnEye + rd.xz*t/outerColumnMetres, rd.xz,
+                (ro.y + rd.y*t-uBase)/layerDepth, rd.y/layerDepth, t1-t, run);
+              nextBlock = t + run + .01;
+              if (empty && d0 <= .002) {
+                if (run >= t1-t) break;
+                float lastEmpty = floor(rayStation(t+run, grid));
+                if (lastEmpty >= station) {
+                  t = stationDistance(lastEmpty, grid);
+                  station = lastEmpty + 1.;
+                  d0 = 0.;
+                }
+              }
+            }
+            float nextT = min(t1, stationDistance(station, grid));
             station += 1.;
             float d1 = density(ro + rd*nextT, nextT);
             float lo = t, hi = nextT, left = d0, right = d1;

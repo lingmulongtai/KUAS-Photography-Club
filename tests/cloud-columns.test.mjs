@@ -21,16 +21,16 @@ test('weather columns stay aligned to the world as the wind, eye and season chan
   const initial = u.uColumnAnchor.value.clone(), size = u.uCloudColumns.value.image.height;
   assert.equal(u.uColumnsReady.value, true);
   columns.update(renderer, x + 1200 * WEATHER_SCALE, z, weather);
-  assert.equal(draws(), 1);
+  assert.equal(draws(), 2);
   // Include one bilinear footprint, anchor drift, tower displacement and the longest sun probe.
   const reach = (44000 + 1536 + .11 * 6800 + 960) / 96 + 1;
   assert.ok(reach < size / 2);
   columns.update(renderer, x + 44 * 96 * WEATHER_SCALE, z, weather);
   assert.equal(u.uColumnAnchor.value.x - initial.x, 44);
   assert.equal(u.uColumnAnchor.value.y, initial.y);
-  assert.equal(draws(), 2);
+  assert.equal(draws(), 4);
   columns.update(renderer, x + 44 * 96 * WEATHER_SCALE, z, {});
-  assert.equal(draws(), 3);
+  assert.equal(draws(), 6);
 });
 
 test('a failed column bake uses procedural density and rebuilds after context restoration', () => {
