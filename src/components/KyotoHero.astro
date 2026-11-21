@@ -20,7 +20,7 @@ import { PANORAMA_VIEWS, VIEWS } from '../scripts/hero/views';
 const pinTrips = completeSpotPreviews((await getTrips())
   .filter((t) => t.data.spot)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
-  .map((t) => ({ spot: t.data.spot!, title: t.data.title, href: `/trips/${encodeURIComponent(t.id)}/`, src: t.data.photos[0].src, alt: t.data.photos[0].alt, credit: credit(t.data.photos[0], t.data.date), sample: t.data.sample }))).map(t => en && t.sample ? { ...t, title: 'Activity records', credit: 'Records are being prepared', href: '/en/trips/' } : t);
+  .map((t) => ({ spot: t.data.spot!, title: t.data.title, href: `/trips/${encodeURIComponent(t.id)}/`, src: t.data.photos[0].src, alt: t.data.photos[0].alt, credit: credit(t.data.photos[0], t.data.date), sample: t.data.sample })));
 ---
 <HeroIntro lang={lang} />
 <section class="hero" aria-labelledby="hero-title" data-view="city" data-lang={lang}>
@@ -88,7 +88,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <a class="next-chip" href={local('/schedule/')} data-next-meeting="chip" data-lang={lang} data-room={club.meetings.room}>
         <span class="next-dot" aria-hidden="true"></span><span data-next-text>{en ? `Meetings: ${club.meetings.dayEn} ${club.meetings.times[0].replace('〜', '')} · ${club.meetings.room}` : `ミーティング ${club.meetings.day} ${club.meetings.times[0]} · ${club.meetings.room}`}</span>
       </a>
-      <p class="edge eyebrow">KYOTO ▸ <span data-status>いまの空</span></p>
+      <p class="edge eyebrow">KYOTO ▸ <span data-status>{en ? 'Current sky' : 'いまの空'}</span></p>
       <h1 id="hero-title">{en ? <>Photography,<br />under Kyoto’s sky.</> : <>京都先端科学大学<br />写真部</>}</h1>
       <!-- A wide screen has room for the club's whole profile; a phone gets one sentence and the traits as chips. -->
       <p class="lead lead-full">
@@ -133,7 +133,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     </aside>
   </div>
 
-  <div class="campus-card" role="region" aria-label="太秦キャンパス" hidden>
+  <div class="campus-card" role="region" aria-label={en ? 'Uzumasa Campus' : '太秦キャンパス'} hidden>
     <p class="edge">OUR CAMPUS</p>
     <h2>{en ? <>Kyoto University of Advanced Science<br />Uzumasa Campus</> : <>京都先端科学大学<br />太秦キャンパス</>}</h2>
     <p class="small">{en ? 'Our usual meeting place.' : '写真部はここで集まっています。'}</p>
@@ -180,7 +180,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
   const hero = stage?.closest<HTMLElement>('.hero');
   if (stage && hero && !document.documentElement.classList.contains('screenshot-preview')) {
-    const en = hero.dataset.lang === 'en';
+    let en = hero.dataset.lang === 'en';
     const framePanel = hero.querySelector<HTMLElement>('[data-frame-panel]')!;
     let onFrameSubmitted: (() => void) | undefined;
     let stopFramePanel: (() => void) | undefined;
@@ -224,7 +224,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const moonTimesText = () => {
       const now = new Date();
       const { year, month, day } = jstParts(now);
-      const key = `${year}-${month}-${day}`;
+      const key = `${year}-${month}-${day}-${en}`;
       if (key !== moonDay) {
         moonDay = key;
         const { rise, set } = moonTimes(now);
@@ -370,26 +370,32 @@ const pinTrips = completeSpotPreviews((await getTrips())
       if (rect.bottom >= 0 && rect.top <= window.innerHeight) showTimeStatus(jstMinutes(new Date()));
     }, 30_000);
 
-    const setView = (mode: HeroMode, arrived: boolean, opening=false) => {
-      hero.dataset.view = mode;
-      const atPanorama=mode==='city' && PANORAMA_VIEWS.some(id=>id===demo?.view);
-      if (atPanorama && demo) panorama=demo.view;
+    let viewArrived = false;
+    const describeView = (mode: HeroMode, arrived: boolean) => {
       const selected=SPOTS.find(spot=>spotDestination(spot.id)===(mode==='campus'?'campus':demo?.view));
-      spotSelect.value=atPanorama?'':selected?.id??'';
-      spotReturn.hidden=mode==='campus'||atPanorama;
-      spotRecords.hidden=spotReturn.hidden||!selected;
       if (selected) spotRecords.href=en?'/en/trips/':`/trips/spots/${selected.id}/`;
       const placeName=selected?.[en?'en':'ja']??VIEWS[demo?.view??'shogunzuka'][en?'en':'ja'];
       placeStatus.textContent=arrived
         ? (en ? `Now viewing ${placeName}.` : `${placeName}を表示しています。`)
         : (en ? 'Moving to the selected place.' : '選んだ地点へ移動しています。');
+      cameraHint.textContent = demo?.orbiting && mode==='city'
+        ? (en ? 'Drag or swipe to orbit this place.' : 'ドラッグでスポットを中心に360°回れます。スマホは横スワイプ。')
+        : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
+      return selected;
+    };
+    const setView = (mode: HeroMode, arrived: boolean, opening=false) => {
+      hero.dataset.view = mode;
+      const atPanorama=mode==='city' && PANORAMA_VIEWS.some(id=>id===demo?.view);
+      if (atPanorama && demo) panorama=demo.view;
+      viewArrived = arrived;
+      const selected = describeView(mode, arrived);
+      spotSelect.value=atPanorama?'':selected?.id??'';
+      spotReturn.hidden=mode==='campus'||atPanorama;
+      spotRecords.hidden=spotReturn.hidden||!selected;
       viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(mode==='city' && b.dataset.view===demo?.view)));
       const activeView = viewButtons.find(b => b.getAttribute('aria-pressed') === 'true');
       moveLens(activeView,opening);
       revealView(activeView,opening);
-      cameraHint.textContent = demo?.orbiting && mode==='city'
-        ? (en ? 'Drag or swipe to orbit this place.' : 'ドラッグでスポットを中心に360°回れます。スマホは横スワイプ。')
-        : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
       if (mode === 'campus') {
         card.hidden = false;
         if (arrived) back.focus({ preventScroll: true });
@@ -397,6 +403,10 @@ const pinTrips = completeSpotPreviews((await getTrips())
       if (opening) return;
       if (arrived && !atPanorama && mode==='city') spotSelect.focus({preventScroll:true});
       if (arrived && atPanorama && !hero.querySelector('.time-control')?.contains(document.activeElement)) viewButtons.find(b=>b.dataset.view===panorama)?.focus({preventScroll:true});
+    };
+
+    const labelExplore = (enabled: boolean) => {
+      exploreToggle.textContent = enabled ? (en ? 'Exit exploration' : '散策を終了') : (en ? 'Explore freely ↗' : '自由散策を始める ↗');
     };
 
     const coarse = matchMedia('(pointer: coarse)').matches;
@@ -479,7 +489,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
           onAreaLoading: loading=>{areaStatus.hidden=!loading;},
           onExplore: enabled=>{
             hero.classList.toggle('is-exploring',enabled);exploreToggle.setAttribute('aria-pressed',String(enabled));
-            exploreToggle.textContent=enabled?(en?'Exit exploration':'散策を終了'):(en?'Explore freely ↗':'自由散策を始める ↗');
+            labelExplore(enabled);
             mobileGuideOpen=false;
             updateExploreGuide();
             exploreTouch.hidden=!enabled;
@@ -504,6 +514,14 @@ const pinTrips = completeSpotPreviews((await getTrips())
       // needs no second antialiasing buffer on the default framebuffer.
       { maxDpr: quality < 1 ? 1.5 : 2, alwaysOn: false, antialias: false },
     ); } catch (error) { console.warn('Kyoto scene unavailable', error); }
+
+    document.addEventListener('home:language', () => {
+      en = hero.dataset.lang === 'en';
+      demo?.setLanguage(en ? 'en' : 'ja');
+      labelExplore(demo?.exploring ?? false);
+      if (sceneReady && demo) describeView(demo.mode, viewArrived);
+      showTimeStatus(shown());
+    });
 
     const returnToPanorama=()=>demo?.flyTo(panorama);
     hero.querySelector<HTMLSelectElement>('[data-season]')!.addEventListener('change',e=>demo?.setSeason((e.target as HTMLSelectElement).value as Season));

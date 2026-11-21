@@ -54,11 +54,17 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.tabIndex = -1;
-    trigger.setAttribute('aria-label', lang === 'en' ? `Explore ${d.en} in 3D` : `${d.ja}へ近づく`);
     trigger.className = 'pin-trigger';
-    const badge = outings ? `<span class="pin-visited">${lang === 'en' ? `Outing${outings > 1 ? ` ×${outings}` : ''}` : `撮影会${outings > 1 ? ` ×${outings}` : ''}`}</span>` : '';
-    trigger.innerHTML = `<span class="pin-dot" aria-hidden="true"></span><span class="pin-text">${badge}${d.ja}<small>${d.en}</small></span>`;
-    if (outings) trigger.setAttribute('aria-label', lang === 'en' ? `Explore ${d.en} in 3D (club outing here)` : `${d.ja}へ近づく（撮影会の記録あり）`);
+    trigger.innerHTML = '<span class="pin-dot" aria-hidden="true"></span><span class="pin-text"></span>';
+    const text = trigger.querySelector<HTMLElement>('.pin-text')!;
+    const badge = outings ? document.createElement('span') : null;
+    if (badge) {
+      badge.className = 'pin-visited';
+      text.append(badge);
+    }
+    const name = document.createTextNode('');
+    const subtitle = document.createElement('small');
+    text.append(name, subtitle);
     node.appendChild(trigger);
     const popup = document.createElement('div');
     popup.className = 'pin-trips';
@@ -80,22 +86,37 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
       node.classList.add('is-open');
     };
     trigger.addEventListener('click', () => { close(); onAction(d.id); });
-    if (related.length) {
-      popup.setAttribute('role', 'region');
-      popup.setAttribute('aria-label', lang === 'en' ? `Outing records near ${d.en}` : `${d.ja}の撮影会`);
-      for (const trip of related) {
-        const link = document.createElement('a');
-        link.href = trip.href;
+    const records = related.map(trip => {
+      const link = document.createElement('a');
+      if (trip.src) {
         const img = document.createElement('img');
         img.src = trip.src; img.alt = trip.alt; img.width = 240; img.height = 135; img.loading = 'lazy';
-        const title = document.createElement('strong');
-        title.textContent = trip.title;
-        const credit = document.createElement('small');
-        credit.textContent = trip.credit;
-        if (trip.src) link.append(img);
-        link.append(title, credit);
-        popup.appendChild(link);
+        link.append(img);
       }
+      const title = document.createElement('strong'), credit = document.createElement('small');
+      link.append(title, credit);
+      popup.appendChild(link);
+      return { trip, link, title, credit };
+    });
+    function translate(language: 'ja' | 'en') {
+      const en = language === 'en';
+      name.data = d[language];
+      subtitle.textContent = en ? d.ja : d.en;
+      if (badge) badge.textContent = (en ? 'Outing' : '撮影会') + (outings > 1 ? ` ×${outings}` : '');
+      trigger.setAttribute('aria-label', en
+        ? `Explore ${d.en} in 3D${outings ? ' (club outing here)' : ''}`
+        : `${d.ja}へ近づく${outings ? '（撮影会の記録あり）' : ''}`);
+      if (records.length) popup.setAttribute('aria-label', en ? `Outing records near ${d.en}` : `${d.ja}の撮影会`);
+      for (const { trip, link, title, credit } of records) {
+        const englishPreview = en && trip.sample;
+        link.href = englishPreview ? '/en/trips/' : trip.href;
+        title.textContent = englishPreview ? 'Activity records' : trip.title;
+        credit.textContent = englishPreview ? 'Records are being prepared' : trip.credit;
+      }
+    }
+    translate(lang);
+    if (records.length) {
+      popup.setAttribute('role', 'region');
       node.appendChild(popup);
       node.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') open(); });
       node.addEventListener('pointerleave', () => { leaveTimer = setTimeout(close, 180); });
@@ -105,7 +126,7 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
       node.addEventListener('close-pin', close);
     }
     layer.appendChild(node);
-    return { def: d, node, trigger, close, text: trigger.querySelector<HTMLElement>('.pin-text')!, labelWidth: 0, labelHeight: 0, anchor: new THREE.Vector3(p.x, ground + d.above, p.z), ground: new THREE.Vector3(p.x, ground, p.z), shown: false, x: 0, y: 0 };
+    return { def: d, node, trigger, close, text, translate, labelWidth: 0, labelHeight: 0, anchor: new THREE.Vector3(p.x, ground + d.above, p.z), ground: new THREE.Vector3(p.x, ground, p.z), shown: false, x: 0, y: 0 };
   });
   el.addEventListener('pointerdown', (e) => { if (!(e.target as Element).closest('.hero-pin')) items.forEach((it) => it.close()); });
   const byRank = [...items].sort((a, b) => a.def.rank - b.def.rank);
@@ -131,6 +152,10 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
 
   return {
     layer,
+    setLanguage(language: 'ja' | 'en') {
+      items.forEach(item => item.translate(language));
+      frame = 0; // Re-measure translated labels before placing them.
+    },
     /** Show only some pins (for the campus view). */
     filter(ids: string[] | null) {
       for (const it of items) it.node.classList.toggle('is-muted', !!ids && !ids.includes(it.def.id));

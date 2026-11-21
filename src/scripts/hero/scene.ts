@@ -126,7 +126,7 @@ export function createHero(
   renderer: THREE.WebGLRenderer,
   el: HTMLElement,
   opts: HeroOptions,
-): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void;setSeason(season:Season):void; setExploring(enabled:boolean):void; setTouchMove(forward:number,side:number,up:number,fast:boolean):void; readonly exploring:boolean; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
+): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void;setSeason(season:Season):void; setLanguage(lang: 'ja' | 'en'): void; setExploring(enabled:boolean):void; setTouchMove(forward:number,side:number,up:number,fast:boolean):void; readonly exploring:boolean; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
   const env = createEnv();
   const scene = new THREE.Scene();
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
@@ -158,6 +158,7 @@ export function createHero(
   let pixelRatio = 1;
   const pointLayers: { uScale: { value: number }; uDpr: { value: number } }[] = [];
   const snow=buildSnow(env,opts.quality);scene.add(snow.points);
+  let labelLanguage = opts.lang ?? 'ja';
   let labels: ReturnType<typeof createLabels> | null = null;
   let campusModel: THREE.Mesh | null = null;
   /** Pixels per metre at 1 m distance, so point lights can size themselves. */
@@ -417,7 +418,7 @@ export function createHero(
     const water = await buildWaterAsync(env, hf, lines, terrain.uniforms,lite?28:18,channel,false,()=>true);
     if (water) scene.add(water);
     scene.add(buildIslands(env, hf, lines));
-    labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, opts.lang);
+    labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, labelLanguage);
     const lamps = buildLamps(env, streetGround, lines, opts.quality);
     const cars = buildCars(env, streetGround, lines, opts.quality);
     driveCars = cars.update;
@@ -955,6 +956,10 @@ export function createHero(
     /** Fly to the campus or back to the view from Shogunzuka. */
     flyTo: (to: 'campus' | HeroView) => flyTo(to, clock),
     setSeason(value){season=value;},
+    setLanguage(language) {
+      labelLanguage = language;
+      labels?.setLanguage(language);
+    },
     setTouchMove(forward,side,up,fast){
       const axis=(value:number)=>exploring&&Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
       touchMove.forward=axis(forward);touchMove.side=axis(side);touchMove.up=axis(up);touchMove.fast=exploring&&fast;
