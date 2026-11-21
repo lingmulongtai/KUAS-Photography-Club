@@ -74,6 +74,7 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
   }
   const ready=plan(initial,1000);
   return {contains:(p:Point)=>coverage.contains(p)||architecture.contains(p),get revision(){return coverage.revision+architecture.revision;},ready,
+    landmarkRings:architecture.intersecting,get landmarkRevision(){return architecture.revision;},
     updatePhoto(target:Point,altitude:number){
       material.selectCity(target);
       void plan(target,altitude);

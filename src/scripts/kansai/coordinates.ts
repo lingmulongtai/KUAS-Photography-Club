@@ -15,6 +15,10 @@ export function lonLat(x:number, y:number, zoom:number): Point {
   const n=2**zoom;
   return [x/n*360-180,Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI];
 }
+export function tileMetresPerDegree(latitude:number):Point {
+  const cos=Math.cos(latitude*Math.PI/180);
+  return [111319.5*cos/Math.sqrt(1-.00669438*(1-cos*cos)),110946];
+}
 export function inBox([x,y]:Point, b:Box) {
   return x>=b[0] && y>=b[1] && x<=b[2] && y<=b[3];
 }

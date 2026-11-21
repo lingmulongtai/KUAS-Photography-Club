@@ -1,5 +1,5 @@
 import {classifyRings,type VectorTileFeature} from '@mapbox/vector-tile';
-import {lonLat,inPolygon,type Point,type Ring} from './coordinates';
+import {lonLat,inPolygon,tileMetresPerDegree,type Point,type Ring} from './coordinates';
 import {Mesh,building,tree,noise,strip,type XYZ,type RGB,type PackedMesh} from './mesh';
 import {modelSources,type BuildingTag} from './sources';
 import {drawGround,roadWidth} from './ground';
@@ -54,7 +54,7 @@ export function tileCompiler(){
     const [tile,fields,tags,canopy,surfaces,edges,lidar,heightsByBuilding]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
       sources.canopy(corners),sources.surfaces(x>>1,y>>1),sources.edges(x,y),
       hyogoHeights(x,y),heightSources(x,y,corners)]);
-    const cos=Math.cos(center[1]*Math.PI/180),mx=111319.5*cos/Math.sqrt(1-.00669438*(1-cos*cos)),my=110946;
+    const [mx,my]=tileMetresPerDegree(center[1]);
     const local=([lon,lat]:Point):Point=>[(lon-center[0])*mx,(lat-center[1])*my];
     const here=([lon,lat]:Point)=>lon>=west&&lon<east&&lat>south&&lat<=north;
     const xyz=(p:Point,h:number):XYZ=>[...local(p),h];

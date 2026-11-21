@@ -37,7 +37,8 @@ export function combineTileMeshes(meshes:PackedMesh[]){
     const x=positions[i]-center[0],y=positions[i+1]-center[1],z=positions[i+2]-center[2];
     radiusSquared=Math.max(radiusSquared,x*x+y*y+z*z);
   }
-  return {positions,normals,colors,uv,ids,center,radius:Math.sqrt(radiusSquared)+.001};
+  return {positions,normals,colors,uv,ids,center,radius:Math.sqrt(radiusSquared)+.001,
+    extent:[minimum[0],minimum[1],maximum[0],maximum[1]] as [number,number,number,number]};
 }
 
 export type TileGeometry=NonNullable<ReturnType<typeof combineTileMeshes>>;

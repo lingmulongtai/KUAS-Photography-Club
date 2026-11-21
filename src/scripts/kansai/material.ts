@@ -6,11 +6,20 @@ import {lonLat} from './coordinates';
 // is expressed in metres, with derivative filtering before the panes get subpixel.
 export function localAppearance(x:number,y:number,localPosition:boolean,redraw:()=>void){
   const material=new C.Material({translucent:false,fabric:{
-    type:'KansaiBuildingTile',uniforms:{image:C.Material.DefaultImageId,visibility:C.Material.DefaultImageId},
+    type:'KansaiBuildingTile',uniforms:{image:C.Material.DefaultImageId,visibility:C.Material.DefaultImageId,
+      landmarks:C.Material.DefaultImageId,landmarkExtent:new C.Cartesian4(0,0,0,0)},
     source:`
-      bool tileBuildingHidden(int id){
+      bool tileBuildingHidden(int id,vec2 localXY){
+        if(id==0)return false;
+        if(landmarkExtent.z>0.){
+          vec2 uv=(localXY-landmarkExtent.xy)/landmarkExtent.zw;
+          if(all(greaterThanEqual(uv,vec2(0.)))&&all(lessThanEqual(uv,vec2(1.)))){
+            vec3 ink=texture(landmarks,uv).rgb;
+            if(ink.r-ink.g>.5)return true;
+          }
+        }
         ivec2 size=textureSize(visibility,0);
-        if(id==0||id>=size.x*size.y)return false;
+        if(id>=size.x*size.y)return false;
         return texelFetch(visibility,ivec2(id%size.x,size.y-1-id/size.x),0).r<.5;
       }
       czm_material czm_getMaterial(czm_materialInput inputData){
@@ -33,12 +42,11 @@ export function localAppearance(x:number,y:number,localPosition:boolean,redraw:(
       in vec2 st;
       in vec4 color;
       in float batchId;
-      uniform float u_tileWidth;
       out vec3 v_normal;
       out vec4 v_color;
       out vec2 v_uv;
       out vec3 v_eye;
-      out vec2 v_map;
+      out vec2 v_local;
       void main(){
         vec4 p=${localPosition?'czm_translateRelativeToEye(vec3(0.),position)':'czm_computePosition()'};
         v_id=featureId;
@@ -46,7 +54,7 @@ export function localAppearance(x:number,y:number,localPosition:boolean,redraw:(
         v_color=color;
         v_normal=czm_normal*normal;
         v_eye=(czm_modelViewRelativeToEye*p).xyz;
-        v_map=${localPosition?'position.xy':'(position3DHigh.xy+position3DLow.xy)'}/u_tileWidth+.5;
+        v_local=${localPosition?'position.xy':'(position3DHigh.xy+position3DLow.xy)'};
         gl_Position=czm_modelViewProjectionRelativeToEye*p;
       }`,
     fragmentShaderSource:`
@@ -54,10 +62,11 @@ export function localAppearance(x:number,y:number,localPosition:boolean,redraw:(
       in vec4 v_color;
       in vec2 v_uv;
       in vec3 v_eye;
-      in vec2 v_map;
+      in vec2 v_local;
+      uniform float u_tileWidth;
       flat in float v_id;
       void main(){
-        if(tileBuildingHidden(int(v_id)))discard;
+        if(tileBuildingHidden(int(v_id),v_local))discard;
         vec3 base=v_color.rgb;
         vec3 up=normalize(czm_viewerPositionWC);
         float day=smoothstep(-.14,.10,dot(up,czm_sunDirectionWC));
@@ -80,7 +89,7 @@ export function localAppearance(x:number,y:number,localPosition:boolean,redraw:(
             vec3 ray=czm_inverseViewRotation*reflect(normalize(v_eye),normalize(v_normal));
             vec3 east=normalize(cross(vec3(0.,0.,1.),up)),north=cross(up,east);
             czm_materialInput inputData;
-            inputData.st=clamp(v_map+vec2(dot(ray,east),dot(ray,north))*.18,.002,.998);
+            inputData.st=clamp(v_local/u_tileWidth+.5+vec2(dot(ray,east),dot(ray,north))*.18,.002,.998);
             vec3 nearby=czm_getMaterial(inputData).diffuse;
             vec3 reflection=mix(nearby*vec3(.59,.64,.68),vec3(.43,.58,.72),smoothstep(-.1,.35,dot(up,ray)));
             base=mix(base,mix(vec3(.18,.24,.27),reflection,.56),window*.8);

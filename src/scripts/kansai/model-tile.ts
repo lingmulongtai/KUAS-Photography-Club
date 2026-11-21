@@ -1,6 +1,7 @@
 import type {Cartographic,CesiumWidget} from 'cesium';
 import {C} from './engine';
-import {lonLat} from './coordinates';
+import {lonLat,tileMetresPerDegree,type Box} from './coordinates';
+import {landmarkCutout} from './landmark-cutout';
 import type {TileGeometry} from './tile-geometry';
 import type {TileQueue} from './tile-queue';
 import type {Surveys} from './surveys';
@@ -39,7 +40,10 @@ export async function buildTile(widget:CesiumWidget,queue:TileQueue,x:number,y:n
     appearance:localAppearance(x,y,geometry.positions instanceof Float32Array,()=>{if(!widget.isDestroyed())widget.scene.requestRender();}),
     asynchronous:false,allowPicking:false,compressVertices:false,vertexCacheOptimize:false}):undefined;
   const shown=new Uint8Array(locations.length).fill(1);
-  let applied=-1,checking=-1,cursor=0,dirty=false;
+  let applied=-1,checking=-1,cursor=0,dirty=false,landmarks=-1;
+  const scale=tileMetresPerDegree(center[1]),box=geometry?.extent;
+  const bounds:Box|undefined=box&&[center[0]+box[0]/scale[0],center[1]+box[1]/scale[1],
+    center[0]+box[2]/scale[0],center[1]+box[3]/scale[1]];
   function publishVisibility(){
     if(!dirty||!primitive)return;
     const width=Math.min(256,locations.length+1),height=Math.ceil((locations.length+1)/width);
@@ -53,7 +57,17 @@ export async function buildTile(widget:CesiumWidget,queue:TileQueue,x:number,y:n
     dirty=false;widget.scene.requestRender();
   }
   return {primitive,releaseMaterial(){primitive?.appearance.material?.destroy();},buildings:locations.length,refresh(surveys:Surveys,until:number){
-    if(!primitive?.ready||applied===surveys.revision)return;
+    if(!primitive?.ready)return;
+    if(landmarks!==surveys.landmarkRevision&&bounds&&locations.length){
+      if(performance.now()>=until)return true;
+      landmarks=surveys.landmarkRevision;
+      const mask=landmarkCutout(surveys.landmarkRings(bounds),center,scale,box!);
+      const u=primitive.appearance.material.uniforms;
+      u.landmarks=mask?.canvas??C.Material.DefaultImageId;
+      u.landmarkExtent=mask?C.Cartesian4.fromArray(mask.extent):new C.Cartesian4();
+      if(mask||applied>=0)widget.scene.requestRender();
+    }
+    if(applied===surveys.revision)return;
     if(cursor===0)checking=surveys.revision;
     // Allow another frame to present while a large municipal model is arriving.
     while(cursor<locations.length){

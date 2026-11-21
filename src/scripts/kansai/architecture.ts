@@ -51,6 +51,16 @@ export async function architecturalModels(widget:CesiumWidget){
   });
   return {
     rings(){return records.filter(b=>active.has(b.id)).flatMap(b=>b.rings);},
+    intersecting([w,s,e,n]:Box){
+      const rings=new Set<Ring>();
+      for(let x=Math.floor(w*250);x<=Math.floor(e*250);x++){
+        for(let y=Math.floor(s*250);y<=Math.floor(n*250);y++){
+          const nearby=bins.get(x+'/'+y);
+          if(nearby)for(const {r,box} of nearby)if(box[2]>=w&&box[0]<=e&&box[3]>=s&&box[1]<=n)rings.add(r);
+        }
+      }
+      return [...rings];
+    },
     get revision(){return revision;},
     contains(p:Point){return bins.get(Math.floor(p[0]*250)+'/'+Math.floor(p[1]*250))?.some(m=>inBox(p,m.box)&&inPolygon(p,[m.r]))??false;},
     dispose(){alive=false;stop();}
