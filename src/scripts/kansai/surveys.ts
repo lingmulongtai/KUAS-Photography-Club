@@ -116,6 +116,7 @@ export async function attachSurveys(widget:CesiumWidget,onFailure:()=>void,initi
   const ready=plan(initial,1000);
   return {contains:(p:Point)=>mask.contains(p)||architecture.contains(p),get revision(){return revision+architecture.revision;},ready,
     updatePhoto(target:Point,altitude:number){
+      material.selectCity(target);
       void plan(target,altitude);
       if(altitude<10500&&[...last.values()].includes(1))void material.update(target,altitude);
     },

@@ -20,8 +20,18 @@ test('a revisited PLATEAU tile can replace or unload its content between travers
   const layer={kind:'bldg',pref:'26',lod:2,url:'kyoto.json',bounds:[135.74,34.99,135.78,35.01]};
   const tiles={tileVisible:event(),tileUnload:event(),tileFailed:event()};
   const postRender=event(),scene={postRender,primitives:{add(){}},requestRender(){}};
-  const engine={Cesium3DTileset:{fromUrl:async()=>tiles},UniformType:{},Cartesian3:class {},TextureUniform:class {},
-    CustomShader:class{setUniform(){} isDestroyed(){return false;} destroy(){}}};
+  const requests=new WeakSet();
+  const engine={Cesium3DTileset:{fromUrl:async()=>tiles},UniformType:{},Cartesian2:class {},Cartesian3:class {},
+    TextureUniform:class{constructor(options){this.url=options.url;}},
+    CustomShader:class{
+      constructor({uniforms}){
+        for(const {value} of Object.values(uniforms))if(value.url){
+          assert.equal(requests.has(value),false,'each shader must own its Cesium image request');
+          requests.add(value);
+        }
+      }
+      setUniform(){} isDestroyed(){return false;} destroy(){}
+    }};
   const module={exports:{}};
   runInNewContext(script,{module,exports:module.exports,window:{Cesium:engine},
     fetch:async()=>({ok:true,json:async()=>[layer]})});

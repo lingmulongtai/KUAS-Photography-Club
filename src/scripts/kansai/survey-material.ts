@@ -1,17 +1,20 @@
 import type {CesiumWidget} from 'cesium';
 import {C} from './engine';
 import {aerialPhoto} from './aerial';
+import {cityGlass,reflectionCity} from './glass';
 import {lonLat,tileXY,type Point,type Ring} from './coordinates';
 
 // Only the untextured LOD1 survey shells use this material. Actual textured meshes keep their imagery.
 export function surveyMaterial(widget:CesiumWidget){
   const uniform=(bytes:Uint8Array,width:number)=>new C.TextureUniform({typedArray:bytes,width,height:width,repeat:false});
-  const maskUniforms={
+  const maskUniforms=()=>({
+    u_environment:{type:C.UniformType.SAMPLER_2D,value:new C.TextureUniform({url:'/kansai/city-reflections.webp',repeat:false})},
+    u_probe:{type:C.UniformType.VEC2,value:new C.Cartesian2(0,0)},
     u_mask:{type:C.UniformType.SAMPLER_2D,value:uniform(new Uint8Array(4),1)},
     u_centre:{type:C.UniformType.VEC3,value:new C.Cartesian3()},
     u_maskE:{type:C.UniformType.VEC3,value:new C.Cartesian3()},
     u_maskN:{type:C.UniformType.VEC3,value:new C.Cartesian3()},
-  };
+  });
   const clip=`
     vec3 local=fsInput.attributes.positionWC-u_centre;
     vec2 m=vec2(dot(local,u_maskE),dot(local,u_maskN))+.5;
@@ -19,15 +22,25 @@ export function surveyMaterial(widget:CesiumWidget){
       vec3 ink=texture(u_mask,m).rgb;
       if(ink.r-ink.g>.5) discard;
     }`;
-  const detailed=new C.CustomShader({uniforms:{...maskUniforms},fragmentShaderText:
-    'void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material){'+clip+'}'});
+  const detailed=new C.CustomShader({uniforms:{...maskUniforms()},fragmentShaderText:`
+    ${cityGlass}
+    void fragmentMain(FragmentInput fsInput,inout czm_modelMaterial material){
+      ${clip}
+      vec3 p=fsInput.attributes.positionWC,eye=fsInput.attributes.positionEC;
+      vec3 n=normalize(cross(dFdx(eye),dFdy(eye)));
+      float vertical=1.-smoothstep(.2,.65,abs(dot(n,czm_viewRotation*normalize(p))));
+      vec3 color=material.diffuse;
+      float glass=vertical*smoothstep(.025,.13,color.b-color.r)*(1.-smoothstep(.45,.82,material.roughness));
+      if(glass>.01)material.diffuse=mix(color,paneReflection(p,eye,n),glass*.32);
+    }`});
   const shader=new C.CustomShader({uniforms:{
-    ...maskUniforms,
+    ...maskUniforms(),
     u_photo:{type:C.UniformType.SAMPLER_2D,value:uniform(new Uint8Array([0,0,0,0]),1)},
     u_origin:{type:C.UniformType.VEC3,value:new C.Cartesian3()},
     u_east:{type:C.UniformType.VEC3,value:new C.Cartesian3(1,0,0)},
     u_north:{type:C.UniformType.VEC3,value:new C.Cartesian3(0,1,0)},
   },fragmentShaderText:`
+    ${cityGlass}
     void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material){
       ${clip}
       vec3 p=fsInput.attributes.positionWC;
@@ -46,7 +59,8 @@ export function surveyMaterial(widget:CesiumWidget){
       vec2 pixel=max(fwidth(grid),vec2(.012));
       vec2 pane=1.-smoothstep(vec2(.25,.19)-pixel,vec2(.25,.19)+pixel,abs(fract(grid)-.5));
       float visible=1.-smoothstep(.18,.65,max(pixel.x,pixel.y));
-      wall=mix(wall,vec3(.26,.33,.37),pane.x*pane.y*visible*.74);
+      float glazing=pane.x*pane.y*visible*(1.-smoothstep(.45,.75,up));
+      if(glazing>.01)wall=mix(wall,paneReflection(p,fsInput.attributes.positionEC,n),glazing*.77);
       vec3 roof=vec3(.28,.29,.29);
       if(all(greaterThanEqual(uv,vec2(0.))) && all(lessThanEqual(uv,vec2(1.)))){
         vec4 photo=texture(u_photo,vec2(uv.x,1.-uv.y));
@@ -112,7 +126,14 @@ export function surveyMaterial(widget:CesiumWidget){
     shader.setUniform('u_photo',uniform(new Uint8Array(rgba.buffer),768));
     widget.scene.requestRender();
   }
-  return {shader,detailed,setMasks,update,dispose(){
+  let lastProbe='';
+  function selectCity(p:Point){
+    const [index,strength]=reflectionCity(p),key=index+'/'+strength;
+    if(key===lastProbe)return;
+    lastProbe=key;
+    for(const sh of [shader,detailed])sh.setUniform('u_probe',new C.Cartesian2(index,strength));
+  }
+  return {shader,detailed,setMasks,update,selectCity,dispose(){
     abort?.abort();for(const sh of [shader,detailed])if(!sh.isDestroyed())sh.destroy();
   }};
 }
