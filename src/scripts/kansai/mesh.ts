@@ -1,4 +1,5 @@
 import earcut from 'earcut';
+import {pitchedRoof} from './roofs';
 import type {GeometryInstance} from 'cesium';
 import {C} from './engine';
 import type {Point} from './coordinates';
@@ -76,24 +77,12 @@ export function building(m:Mesh,rings:Point[][],floor:number,eaves:number,ridge:
       m.quad(withZ(a,wallBase),withZ(b,wallBase),withZ(b,eaves),withZ(a,eaves),wall);
     }
   }
-  let r=rings[0];
-  m.surfaceType='roof';
-  if(r.length===4&&rings.length===1&&ridge>0){
-    const len=(a:Point,b:Point)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-    if(len(r[0],r[1])>len(r[1],r[2]))r=[r[1],r[2],r[3],r[0]];
-    const mid=(a:Point,b:Point):XYZ=>[(a[0]+b[0])/2,(a[1]+b[1])/2,eaves+ridge];
-    const a=mid(r[0],r[1]),b=mid(r[2],r[3]),p=r.map(v=>withZ(v,eaves));
-    const hip=roofShape==='hipped'||roofShape==='half-hipped'||roofShape==='pyramidal';
-    if(hip){
-      const inset=roofShape==='pyramidal'?.5:Math.min(.42,len(r[0],r[1])/(2*Math.max(1,len(r[1],r[2]))));
-      const dx=(b[0]-a[0])*inset,dy=(b[1]-a[1])*inset;
-      a[0]+=dx;a[1]+=dy;b[0]-=dx;b[1]-=dy;
-    }
-    m.surfaceType=hip?'roof':'wall';
-    m.triangle(p[0],p[1],a,hip?roof:wall);m.triangle(p[2],p[3],b,hip?roof:wall);
-    m.surfaceType='roof';
-    m.quad(a,p[1],p[2],b,roof);m.quad(p[0],a,b,p[3],roof);
-  }else m.surface(rings.map(r=>r.map(v=>withZ(v,eaves))),roof);
+  if(ridge>0){
+    pitchedRoof(rings,roofShape,eaves,ridge,(a,b,c)=>{m.surfaceType='roof';m.triangle(a,b,c,roof);},
+      (a,b,c,d)=>{m.surfaceType='wall';m.quad(a,b,c,d,wall);});
+  }else{
+    m.surfaceType='roof';m.surface(rings.map(r=>r.map(v=>withZ(v,eaves))),roof);
+  }
 }
 export function tree(m:Mesh,x:number,y:number,z:number,seed:number){
   const h=6+11*seed,r=2.6+3*seed;

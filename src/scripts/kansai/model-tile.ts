@@ -68,7 +68,7 @@ export async function buildTile(widget:CesiumWidget,sources:ModelSources,x:numbe
     const base=ground(p),minimum=tag?.minHeight??(tag?.minLevel??0)*3.1;
     if(height<=minimum)return;
     const roofShape=tag?.roof??(!solid&&size<320?(style>.65?'hipped':'gabled'):'flat');
-    const ridge=['gabled','hipped','half-hipped','gambrel','pyramidal'].includes(roofShape)&&projected.length===1&&projected[0].length===4?
+    const ridge=['gabled','hipped','half-hipped','gambrel','pyramidal','mansard','skillion'].includes(roofShape)?
       Math.min(height*.38,tag?.roofHeight??(tag?.roofLevels?tag.roofLevels*2:Math.sqrt(size)*.14)):0;
     const mesh=new Mesh((east-west)*mx,(north-south)*my),low=minimum?base+minimum:Math.min(base,...rings[0].map(ground))-.5;
     building(mesh,projected,base+minimum,base+height-ridge,ridge,style,roofShape,low);
