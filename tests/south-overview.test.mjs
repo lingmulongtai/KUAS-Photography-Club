@@ -23,6 +23,16 @@ test('southern overview is a bounded sample of measured and confluence buildings
   } finally {globalThis.fetch=original;}
 });
 
+test('the northern panorama includes houses in the Iwakura, Kurama and Ohara valleys',async()=>{
+  const bytes=await readFile(new URL('../public/kyoto/buildings-north-lod.json.gz',import.meta.url));
+  assert.ok(bytes.length<30000);
+  const {buildings}=JSON.parse(gunzipSync(bytes));
+  for(const [x,z] of [[2420,-7475],[1225,-12060],[6125,-12925]]){
+    assert.ok(buildings.filter(b=>Math.hypot(b[0]-x,b[1]-z)<500).length>=8);
+  }
+  assert.ok(buildings.every(([x,z,w,d,h])=>x>=-8200&&x<=8100&&z>=-20000&&z<=-7000&&w>0&&d>0&&h>=2));
+});
+
 test('detailed south replaces the overview while partial neighbouring coverage retains it',async()=>{
   const compiled=buildSync({stdin:{resolveDir:process.cwd(),contents:"export {buildSouthOverview} from './src/scripts/hero/south-overview.ts';"},
     bundle:true,platform:'node',format:'cjs',external:['three'],write:false}).outputFiles[0].text;

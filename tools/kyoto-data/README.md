@@ -11,7 +11,7 @@ sources once into `cache/` (not committed, about 2 GB) and write compact files t
 | `aerial-wide.webp`, `aerial-city.webp` | Aerial photos draped over the terrain | GSI 全国最新写真（シームレス） |
 | `aerial-arashiyama*.webp`, `aerial-higashiyama*.webp` | Sharper photos of Arashiyama and of the slopes below Shogunzuka and Kiyomizu-dera, PC and mobile sizes | GSI 全国最新写真（シームレス） z16 / z17 |
 | `lines.bin` | Roads (by width), above-ground railways, rivers and ponds | GSI ベクトルタイル |
-| `southern-night-lights.bin` | Distant street lighting south of Takeda on the 30 m basin and 100 m outer terrain grids | Shipped GSI road and tunnel lines |
+| `southern-night-lights.bin` | Distant streets south of Takeda and in the northern valleys on the 30 m basin and 100 m outer terrain grids | Shipped GSI road and tunnel lines |
 | `tunnels.json.gz` | Road tunnel centre lines over the core and every region (8.5 KB); the browser cuts these stretches out of the roads so none is painted over a mountain | GSI ベクトルタイル (ftCode 2704/2714/2724) |
 | `buildings.bin` | Selected building footprints and measured heights; dense detail near viewpoints and KUAS--Arashiyama | PLATEAU 京都市 2025 LOD1 |
 
@@ -56,6 +56,8 @@ Both credits are shown in the site footer.
 `python build_regions.py tennozan` は天王山から大山崎・八幡・島本方面にかけての建物輪郭、道路、鉄道、水域と広域写真を生成します。京都市内と重なる部分はPLATEAUの実測建物を優先し、残る国土地理院の輪郭には高さ6mまたは10mを割り当てます。国土地理院由来の高さは実測値ではありません。建物・道路・水面は一度に一地域だけ詳細表示します。京都南部の元データがキャッシュになければPLATEAUを取得してから重複を除きます。
 
 国土地理院由来の建物は、天王山の展望地点から3.5km以内は20m²以上の輪郭を保持し、それより遠くは120m²以上に絞って形状も簡素にします。これは広い地域の転送量と表示負荷を抑えるための省略であり、遠方にある小さな建物の網羅はしていません。
+
+`python build_regions.py north` は岩倉から鞍馬・大原までの京都北部16.3 × 13 kmに、建物、道路、鉄道、水域と地理院のシームレス写真（ズーム14）を追加します。PLATEAUの実測建物を優先し、収録範囲を外れる集落には地理院の建物輪郭を補います。地理院の輪郭だけで作った建物の高さは6 mまたは10 mの概略値です。地域を生成した後は `python build_tunnels.py` で道路トンネルを更新します。
 
 `python build_tennozan_photo.py` は展望地点と合流部周辺の5km四方に、国土地理院のシームレス写真 z16を使ったより鮮明な写真を作ります。PC用760,000 bytes、スマホ用260,000 bytesが上限で、天王山への移動時に読み込みます。遠景の建物は `node --experimental-strip-types tools/kyoto-data/build-south-lod.mjs` で京都南部と三川地域から少数の代表建物を選び、詳細地域と重なる部分を隠します。
 

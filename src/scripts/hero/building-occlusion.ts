@@ -8,7 +8,7 @@ import type { Box } from './geo';
  * walls use as ambient occlusion: alleys between dense houses fall into shade instead of
  * showing the sunlit roofs that the aerial photo carries under the 3D buildings.
  */
-export function buildOcclusion(data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, box: Box, size: number) {
+export function buildOcclusion(data: { boxes: BoxBuilding[]; polys: PolyBuilding[] }, box: Box, size: number, core?: THREE.DataTexture) {
   const [minX, minZ, maxX, maxZ] = box;
   // coverage counted on a 2×2 grid of samples per texel (0..4)
   const hits = new Uint8Array(size * size);
@@ -50,10 +50,19 @@ export function buildOcclusion(data: { boxes: BoxBuilding[]; polys: PolyBuilding
       return inside;
     });
   }
-  const red = new Uint8Array(size * size);
-  for (let i = 0; i < red.length; i++) red[i] = Math.min(4, hits[i]) * 63.75;
+  // A regional texture carries both maps so changing districts preserves the shadow
+  // beneath houses on the other side of the boundary, using a single terrain sampler.
+  const corePixels = core?.image.data;
+  const pixels = new Uint8Array(hits.length * (corePixels ? 2 : 1));
+  for (let i = 0; i < hits.length; i++) {
+    const coverage = Math.min(4, hits[i]) * 63.75;
+    if (corePixels) {
+      pixels[2*i] = corePixels[i];
+      pixels[2*i+1] = coverage;
+    } else pixels[i] = coverage;
+  }
   // rows run from north (minZ) to south, which is v = 0 → 1 in the shader: no flip
-  const texture = new THREE.DataTexture(red, size, size, THREE.RedFormat, THREE.UnsignedByteType);
+  const texture = new THREE.DataTexture(pixels, size, size, corePixels ? THREE.RGFormat : THREE.RedFormat, THREE.UnsignedByteType);
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.generateMipmaps = true;
@@ -71,9 +80,15 @@ uniform sampler2D uBuilt;
 uniform vec4 uBuiltBox;
 uniform float uBuiltOn;
 uniform float uBuiltTexel;
+uniform vec4 uRegionBuiltBox;
+uniform float uRegionBuiltTexel;
 float builtAt(vec2 p, float metres){
-  vec2 uv = (p - uBuiltBox.xy) / (uBuiltBox.zw - uBuiltBox.xy);
+  bool regional = uRegionBuiltTexel > 0. && all(greaterThanEqual(p,uRegionBuiltBox.xy)) && all(lessThan(p,uRegionBuiltBox.zw));
+  vec4 box = regional ? uRegionBuiltBox : uBuiltBox;
+  float texel = regional ? uRegionBuiltTexel : uBuiltTexel;
+  vec2 uv = (p - box.xy) / (box.zw - box.xy);
   float edge = step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.);
-  return textureLod(uBuilt, uv, max(log2(metres / uBuiltTexel), 0.)).r * edge * uBuiltOn;
+  vec2 coverage = textureLod(uBuilt, uv, max(log2(metres / texel), 0.)).rg;
+  return (regional ? coverage.g : coverage.r) * edge * uBuiltOn;
 }
 `;

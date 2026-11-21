@@ -334,7 +334,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // from far away the avenues read as lines of light with a little haze around them
           float halo = smoothstep(900., 4000., dist);
           emit += vec3(1., .74, .46) * exp(-max(rd.avenue, 0.) / 14.) * (1. - smoothstep(16., 30., rd.avenue)) * halo * .18;
-          // Southern streets remain visible before any regional city is requested.
+          // The overview stores average street emission across 30–100 m, not individual lanes.
           // Reuse the two already-filtered normal samples. Detailed streets take over near the camera.
           float distantLight = (1.-basinSurface.a)*basin
             + (1.-outerSurface.a)*(1.-basin)*uOuterOn*inside(uOuterBox,p,120.);
@@ -345,7 +345,10 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float detailed = max(uRoadsOn*smoothstep(-30.,0.,coreInset),
             uRegionRoadsOn*smoothstep(-30.,0.,boxInset(uRegionRoadBox,p)));
           float closeDetail = detailed*(1.-smoothstep(2400.,4000.,dist));
-          emit = max(emit, vec3(.65,.47,.29)*distantLight*(1.-max(core,closeDetail)));
+          // Keep light on the horizon. A single enlarged overview texel must not
+          // light an entire block below the camera while its real streets are loading.
+          float overviewGain = mix(.08,1.,smoothstep(1200.,4000.,dist));
+          emit = max(emit, vec3(.65,.47,.29)*distantLight*overviewGain*(1.-max(core,closeDetail)));
           emit *= uCity * cityLightShimmer(vWorld);
         }
         // a teal ring that pulses around the campus when it is in focus

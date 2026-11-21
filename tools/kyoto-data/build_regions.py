@@ -1,7 +1,7 @@
 """Bounded, independently loadable city regions. Never overwrite core city assets.
 
-Kyoto wards use PLATEAU measured heights. Kameoka/Sonobe use GSI building
-outlines with explicitly illustrative heights; no PLATEAU coverage is claimed.
+Kyoto wards use PLATEAU measured heights where available. In Rakuhoku the
+GSI outlines also cover villages beyond the measured city model.
 """
 import json
 import os
@@ -36,14 +36,16 @@ REGIONS = {
     'sonobe': {'box': (-33000,-18000,-21000,-8000), 'ja':'園部・八木', 'en':'Sonobe / Yagi'},
     'yamashina': {'box': (4600,-2500,12500,8500), 'ja':'山科', 'en':'Yamashina', 'wards':['26110_yamashina-ku']},
     'south': {'box': (-9000,6200,4600,19000), 'ja':'京都南部', 'en':'Southern Kyoto', 'wards':['26107_minami-ku','26109_fushimi-ku']},
+    'north': {'box': (-8200,-20000,8100,-7000), 'ja':'京都北部・洛北', 'en':'Northern Kyoto / Rakuhoku',
+              'wards':['26101_kita-ku','26103_sakyo-ku'], 'fillOutlines':True, 'photoZoom':14},
 }
 
 
 def fetch_sources(region):
     box=region['box']
     jobs=[]
-    sets=[('bvmap','experimental_bvmap',14,'pbf'),('seamlessphoto','seamlessphoto',13,'jpg')]
-    if not region.get('wards'):
+    sets=[('bvmap','experimental_bvmap',14,'pbf'),('seamlessphoto','seamlessphoto',region.get('photoZoom',13),'jpg')]
+    if not region.get('wards') or region.get('fillOutlines'):
         sets.append(('bvmap','experimental_bvmap',15,'pbf'))
     for name,remote,zoom,ext in sets:
         for z,x,y in R.tiles_for(box,zoom):
@@ -238,6 +240,9 @@ def export_lines(key,box):
 def build(key,region):
     fetch_sources(region)
     buildings=clipped_buildings(key,region)
+    if region.get('fillOutlines'):
+        outlines=clipped_buildings(f'{key}-outlines',{'box':region['box']})
+        buildings=merge_measured(outlines,buildings,region,key)
     if key=='tennozan':
         buildings=merge_tennozan_measured(buildings,region)
     if key=='osaka':
@@ -261,15 +266,16 @@ def build(key,region):
         raise RuntimeError('Regional vector assets exceed 1.5 MiB budget')
     width=region['box'][2]-region['box'][0];depth=region['box'][3]-region['box'][1]
     dims=(2048,round(2048*depth/width)) if width>=depth else (round(2048*width/depth),2048)
-    photo=render(region['box'],dims,13,oversample=1)
+    photo_zoom=region.get('photoZoom',13)
+    photo=render(region['box'],dims,photo_zoom,oversample=1)
     _,size=save(photo,f'aerial-{key}.webp',600_000)
     mobile=photo.resize(tuple(round(v/2) for v in dims),Image.Resampling.LANCZOS)
     _,mobile_size=save(mobile,f'aerial-{key}-mobile.webp',220_000)
     return {'id':key,'ja':region['ja'],'en':region['en'],'box':region['box'],
-        'heightSource':('PLATEAU measured and GSI outlines; illustrative heights (6 m / 10 m)' if key in ('tennozan','osaka')
+        'heightSource':('PLATEAU measured and GSI outlines; illustrative heights (6 m / 10 m)' if key in ('tennozan','osaka') or region.get('fillOutlines')
                         else 'PLATEAU measured' if region.get('wards') else 'GSI outlines; illustrative heights (6 m / 10 m)'),
         'buildings':{'meta':f'buildings-{key}.json','file':f'buildings-{key}.bin','bytes':building_bytes},'lines':lines,
-        'photo':{'box':region['box'],'file':f'aerial-{key}.webp','size':dims,'bytes':size,'zoom':13,
+        'photo':{'box':region['box'],'file':f'aerial-{key}.webp','size':dims,'bytes':size,'zoom':photo_zoom,
                  'mobile':{'file':f'aerial-{key}-mobile.webp','size':mobile.size,'bytes':mobile_size}}}
 
 

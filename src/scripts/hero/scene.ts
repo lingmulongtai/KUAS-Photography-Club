@@ -53,7 +53,7 @@ import { buildIslands } from './islands';
 import { islandMask } from './island-mask';
 import { LINE, loadLines } from './lines-data';
 import { withoutTunnels } from './tunnels';
-import {createRegionalLoader,regionAt,type CityRegion} from './regional-loader';
+import {createRegionalLoader,regionAt,regionInView,type CityRegion} from './regional-loader';
 import {replacesHeianFootprint} from './heian-shrine';
 import {replacesNijoFootprint,replacesNijoBox} from './nijo-castle';
 import {replacesKyotoStation} from './kyoto-station';
@@ -178,7 +178,7 @@ export function createHero(
   let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
-  let ensureCityRegion:((center:{x:number;z:number})=>void)|null=null;
+  let ensureCityRegion:((center:{x:number;z:number},bearing?:number)=>void)|null=null;
   let prefetchCityRegion:((center:{x:number;z:number},target?:HeroView)=>void)|null=null;
   let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
   let followForest: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
@@ -342,7 +342,8 @@ export function createHero(
     if (!city) throw new Error('Initial city preparation cancelled');
     await yieldToBrowser();
     const builtSize = lite ? 1024 : 2048;
-    env.uBuilt.value = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
+    const coreBuilt = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
+    env.uBuilt.value = coreBuilt;
     env.uBuiltBox.value.set(...BUILDINGS_BOX);
     env.uBuiltTexel.value = (BUILDINGS_BOX[2] - BUILDINGS_BOX[0]) / builtSize;
     env.uBuiltOn.value = 1;
@@ -417,7 +418,6 @@ export function createHero(
     const scenePrograms = prepare(scene);
     // Neighbouring basins are intentionally absent from the initial transfer. At most
     // one additional city is alive, and switching destinations never queues all four.
-    const coreBuilt=env.uBuilt.value;
     let regionalDrive:((dt:number)=>void)|null=null;
     let railDrive:((dt:number)=>void)|null=null;
     void loadBinary('railways.json.gz').then(bytes=>{
@@ -425,8 +425,12 @@ export function createHero(
       scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
     }).catch(error=>console.warn('Railway scenery unavailable',error));
     driveCars=(dt)=>{cars.update(dt);regionalDrive?.(dt);railDrive?.(dt);};
-    let southOverview:Awaited<ReturnType<typeof buildSouthOverview>>|null=null;
-    let osakaOverview:Awaited<ReturnType<typeof buildSouthOverview>>|null=null,detailBox:Box|null=null;
+    const overviews:Awaited<ReturnType<typeof buildSouthOverview>>[]=[];
+    let detailBox:Box|null=null;
+    const setOverviewDetail=(box:Box|null)=>{
+      detailBox=box;
+      for(const overview of overviews)overview.setDetailBox(box);
+    };
     const disposeGroup=(group:THREE.Object3D)=>{
       const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
       group.traverse(o=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;
@@ -445,7 +449,7 @@ export function createHero(
         throw results.find(result=>result.status==='rejected')!.reason;
       }
       return {buildings:b.value,lines:l.value,photo:p.value,dispose:()=>p.value.dispose()};
-    },async(r,data,current)=>{
+    },async(r,data,current,releasePrevious)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
       const step=async()=>{await yieldToBrowser();if(!current())throw new Error('Region superseded');};
       let campusNormal:THREE.Texture|null=null;
@@ -479,12 +483,12 @@ export function createHero(
         }
       }
       await step();
-      lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7);group.add(lamps.points);
+      lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7,true);group.add(lamps.points);
       traffic=buildCars(env,hf,data.lines,lite ? .25 : .45);group.add(traffic.group);
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
       await step();
-      built=buildOcclusion(data.buildings,r.box,builtSize);
+      built=buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
       await step();
       mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
       infrastructure=infrastructureMask(data.lines,r.box);
@@ -494,18 +498,18 @@ export function createHero(
         throw error;
       }
       const detailedCampus=r.id==='kameoka-campus';
+      releasePrevious();
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
       let forestMaskChanged=false;
       const release=(releaseData=true)=>{
-        detailBox=null;southOverview?.setDetailBox(null);osakaOverview?.setDetailBox(null);
+        setOverviewDetail(null);
         cityLods.delete(city);
         regionalDrive=null;scene.remove(group);disposeGroup(group);
         for(const layer of [lamps.uniforms,traffic.uniforms]){const i=pointLayers.indexOf(layer);if(i>=0)pointLayers.splice(i,1);}
         terrain.uniforms.uRegionRoadsOn.value=0;
         terrain.uniforms.uRegionRoads.value=wide;
         terrain.setPhoto(0,null);
-        env.uBuilt.value=coreBuilt;env.uBuiltBox.value.set(...BUILDINGS_BOX);
-        env.uBuiltTexel.value=(BUILDINGS_BOX[2]-BUILDINGS_BOX[0])/builtSize;
+        env.uBuilt.value=coreBuilt;env.uRegionBuiltTexel.value=0;
         outerExcluded=()=>false;
         if(forestMaskChanged)refreshForest();
         road.dispose();built.dispose();if(releaseData)data.dispose();shadow.invalidate();
@@ -519,32 +523,52 @@ export function createHero(
       terrain.uniforms.uRegionRoadBox.value.set(...r.box);
       terrain.uniforms.uRegionRoadsOn.value=1;
       terrain.setPhoto(0,data.photo,r.photo.box);
-      env.uBuilt.value=built;env.uBuiltBox.value.set(...r.box);
-      env.uBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
+      env.uBuilt.value=built;env.uRegionBuiltBox.value.set(...r.box);
+      env.uRegionBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
       outerExcluded=(x,z)=>mask(x,z)||infrastructure(x,z)||(detailedCampus&&(isKameokaBuilding(x,z)||kameokaClearing(x-KAMEOKA_CENTER.x,z-KAMEOKA_CENTER.z)));
       forestMaskChanged=true;
       refreshForest();
       regionalDrive=traffic.update;
       pointLayers.push(lamps.uniforms,traffic.uniforms);updatePointScale();
       scene.add(group);casts(city.group);cityLods.add(city);shadow.invalidate();
-      detailBox=r.box;southOverview?.setDetailBox(detailBox);osakaOverview?.setDetailBox(detailBox);
+      setOverviewDetail(r.box);
       } catch(error) {release(false);throw error;}
       return ()=>release();
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
     const regionManifest=await loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
       .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
-    let areaRequest=0;
-    ensureCityRegion=center=>{
-      let region=regionAt(regionManifest.regions,center);
-      sharedSlot?.select(region?.id==='tennozan');
-      void osakaPhotos.update(region?.id==='osaka'?center:null);
+    let lastAreaRequest:{id:string|null;retry?:ReturnType<typeof setTimeout>}|undefined;
+    let lastPhotoX=0,lastPhotoZ=0;
+    ensureCityRegion=(center,bearing)=>{
+      let region=bearing===undefined?regionAt(regionManifest.regions,center):regionInView(regionManifest.regions,center,bearing);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
       if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)
         region={...region,id:'uji-detail',photo:meta.byodoin};
-      const request=++areaRequest;
-      opts.onAreaLoading?.(!!region&&region.id!==regionLoader.id);
-      void regionLoader.request(region).finally(()=>{if(request===areaRequest)opts.onAreaLoading?.(false);});
+      const id=region?.id??null;
+      const changed=lastAreaRequest?.id!==id;
+      if(changed || bearing===undefined || (id==='osaka' && Math.hypot(center.x-lastPhotoX,center.z-lastPhotoZ)>=600)){
+        sharedSlot?.select(id==='tennozan');
+        void osakaPhotos.update(id==='osaka'?center:null);
+        lastPhotoX=center.x;lastPhotoZ=center.z;
+      }
+      if(!changed)return;
+      clearTimeout(lastAreaRequest?.retry);
+      const request:NonNullable<typeof lastAreaRequest>={id};
+      lastAreaRequest=request;
+      let delay=5000;
+      const attempt=()=>{
+        opts.onAreaLoading?.(!!region&&id!==regionLoader.id);
+        void regionLoader.request(region).finally(()=>{
+          if(request!==lastAreaRequest)return;
+          opts.onAreaLoading?.(false);
+          if(region && regionLoader.id!==id){
+            request.retry=setTimeout(attempt,delay);
+            delay=Math.min(30000,delay*2);
+          }
+        });
+      };
+      attempt();
     };
     prefetchCityRegion=(center,target)=>{
       const next=target==='tennozan'||target==='osakaSkyline'
@@ -556,19 +580,19 @@ export function createHero(
     prefetchCityRegion(landscapeCenter(VIEW),view);
     await Promise.all([cloudProgram, scenePrograms]);
     loading.built();
-    idle(()=>{void loadBinary('buildings-south-lod.json.gz').then(async bytes=>{
-      const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[]};
-      southOverview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
-      southOverview.setDetailBox(detailBox);scene.add(southOverview.mesh);
-    }).catch(error=>console.warn('Southern overview unavailable',error));});
-    idle(()=>{void loadBinary('buildings-osaka-lod.json.gz').then(async bytes=>{
-      const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers:OverviewBuilding[]};
-      osakaOverview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
-      osakaOverview.setDetailBox(detailBox);scene.add(osakaOverview.mesh);
-      // Towers taller than the compact region format are drawn at their measured heights.
-      const skyline=await buildSouthOverview(env,data.towers,(x,z)=>hf.height(x,z));
-      scene.add(skyline.mesh);
-    }).catch(error=>console.warn('Osaka overview unavailable',error));});
+    for(const area of ['south','osaka','north'])idle(()=>{
+      void loadBinary(`buildings-${area}-lod.json.gz`).then(async bytes=>{
+        const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers?:OverviewBuilding[]};
+        const overview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
+        overview.mesh.name=`${area}-overview`;
+        overview.setDetailBox(detailBox);overviews.push(overview);scene.add(overview.mesh);
+        if(data.towers){
+          // Osaka's tallest measured towers exceed the detailed city's height encoding.
+          const skyline=await buildSouthOverview(env,data.towers,(x,z)=>hf.height(x,z));
+          scene.add(skyline.mesh);
+        }
+      }).catch(error=>console.warn(`City overview unavailable: ${area}`,error));
+    });
   })().catch((err) => { console.error('Kyoto data failed to load', err); loading.fail(err); });
 
   let lastStatus = '';
@@ -650,7 +674,7 @@ export function createHero(
   heroControls.addEventListener('keydown', event => {
     if (['Enter', ' ', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'w', 'a', 's', 'd', 'q', 'e'].includes(event.key)) stopIntroCamera();
   }, true);
-  let exploring=false,freeBearing=0,freePitch=0,lastInput=performance.now();
+  let exploring=false,freeBearing=0,freePitch=0,lastInput=performance.now(),nextAreaCheck=0;
   const freePosition=new THREE.Vector3(),freeCenter=new THREE.Vector3();
   const keys=new Set<string>();
   const touchMove={forward:0,side:0,up:0,fast:false};
@@ -827,8 +851,12 @@ export function createHero(
       camera.position.copy(freePosition);const yaw=(freeBearing+lookDrag.yaw)*RAD,pitch=THREE.MathUtils.clamp(freePitch+lookDrag.pitch,-85,85)*RAD;
       lastTarget.set(freePosition.x+Math.sin(yaw)*Math.cos(pitch)*1000,freePosition.y+Math.sin(pitch)*1000,freePosition.z-Math.cos(yaw)*Math.cos(pitch)*1000);
       followForest?.(freePosition,yaw/RAD);
+      if(now>=nextAreaCheck){
+        ensureCityRegion?.(freePosition,yaw/RAD);
+        nextAreaCheck=now+250;
+      }
       if(freeCenter.distanceTo(freePosition)>600){
-        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);ensureCityRegion?.(freePosition);
+        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);
         prefetchCityRegion?.({x:freePosition.x+Math.sin(yaw)*1200,z:freePosition.z-Math.cos(yaw)*1200});
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }
@@ -915,6 +943,7 @@ export function createHero(
         flight=null;resetLook();freePosition.copy(camera.position);freeCenter.copy(freePosition);
         terrainRecenter?.(freePosition,true);shadow.invalidate();
         const d=lastTarget.clone().sub(camera.position).normalize();freeBearing=Math.atan2(d.x,-d.z)/RAD;freePitch=Math.asin(d.y)/RAD;
+        ensureCityRegion?.(freePosition,freeBearing);nextAreaCheck=performance.now()+250;
         exploring=true;env.uHighlight.value=1;el.tabIndex=0;el.focus({preventScroll:true});opts.onExplore?.(true);
       }else flyTo(mode==='campus'?'campus':view,clock);
     },

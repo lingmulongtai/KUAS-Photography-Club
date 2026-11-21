@@ -13,16 +13,35 @@ export function regionAt(regions:readonly CityRegion[],p:{x:number;z:number}) {
   return regions.find(r=>p.x>=r.box[0]&&p.x<r.box[2]&&p.z>=r.box[1]&&p.z<r.box[3])??null;
 }
 
-/** Serial loading bounds memory even when destinations change faster than downloads finish.
- * A stale result is released without constructing its city. Failed loads can be retried. */
+/** Include the streets around the explorer and those visible ahead across a sheet boundary. */
+export function regionInView(regions:readonly CityRegion[],eye:{x:number;z:number},bearing:number) {
+  const inside=regionAt(regions,eye);
+  if(inside)return inside;
+  const yaw=bearing*Math.PI/180;
+  const aheadX=eye.x+1700*Math.sin(yaw),aheadZ=eye.z-1700*Math.cos(yaw);
+  const distance=(x:number,z:number,[west,north,east,south]:Box)=>
+    Math.hypot(Math.max(west-x,0,x-east),Math.max(north-z,0,z-south));
+  let nearest:CityRegion|null=null,best=Infinity;
+  for(const region of regions){
+    const around=distance(eye.x,eye.z,region.box),ahead=distance(aheadX,aheadZ,region.box);
+    if(around>1200 && ahead>1450)continue;
+    const score=around+ahead*.5;
+    if(score<best){nearest=region;best=score;}
+  }
+  return nearest;
+}
+
+/** Keep the visible city during a serial download/build. Release it immediately before
+ * the new city installs its shared terrain textures. Failed loads can be retried. */
 export function createRegionalLoader<T extends {dispose():void}>(
   load:(region:CityRegion)=>Promise<T>,
-  activate:(region:CityRegion,data:T,current:()=>boolean)=> (()=>void) | Promise<()=>void>,
+  activate:(region:CityRegion,data:T,current:()=>boolean,releasePrevious:()=>void)=> (()=>void) | Promise<()=>void>,
   onError:(error:unknown)=>void,
 ) {
   let wanted:CityRegion|null=null;
   let active:{id:string;dispose():void}|null=null;
   let running:Promise<void>|null=null;
+  const releasePrevious=()=>{active?.dispose();active=null;};
   let revision=0,settledRevision=0;
   // One speculative dataset at most, and no parallel regional downloads/decodes.
   let downloading:Promise<unknown>=Promise.resolve();
@@ -40,8 +59,7 @@ export function createRegionalLoader<T extends {dispose():void}>(
     try {
     while(wanted?.id!==active?.id) {
       const next=wanted;
-      active?.dispose();active=null;
-      if(!next) return;
+      if(!next){releasePrevious();return;}
       let data:T;
       try {data=await take(next);} catch(error) {
         onError(error);
@@ -50,8 +68,9 @@ export function createRegionalLoader<T extends {dispose():void}>(
       }
       if(wanted?.id!==next.id){data.dispose();continue;}
       try {
-        const dispose=await activate(next,data,()=>wanted?.id===next.id);
+        const dispose=await activate(next,data,()=>wanted?.id===next.id,releasePrevious);
         if(wanted?.id!==next.id){dispose();continue;}
+        releasePrevious();
         active={id:next.id,dispose};
       } catch(error){data.dispose();if(wanted?.id!==next.id)continue;onError(error);return;}
     }
