@@ -182,6 +182,7 @@ export function createHero(
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   let groundAt: ((x: number, z: number) => number) | null = null;
   let regional:Awaited<ReturnType<typeof import('./regional-ground').regionalGround>> | undefined;
+  let regionalCity:Awaited<ReturnType<typeof import('./regional-city').regionalCity>>|undefined;
   let ensureRegionalGround:(()=>Promise<void>)|undefined;
   let flightRequest=0;
   let travelBounds:Box=[-34000,-19000,13000,20000];
@@ -780,6 +781,9 @@ export function createHero(
         travelBounds=result.bounds;
         groundAt=result.ground;
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
+        void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
+          module.regionalCity(scene,env,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite)
+        ).then(city=>{regionalCity=city;}).catch(error=>console.warn('Regional city index unavailable',error));
       }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
     idle(()=>void ensureRegionalGround?.());
     startGroundRelief=() => idle(() => {
@@ -1236,7 +1240,9 @@ export function createHero(
       const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
-      regional?.update(camera.position.x,camera.position.z,performance.now()/1000);
+      const regionalTime=performance.now()/1000;
+      regional?.update(camera.position.x,camera.position.z,regionalTime);
+      regionalCity?.update(camera.position.x,camera.position.z,regionalTime);
       clouds.prepareField(renderer,camera.position);
       if (dt > 0) driveCars?.(dt);
       if (dt > 0 && !opts.reducedMotion) aircraft.update(dt);
