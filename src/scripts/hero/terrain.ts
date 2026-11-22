@@ -353,6 +353,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         albedo *= 1. - .5 * smoothstep(.05, .6, contact) - .22 * urban;
 
         albedo=mix(albedo,albedo*vec3(1.65,.72,.38),green*uAutumn*.6);
+        albedo=mix(albedo,albedo*vec3(.82,1.18,.78),green*uSummer*.72);
         albedo=seasonalSurface(albedo,n,vWorld);
         float sh = sunShadow(vWorld, n);
         vec3 col = shade(albedo, n, vWorld, sh);

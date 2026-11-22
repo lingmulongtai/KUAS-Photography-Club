@@ -4,9 +4,11 @@ import {climateOf,seasonWeights} from '../src/scripts/hero/seasons.ts';
 import {philosopherCherries} from '../src/scripts/hero/philosopher-cherries.ts';
 test('automatic scenery follows the Kyoto month and manual presets remain independent of the date',()=>{
   assert.equal(seasonWeights('auto',4).spring,1);assert.equal(seasonWeights('auto',8).snow,0);
+  assert.equal(seasonWeights('auto',8).summer,1);assert.ok(seasonWeights('auto',6).summer>0);
   assert.ok(seasonWeights('auto',11).autumn>seasonWeights('auto',10).autumn);
   assert.ok(seasonWeights('auto',1).snow>0);assert.equal(seasonWeights('winter',8).snow,1);
   assert.equal(seasonWeights('spring',12).spring,1);assert.equal(seasonWeights('summer',1).snow,0);
+  assert.equal(seasonWeights('summer',1).summer,1);assert.equal(seasonWeights('winter',8).summer,0);
 });
 test('the sky follows the scenery season: the Kyoto month on auto, the preset otherwise',()=>{
   assert.equal(climateOf('auto',4),'spring');assert.equal(climateOf('auto',8),'summer');

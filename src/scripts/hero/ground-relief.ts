@@ -63,6 +63,7 @@ function groundMaterial(env: Env, roads: RoadUniforms) {
         vec3 col;
         if(kind<1.5){
           vec3 leaves=mix(vec3(.107,.182,.055),vec3(.21,.27,.083),seed);
+          leaves=mix(leaves,vec3(.095,.245,.052)*(.85+.26*seed),uSummer*.76);
           leaves=mix(leaves,vec3(.32,.235,.082)*(.83+.25*seed),uAutumn);
           vec3 wet=mix(vec3(.11,.135,.093),vec3(.18,.205,.164),seed);
           col=mix(leaves,wet,uSpring*.82);
@@ -81,6 +82,7 @@ function groundMaterial(env: Env, roads: RoadUniforms) {
           col=mix(vec3(.161,.175,.091),vec3(.278,.256,.151),soilTone)*(.9+.18*grain);
         }else{
           col=mix(vec3(.135,.215,.052),vec3(.224,.297,.077),seed);
+          col=mix(col,vec3(.11,.26,.058)*(.86+.22*seed),uSummer*.65);
           col=mix(col,vec3(.319,.243,.070),uAutumn);
           col*=.89+.19*grain;
         }

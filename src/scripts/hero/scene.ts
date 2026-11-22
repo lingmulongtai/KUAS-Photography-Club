@@ -947,6 +947,10 @@ export function createHero(
   let lastStatus = '';
 
   let season:Season='auto';
+  const SUMMER_ZENITH=new THREE.Color('#0a44b8');
+  const SUMMER_MID=new THREE.Color('#3288e0');
+  const SUMMER_HORIZON=new THREE.Color('#c8e8fa');
+  const SUMMER_DUSK_HORIZON=new THREE.Color('#ff8446');
   function applyTime(date: Date, t: number) {
     const sun = sunPosition(date);
     const alt = sun.altitude / RAD;
@@ -971,17 +975,27 @@ export function createHero(
         shadow.setRegion(shadowRegion(VIEW,eye));
       }
     }
-    env.uSpring.value=weights.spring;env.uAutumn.value=weights.autumn;env.uSnow.value=weights.snow;
+    env.uSpring.value=weights.spring;env.uSummer.value=weights.summer;env.uAutumn.value=weights.autumn;env.uSnow.value=weights.snow;
     snow.points.visible=weights.snow>0;
+    const summerDay=weights.summer*THREE.MathUtils.smoothstep(alt,4,20);
+    const summerDusk=weights.summer*THREE.MathUtils.smoothstep(alt,-4,3)*(1-THREE.MathUtils.smoothstep(alt,6,18));
     env.uSunDir.value.set(...directionFrom(sun));
     env.uZenith.value.copy(look.zenith);
     env.uMid.value.copy(look.mid);
     env.uHorizon.value.copy(look.horizon);
+    if(summerDay>0){
+      env.uZenith.value.lerp(SUMMER_ZENITH,.64*summerDay);
+      env.uMid.value.lerp(SUMMER_MID,.52*summerDay);
+      env.uHorizon.value.lerp(SUMMER_HORIZON,.40*summerDay);
+    }
+    if(summerDusk>0){
+      env.uHorizon.value.lerp(SUMMER_DUSK_HORIZON,.28*summerDusk);
+    }
     env.uGlow.value.copy(look.glow).multiplyScalar(look.glowAmt);
-    const directSun = look.sunAmt * THREE.MathUtils.smoothstep(alt, -1.2, 1.2);
+    const directSun = look.sunAmt * THREE.MathUtils.smoothstep(alt, -1.2, 1.2) * (1 + .18 * summerDay);
     env.uSunLight.value.copy(look.sun).multiplyScalar(directSun);
     shadow.update(env.uSunDir.value, directSun);
-    env.uCloudLight.value.copy(look.cloud).multiplyScalar(look.cloudAmt);
+    env.uCloudLight.value.copy(look.cloud).multiplyScalar(look.cloudAmt * (1 + .24 * summerDay));
     env.uCity.value = look.city;
     env.uLit.value = windowsLit(minutes);
     env.uVenus.value = THREE.MathUtils.smoothstep(alt, -8, -2) * (1 - THREE.MathUtils.smoothstep(alt, 1, 5));
@@ -1000,7 +1014,7 @@ export function createHero(
     env.uStars.value = dark * (1.3 - 0.65 * moonlight);
     celestial.setSidereal(localSiderealAngle(date, KYOTO.lon));
 
-    renderer.toneMappingExposure = look.exposure;
+    renderer.toneMappingExposure = look.exposure * (1 + .05 * summerDay);
     // after dusk the threshold drops below the lamps and windows, so every light (the far towns
     // included) glows by its own brightness; by day and at sunset only the brightest highlights pass
     const night = THREE.MathUtils.smoothstep(look.city, .55, 1);

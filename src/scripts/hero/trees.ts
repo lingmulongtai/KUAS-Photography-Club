@@ -129,6 +129,7 @@ export function createForest(
       attribute float aVox;
       uniform float uTime;
       uniform float uSpring;
+      uniform float uSummer;
       uniform float uAutumn;
       varying vec3 vWorld;
       varying vec3 vNormal;
@@ -160,6 +161,8 @@ export function createForest(
         vNormal = normalize(normalize(n) + vec3(0., .15, 0.));
         float leafPhase=fract(sin(dot(iPos.xz,vec2(.13,.17)))*347.7);
         vec3 leaves=mix(iTint,mix(vec3(.5,.12,.035),vec3(.66,.4,.065),leafPhase),uAutumn*iSeason.x*(.45+.55*leafPhase));
+        // Gentle sRGB shift before fragment gamma decode gives lush midsummer emerald without neon clipping.
+        leaves=mix(leaves,leaves*vec3(.86,1.12,.84)+vec3(0.,.012,.004),uSummer*(.52+.48*iSeason.x));
         leaves=mix(leaves,vec3(.85,.62,.69),uSpring*iSeason.y);
         vTint = mix(leaves,vec3(.22,.15,.09),aBark);
         vUp = position.y;
@@ -202,7 +205,7 @@ export function createForest(
         // sunlight through the leaves when the tree stands against the sun
         vec3 v = normalize(vWorld - cameraPosition);
         float back = pow(max(dot(v, uSunDir), 0.), 5.) * (1. - vBark);
-        col += uSunLight * alb * vec3(.9, 1.15, .45) * back * (.25 + .75 * sh) * .55;
+        col += uSunLight * alb * vec3(.9, 1.2, .42) * back * (.25 + .75 * sh) * (.55 + .35 * uSummer);
         gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
       }
     `,
