@@ -6,7 +6,7 @@ import {gzipSync} from 'node:zlib';
 import {buildSync} from 'esbuild';
 import {terrainPrograms} from '../tools/kansai-data/terrain-programs.mjs';
 import {readFileSync} from 'node:fs';
-import {boundEnvironmentLoops} from '../tools/kansai-data/cesium-assets.mjs';
+import {boundEnvironmentLoops,orderGltfAttributes} from '../tools/kansai-data/cesium-assets.mjs';
 import irradiance from '@cesium/engine/Source/Shaders/ComputeIrradianceFS.js';
 import specular from '@cesium/engine/Source/Shaders/ConvolveSpecularMapFS.js';
 
@@ -22,6 +22,19 @@ test('environment lighting preserves native sample counts and the WebGL1 shader 
   }
   assert.equal(bounded.split('#else\n    const int sampleCount = samples;').length-1,2);
   assert.equal(boundEnvironmentLoops('unrecognised shader bundle'),'unrecognised shader bundle');
+});
+
+test('survey primitives with shuffled glTF semantics generate the same attribute plan',()=>{
+  const native=readFileSync(new URL('../node_modules/cesium/Build/Cesium/Cesium.js',import.meta.url),'utf8');
+  const ordered=orderGltfAttributes(native);
+  // Exercise the installed loader's iteration and accessor lookup on both encodings.
+  const loop=ordered.match(/f=t\.attributes;if\(l\(f\)\)(for\(let V of Object\.keys\(f\)\.sort\(\)\)\{let w=f\[V\])/);
+  assert.ok(loop);
+  const read=new Function('f',`const plan=[];${loop[1]};plan.push([V,w])}return plan;`);
+  const entries=[['POSITION',7],['NORMAL',12],['TEXCOORD_0',0],['_BATCHID',4]];
+  assert.deepEqual(read(Object.fromEntries(entries)),read(Object.fromEntries([...entries].reverse())));
+  assert.deepEqual(Object.fromEntries(read(Object.fromEntries(entries))),Object.fromEntries(entries));
+  assert.throws(()=>orderGltfAttributes('unrecognised release'),/Review glTF/);
 });
 
 test('terrain warm-up uses the installed engine sources and covers each aerial layer count',()=>{

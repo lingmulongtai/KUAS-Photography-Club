@@ -27,19 +27,31 @@ export function boundEnvironmentLoops(bundle){
   return modified?'/* This distribution modifies the diffuse and specular GPU loop bounds. */\n'+bundle:bundle;
 }
 
+// glTF stores vertex semantics in a dictionary. A different key order in two
+// survey files otherwise produces separate GLSL sources and separate native
+// program links, even when their material and vertex layout are equivalent.
+export function orderGltfAttributes(bundle){
+  // GltfLoader.loadPrimitive in the pinned Cesium distribution. Match the
+  // surrounding accessor lookup to leave instance and morph-target plans alone.
+  const loader='g=!1,f=t.attributes;if(l(f))for(let V in f){if(!f.hasOwnProperty(V))continue;let w=f[V]';
+  const index=bundle.indexOf(loader);
+  if(index<0||index!==bundle.lastIndexOf(loader))throw Error('Review glTF primitive attribute loading in this Cesium release');
+  return bundle.replace(loader,loader.replace('in f){if(!f.hasOwnProperty(V))continue;', 'of Object.keys(f).sort()){'));
+}
+
 // Serve workers, shaders and decoders from the same release and origin as Cesium.js.
 export async function prepareCesiumAssets() {
   const {version} = JSON.parse(await readFile(new URL('../../package.json', distribution), 'utf8'));
   const stamp = new URL('version.txt', output);
   await mkdir(output, {recursive:true});
   await writeTerrainPrograms(new URL('terrain-programs.json.gz',output));
-  const buildVersion=version+'-env-loops-1';
+  const buildVersion=version+'-env-loops-1-gltf-order-1';
   if (await readFile(stamp, 'utf8').catch(() => '') === buildVersion && await stat(new URL('Cesium.js', output)).catch(() => null)) return;
   for (const asset of ['Assets', 'ThirdParty', 'Widgets', 'Workers']) {
     await cp(new URL(asset, distribution), new URL(asset, output), {recursive:true});
   }
   await cp(new URL('../../LICENSE.md', distribution), new URL('LICENSE.md', output));
   const bundle=await readFile(new URL('Cesium.js',distribution),'utf8');
-  await writeFile(new URL('Cesium.js',output),boundEnvironmentLoops(bundle));
+  await writeFile(new URL('Cesium.js',output),'/* Primitive attributes are loaded in semantic order. */\n'+orderGltfAttributes(boundEnvironmentLoops(bundle)));
   await writeFile(stamp, buildVersion);
 }
