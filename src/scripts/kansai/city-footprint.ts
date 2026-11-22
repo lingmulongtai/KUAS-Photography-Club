@@ -1,5 +1,5 @@
-import {CLASS, USAGE, type BoxBuilding, type PolyBuilding} from '../hero/buildings-data';
-import {toLocal} from '../hero/geo';
+import {CLASS, USAGE, type BoxBuilding, type PolyBuilding} from '../hero/buildings-data.ts';
+import {toLocal} from '../hero/geo.ts';
 import type {Ring} from './coordinates';
 
 /** The regional survey has footprint class and height, but often no recorded use. */

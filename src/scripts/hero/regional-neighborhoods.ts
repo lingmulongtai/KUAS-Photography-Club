@@ -18,7 +18,8 @@ const district=(x:number,y:number)=>x+'/'+y;
 // A district draws its flat and pitched roofs from the same 8-byte footprint records.
 export async function regionalNeighborhoods(scene:THREE.Scene,env:Env,ground:(x:number,z:number)=>number,
   lite:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>){
-  const {tiles}=await json<{tiles:Record<string,number>}>('neighborhoods/index.json');
+  const {tiles,profiled=[]}=await json<{tiles:Record<string,number>;profiled?:string[]}>('neighborhoods/index.json');
+  const survey=new Set(profiled);
   const activeBox={value:new THREE.Vector4(1,1,0,0)};
   const loaded=new Map<string,Batch>(),pending=new Set<string>(),retry=new Map<string,number>();
   let wanted=new Map<string,Tile>(),previous='',next=0,near=new Set<string>(),ready=new Map<boolean,Promise<unknown>>();
@@ -33,19 +34,23 @@ export async function regionalNeighborhoods(scene:THREE.Scene,env:Env,ground:(x:
     const bytes=new Uint8Array(await inflate(new Uint8Array(await res.arrayBuffer())));
     if(!wanted.has(t.key))return;
     const count=tiles[t.key],data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
-    if(bytes.length!==count*8)throw new Error('Incomplete roof survey '+t.key);
+    const strideBytes=survey.has(t.key)?10:8;
+    if(bytes.length!==count*strideBytes)throw new Error('Incomplete roof survey '+t.key);
     const roofs=[{houses:[] as PlacedHouse[],slots:[] as number[]},{houses:[] as PlacedHouse[],slots:[] as number[]}];
     // Scatter the prefix uniformly so far LOD retains streets throughout the district.
     let stride=1597;
     function gcd(a:number,b:number):number{return b?gcd(b,a%b):a;}
     while(gcd(stride,count)!==1)stride++;
     for(let i=0;i<count;i++){
-      const k=((i*stride)%count)*8,u=data.getUint16(k,true)/65535,v=data.getUint16(k+2,true)/65535;
+      const k=((i*stride)%count)*strideBytes,u=data.getUint16(k,true)/65535,v=data.getUint16(k+2,true)/65535;
       const [lon,lat]=lonLat(t.x+u,t.y+v,12),{x,z}=toLocal(lat,lon);
       const h=bytes[k+6],w=bytes[k+4],d=bytes[k+5],base=ground(x,z);
-      const kind=facadeKind(false,w*d,h),pitched=(kind&3)===0;
+      const kind=strideBytes===10?bytes[k+8]:facadeKind(false,w*d,h);
+      const code=strideBytes===10?bytes[k+9]:255;
+      const roof=code===255?undefined:{type:(code>>6) as 0|1|2,rh:(code&63)*.25};
+      const pitched=roof?roof.type>0:(kind&3)===0;
       const batch=roofs[Number(pitched)],angle=bytes[k+7]*Math.PI/256;
-      const b={x,z,w,d,h,kind,angle,ground:0};
+      const b={x,z,w,d,h,kind,angle,ground:0,roof};
       batch.houses.push({b,y:base,seed:(u*71.31+v*13.17)%1});
       batch.slots.push(Math.min(15,Math.floor(v*16))*16+Math.min(15,Math.floor(u*16)));
       if(i%2048===2047){await new Promise(r=>setTimeout(r,0));if(!wanted.has(t.key))return;}
