@@ -478,11 +478,12 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pi
 }
 
 /** Walls and a triangulated flat roof for each outline, merged into one geometry. */
-function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
-  const pos: number[] = [];
-  const nrm: number[] = [];
-  const wall: number[] = [];
-  const info: number[] = [];
+function* extrudedSteps(list: { p: PolyBuilding; y: number; seed: number }[]) {
+  // Six wall vertices per edge and at most (m-2) roof triangles per simple ring.
+  const capacity=list.reduce((n,{p})=>n+6*p.ring.length/2+3*Math.max(0,p.ring.length/2-2),0);
+  const pos=new Float32Array(3*capacity),nrm=new Float32Array(3*capacity);
+  const wall=new Float32Array(2*capacity),info=new Float32Array(4*capacity);
+  let count=0,pointsSinceYield=0;
   type V = [number, number, number, number, number];
   /** One triangle of vertices [x, y, z, u, v], wound counter-clockwise around the outward normal n. */
   const tri = (a: V, b: V, c: V, n: number[], inf: number[]) => {
@@ -490,10 +491,11 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
     const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
     const dot = (ab[1] * ac[2] - ab[2] * ac[1]) * n[0] + (ab[2] * ac[0] - ab[0] * ac[2]) * n[1] + (ab[0] * ac[1] - ab[1] * ac[0]) * n[2];
     for (const q of dot < 0 ? [a, c, b] : [a, b, c]) {
-      pos.push(q[0], q[1], q[2]);
-      nrm.push(n[0], n[1], n[2]);
-      wall.push(q[3], q[4]);
-      info.push(...inf);
+      const xyz=count*3,uv=count*2;
+      pos[xyz]=q[0];pos[xyz+1]=q[1];pos[xyz+2]=q[2];
+      nrm[xyz]=n[0];nrm[xyz+1]=n[1];nrm[xyz+2]=n[2];
+      wall[uv]=q[3];wall[uv+1]=q[4];
+      info.set(inf,count*4);count++;
     }
   };
   const box = new THREE.Box3();
@@ -501,6 +503,8 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
   for (const { p, y, seed } of list) {
     const r = p.ring;
     const m = r.length / 2;
+    if(pointsSinceYield>=256){yield;pointsSinceYield=0;}
+    pointsSinceYield+=m;
     const top = y + p.h + separation(seed).lift;
     const bottom = y - FOOTING;
     // signed area decides which side of each edge is outside
@@ -541,10 +545,10 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
     }
   }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-  geo.setAttribute('aWall', new THREE.Float32BufferAttribute(wall, 2));
-  geo.setAttribute('aInfo', new THREE.Float32BufferAttribute(info, 4));
+  geo.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0,count*3), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nrm.subarray(0,count*3), 3));
+  geo.setAttribute('aWall', new THREE.BufferAttribute(wall.subarray(0,count*2), 2));
+  geo.setAttribute('aInfo', new THREE.BufferAttribute(info.subarray(0,count*4), 4));
   geo.boundingBox = box;
   geo.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
   return geo;
@@ -695,7 +699,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: Bo
         block.proxy.add(new THREE.Mesh(blockGeometry(proxyShapes.flat, full, c.flat, false), proxyMaterial));
       }
     }
-    if (c.polys.length) add(extruded(c.polys), polyMat, polyDepth);
+    if (c.polys.length) add(yield* extrudedSteps(c.polys), polyMat, polyDepth);
     if (c.pitched.length) {
       const far = instanced(pitched, c.pitched, true);
       // the stepped houses share the far set's per-house data
@@ -818,7 +822,14 @@ export async function buildResidentCity(env:Env,hf:Heightfield,data:CityData,ext
   for(const t of tiles.values()){
     if(t.flat.length)batches.push(new THREE.Mesh(instanced(flat,t.flat,false),houses));
     if(t.pitched.length)batches.push(new THREE.Mesh(instanced(pitched,t.pitched,true),houses));
-    if(t.polys.length)batches.push(new THREE.Mesh(extruded(t.polys),polygons));
+    if(t.polys.length){
+      const steps=extrudedSteps(t.polys);
+      for(;;){
+        const step=steps.next();
+        if(step.done){batches.push(new THREE.Mesh(step.value,polygons));break;}
+        if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+      }
+    }
     if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
   }
   for(const batch of batches){
