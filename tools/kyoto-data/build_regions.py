@@ -22,14 +22,14 @@ from common import CACHE, OUT, write_gz
 from fetch import GSI, get, fetch_plateau, leaves, intersects
 from build_buildings import export_buildings, heightfield
 from build_lines import to_local_fn
-from build_higashiyama import render, save
+from build_higashiyama import save
 from build_arashiyama import polygons
 from extract_buildings import decode_tile
 
 REGIONS = {
     # Uji precedes overlapping ward data: Kyoto PLATEAU does not cover Uji City.
     'uji': {'box': (0,10000,11000,19000), 'ja':'宇治・平等院', 'en':'Uji / Byodoin'},
-    'osaka': {'box': (-30000,20000,-14000,36000), 'ja':'大阪北部・梅田', 'en':'North Osaka / Umeda', 'photoZoom':14, 'photoSize':1536},
+    'osaka': {'box': (-30000,20000,-14000,36000), 'ja':'大阪北部・梅田', 'en':'North Osaka / Umeda', 'photoZoom':14},
     # Prioritize the confluence over the Kyoto-only south PLATEAU region.
     'tennozan': {'box': (-14000,8500,500,23000), 'ja':'天王山・三川合流域', 'en':'Tennozan / Three Rivers'},
     'kameoka': {'box': (-24000,-8000,-9000,4000), 'ja':'亀岡・保津峡', 'en':'Kameoka / Hozukyo'},
@@ -38,14 +38,14 @@ REGIONS = {
                   'photoBox': (2250,-2500,12500,10000), 'photoZoom':15, 'photoSize':1792},
     'south': {'box': (-9000,6200,4600,19000), 'ja':'京都南部', 'en':'Southern Kyoto', 'wards':['26107_minami-ku','26109_fushimi-ku']},
     'north': {'box': (-8200,-20000,8100,-7000), 'ja':'京都北部・洛北', 'en':'Northern Kyoto / Rakuhoku',
-              'wards':['26101_kita-ku','26103_sakyo-ku'], 'fillOutlines':True, 'photoZoom':14},
+              'wards':['26101_kita-ku','26103_sakyo-ku'], 'fillOutlines':True, 'photoZoom':14, 'photoSize':2048},
 }
 
 
 def fetch_sources(region):
     box=region['box']
     jobs=[]
-    sets=[('bvmap','experimental_bvmap',14,'pbf'),('seamlessphoto','seamlessphoto',region.get('photoZoom',13),'jpg')]
+    sets=[('bvmap','experimental_bvmap',14,'pbf'),('seamlessphoto','seamlessphoto',region.get('photoZoom',15),'jpg')]
     if not region.get('wards') or region.get('fillOutlines'):
         sets.append(('bvmap','experimental_bvmap',15,'pbf'))
     for name,remote,zoom,ext in sets:
@@ -260,15 +260,16 @@ def export_lines(key,box,*,track_box=None,tracks=()):
 def build_photo(key,region):
     box=region.get('photoBox',region['box'])
     width,depth=box[2]-box[0],box[3]-box[1]
-    longest=region.get('photoSize',2048)
+    longest=region.get('photoSize',1536)
     dims=(round(longest*width/max(width,depth)),round(longest*depth/max(width,depth)))
-    zoom=region.get('photoZoom',13)
-    if key=='yamashina':
+    zoom=region.get('photoZoom',15)
+    if key in ('north','osaka'):
+        from build_higashiyama import render
+        image=render(box,dims,zoom,oversample=1)
+    else:
         from build_basin_atlas import photo, balance, neutral_ground
         with Image.open(os.path.join(OUT,'aerial-city.webp')) as city:
             image=balance(photo(box,zoom,dims),neutral_ground(city.convert('RGB')))
-    else:
-        image=render(box,dims,zoom,oversample=1)
     _,size=save(image,f'aerial-{key}.webp',600_000)
     mobile=image.resize(tuple(round(v/2) for v in dims),Image.Resampling.LANCZOS)
     _,mobile_size=save(mobile,f'aerial-{key}-mobile.webp',220_000)
