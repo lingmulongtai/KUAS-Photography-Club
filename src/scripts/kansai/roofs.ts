@@ -18,13 +18,14 @@ function clip(poly:Point[],distance:Face){
 /** Intersect roof planes with the actual footprint, including re-entrant wings and courtyards. */
 export function pitchedRoof(rings:Point[][],shape:string,eaves:number,rise:number,
   face:(a:RoofVertex,b:RoofVertex,c:RoofVertex)=>void,
-  wall:(a:RoofVertex,b:RoofVertex,c:RoofVertex,d:RoofVertex)=>void){
+  wall:(a:RoofVertex,b:RoofVertex,c:RoofVertex,d:RoofVertex)=>void, ridgeAngle?:number){
   const outline=rings[0];
   let dx=1,dy=0,longest=0;
   for(let i=0;i<outline.length;i++){
     const p=outline[i],q=outline[(i+1)%outline.length],x=q[0]-p[0],y=q[1]-p[1],len=Math.hypot(x,y);
     if(len>longest){longest=len;dx=x/len;dy=y/len;}
   }
+  if(ridgeAngle!==undefined){dx=Math.cos(ridgeAngle);dy=Math.sin(ridgeAngle);}
   const along:Face=([x,y])=>x*dx+y*dy,across:Face=([x,y])=>y*dx-x*dy;
   const u=outline.map(along),v=outline.map(across),u0=Math.min(...u),u1=Math.max(...u),v0=Math.min(...v),v1=Math.max(...v);
   const width=Math.max(.01,v1-v0),length=Math.max(.01,u1-u0);

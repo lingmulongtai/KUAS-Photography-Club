@@ -58,7 +58,7 @@ export function strip(m:Mesh,a:XYZ,b:XYZ,width:number,color:RGB,depth=0,offset=0
 const walls:RGB[]=[[154,151,144],[128,131,130],[173,163,146],[136,115,103],[160,165,161],[182,177,166]];
 const roofs:RGB[]=[[80,84,85],[97,94,88],[74,83,91],[114,99,88],[73,81,78]];
 /** Winding is normalized in east/north coordinates, including courtyard walls. */
-export function building(m:Mesh,rings:Point[][],floor:number,eaves:number,ridge:number,style:number,roofShape:string,wallBase=floor){
+export function building(m:Mesh,rings:Point[][],floor:number,eaves:number,ridge:number,style:number,roofShape:string,wallBase=floor,ridgeAngle?:number){
   if(!rings[0]?.length || eaves<=floor)return;
   const wall=walls[Math.min(walls.length-1,Math.floor(style*walls.length))];
   const roof=roofs[Math.min(4,Math.floor(style*5))];
@@ -74,7 +74,7 @@ export function building(m:Mesh,rings:Point[][],floor:number,eaves:number,ridge:
   }
   if(ridge>0){
     pitchedRoof(rings,roofShape,eaves,ridge,(a,b,c)=>{m.surfaceType='roof';m.triangle(a,b,c,roof);},
-      (a,b,c,d)=>{m.surfaceType='wall';m.quad(a,b,c,d,wall);});
+      (a,b,c,d)=>{m.surfaceType='wall';m.quad(a,b,c,d,wall);},ridgeAngle);
   }else{
     m.surfaceType='roof';m.surface(rings.map(r=>r.map(v=>withZ(v,eaves))),roof);
   }

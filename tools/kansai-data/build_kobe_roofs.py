@@ -104,6 +104,61 @@ def sample(cache,x,y,bounds,zoom,scale):
     return result, u/scale-sx,v/scale-sy
 
 
+def pitched_profile(shell, valid, values, left, top, scale):
+    """Fit the same ridge and hip planes used by the renderer to returns inside this footprint."""
+    yy, xx = np.nonzero(valid)
+    if len(xx) < 20:
+        return
+    step = max(1, len(xx) // 400)
+    pos = np.column_stack((left + (xx[::step] + .5) / scale, top + (yy[::step] + .5) / scale))
+    heights = values[yy[::step], xx[::step]].astype(float)
+    edges = np.roll(shell, -1, axis=0) - shell
+    axis = edges[np.argmax(np.sum(edges*edges, axis=1))]
+    length = np.linalg.norm(axis)
+    if length < 1:
+        return
+    axis = axis / length
+    best_score = .72
+    result = None
+    for direction in (axis, np.array([-axis[1], axis[0]])):
+        normal = np.array([-direction[1], direction[0]])
+        along, across = shell @ direction, shell @ normal
+        length, width = np.ptp(along), np.ptp(across)
+        if min(width, length) < 4 / scale:
+            continue
+        u = pos @ direction - along.min()
+        v = pos @ normal - across.min()
+        # Avoid mixed ground/wall returns along the four outer edges.
+        keep = (u > .55/scale) & (u < length-.55/scale) & (v > .55/scale) & (v < width-.55/scale)
+        if keep.sum() < 16:
+            continue
+        u, v, h = u[keep], v[keep], heights[keep]
+        h = np.clip(h, *np.percentile(h, [6, 94]))
+        variance = np.var(h)
+        if variance < 1:
+            continue
+        gable = 1 - np.abs(2*v/width - 1)
+        hip = np.minimum(gable, 2*np.minimum(u, length-u)/min(length, width))
+        for kind, fraction in enumerate((gable, hip)):
+            if np.ptp(fraction) < .58:
+                continue
+            mean = fraction.mean()
+            f = fraction - mean
+            rise = (f @ (h-h.mean())) / (f @ f)
+            eaves = h.mean() - mean*rise
+            # Heights are half metres, footprint units are about half a metre in Kobe.
+            if rise < 2.5 or rise > min(32, width*.78) or eaves < 5:
+                continue
+            error = np.mean((h - (eaves + rise*fraction))**2)
+            score = 1-error/variance - (.018 if kind == 1 else 0)
+            if score > best_score:
+                best_score = score
+                # Rendering coordinates are east/north, survey rasters are east/south.
+                angle = math.atan2(-direction[1], direction[0]) % math.pi
+                result = [kind, round(angle/math.pi*256) % 256, round(eaves), round(rise)]
+    return result
+
+
 def profile(rings,box,zoom,scale,cache,x,y):
     shell=np.asarray(rings[0]).reshape(-1,2)
     poly=Polygon(shell,[np.asarray(r).reshape(-1,2) for r in rings[1:] if len(r)>=6])
@@ -117,8 +172,14 @@ def profile(rings,box,zoom,scale,cache,x,y):
     lo,med,upper=np.percentile(measured,[20,50,93])
     centre=[round((box[0]+box[2])*.5),round((box[1]+box[3])*.5)]
     row=[*centre,box[2]-box[0],box[3]-box[1],round(med),round(upper),[]]
-    if upper-lo<5 or poly.area<580:
+    def finish():
+        if not row[6] and upper-lo >= 3 and med <= 52:
+            roof = pitched_profile(shell, valid, values, left, top, scale)
+            if roof:
+                row.append(roof)
         return row
+    if upper-lo<5 or poly.area<580:
+        return finish()
     # Segment genuine roof plateaus, allowing a sloped house roof to use the pitched-roof mesh.
     hist=np.bincount(measured.astype(int)//4,minlength=170)
     smooth=np.convolve(hist,[.18,.64,.18],"same")
@@ -129,10 +190,10 @@ def profile(rings,box,zoom,scale,cache,x,y):
         if all(abs(i-j)>=2 for j in levels): levels.append(i)
         if len(levels)==4:break
     levels.sort()
-    if len(levels)<2:return row
+    if len(levels)<2:return finish()
     levels=[float(np.median(measured[(measured>=i*4-1)&(measured<=i*4+4)])) for i in levels]
     previous=levels[0]
-    if previous<5 or previous<med*.32:return row
+    if previous<5 or previous<med*.32:return finish()
     tiers=[]
     for level in levels[1:]:
         cut=(level+previous)*.5
@@ -152,12 +213,13 @@ def profile(rings,box,zoom,scale,cache,x,y):
                 footprints.append([encode(piece.exterior),*[encode(hole) for hole in piece.interiors if Polygon(hole).area>48]])
         if footprints:tiers.append([round(level),footprints]);previous=level
     if tiers:row[4],row[6]=round(levels[0]),tiers
-    return row
+    return finish()
 
 
 def run():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("scratch",type=Path);parser.add_argument("boundaries",type=Path)
+    parser.add_argument("--rebuild", action="store_true", help="replace generated profiles using the cached height survey")
     args=parser.parse_args();cache=args.scratch;cache.mkdir(exist_ok=True,parents=True);OUT.mkdir(exist_ok=True)
     with zipfile.ZipFile(args.boundaries) as z:
         src=json.loads(z.read(next(f for f in z.namelist() if f.endswith('.geojson'))))['features']
@@ -166,7 +228,7 @@ def run():
     index={}
     for x,y in sorted(tile_range(boundary),key=lambda xy:(xy[0]-3586)**2+(xy[1]-1626)**2):
         key=f"{x}-{y}"; dest=OUT/(key+'.json.gz')
-        if dest.exists():
+        if dest.exists() and not args.rebuild:
             index[key]=len(json.loads(gzip.decompress(dest.read_bytes())));continue
         records=list(outlines(cache,x,y,boundary))
         needed=set()
@@ -183,9 +245,11 @@ def run():
         data=json.dumps(rows,separators=(',',':')).encode()
         tmp=dest.with_suffix('.part');tmp.write_bytes(gzip.compress(data,compresslevel=9,mtime=0));tmp.replace(dest)
         index[key]=len(rows)
-        (OUT/'index.json').write_text(json.dumps(index,sort_keys=True,separators=(',',':'))+'\n')
         print(key,len(rows),'profiles,',sum(bool(r[6]) for r in rows),'stepped',flush=True)
-    (OUT/'index.json').write_text(json.dumps(index,sort_keys=True,separators=(',',':'))+'\n')
+    manifest=OUT/'index.json'
+    stage=manifest.with_suffix('.part')
+    stage.write_text(json.dumps(index,sort_keys=True,separators=(',',':'))+'\n')
+    stage.replace(manifest)
 
 if __name__=='__main__':
     run()

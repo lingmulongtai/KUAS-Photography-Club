@@ -3,7 +3,8 @@ import {tileXY,lonLat,type Point,type Ring} from './coordinates';
 import {building,type Mesh} from './mesh';
 
 type Terrace=[halfMetres:number,polygons:number[][][]];
-export type RoofRecord=[cx:number,cy:number,width:number,depth:number,base:number,upper:number,terraces:Terrace[]];
+type Pitch=[shape:0|1,angle:number,eaves:number,rise:number];
+export type RoofRecord=[cx:number,cy:number,width:number,depth:number,base:number,upper:number,terraces:Terrace[],pitch?:Pitch];
 const extent=16384;
 export function roofFootprints(rows:RoofRecord[]){
   const slots=new Map<number,RoofRecord[]>();
@@ -54,7 +55,7 @@ export function matchRoof(find:ReturnType<typeof roofFootprints>,ring:Ring,x:num
 /** The lowest measured roof spans the building. Higher surfaces retain their surveyed outlines and courtyards. */
 export function drawSurveyedRoof(mesh:Mesh,rings:Ring[],row:RoofRecord,base:number,low:number,style:number,
   x:number,y:number,local:(p:Point)=>Point,shape:string,preferredHeight?:number){
-  const terraces=row[6],measuredTop=Math.max(row[5],...terraces.map(t=>t[0]))*.5;
+  const terraces=row[6],measuredTop=Math.max(row[5],row[7]?row[7][2]+row[7][3]:0,...terraces.map(t=>t[0]))*.5;
   // A newer mapped tower or an elevated building part can postdate the airborne survey.
   if(preferredHeight && (preferredHeight>measuredTop*1.4+4 || preferredHeight<measuredTop*.6-4))return false;
   const raised=terraces.length>0;
@@ -64,7 +65,13 @@ export function drawSurveyedRoof(mesh:Mesh,rings:Ring[],row:RoofRecord,base:numb
   const previousCode=mesh.wallCode,previousDatum=mesh.wallDatum;
   mesh.wallDatum=base;
   mesh.wallCode=measuredTop>=30?174:measuredTop>=13?154:104;
-  building(mesh,rings,base,base+row[4]*.5,simpleRise,style,shape,low);
+  const pitch=row[7];
+  if(pitch){
+    const [kind,angle,eaves,rise]=pitch;
+    building(mesh,rings,base,base+eaves*.5,rise*.5,style,kind===0?'gabled':'hipped',low,angle*Math.PI/256);
+  }else{
+    building(mesh,rings,base,base+row[4]*.5,simpleRise,style,shape,low);
+  }
   let floor=row[4]*.5;
   for(const [height,polygons] of terraces){
     for(const polygon of polygons){

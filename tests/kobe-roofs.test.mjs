@@ -28,11 +28,16 @@ test('Kobe survey keeps measured masses at the corresponding Sannomiya street an
 
 test('all shipped Kobe roof blocks contain complete measured profiles with bounded, rising terraces',()=>{
   const index=JSON.parse(readFileSync(new URL('kobe-roofs/index.json',data)));
-  let profiles=0,stepped=0;
+  let profiles=0,stepped=0,pitched=0;
   for(const [key,count] of Object.entries(index)){
     const rows=read('kobe-roofs/'+key+'.json.gz');assert.equal(rows.length,count);profiles+=count;
-    for(const [x,y,w,h,base,upper,terraces] of rows){
+    for(const [x,y,w,h,base,upper,terraces,pitch] of rows){
       assert.ok(x>=0 && x<=16384 && y>=0 && y<=16384 && w>0 && h>0 && base>=5 && upper>=base);
+      if(pitch){
+        const [kind,angle,eaves,rise]=pitch;
+        assert.ok(!terraces.length && (kind===0 || kind===1) && angle>=0 && angle<256 && eaves>=5 && rise>=2);
+        pitched++;
+      }
       if(terraces.length)stepped++;
       let floor=base;
       for(const [height,polys] of terraces){
@@ -41,5 +46,20 @@ test('all shipped Kobe roof blocks contain complete measured profiles with bound
       }
     }
   }
-  assert.ok(profiles>300000 && stepped>4500);
+  assert.ok(profiles>300000 && stepped>4500 && pitched>1000);
+});
+
+test('the surveyed ridge crosses the correct walls even when the map has a flat roof',()=>{
+  // An east-west footprint with a measured north-south ridge and eaves at 4 m.
+  const outline=[[-10,-5],[10,-5],[10,5],[-10,5]],mesh=new Mesh();
+  const profile=[100,100,40,20,10,14,[],[0,128,8,6]];
+  assert.ok(drawSurveyedRoof(mesh,[outline],profile,30,30,.3,0,0,p=>p,'flat'));
+  let ridgeVertices=0;
+  for(let i=0;i<mesh.positions.length;i+=3){
+    if(Math.abs(mesh.positions[i+2]-37)<1e-5){
+      assert.ok(Math.abs(mesh.positions[i])<1e-5);
+      ridgeVertices++;
+    }
+  }
+  assert.ok(ridgeVertices>=4);
 });

@@ -60,7 +60,7 @@ export async function compileSkyline({x,y,legacy}:Request,sample:Heights,coopera
     if(!b.roof || !drawSurveyedRoof(mesh,b.polygons,b.roof,base,base,b.style,x,y,local,'flat')){
       building(mesh,b.polygons,base+b.min,base+b.height,0,b.style,'flat',base+b.min);
     }
-    bounds[2]=Math.min(bounds[2],base+b.min);bounds[5]=Math.max(bounds[5],base+b.height,base+(b.roof?Math.max(b.roof[5],...b.roof[6].map(t=>t[0]))*.5:0));
+    bounds[2]=Math.min(bounds[2],base+b.min);bounds[5]=Math.max(bounds[5],base+b.height,base+(b.roof?Math.max(b.roof[5],b.roof[7]?b.roof[7][2]+b.roof[7][3]:0,...b.roof[6].map(t=>t[0]))*.5:0));
     ranges.push({start,count:mesh.positions.length/3-start,tile:b.tile});
     if(performance.now()>deadline){if(!await cooperate())return null;deadline=performance.now()+3;}
   }
