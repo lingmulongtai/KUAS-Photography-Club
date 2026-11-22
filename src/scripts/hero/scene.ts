@@ -137,6 +137,8 @@ export function createHero(
   el: HTMLElement,
   opts: HeroOptions,
 ): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void;setSeason(season:Season):void; setLanguage(lang: 'ja' | 'en'): void; setExploring(enabled:boolean):void; setTouchMove(forward:number,side:number,up:number,fast:boolean):void; readonly exploring:boolean; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
+  // Reading shader diagnostic logs synchronously can drain the GPU queue on the first district draw.
+  if(import.meta.env.PROD)renderer.debug.checkShaderErrors=false;
   const env = createEnv();
   const scene = new THREE.Scene();
   // Light counts are part of Three's program cache key, including custom terrain shaders.
