@@ -95,11 +95,13 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
 `;
 
 export const CLOUD_COLUMN_LOOKUP = /* glsl */ `
+  uniform float uStyle, uCover, uClear;
   uniform sampler2D uCloudColumns;
   uniform sampler2D uColumnCeilings;
   uniform vec2 uColumnAnchor, uColumnEye;
   uniform bool uColumnsReady;
   const float outerColumnMetres = ${CELL_METRES}.;
+  bool isStyle(float s){ return abs(uStyle - s) < .5; }
   vec3 lookupColumn(vec2 p){
     vec2 local = p * ${GRID} - uColumnAnchor;
     if (uColumnsReady && max(abs(local.x), abs(local.y)) < ${SIZE / 2 - .5}) {
@@ -107,12 +109,16 @@ export const CLOUD_COLUMN_LOOKUP = /* glsl */ `
       float farWeight = smoothstep(128., 148., max(fromEye.x, fromEye.y));
       vec2 uvScale = vec2(1./${2 * SIZE}., 1./${SIZE}.);
       vec3 nearColumn = vec3(0.);
-      if (farWeight < 1.) nearColumn = texture2D(uCloudColumns, (3.*local + ${SIZE / 2}.) * uvScale).rgb;
+      if (farWeight < 1.) nearColumn = textureLod(uCloudColumns, (3.*local + ${SIZE / 2}.) * uvScale, 0.).rgb;
       if (farWeight <= 0.) return nearColumn;
       vec2 outer = local + vec2(${SIZE * 1.5}., ${SIZE / 2}.);
-      return mix(nearColumn, texture2D(uCloudColumns, outer * uvScale).rgb, farWeight);
+      return mix(nearColumn, textureLod(uCloudColumns, outer * uvScale, 0.).rgb, farWeight);
     }
-    return cloudColumn(p);
+    // Lightweight emergency fallback only if render-to-texture failed; avoids inlining 15-noise bake code into raymarch.
+    float n = vnoise(p * 3.8 + 5.5) * .65 + vnoise(p * 9.5 - 2.2) * .35;
+    float th = 1. - uCover * .95 + uClear * .25;
+    float c = clamp((n - th) / max(1. - th, .05), 0., 1.);
+    return c > 0. ? vec3(.25 + .75 * sqrt(c), smoothstep(0., .45, c), isStyle(4.) ? smoothstep(0., .5, c) : 0.) : vec3(0.);
   }
   // The maximum includes the bilinear footprint on all four sides of the block.
   // Use only unmixed pages. Towers displace their sample coordinates with height.
