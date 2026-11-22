@@ -231,3 +231,13 @@ test('pitched roof planes retain the courtyard opening and meet at the recorded 
     assert.ok(Math.abs(high-9)<1e-6,shape+' ridge '+high);
   }
 });
+
+test('Kobe Maritime Museum replaces its waterfront footprint with an open 45 metre space frame',()=>{
+  const row=json('landmarks/index.json').find(r=>r.id==='kobe-maritime-museum');
+  assert.equal(row.pref,'28');
+  assert.ok(inPolygon([row.lon,row.lat],row.rings));
+  const bytes=readFileSync(new URL('landmarks/kobe-maritime-museum.glb',root));
+  const doc=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
+  const vertices=doc.accessors[doc.meshes[0].primitives[0].attributes.POSITION];
+  assert.ok(Math.abs(vertices.max[1]-45)<.3 && vertices.min[0]<-63 && vertices.max[2]>30);
+});

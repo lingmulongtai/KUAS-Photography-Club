@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {createServer} from 'vite';
 import {roofNormalUri,tileCoordinates} from './roof-tile-material.mjs';
+import {maritimeMuseum,museumParts} from './maritime-museum.mjs';
 import {portTower} from './port-tower.mjs';
 import {districtModel} from './nankinmachi.mjs';
 import {kasugaBuildings} from './kasuga.mjs';
@@ -105,6 +106,8 @@ try{
   const hotel=JSON.parse(await fs.readFile(new URL('harbor-hotel.json',import.meta.url)));
   const hotelMask=hotel.floorOutlines[0].map(([x,z])=>[hotel.lon+x/91644,hotel.lat-z/110940]);
   await save('kobe-harbor-hotel',harborHotel(hotel),hotel.lon,hotel.lat,[hotelMask],'28');
+  const museumRing=maritimeMuseum.outline.map(([x,z])=>[maritimeMuseum.lon+x/91644,maritimeMuseum.lat-z/110940]);
+  await save('kobe-maritime-museum',museumParts(),maritimeMuseum.lon,maritimeMuseum.lat,[museumRing],'28');
   const {block}=await load('compound-models'),{roof}=await load('temple-models');
   for(const site of JSON.parse(await fs.readFile(new URL('nankinmachi.json',output)))){
     const {id,parts}=districtModel(site,block);
