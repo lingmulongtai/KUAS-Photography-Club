@@ -52,11 +52,13 @@ export function strip(m:Mesh,a:XYZ,b:XYZ,width:number,color:RGB,depth=0,offset=0
     m.quad(point(b,t,depth),point(a,t,depth),point(a,t),point(b,t),edge);
   }
 }
+// Neutral concrete, painted render, brick and stone. Use one repeatable finish per footprint.
+const walls:RGB[]=[[154,151,144],[128,131,130],[173,163,146],[136,115,103],[160,165,161],[182,177,166]];
 const roofs:RGB[]=[[80,84,85],[97,94,88],[74,83,91],[114,99,88],[73,81,78]];
 /** Winding is normalized in east/north coordinates, including courtyard walls. */
 export function building(m:Mesh,rings:Point[][],floor:number,eaves:number,ridge:number,style:number,roofShape:string,wallBase=floor){
   if(!rings[0]?.length || eaves<=floor)return;
-  const tone=Math.floor(style*19),wall:RGB=[183+tone,177+tone,163+tone];
+  const wall=walls[Math.min(walls.length-1,Math.floor(style*walls.length))];
   const roof=roofs[Math.min(4,Math.floor(style*5))];
   m.surfaceType='wall';
   for(let k=0;k<rings.length;k++){

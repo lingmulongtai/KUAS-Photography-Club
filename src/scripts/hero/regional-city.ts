@@ -52,7 +52,8 @@ function cityMaterial(env:Env,boundary:Awaited<ReturnType<typeof boundaryUniform
           float near=1.-smoothstep(.25,1.,max(aa.x,aa.y));
           float lit=step(hash12(floor(cell)+floor(vWorld.xz/30.)),uLit);
           emit=vec3(1.15,.77,.40)*uCity*mix(.16*uLit,pane.x*pane.y*lit,near);
-          albedo*=mix(1.,.76,pane.x*pane.y*near);
+          // Keep the dark window-to-wall ratio even when individual panes fall below one pixel.
+          albedo*=1.-.37*mix(.19,pane.x*pane.y,near);
         }
         gl_FragColor=vec4(applyHaze(shade(seasonalSurface(albedo,n,vWorld),n,vWorld,1.),emit,vWorld),1.);
       }`});
