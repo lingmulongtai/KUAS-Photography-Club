@@ -26,26 +26,49 @@ function patchAxis(lo:number,hi:number,edge0:number,edge1:number,step:number,fin
   return [...values].sort((a,b)=>a-b);
 }
 
-function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[]) {
+async function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[],current:()=>boolean) {
   const overlap=fine.map(g=>g.meta.box).filter(b=>b[0]<box[2] && b[2]>box[0] && b[1]<box[3] && b[3]>box[1]);
   const xs=patchAxis(box[0],box[2],kyoto[0],kyoto[2],200,overlap.map(b=>[b[0],b[2]]));
   const zs=patchAxis(box[1],box[3],kyoto[1],kyoto[3],200,overlap.map(b=>[b[1],b[3]]));
   const pos=new Float32Array(xs.length*zs.length*3),uv=new Float32Array(xs.length*zs.length*2);
-  const indices:number[]=[];
-  for(let j=0;j<zs.length;j++)for(let i=0;i<xs.length;i++){
-    const k=j*xs.length+i,x=xs[i],z=zs[j];
-    pos.set([x,ground(x,z),z],k*3);
-    uv.set([(x-box[0])/(box[2]-box[0]),1-(z-box[1])/(box[3]-box[1])],k*2);
-    if(i+1===xs.length || j+1===zs.length)continue;
-    if(x>=kyoto[0] && xs[i+1]<=kyoto[2] && z>=kyoto[1] && zs[j+1]<=kyoto[3])continue;
-    indices.push(k,k+xs.length,k+1,k+1,k+xs.length,k+xs.length+1);
+  const columns=xs.length,rows=zs.length,vertices=rows*columns;
+  const indices=vertices>65535?new Uint32Array(6*(columns-1)*(rows-1)):new Uint16Array(6*(columns-1)*(rows-1));
+  const normal=new Float32Array(vertices*3);
+  let offset=0,minimum=Infinity,maximum=-Infinity,deadline=performance.now()+3;
+  const giveFrame=async()=>{
+    await new Promise<void>(resolve=>setTimeout(resolve,0));
+    deadline=performance.now()+3;
+    return current();
+  };
+  for(let j=0;j<rows;j++){
+    for(let i=0;i<columns;i++){
+      const k=j*columns+i,x=xs[i],z=zs[j],h=ground(x,z);
+      pos[k*3]=x;pos[k*3+1]=h;pos[k*3+2]=z;
+      uv[k*2]=(x-box[0])/(box[2]-box[0]);uv[k*2+1]=1-(z-box[1])/(box[3]-box[1]);
+      minimum=Math.min(minimum,h);maximum=Math.max(maximum,h);
+      if(i+1===columns || j+1===rows)continue;
+      if(x>=kyoto[0] && xs[i+1]<=kyoto[2] && z>=kyoto[1] && zs[j+1]<=kyoto[3])continue;
+      indices.set([k,k+columns,k+1,k+1,k+columns,k+columns+1],offset);offset+=6;
+    }
+    if(performance.now()>=deadline && !await giveFrame())return null;
+  }
+  for(let j=0;j<rows;j++){
+    const north=Math.max(0,j-1),south=Math.min(rows-1,j+1);
+    for(let i=0;i<columns;i++){
+      const west=Math.max(0,i-1),east=Math.min(columns-1,i+1);
+      const dx=(pos[(j*columns+west)*3+1]-pos[(j*columns+east)*3+1])/(xs[east]-xs[west]);
+      const dz=(pos[(north*columns+i)*3+1]-pos[(south*columns+i)*3+1])/(zs[south]-zs[north]);
+      const inv=1/Math.hypot(dx,1,dz),k=(j*columns+i)*3;
+      normal[k]=dx*inv;normal[k+1]=inv;normal[k+2]=dz*inv;
+    }
+    if(performance.now()>=deadline && !await giveFrame())return null;
   }
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.BufferAttribute(pos,3));
   geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
+  geometry.setAttribute('normal',new THREE.BufferAttribute(normal,3));
+  geometry.setIndex(new THREE.BufferAttribute(indices.subarray(0,offset),1));
+  geometry.boundingSphere=new THREE.Box3(new THREE.Vector3(box[0],minimum,box[1]),new THREE.Vector3(box[2],maximum,box[3])).getBoundingSphere(new THREE.Sphere());
   return geometry;
 }
 
@@ -161,8 +184,10 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       running++;
       void loadTexture(state.patch.file,aniso).then(async photo=>{
         if(state.distance>65000){photo.dispose();return;}
+        const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=65000);
+        if(!geometry){photo.dispose();return;}
         const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});
-        const mesh=new THREE.Mesh(patchGeometry(state.patch.box,kyoto,ground,fine),material);
+        const mesh=new THREE.Mesh(geometry,material);
         await (shaderReady??=prepare(mesh));
         if(state.distance>65000){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
         mesh.name='regional-ground';
