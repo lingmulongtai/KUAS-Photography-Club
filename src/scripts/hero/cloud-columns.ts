@@ -215,7 +215,7 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
         renderer.setRenderTarget(target);
         const gl = renderer.getContext();
         if (!uniforms.uColumnsReady.value && gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
-        if(!uniforms.uColumnsReady.value)renderer.debug.checkShaderErrors=true;
+        if(!uniforms.uColumnsReady.value && diagnostics!==false)renderer.debug.checkShaderErrors=true;
         renderer.debug.onShaderError = (...args) => { failed = true; onError?.(...args); };
         renderer.render(scene, camera);
         if (failed) return;

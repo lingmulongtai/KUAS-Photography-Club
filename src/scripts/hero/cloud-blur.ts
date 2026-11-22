@@ -103,7 +103,7 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       clouds.material = material;
       const previousShaderError = renderer.debug.onShaderError;
       const diagnostics=renderer.debug.checkShaderErrors;
-      if(!verified)renderer.debug.checkShaderErrors=true;
+      if(!verified && diagnostics!==false)renderer.debug.checkShaderErrors=true;
       let shaderFailed = false;
       if (!verified) renderer.debug.onShaderError = (...args) => {
         shaderFailed = true;
