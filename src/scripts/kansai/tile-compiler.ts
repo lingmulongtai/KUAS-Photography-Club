@@ -8,9 +8,11 @@ import {roofSurvey,matchRoof,drawSurveyedRoof,surveyFits} from './surveyed-roofs
 import {hyogoHeights} from './lidar';
 import {regionalHeights} from './building-heights';
 import {railStructure} from './rail';
+import {insideSacredFootprint,sacredForZ16,type SacredSite} from './sacred-sites';
 import {bridgeClearance,drawBridgePolyline,drawRailPolyline} from './transport-mesh';
 import {drawSetaBridges,isSetaDeck,type VerticalDatum} from './seta-bridge';
 import {combineTileMeshes,type TileGeometry} from './tile-geometry';
+import {toLocal} from '../hero/geo';
 
 
 function openRing(r:Ring):Ring {
@@ -42,7 +44,7 @@ function terrainSampler(elevations:Float64Array,west:number,south:number,east:nu
 }
 
 export interface TileRequest {datum?:VerticalDatum;includeTrees?:boolean;id:number;x:number;y:number;elevations:Float64Array<ArrayBuffer>}
-export interface CompiledTile {center:Point;geometry?:TileGeometry;locations:Point[];city?:StreetBuilding[];facades?:number[][]}
+export interface CompiledTile {center:Point;geometry?:TileGeometry;locations:Point[];city?:StreetBuilding[];facades?:number[][];sacred?:SacredSite[]}
 
 export function tileCompiler(){
   let data:Promise<[Awaited<ReturnType<typeof modelSources>>,Awaited<ReturnType<typeof regionalHeights>>]>|undefined;
@@ -55,9 +57,10 @@ export function tileCompiler(){
     const corners:Point[]=[nw,se,[west,south],[east,north]];
 
     const ground=terrainSampler(elevations,west,south,east,north);
-    const [tile,fields,tags,canopy,surfaces,edges,lidar,heightsByBuilding,survey]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
+    const [tile,fields,tags,canopy,surfaces,edges,lidar,heightsByBuilding,survey,sacredSites]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
       includeTrees?sources.canopy(corners):null,sources.surfaces(x>>1,y>>1),sources.edges(x,y),
-      hyogoHeights(x,y),heightSources(x,y,corners),roofSurvey(x>>4,y>>4)]);
+      hyogoHeights(x,y),heightSources(x,y,corners),roofSurvey(x>>4,y>>4),
+      datum==='orthometric'?sacredForZ16(x,y):Promise.resolve([] as SacredSite[])]);
     const [mx,my]=tileMetresPerDegree(center[1]);
     const local=([lon,lat]:Point):Point=>[(lon-center[0])*mx,(lat-center[1])*my];
     const here=([lon,lat]:Point)=>lon>=west&&lon<east&&lat>south&&lat<=north;
@@ -72,6 +75,10 @@ export function tileCompiler(){
       const projected=rings.map(r=>openRing(r).map(local)).filter(r=>r.length>=3);
       if(!projected.length)return;
       const size=area(projected[0]);if(size<1)return;
+      if(datum==='orthometric' && sacredSites.length){
+        const lp=toLocal(p[1],p[0]);
+        if(sacredSites.some(s=>insideSacredFootprint(lp.x,lp.z,s)))return;
+      }
       if(includeTrees){
         const cols=rings[0].map(col),rows=rings[0].map(row);
         for(let j=Math.min(...rows);j<=Math.max(...rows);j++)for(let i=Math.min(...cols);i<=Math.max(...cols);i++){
@@ -212,6 +219,6 @@ export function tileCompiler(){
       const [px,py]=local(p);tree(groundMesh,px,py,ground(p),noise(iy,ix+6));
     }
     const terrain=groundMesh.buffers();if(terrain)meshes.push(terrain);
-    return {center,locations,...(datum==='orthometric'?{city,facades}:{}),geometry:combineTileMeshes(meshes)};
+    return {center,locations,...(datum==='orthometric'?{city,facades,...(sacredSites.length?{sacred:sacredSites}:{})}:{}),geometry:combineTileMeshes(meshes)};
   };
 }

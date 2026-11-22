@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {lonLat, tileMetresPerDegree, tileXY, type Point} from '../kansai/coordinates';
 import {tileQueue} from '../kansai/tile-queue';
 import {type CompiledTile} from '../kansai/tile-compiler';
+import {buildSacredGeometry,sacredMaterial} from '../kansai/sacred-models';
 import {boundaryUniforms,clipCityMaterial,HOME_BOUNDARY} from './regional-boundary';
 import {regionalLandmarks} from './regional-landmarks';
 import {skylineReader} from './regional-skyline';
@@ -118,7 +119,7 @@ function streetMesh(tile:CompiledTile,materials:THREE.Material[],contains:(p:Poi
   return {mesh,mask};
 }
 
-async function nearMesh(tile:CompiledTile,materials:THREE.Material[],env:Env,boundary:Boundary,ground:Ground,
+async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:THREE.Material,env:Env,boundary:Boundary,ground:Ground,
   architecture:Architecture,lite:boolean,current:()=>boolean):Promise<Entry|null>{
   const group=new THREE.Group(),street=streetMesh(tile,materials,architecture.contains);
   if(street){group.add(street.mesh);street.mesh.layers.enable(SHADOW_LAYER);}
@@ -142,8 +143,29 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],env:Env,bou
     b.ground-=ground(x,z);
     if(isBox)data.boxes.push(b);else data.polys.push(b);
   }
+  const sacredBySite=new Map<Site,NonNullable<CompiledTile['sacred']>>();
+  for(const s of tile.sacred??[]){
+    const site=architecture.siteAt([s.lon,s.lat]);
+    let list=sacredBySite.get(site);
+    if(!list){list=[];sacredBySite.set(site,list);}
+    list.push(s);
+  }
+  const sacredMeshes:{site:Site;mesh:THREE.Mesh}[]=[];
+  for(const [site,list] of sacredBySite){
+    const geo=buildSacredGeometry(list,ground);
+    if(!geo)continue;
+    const mesh=new THREE.Mesh(geo,sacredMat);
+    mesh.name='regional-sacred-buildings';
+    mesh.layers.enable(SHADOW_LAYER);
+    group.add(mesh);
+    sacredMeshes.push({site,mesh});
+  }
   const cities:{site:Site;city:NonNullable<Awaited<ReturnType<typeof buildCityAsync>>>}[]=[];
-  const dispose=()=>{street?.mesh.geometry.dispose();for(const {city} of cities)city.dispose();};
+  const dispose=()=>{
+    street?.mesh.geometry.dispose();
+    for(const {mesh} of sacredMeshes)mesh.geometry.dispose();
+    for(const {city} of cities)city.dispose();
+  };
   try{
     for(const [site,data] of sites){
       const city=await buildCityAsync(env,{height:ground},data,()=>true,lite ? .6 : 1,current);
@@ -154,7 +176,11 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],env:Env,bou
       city.group.name='regional-kyoto-buildings';
       group.add(city.group);
     }
-    const mask=()=>{street?.mask();for(const {site,city} of cities)city.group.visible=!site?.group;};
+    const mask=()=>{
+      street?.mask();
+      for(const {site,city} of cities)city.group.visible=!site?.group;
+      for(const {site,mesh} of sacredMeshes)mesh.visible=!site?.group;
+    };
     mask();
     return group.children.length?{mesh:group,cityMaterials:cities[0]?.city.materials,mask,dispose,lod:(eye,schedule)=>{
       let changed=false;
@@ -208,6 +234,8 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
   const readSkyline=skylineReader(ground);
   const queue=tileQueue(false,'orthometric'),material=surveyedMaterial(env,boundary);
   const streetMaterials=[material,streetMaterial(env,boundary)];
+  const sacredMat=sacredMaterial(env,boundary);
+  const warmStreetMaterials=[...streetMaterials,sacredMat];
   let shadowDirty=false,nextShadow=0;
   let skylineReady:Promise<unknown>|undefined,streetReady:Promise<unknown>|undefined,cityReady:Promise<unknown>|undefined;
 
@@ -278,12 +306,12 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
       if(loaded.has(id)||loading.has(id)||(retry.get(id)??0)>now)continue;
       loading.add(id);
       const job=t.zoom===16?queue.compile(t.x,t.y,sampleTile(t.x,t.y,ground))
-        .then(tile=>wanted.has(id)?nearMesh(tile,streetMaterials,env,boundary,ground,architecture,lite,()=>wanted.has(id)):null):
+        .then(tile=>wanted.has(id)?nearMesh(tile,streetMaterials,sacredMat,env,boundary,ground,architecture,lite,()=>wanted.has(id)):null):
         readSkyline({x:t.x,y:t.y,legacy},()=>wanted.has(id)).then(data=>data && wanted.has(id)?skylineMesh(data,material):null);
       void job.then(async result=>{
         if(result?.mesh){
           if(t.zoom===16){
-            await (streetReady??=prepareCityMaterials(streetMaterials,prepare));
+            await (streetReady??=prepareCityMaterials(warmStreetMaterials,prepare));
             if('cityMaterials' in result && result.cityMaterials)await (cityReady??=prepareCityMaterials(result.cityMaterials,prepare));
           }else await (skylineReady??=prepare(result.mesh));
         }

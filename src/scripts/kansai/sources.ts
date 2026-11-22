@@ -1,8 +1,8 @@
-import {rasterPixels} from './raster';
+import {rasterPixels} from './raster.ts';
 import {VectorTile,type VectorTileFeature} from '@mapbox/vector-tile';
 import Pbf from 'pbf';
-import type {Point, Ring} from './coordinates';
-import {tileXY} from './coordinates';
+import type {Point, Ring} from './coordinates.ts';
+import {tileXY} from './coordinates.ts';
 
 const root='/kansai/';
 async function response(file:string) {

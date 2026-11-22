@@ -84,6 +84,10 @@ import {replacesInari,inariClearing} from './fushimi-inari';
 import {createTrafficView} from './traffic-view';
 import {katsuraStation} from './katsura-station';
 import {replacesByodoin,BYODOIN_CENTER} from './byodoin';
+import {inRing,type Ring} from '../kansai/coordinates';
+import {json as kansaiJson} from '../kansai/sources';
+import {buildSacredGeometry,sacredMaterial} from '../kansai/sacred-models';
+import {sacredForBox,sacredMatcher,type SacredSite} from '../kansai/sacred-sites';
 
 export interface HeroStatus {
   minutes: number;
@@ -427,19 +431,39 @@ export function createHero(
     const kawaramachi = kawaramachiFacades(buildings,hf), gion = gionStreetscape(buildings,hf);
     const katsura=katsuraStation(buildings.polys,(x,z)=>hf.height(x,z));
     const landmarks = buildLandmarks(env, hf,[...kawaramachi.parts,...gion.parts,...katsura.parts]);
+    const landmarkCatalog = await kansaiJson<{id:string;lon:number;lat:number;rings:Ring[]}[]>('landmarks/index.json').catch(() => []);
+    const isCatalogLandmark = (s: SacredSite) => landmarkCatalog.some(r =>
+      Math.abs(r.lon - s.lon) < 0.008 && Math.abs(r.lat - s.lat) < 0.007 && r.rings.some(ring => inRing([s.lon, s.lat], ring)),
+    );
+    const kyotoSacredMat = sacredMaterial(env);
     const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30},
       {p:landmarks.positions.tojiKondo,w:47,d:32},{p:landmarks.positions.tojiKodo,w:48,d:29},{p:landmarks.positions.tojiJikido,w:42,d:33},
       {p:{x:2095.62,z:-1314.07},w:28,d:17}];
     const replaced = (x:number,z:number) => replacesInari(x,z)||replacesNijoBox(x,z)||replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
+    const sacredExcludedCore = (s: SacredSite) => {
+      if (replaced(s.x, s.z) || isCatalogLandmark(s) || replacesByodoin(s.x, s.z)) return true;
+      // Keep hand-modeled Kyoto compounds (Heian, Imperial Palace, Nijo, Toji/Yasaka/Kiyomizu pagodas) intact.
+      if (s.x >= 2015 && s.x <= 2210 && s.z >= -1495 && s.z <= -1275) return true;
+      if (s.x >= 125 && s.x <= 395 && s.z >= -2638 && s.z <= -2175) return true;
+      if (s.x >= -1160 && s.x <= -510 && s.z >= -1460 && s.z <= -870) return true;
+      for (const id of ['toji', 'yasaka', 'kiyomizu', 'heianTorii'] as const) {
+        const p = landmarks.positions[id];
+        if (p && Math.hypot(s.x - p.x, s.z - p.z) < 28) return true;
+      }
+      return false;
+    };
+    const coreSacred = (await sacredForBox(BUILDINGS_BOX)).filter(s => !sacredExcludedCore(s));
+    const replacesCoreSacred = sacredMatcher(coreSacred);
     const hojo=landmarks.positions.ryoanji;
     const hojoBox:Box=[hojo.x-14.5,hojo.z-15.5,hojo.x+14.5,hojo.z+10.5];
     const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>!katsura.replaced.has(p)&&!replacesHeianFootprint(p.ring)&&!replacesNijoFootprint(p.ring)&&!replacesKyotoStation(p.ring)).flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
       let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}
-      return !replaced(x/(p.ring.length/2),z/(p.ring.length/2));
+      const cx=x/(p.ring.length/2),cz=z/(p.ring.length/2);
+      return !replaced(cx,cz)&&!replacesCoreSacred(cx,cz);
     })};
     await yieldToBrowser();
     const city = await buildCityAsync(env, hf, modeledBuildings, (b) =>
-      !replaced(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
+      !replaced(b.x,b.z) && !replacesCoreSacred(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
       opts.quality,
       () => true,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
@@ -447,6 +471,13 @@ export function createHero(
       new Set([...stationMatches.boxes.map(([i]) => buildings.boxes[i]), ...stationMatches.polys.map(([i]) => buildings.polys[i])]),
     );
     if (!city) throw new Error('Initial city preparation cancelled');
+    const coreSacredGeo = buildSacredGeometry(coreSacred, (x, z) => hf.height(x, z));
+    if (coreSacredGeo) {
+      const sacredMesh = new THREE.Mesh(coreSacredGeo, kyotoSacredMat);
+      sacredMesh.name = 'kyoto-sacred-buildings';
+      basinLod.detail.add(sacredMesh);
+      casts(sacredMesh);
+    }
     const streetPrograms=prepareCityMaterials(city.materials,prepare);
     city.fallback.name = 'Station district fallback';
     panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
@@ -671,13 +702,22 @@ export function createHero(
       let mask:ReturnType<typeof createBuildingMask>,infrastructure:ReturnType<typeof infrastructureMask>;
       try {
       const detailedCampus=r.id==='kameoka-campus';
+      const regionSacred=(await sacredForBox(r.box)).filter(s=>!replacesByodoin(s.x,s.z)&&!isCatalogLandmark(s)&&(!detailedCampus||!isKameokaBuilding(s.x,s.z)));
+      const replacesRegionSacred=sacredMatcher(regionSacred);
       const polys=detailedCampus?data.buildings.polys.filter(p=>{
         let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !isKameokaBuilding(x/(p.ring.length/2),z/(p.ring.length/2));
       }):data.buildings.polys;
-      const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
+      const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}const cx=x/(p.ring.length/2),cz=z/(p.ring.length/2);return !replacesByodoin(cx,cz)&&!replacesRegionSacred(cx,cz);});
       await step();
-      city=await prepareSteps(buildCitySteps(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||r.id==='tennozan'||r.id==='yamashina'||b.w*b.d>65||b.h>10),opts.quality),step);
+      city=await prepareSteps(buildCitySteps(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&!replacesRegionSacred(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||r.id==='tennozan'||r.id==='yamashina'||b.w*b.d>65||b.h>10),opts.quality),step);
       group.add(city.group);
+      const regionSacredGeo=buildSacredGeometry(regionSacred,(x,z)=>hf.height(x,z));
+      if(regionSacredGeo){
+        const sacredMesh=new THREE.Mesh(regionSacredGeo,sacredMaterial(env));
+        sacredMesh.name=`region-${r.id}-sacred`;
+        group.add(sacredMesh);
+        casts(sacredMesh);
+      }
       await step();
       const wideWater=r.id==='tennozan'||r.id==='osaka';
       const waterEdge=wideWater?(lite?80:60):(lite?36:24);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import {decodedTexture} from './data';
-import {BOUNDARY_LOOKUP} from '../kansai/boundary-lookup';
-import {M_PER_DEG_LAT,M_PER_DEG_LON,ORIGIN} from './geo';
+import {decodedTexture} from './data.ts';
+import {BOUNDARY_LOOKUP} from '../kansai/boundary-lookup.ts';
+import {M_PER_DEG_LAT,M_PER_DEG_LON,ORIGIN} from './geo.ts';
 
 const names={coarse:'prefectures',districts:'districts',edges:'edges',islets:'islets'};
 async function textures(){
