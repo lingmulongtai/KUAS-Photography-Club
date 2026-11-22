@@ -111,7 +111,14 @@ const fragmentShader = `
 export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture,needed:()=>boolean)=>Promise<void>) {
   const [{grid,patches},surveys]=await Promise.all([loadJSON<GroundSurvey>('kansai/ground.json'),loadJSON<District[]>('kansai/districts/index.json')]);
   const [heights,boundary,cover,fine]=await Promise.all([
-    loadGrid(grid),boundaryUniforms(),loadBinary('kansai/canopy.bin').then(decodeTreeCover),
+    loadGrid(grid),boundaryUniforms().then(async uniforms=>{
+      // These integer lookups decide land ownership. Upload them intact before the first regional draw.
+      for(const {value} of Object.values(uniforms)){
+        await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+        await upload(value,()=>true);
+      }
+      return uniforms;
+    }),loadBinary('kansai/canopy.bin').then(decodeTreeCover),
     Promise.all(surveys.flatMap(s=>s.grid?[s.grid]:[]).map(async grid=>new Grid(grid,await loadGrid(grid)))),
   ]);
   const step=(cover.box[2]-cover.box[0])/cover.width;
