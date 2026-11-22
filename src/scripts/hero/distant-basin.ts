@@ -59,20 +59,7 @@ export function distantBasin(env:Env,scene:THREE.Scene,ground:(x:number,z:number
   scene.add(detail,horizon);
   const surveys:Survey[]=[];
   let building=false,ready=false,requested=false;
-  let archived=false,reading=true;
-  // Start after the core survey is available, ahead of the first trip outside Kyoto.
-  // If the baked data cannot be read, the original surveys below still build the same skyline.
-  void loadBinary('kansai/kyoto-horizon.bin.gz','low').then(async bytes=>{
-    const batches=horizonBatches(env,bytes);
-    try{
-      await prepare(batches[0]);
-      horizon.add(...batches);
-      archived=ready=true;surveys.length=0;
-    }catch(error){
-      for(const b of batches){b.geometry.dispose();b.dispose();(b.material as THREE.Material).dispose();}
-      throw error;
-    }
-  }).catch(error=>console.warn('Using live surveys for the Kyoto horizon',error)).finally(()=>{reading=false;});
+  let archived=false,archiveTried=false,reading=false,lastFallback=false;
   async function build(){
     if(building)return;
     building=true;
@@ -87,14 +74,40 @@ export function distantBasin(env:Env,scene:THREE.Scene,ground:(x:number,z:number
       ready=true;
     }finally{building=false;}
   }
+  function requestBuild(){
+    if(ready||requested||reading)return;
+    requested=true;
+    void build().catch(error=>console.warn('Distant Kyoto skyline unavailable',error)).finally(()=>{requested=false;});
+  }
+  function loadArchive(){
+    if(archiveTried)return;
+    archiveTried=true;reading=true;
+    // Fetch the prebuilt skyline only once the camera travels well outside Kyoto.
+    // If the baked data cannot be read, the registered live surveys build the same skyline.
+    void loadBinary('kansai/kyoto-horizon.bin.gz','low').then(async bytes=>{
+      const batches=horizonBatches(env,bytes);
+      try{
+        await prepare(batches[0]);
+        horizon.add(...batches);
+        archived=ready=true;surveys.length=0;
+      }catch(error){
+        for(const b of batches){b.geometry.dispose();b.dispose();(b.material as THREE.Material).dispose();}
+        throw error;
+      }
+    }).catch(error=>{
+      console.warn('Using live surveys for the Kyoto horizon',error);
+    }).finally(()=>{
+      reading=false;
+      if(!archived && lastFallback)requestBuild();
+    });
+  }
   return {detail,register(data:Survey){if(!archived){surveys.push(data);ready=false;}},update(x:number,z:number,focal:number){
     const [w,n,e,s]=BUILDINGS_BOX;
     const distance=Math.hypot(Math.max(w-x,0,x-e),Math.max(n-z,0,z-s));
     const cutoff=Math.max(19000,focal*18);
-    if(distance>cutoff*.65 && !ready && !requested && !reading){
-      requested=true;
-      void build().catch(error=>console.warn('Distant Kyoto skyline unavailable',error)).finally(()=>{requested=false;});
-    }
+    lastFallback=distance>cutoff*.65;
+    if(distance>cutoff*.45 && !ready && !archiveTried)loadArchive();
+    if(lastFallback && !ready && archiveTried)requestBuild();
     const far=ready && distance>cutoff*(horizon.visible ? .92 : 1);
     horizon.visible=far;
     detail.visible=!far;

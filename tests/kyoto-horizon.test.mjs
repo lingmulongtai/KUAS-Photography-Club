@@ -5,11 +5,16 @@ import {test} from 'node:test';
 import {buildSync} from 'esbuild';
 import * as THREE from 'three';
 
-test('prebuilt Kyoto horizon preserves all six measured surveys and their culling bounds',()=>{
+function loadDistantBasinModule(){
   const src=buildSync({entryPoints:['src/scripts/hero/distant-basin.ts'],bundle:true,format:'cjs',platform:'node',external:['three'],write:false,logLevel:'silent'}).outputFiles[0].text;
   const out={exports:{}};new Function('require','module','exports',src)(()=>THREE,out,out.exports);
+  return out.exports;
+}
+
+test('prebuilt Kyoto horizon preserves all six measured surveys and their culling bounds',()=>{
+  const mod=loadDistantBasinModule();
   const bytes=gunzipSync(readFileSync(new URL('../public/kyoto/kansai/kyoto-horizon.bin.gz',import.meta.url)));
-  const meshes=out.exports.horizonBatches({},bytes);
+  const meshes=mod.horizonBatches({},bytes);
   assert.deepEqual(meshes.map(m=>m.count),[39925,5359,1839,3019,2137,3736]);
   for(const mesh of meshes){
     for(let i=0;i<mesh.count;i+=31){
@@ -18,5 +23,49 @@ test('prebuilt Kyoto horizon preserves all six measured surveys and their cullin
       assert.ok(matrix.determinant()>0);
     }
   }
-  assert.throws(()=>out.exports.horizonBatches({},bytes.subarray(0,-4)),/Truncated/);
+  assert.throws(()=>mod.horizonBatches({},bytes.subarray(0,-4)),/Truncated/);
+});
+
+test('distantBasin defers kyoto-horizon.bin.gz inside Kyoto and loads it when approaching the cutoff',async t=>{
+  const mod=loadDistantBasinModule();
+  const rawBytes=gunzipSync(readFileSync(new URL('../public/kyoto/kansai/kyoto-horizon.bin.gz',import.meta.url)));
+  const calls=[];
+  t.mock.method(globalThis,'fetch',async url=>{
+    calls.push(String(url));
+    return new Response(rawBytes);
+  });
+  const scene=new THREE.Scene();
+  const basin=mod.distantBasin({},scene,()=>0,async()=>{});
+  // Inside Kyoto and nearby viewpoints should never fetch the 1.2 MB distant skyline.
+  assert.equal(basin.update(2430,161,1000),false);
+  assert.equal(basin.update(-7613,14397,1000),false);
+  assert.equal(calls.length,0);
+  // Once well outside Kyoto (> 45% of cutoff), fetch the baked horizon once.
+  assert.equal(basin.update(14000,0,1000),false);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0],'/kyoto/kansai/kyoto-horizon.bin.gz');
+  await new Promise(resolve=>setTimeout(resolve,20));
+  // Beyond cutoff the horizon swaps in cleanly.
+  assert.equal(basin.update(26000,0,1000),true);
+  assert.equal(basin.detail.visible,false);
+  assert.equal(scene.getObjectByName('kyoto-basin-horizon').visible,true);
+  assert.equal(calls.length,1);
+});
+
+test('distantBasin falls back to live registered surveys when kyoto-horizon fails',async t=>{
+  const mod=loadDistantBasinModule();
+  t.mock.method(globalThis,'fetch',async()=>new Response('missing',{status:404}));
+  t.mock.method(console,'warn',()=>{});
+  const scene=new THREE.Scene();
+  const basin=mod.distantBasin({},scene,()=>10,async()=>{});
+  basin.register({
+    boxes:[{x:0,z:0,w:30,d:30,h:24,angle:0,ground:0,kind:0}],
+    polys:[],
+  });
+  assert.equal(basin.update(26000,0,1000),false);
+  await new Promise(resolve=>setTimeout(resolve,40));
+  assert.equal(basin.update(26000,0,1000),true);
+  const horizon=scene.getObjectByName('kyoto-basin-horizon');
+  assert.equal(horizon.visible,true);
+  assert.equal(horizon.children.length,1);
 });
