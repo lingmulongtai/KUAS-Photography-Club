@@ -225,7 +225,7 @@ test('a late but successful load still plays the whole opening instead of skippi
 test('the ring is handed to the compositor and keeps the upper half hidden before halfway so no 50% dot leaks',()=>{
   const state=mount({reduced:false,animated:true});
   state.emit('hero:progress',.45);
-  const [lowEarly,highEarly]=state.ring;
+  const [,highEarly]=state.ring;
   assert.ok(highEarly.frames.every(frame=>frame.opacity===0),'upper half stays invisible before 50% handover');
   state.emit('hero:progress',.65);
   assert.equal(state.ring.length,6,'two glides of three ring layers');
