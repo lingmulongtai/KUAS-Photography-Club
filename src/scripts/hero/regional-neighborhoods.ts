@@ -77,12 +77,13 @@ export async function regionalNeighborhoods(scene:THREE.Scene,env:Env,ground:(x:
     near=keys;
     for(const [key,b] of loaded){const t=wanted.get(key);if(t)maskFor(t,b.mask);}
   }
-  function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null){
+  function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null,eye:{x:number;z:number}){
     if(now<next)return;
     next=now+.18;
     activeBox.value.set(...(detail??[1,1,0,0] as Box));
     const [tx,ty]=tileXY(ORIGIN.lon+x/M_PER_DEG_LON,ORIGIN.lat-z/M_PER_DEG_LAT,12);
-    const heading=Math.atan2(dirX,-dirZ),signature=[Math.floor(tx*4),Math.floor(ty*4),Math.round(heading*5)].join('/');
+    const [ex,ey]=tileXY(ORIGIN.lon+eye.x/M_PER_DEG_LON,ORIGIN.lat-eye.z/M_PER_DEG_LAT,12);
+    const heading=Math.atan2(dirX,-dirZ),signature=[Math.floor(tx*4),Math.floor(ty*4),Math.round(heading*5),Math.floor(ex*4),Math.floor(ey*4)].join('/');
     if(signature!==previous){
       previous=signature;
       const jobs:{t:Tile;score:number}[]=[];
@@ -94,9 +95,13 @@ export async function regionalNeighborhoods(scene:THREE.Scene,env:Env,ground:(x:
         if(distance>(lite?2.7:3.65) || (distance>1.55 && forward<.15))continue;
         jobs.push({t:{key,x:a,y:b},score:distance*(1-.4*forward)});
       }
+      const previousWanted=wanted;
       wanted=new Map(jobs.sort((a,b)=>a.score-b.score).map(({t})=>[t.key,t]));
       for(const [key,b] of loaded)if(!wanted.has(key)){
         const [a,row]=key.split('/').map(Number);
+        if((tx!==ex||ty!==ey) && previousWanted.has(key) && Math.hypot(a+.5-ex,row+.5-ey)<(lite?2.7:3.65)){
+          wanted.set(key,previousWanted.get(key)!);continue;
+        }
         if(Math.hypot(a+.5-tx,row+.5-ty)<(lite?3.3:4.4)){b.group.visible=false;continue;}
         scene.remove(b.group);dispose(b);loaded.delete(key);
       }
@@ -105,7 +110,7 @@ export async function regionalNeighborhoods(scene:THREE.Scene,env:Env,ground:(x:
     for(const t of wanted.values()){
       const batch=loaded.get(t.key);
       if(!batch)continue;
-      const distance=Math.max(0,Math.hypot(t.x+.5-tx,t.y+.5-ty)-.65);
+      const distance=Math.max(0,Math.min(Math.hypot(t.x+.5-ex,t.y+.5-ey),Math.hypot(t.x+.5-tx,t.y+.5-ty))-.65);
       for(const {mesh,count} of batch.batches)
         mesh.geometry.instanceCount=Math.max(1,Math.ceil(count/(1+distance*distance*(lite?2.2:1.4))));
     }

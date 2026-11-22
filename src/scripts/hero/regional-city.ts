@@ -213,10 +213,11 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
     neighborhoods.setNear(near);
     for(const [id,entry] of loaded)if(id.startsWith('12/'))entry.mask?.(near);
   }
-  function plan(px:number,pz:number){
+  function plan(px:number,pz:number,eye:Eye){
     const lo=ORIGIN.lon+px/M_PER_DEG_LON,la=ORIGIN.lat-pz/M_PER_DEG_LAT;
     const [cx,cy]=tileXY(lo,la,16).map(Math.floor);
-    const signature=cx+'/'+cy;
+    const [ex,ey]=tileXY(ORIGIN.lon+eye.x/M_PER_DEG_LON,ORIGIN.lat-eye.z/M_PER_DEG_LAT,16).map(Math.floor);
+    const signature=[cx,cy,ex,ey].join('/');
     if(last===signature)return;
     last=signature;
     const jobs:Layer[]=[];
@@ -234,7 +235,14 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
         jobs.push({x,y,zoom,distance:i*i+j*j+(zoom===12?2:0)});
       }
     }
+    const previous=wanted;
     wanted=new Map(jobs.sort((a,b)=>a.distance-b.distance).map(t=>[key(t),t]));
+    // A flight prefetches the destination. Keep roofs still visible at its departure point.
+    for(const [id,t] of previous){
+      if(wanted.has(id) || !loaded.has(id))continue;
+      const col=t.zoom===16?ex:ex>>4,row=t.zoom===16?ey:ey>>4;
+      if(Math.max(Math.abs(t.x-col),Math.abs(t.y-row))<=(t.zoom===16?radius:2))wanted.set(id,t);
+    }
     for(const [id,entry] of loaded)if(!wanted.has(id)){
       if(entry.mesh)scene.remove(entry.mesh);
       entry.dispose?.();
@@ -247,12 +255,12 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
     if(now<next)return;
     next=now+.09;
     architecture.update(x,z,now);
-    neighborhoods.update(x,z,dirX,dirZ,now,detail);
+    neighborhoods.update(x,z,dirX,dirZ,now,detail,eye);
     if(landmarkRevision!==architecture.revision){
       landmarkRevision=architecture.revision;
       for(const [id,entry] of loaded)if(id.startsWith('16/'))entry.mask?.(near);
     }
-    plan(x,z);
+    plan(x,z,eye);
     for(const entry of loaded.values())entry.lod?.(eye);
     for(const [id,t] of wanted){
       if(loading.size>=2)break;
