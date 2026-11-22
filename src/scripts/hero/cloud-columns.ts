@@ -190,13 +190,14 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
       uniforms.uColumnEye.value.set(cx - anchor.x, cz - anchor.y);
       if (failed || (lastWeather === weather &&
         Math.max(Math.abs(cx - anchor.x), Math.abs(cz - anchor.y)) < RECENTER)) return;
-      const previous = renderer.getRenderTarget(), onError = renderer.debug.onShaderError;
+      const previous = renderer.getRenderTarget(), onError = renderer.debug.onShaderError, diagnostics=renderer.debug.checkShaderErrors;
       anchor.set(Math.floor(cx), Math.floor(cz));
       uniforms.uColumnEye.value.set(cx - anchor.x, cz - anchor.y);
       try {
         renderer.setRenderTarget(target);
         const gl = renderer.getContext();
         if (!uniforms.uColumnsReady.value && gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
+        if(!uniforms.uColumnsReady.value)renderer.debug.checkShaderErrors=true;
         renderer.debug.onShaderError = (...args) => { failed = true; onError?.(...args); };
         renderer.render(scene, camera);
         if (failed) return;
@@ -208,7 +209,7 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
       } catch { failed = true; }
       finally {
         mesh.material = material;
-        renderer.debug.onShaderError = onError;
+        renderer.debug.onShaderError = onError;renderer.debug.checkShaderErrors=diagnostics;
         renderer.setRenderTarget(previous);
         uniforms.uColumnsReady.value = !failed;
         uniforms.uCloudColumns.value = failed ? null : target.texture;

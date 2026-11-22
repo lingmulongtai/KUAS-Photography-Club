@@ -238,7 +238,7 @@ export function createHero(
     const metadata = loading.track(loadJSON<TerrainMeta>('terrain.json'));
     const cityRegions=loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
       .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
-    const cloudProgram = Promise.all([prepare(clouds.mesh), prepare(clouds.columnMesh)]);
+    const cloudProgram = Promise.all([clouds.mesh,clouds.columnMesh,cloudBlur.compositeMesh,cloudHistory.compositeMesh].map(prepare));
     const meta = await metadata;
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
     const elevation = loading.track(loadHeightfield(meta));

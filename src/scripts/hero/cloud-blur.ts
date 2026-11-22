@@ -56,6 +56,7 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
   const viewRotation = new THREE.Matrix3();
   let failed = false, verified = false;
   return {
+    compositeMesh:new THREE.Mesh(clouds.geometry,material),
     restored() { failed = verified = false; },
     render(blur: readonly [number, number], width: number, height: number, dpr: number, draw: () => void) {
       const strength = Math.hypot(...blur);
@@ -101,6 +102,8 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       if (failed) { draw(); return; }
       clouds.material = material;
       const previousShaderError = renderer.debug.onShaderError;
+      const diagnostics=renderer.debug.checkShaderErrors;
+      if(!verified)renderer.debug.checkShaderErrors=true;
       let shaderFailed = false;
       if (!verified) renderer.debug.onShaderError = (...args) => {
         shaderFailed = true;
@@ -109,7 +112,7 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       };
       try { draw(); }
       catch (error) { if (!shaderFailed) throw error; }
-      finally { renderer.debug.onShaderError = previousShaderError; clouds.material = original; }
+      finally { renderer.debug.checkShaderErrors=diagnostics;renderer.debug.onShaderError = previousShaderError; clouds.material = original; }
       if (shaderFailed) { failed = true; draw(); } else verified = true;
     },
     dispose() { target.dispose(); material.dispose(); },
