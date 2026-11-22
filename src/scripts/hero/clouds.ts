@@ -72,35 +72,42 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
       }
 
       vec3 cloudCoord(vec3 pos){
-        // Tileable 3D Perlin-Worley scale tuned for crisp ~80-220 m cumulus cauliflower lobes.
-        float invCell = isStyle(4.) ? .00046 : isStyle(3.) ? .00066 : isStyle(2.) || isStyle(5.) ? .00084 : .00096;
+        // Tileable 3D Perlin-Worley scale: bold buoyant cauliflower billows on towering nyudogumo.
+        bool tower = isStyle(3.) || isStyle(4.);
+        float invCell = isStyle(4.) ? .00062 : isStyle(3.) ? .00076 : isStyle(2.) || isStyle(5.) ? .00084 : .00096;
         vec3 p = pos - vec3(uWind.x, 0., uWind.y) / K;
-        // Slight horizontal breadth gives cumulus puffs wide, natural bases rather than tall spikes.
-        return vec3(p.x, p.y * 1.24, p.z) * invCell;
+        float yScale = tower ? .88 : 1.24;
+        return vec3(p.x, p.y * yScale, p.z) * invCell;
       }
 
       /** Macro cloud envelope from the 2D weather column map and vertical profile (0..1). */
       float coarse(vec3 pos){
         float h = (pos.y - uBase) / (uTop - uBase);
         if (h <= 0. || h >= 1.) return 0.;
+        bool tower = isStyle(3.) || isStyle(4.);
         vec2 xz = pos.xz;
-        if (isStyle(3.) || isStyle(4.)){
-          // Tall convective towers shear gently with altitude into broad overhanging lobes.
-          vec3 w = texture(uCloudNoise, (pos - vec3(uWind.x, 0., uWind.y) / K) * .00014).rgb - .5;
-          xz += w.xz * (uTop - uBase) * .14 * h;
+        if (tower){
+          // Towering summer thunderheads lean and bulge into stacked overhanging cauliflower lobes.
+          vec3 pShift = pos - vec3(uWind.x, 0., uWind.y) / K;
+          vec3 w0 = texture(uCloudNoise, pShift * .00018).rgb - .5;
+          vec3 w1 = texture(uCloudNoise, pShift * .00048 + vec3(.31, .17, .73)).rgb - .5;
+          xz += (w0.xz * .18 + w1.xz * .07) * (uTop - uBase) * smoothstep(.05, .85, h);
         }
         vec3 column = lookupColumn(xz * K - uWind + uOffset);
         float topH = column.r;
         float cov = column.g;
         if (topH <= .001 || cov <= .001) return 0.;
-        // Flat-ish convective cloud base and rounded mushroom crown; strictly zero at h = 0 and h = topH
+        // Flat convective base and soft rounded cauliflower crown; strictly zero at h = 0 and h = topH
         // so emptyColumnRun acceleration remains conservative.
-        float baseSoft = mix(.16, .07, cov);
+        float baseSoft = tower ? .065 : mix(.16, .07, cov);
         float baseGrad = smoothstep(0., baseSoft, h);
-        float topGrad = 1. - smoothstep(topH * .64, topH, h);
-        float env = baseGrad * topGrad * cov;
+        float topGrad = 1. - smoothstep(topH * (tower ? .54 : .64), topH, h);
+        // Gentle mid-upper tapering keeps towers stacked in rounded tiers instead of sheer vertical slabs.
+        float tierShape = tower ? mix(1.0, .86, smoothstep(.22, .85, h)) : 1.0;
+        float env = baseGrad * topGrad * cov * tierShape;
         if (isStyle(4.)){
-          float anvil = smoothstep(.76, .87, h) * (1. - smoothstep(.93, 1., h)) * column.b * .74;
+          // Spreading fibrous anvil shelf crowning the tallest midsummer thunderheads.
+          float anvil = smoothstep(.76, .86, h) * (1. - smoothstep(.93, 1., h)) * column.b * .74;
           env = max(env, anvil);
         }
         return env;
@@ -112,49 +119,52 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
         if (env <= .001) return 0.;
         vec4 n = texture(uCloudNoise, cloudCoord(pos));
         float fbmLow = n.g * .625 + n.b * .25 + n.a * .125;
-        float shape = clamp(remap(n.r, -(1. - fbmLow) * .62, 1., 0., 1.), 0., 1.);
-        float sculpted = clamp(remap(shape, 1. - min(1., env * 1.18), 1., 0., 1.), 0., 1.);
-        return sculpted * mix(.65, 1.0, env);
+        float shape = clamp(remap(n.r, -(1. - fbmLow) * .72, 1., 0., 1.), 0., 1.);
+        float boost = (isStyle(3.) || isStyle(4.)) ? 1.04 : 1.18;
+        float sculpted = clamp(remap(shape, 1. - min(1., env * boost), 1., 0., 1.), 0., 1.);
+        return sculpted * mix(.62, 1.0, env);
       }
 
       /** Full 3D volumetric cloud density with multi-scale cauliflower billows & frothy wisps. */
       float density(vec3 pos, float dist){
         float env = coarse(pos);
         if (env <= .001) return 0.;
+        bool tower = isStyle(3.) || isStyle(4.);
         float h = clamp((pos.y - uBase) / (uTop - uBase), 0., 1.);
         vec3 q = cloudCoord(pos);
         vec4 baseN = texture(uCloudNoise, q);
         float fbmLow = baseN.g * .625 + baseN.b * .25 + baseN.a * .125;
-        // Perlin-Worley base shape forms broad cauliflower heads and internal density pockets.
-        float shape = clamp(remap(baseN.r, -(1. - fbmLow) * .65, 1., 0., 1.), 0., 1.);
-        float d = clamp(remap(shape, 1. - min(1., env * 1.18), 1., 0., 1.), 0., 1.) * mix(.65, 1.0, env);
+        // Perlin-Worley base shape forms bold cauliflower heads and deep sculptural crevices.
+        float shape = clamp(remap(baseN.r, -(1. - fbmLow) * (tower ? .78 : .65), 1., 0., 1.), 0., 1.);
+        float boost = tower ? 1.04 : 1.18;
+        float d = clamp(remap(shape, 1. - min(1., env * boost), 1., 0., 1.), 0., 1.) * mix(.62, 1.0, env);
         if (d <= .0005) return 0.;
 
-        // Mid-scale curling Worley detail carves puffy cauliflower sub-lobes (fades continuously with distance).
-        float detailFade = 1. - smoothstep(8000., 24000., dist);
+        // Keep cauliflower sub-lobes crisp even on distant 15-30 km summer thunderheads over the mountains.
+        float detailFade = 1. - smoothstep(tower ? 18000. : 9000., tower ? 38000. : 24000., dist);
         if (detailFade > .001){
-          vec3 curl = (baseN.gbr - .5) * .26;
-          vec4 hiN = texture(uCloudNoise, q * 2.75 + curl + vec3(0., h * .18, 0.));
+          vec3 curl = (baseN.gbr - .5) * (tower ? .32 : .26);
+          vec4 hiN = texture(uCloudNoise, q * (tower ? 2.45 : 2.75) + curl + vec3(0., h * .18, 0.));
           float hiFbm = hiN.g * .625 + hiN.b * .25 + hiN.a * .125;
-          float hiMod = mix(hiFbm, 1. - hiFbm, smoothstep(.04, .26, h));
-          float edgeMask = 1. - d * .48;
-          float erodeStrength = (isStyle(4.) ? .58 : isStyle(3.) ? .54 : isStyle(5.) ? .36 : .52) * detailFade * edgeMask;
+          float hiMod = mix(hiFbm, 1. - hiFbm, smoothstep(.04, .24, h));
+          float edgeMask = 1. - d * (tower ? .36 : .48);
+          float erodeStrength = (isStyle(4.) ? .66 : isStyle(3.) ? .62 : isStyle(5.) ? .36 : .52) * detailFade * edgeMask;
           d = clamp(remap(d, hiMod * erodeStrength, 1., 0., 1.), 0., 1.);
 
-          // Close-up frothy turbulence (~20-50 m wisps) prevents smooth clay-like surfaces overhead.
+          // Close-up frothy turbulence (~20-50 m wisps) prevents smooth clay-like surfaces.
           #if DETAIL > 1
-          float closeFade = 1. - smoothstep(3800., 10500., dist);
+          float closeFade = 1. - smoothstep(tower ? 8000. : 3800., tower ? 20000. : 10500., dist);
           if (closeFade > .001 && d > .001){
-            vec4 fineN = texture(uCloudNoise, q * 7.2 + curl * 2.1 + hiN.rgb * .16);
+            vec4 fineN = texture(uCloudNoise, q * 6.8 + curl * 2.0 + hiN.rgb * .16);
             float fineFbm = fineN.g * .55 + fineN.b * .30 + fineN.a * .15;
-            float wispErode = (1. - fineFbm) * .42 * closeFade * (1. - d * .55);
+            float wispErode = (1. - fineFbm) * .44 * closeFade * (1. - d * .50);
             d = clamp(remap(d, wispErode, 1., 0., 1.), 0., 1.);
           }
           #endif
         }
         // Soft frothy edge feathering with dense sunlit upper interiors.
-        float densityProfile = mix(.68, 1.22, smoothstep(.05, .44, h));
-        return clamp(pow(d, 1.18) * densityProfile, 0., 1.);
+        float densityProfile = mix(.70, 1.24, smoothstep(.05, .42, h));
+        return clamp(pow(d, 1.15) * densityProfile, 0., 1.);
       }
 
       void main(){
@@ -180,23 +190,30 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
 
         if (t1 > t0) {
           float layerDepth = uTop - uBase;
+          bool tower = isStyle(3.) || isStyle(4.);
           float qualityScale = ${detail > 1 ? '1.0' : '1.45'};
+          float nearStep = isStyle(4.) ? 16. : isStyle(3.) ? 13. : 9.5;
+          float farStep = isStyle(4.) ? 68. : isStyle(3.) ? 62. : 58.;
+          // Keep empty-air skipping fast enough to span 44 km without ever coarsening in-cloud fine steps.
+          float minEmptyStep = (t1 - t0) / (tower ? 78. : 96.);
           float verticalCap = layerDepth / (float(uMarchSteps) * max(abs(rd.y), .14));
           float jitter = ign(gl_FragCoord.xy);
-          float firstStep = min(mix(9.0, 74., smoothstep(600., 34000., t0)) * qualityScale, verticalCap);
+          float firstStep = min(mix(nearStep, farStep, smoothstep(600., 32000., t0)) * qualityScale, verticalCap);
           float t = t0 + jitter * firstStep;
           float nextBlock = t0;
-          bool useCeilings = uColumnsReady && !isStyle(3.) && !isStyle(4.);
+          bool useCeilings = uColumnsReady && !tower;
           bool fineMode = false;
+          float fineUntil = 0.;
           int emptyFine = 0;
-          float extinction = isStyle(5.) ? .024 : isStyle(4.) ? .028 : .036;
+          int fineCount = 0;
+          float extinction = isStyle(5.) ? .024 : isStyle(4.) ? .026 : isStyle(3.) ? .030 : .036;
           float ls = isStyle(4.) ? 2.4 : isStyle(3.) ? 1.55 : 1.0;
 
-          float emptyStride = useCeilings ? 2.6 : 3.8;
+          float emptyStride = useCeilings ? 2.6 : 3.2;
           #if DETAIL > 1
-          const int MAX_ITERS = 200;
+          const int MAX_ITERS = 240;
           #else
-          const int MAX_ITERS = 130;
+          const int MAX_ITERS = 160;
           #endif
 
           for (int i = 0; i < MAX_ITERS; ++i) {
@@ -208,14 +225,19 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
               nextBlock = t + run + .05;
               if (empty) {
                 if (run >= t1 - t) break;
-                float skipStep = min(mix(9.0, 74., smoothstep(600., 34000., t + run)) * qualityScale, verticalCap);
+                float skipStep = min(mix(nearStep, farStep, smoothstep(600., 32000., t + run)) * qualityScale, verticalCap);
                 t += run + jitter * skipStep * .65;
                 continue;
               }
             }
 
-            float fineStep = min(mix(9.0, 74., smoothstep(600., 34000., t)) * qualityScale, verticalCap);
-            float dt = fineMode ? fineStep : fineStep * emptyStride;
+            float baseFine = min(mix(nearStep, farStep, smoothstep(600., 32000., t)) * qualityScale, verticalCap);
+            // Only relax fine step size on unusually long grazing rays so normal edges stay silky-smooth.
+            float relax = 1. + max(0., float(fineCount - 75)) * .055;
+            float fineStep = baseFine * relax;
+            // Cap coarse empty steps by distance so thin near/mid anvil rims are never jumped over.
+            float maxEmpty = mix(95., 340., smoothstep(2500., 24000., t)) * qualityScale;
+            float dt = fineMode ? fineStep : min(maxEmpty, max(minEmptyStep, baseFine * emptyStride));
             dt = min(dt, t1 - t);
             if (dt <= .01) break;
 
@@ -224,7 +246,16 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
 
             if (!fineMode) {
               if (envVal > .001) {
-                t = max(t0, t - fineStep * .5);
+                // Bisect the hit bracket cheaply on coarse() so fine marching starts right on the cloud surface
+                // and cannot drop back to coarse before crossing the confirmed hit.
+                float tLo = max(t0, t - dt * .5);
+                float tHi = t + dt * .5;
+                float m1 = .5 * (tLo + tHi);
+                if (coarse(ro + rd * m1) > .001) tHi = m1; else tLo = m1;
+                float m2 = .5 * (tLo + tHi);
+                if (coarse(ro + rd * m2) > .001) tHi = m2; else tLo = m2;
+                t = tLo;
+                fineUntil = tHi + fineStep;
                 fineMode = true;
                 emptyFine = 0;
                 continue;
@@ -232,15 +263,22 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
               t += dt;
               continue;
             }
+            fineCount++;
 
-            float d = envVal > .001 ? density(pos, t + dt * .5) : 0.;
-            if (d <= .0008) {
-              emptyFine++;
-              if (emptyFine >= 4) fineMode = false;
+            if (envVal <= .001) {
+              if (t >= fineUntil) {
+                emptyFine++;
+                if (emptyFine >= 2) fineMode = false;
+              }
               t += dt;
               continue;
             }
             emptyFine = 0;
+            float d = density(pos, t + dt * .5);
+            if (d <= .0008) {
+              t += dt;
+              continue;
+            }
 
             float h = clamp((pos.y - uBase) / layerDepth, 0., 1.);
             // Exponential sun-ray optical depth: 3D billow probes carve sculptural shadows between cumulus heads.
@@ -270,13 +308,15 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
               ecc *= .50;
             }
             // Subtle powder dark-edge relief on shadowed sides facing away from the sun.
-            float powder = mix(.66 + .34 * (1. - exp(-d * 5.0)), 1., .42 + .48 * max(mu, 0.));
-            vec3 sun = uCloudLight * sunScatter * powder * (isStyle(5.) ? .44 : .84);
+            float powder = mix(.64 + .36 * (1. - exp(-d * 5.0)), 1., .40 + .50 * max(mu, 0.));
+            float towerBoost = isStyle(4.) ? 1.04 : isStyle(3.) ? .96 : isStyle(5.) ? .44 : .84;
+            vec3 sun = uCloudLight * sunScatter * powder * towerBoost;
 
-            // Ambient sky illumination: cool blue-grey underside shadows vs luminous zenith-lit tops.
-            float skyVis = mix(.34, 1.0, smoothstep(0., .78, h)) * mix(1.0, .72, clamp(d * 1.15, 0., 1.));
-            vec3 skyTint = mix(mix(uHorizon, uZenith, .45), mix(uHorizon, uZenith, .74), h);
-            vec3 sky = skyTint * skyVis * (1.02 - .52 * uCity) * (isStyle(5.) ? .74 : 1.0);
+            // Ambient sky illumination: clean summer sky-blue shadow bellies vs dazzling sunlit white tops.
+            float bellyFloor = (isStyle(3.) || isStyle(4.)) ? .40 : .36;
+            float skyVis = mix(bellyFloor, 1.08, smoothstep(0., .70, h)) * mix(1.0, .78, clamp(d * 1.05, 0., 1.));
+            vec3 skyTint = mix(mix(uHorizon, uZenith, .54), mix(uHorizon, uZenith, .74), h);
+            vec3 sky = skyTint * skyVis * (1.06 - .54 * uCity) * (isStyle(5.) ? .74 : 1.0);
             vec3 below = cityGlow * (1. - h) * (1. - h) * 1.65 + moon * exp(-od * .55);
             vec3 col = (sun + sky + below) * (isStyle(5.) ? .66 : 1.);
 

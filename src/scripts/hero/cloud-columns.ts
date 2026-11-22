@@ -43,8 +43,8 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
       if (n + .2 < emptyBelow) return emptyField;
       n += vnoise(p * 31. - 1.7) * .2;
     } else {
-      // Keep towering clouds horizontally broad so thunderheads never pinch into skinny spires.
-      float f = isStyle(1.) ? 1.55 : isStyle(3.) ? .44 : isStyle(4.) ? .20 : .92;
+      // Keep towering clouds horizontally broad yet well-populated across the summer horizon.
+      float f = isStyle(1.) ? 1.55 : isStyle(3.) ? .52 : isStyle(4.) ? .36 : .92;
       // Clustered multi-lobe cumulus footprints with smaller satellite puffs.
       float big = vnoise(p * 3.6 * f + 5.5) * .52 + vnoise(p * 8.2 * f - 2.2) * .32 + vnoise(p * 18. * f + 6.7) * .16;
       n = big;
@@ -56,13 +56,15 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
         small += vnoise(p * 38. * f - 1.7) * .18;
         n = mix(small, big, blend);
         // Smaller horizontal puffs stay proportionally shallower so they read as broad clouds, never cones.
-        sizeScale = mix(.42, 1.0, blend);
+        sizeScale = mix(isStyle(3.) ? .58 : .42, 1.0, blend);
       }
     }
     if (n < emptyBelow) return emptyField;
-    // Some heads stay flat while broader cores dome higher; thunderheads rise in broad clustered turrets.
-    float tall = deck() ? 1. : isStyle(4.) ? mix(.55, 1., vnoise(p * 3.5 + 1.9)) : mix(.48, 1., vnoise(p * 3.2 + 1.9)) * sizeScale;
-    if (isStyle(3.) || isStyle(4.)) tall *= mix(.82, 1., vnoise(p * 9.5 - 6.1));
+    // Thunderheads rise in tiered cauliflower turrets from a broad base.
+    float tall = deck() ? 1. : isStyle(4.) ? mix(.62, 1., smoothstep(.18, .82, vnoise(p * 3.6 + 1.9)))
+      : isStyle(3.) ? mix(.58, 1., vnoise(p * 3.8 + 1.9)) * sizeScale
+      : mix(.48, 1., vnoise(p * 3.2 + 1.9)) * sizeScale;
+    if (isStyle(3.) || isStyle(4.)) tall *= mix(.78, 1., smoothstep(.15, .85, vnoise(p * 9.5 - 6.1)));
     return vec3(n, th, tall);
   }
 
@@ -71,13 +73,13 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
     return clamp((f.x - f.y + spread) / max(1. - f.y, .05), 0., 1.);
   }
 
-  /** How high a cloud with this coverage grows, as a share of the slab (rounded domes, never pointy cones). */
+  /** How high a cloud with this coverage grows, as a share of the slab (broad-shouldered towers & domes). */
   float crown(float c){
     if (deck()) return .55 + .45 * sqrt(c);
-    // Broad shouldered dome curve: rises smoothly to a rounded crown instead of a pointed peak.
-    float dome = smoothstep(0., .78, c);
-    if (isStyle(4.)) return mix(.14, 1.0, smoothstep(.18, .72, c)) * (.35 + .65 * dome);
-    if (isStyle(3.)) return mix(.18, 1.0, smoothstep(.14, .68, c)) * (.40 + .60 * dome);
+    // Smooth multi-tiered cumulus/thunderhead profile with soft margins so edges never form vertical walls.
+    float dome = smoothstep(0., .82, c);
+    if (isStyle(4.)) return mix(.18, 1.0, smoothstep(.06, .66, c)) * (.38 + .62 * pow(dome, .62));
+    if (isStyle(3.)) return mix(.20, 1.0, smoothstep(.06, .64, c)) * (.40 + .60 * pow(dome, .62));
     return .22 + .78 * pow(dome, .65);
   }
 
@@ -86,8 +88,9 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
     vec3 f = field(p);
     if (f.z == 0.) return vec3(0.);
     float c = cover(f, 0.);
-    return vec3(crown(c) * f.z, smoothstep(0., .42, c),
-      isStyle(4.) ? smoothstep(0., .38, cover(f, .07)) : 0.);
+    // Keep coverage gradient broad on towers so 3D Worley noise sculpts deep cauliflower sides all the way out.
+    return vec3(crown(c) * f.z, smoothstep(0., isStyle(4.) ? .56 : isStyle(3.) ? .52 : .42, c),
+      isStyle(4.) ? smoothstep(0., .42, cover(f, .07)) : 0.);
   }
 `;
 
