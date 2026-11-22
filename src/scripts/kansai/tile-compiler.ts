@@ -103,9 +103,13 @@ export function tileCompiler(){
           eaves=profile[4]*.5;
           rh=roofShape==='flat'?0:Math.min((profile[5]-profile[4])*.5,eaves*.32);
         }
-        const record=cityFootprint(rings[0],eaves+rh*.5,base,kind,{type:rh?type:0,rh},pitch?-pitch[1]*Math.PI/256:undefined);
+        const inferredHouse=!pitch && !tag?.roof && (kind&3)===0;
+        const roof=inferredHouse?undefined:{type:rh?type:0 as const,rh};
+        const roofHeight=inferredHouse?(profile?profile[4]*.5:height):eaves+rh*.5;
+        const record=cityFootprint(rings[0],roofHeight,base,kind,roof,pitch?-pitch[1]*Math.PI/256:undefined);
         // Kyoto extrudes irregular flat outlines. Retain the surveyed roof planes of an irregular pitched house.
-        if(record && ('x' in record || rh===0)){city.push(record);return;}
+        const simple=pitch || !tag?.roof || ['flat','gabled','hipped'].includes(tag.roof);
+        if(simple && record && ('x' in record || rh===0 || inferredHouse)){city.push(record);return;}
       }
       const mesh=new Mesh((east-west)*mx,(north-south)*my);
       if(datum==='orthometric')mesh.wallDatum=base;
