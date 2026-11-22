@@ -31,6 +31,12 @@ def write_regions():
     for lower, upper in SUPERSEDED.items():
         if lower in regions and upper in regions:
             del regions[lower]
+    # The 2025 Kyoto survey has no detailed Nishikyo buildings. Its roof outlines
+    # independently confirm these retained 2024 features in the Katsura area.
+    local = 'katsura/tileset.json'
+    bounds = json.loads((ROOT/local).read_bytes())['root']['boundingVolume']['region'][:4]
+    regions['katsura'] = {'kind':'bldg','lod':2,'pref':'26','url':'/kansai/surveys/'+local,
+                         'bounds':[round(degrees(v),8) for v in bounds]}
     (ROOT/'regions.json').write_text(json.dumps(list(regions.values()), separators=(',', ':'))+'\n')
     print(len(regions), 'bounded survey sources')
 

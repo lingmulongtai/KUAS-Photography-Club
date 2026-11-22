@@ -73,6 +73,46 @@ test('Osaka Castle has a resident textured keep at its surveyed height',()=>{
   assert.ok(Math.abs(keep.ellipsoidHeight+geometry.max[1]-121.685)<.05);
 });
 
+test('Katsura only loads photographed 2024 roofs with a unique 2025 building match',()=>{
+  const base='surveys/katsura/',rows=json(base+'matches.json').buildings;
+  const region=json('surveys/regions.json').find(layer=>layer.url.endsWith('/katsura/tileset.json'));
+  assert.equal(region.pref,'26');assert.equal(region.lod,2);
+  assert.equal(rows.length,646);
+  const targets=new Map(rows.map(([old,current,iou,height,latest])=>{
+    assert.ok(iou>=.8&&Math.abs(height-latest)<=Math.max(2,height*.18));
+    return [old,current];
+  }));
+  assert.equal(targets.size,rows.length);
+  assert.equal(new Set(targets.values()).size,rows.length);
+  for(const child of json(base+'tileset.json').root.children){
+    const tile=readFileSync(new URL(base+child.content.uri,root));
+    assert.equal(tile.toString('ascii',0,4),'b3dm');
+    assert.equal(tile.readUInt32LE(8),tile.length);
+    const start=28+tile.readUInt32LE(12),end=start+tile.readUInt32LE(20);
+    const batch=JSON.parse(tile.toString('utf8',start,end));
+    const gltf=JSON.parse(tile.toString('utf8',end+20,end+20+tile.readUInt32LE(end+12)));
+    assert.ok(gltf.materials.some(m=>m.pbrMetallicRoughness.baseColorTexture));
+    const texture=gltf.textures[0];
+    const photo=readFileSync(new URL(base+gltf.images[texture.source].uri,root));
+    const compressed=readFileSync(new URL(base+gltf.images[texture.extensions.KHR_texture_basisu.source].uri,root));
+    assert.equal(photo.subarray(1,4).toString(),'PNG');
+    assert.equal(compressed.subarray(0,12).toString('hex'),'ab4b5458203230bb0d0a1a0a');
+    assert.equal(compressed.readUInt32LE(20),photo.readUInt32BE(16));
+    assert.equal(compressed.readUInt32LE(24),photo.readUInt32BE(20));
+    assert.ok(compressed.readUInt32LE(40)>1);
+    for(const p of gltf.meshes[0].primitives){
+      assert.ok(p.attributes._BATCHID!==undefined);
+      const accessor=gltf.accessors[p.attributes._BATCHID],view=gltf.bufferViews[accessor.bufferView];
+      const data=end+28+tile.readUInt32LE(end+12)+view.byteOffset;
+      for(let i=0;i<accessor.count;i++)assert.ok(tile.readUInt16LE(data+2*i)<batch.gml_id.length);
+    }
+    for(const [i,id] of batch.source_gml_id.entries()){
+      assert.equal(batch._lod[i],2);assert.equal(targets.get(id),batch.gml_id[i]);targets.delete(id);
+    }
+  }
+  assert.equal(targets.size,0);
+});
+
 test('the Kyoto laser-survey roofs have a registered footprint, camera-lit normals and a photograph',()=>{
   const catalogue=json('landmarks/index.json'), roofs=json('landmarks/temple-roofs.json');
   assert.equal(roofs.length,8);

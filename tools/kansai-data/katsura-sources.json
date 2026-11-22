@@ -1,0 +1,57 @@
+{
+  "2024": {
+    "archive": "https://assets.cms.plateau.reearth.io/assets/43/8b5371-59a8-4d51-9ebd-0ba37a9cf5d2/26100_kyoto-shi_city_2024_3dtiles_mvt_1_op.zip",
+    "entries": {
+      "data112.b3dm": [
+        2052228936,
+        1428911,
+        "f81a79274c48d59ee256e6fc769b52c1734e176ea6c6e7d2a7542f1623d39345"
+      ],
+      "data114.b3dm": [
+        2053933075,
+        675262,
+        "402451d3e3c3dced4122ab25a2b7b0253024357215ba1337d9e33067d17670b2"
+      ],
+      "data116.b3dm": [
+        2054660374,
+        1290426,
+        "ee4e70b64217766bd40d8f70abbbd1b048a43abe9616d3bea75ae848f8a51563"
+      ],
+      "data117.b3dm": [
+        2055950938,
+        522196,
+        "9cbfa866ad3908f2055dbd124722652cede8a0c3bed99d16efbf8921ac196bfb"
+      ],
+      "data118.b3dm": [
+        2056473272,
+        1588761,
+        "120078e30e303f10879a26ff037076aaa31523891ac1850512d6a1ffb810405a"
+      ],
+      "data119.b3dm": [
+        2058062171,
+        1268768,
+        "8f81d61600a8cc292e31589eec2053a10a7e5bdfcd9827a057c6f11d4a4b2e17"
+      ]
+    }
+  },
+  "2025": {
+    "archive": "https://assets.cms.plateau.reearth.io/assets/c8/4c6540-2bcf-4773-b21d-74ad2d9f1ba1/26100_kyoto-shi_city_2025_citygml_1_op.zip",
+    "entries": {
+      "52353564_bldg_6697_op.gml": [
+        799000367,
+        484631,
+        "393880ea29a6525b5b1724df571053da5308e74c9e06f02c8efa4666bad632f1"
+      ],
+      "52353565_bldg_6697_op.gml": [
+        799485078,
+        1211103,
+        "1e1de7e58f05b6abe03f4560bd927bf011f37309475229227b3b38bab4afea56"
+      ],
+      "52353575_bldg_6697_op.gml": [
+        806104026,
+        1722742,
+        "c6f80eec43be6d0c99cd825b278d202c5137afddc713df5bb3db5d2dbf6fcd23"
+      ]
+    }
+  }
+}
