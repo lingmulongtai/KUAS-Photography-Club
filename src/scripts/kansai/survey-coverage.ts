@@ -38,13 +38,16 @@ export class SurveyCoverage {
   private previous=new Map<Cesium3DTileContent,number>();
   private rings=new Set<Ring>();
   private groups=new Map<string,Building>();
-  private centers:Grid=new Map();
-  private cover:Grid=new Map();
+  private centers:Grid[]=Array.from({length:5},()=>new Map());
+  private cover:Grid[]=Array.from({length:5},()=>new Map());
   revision=0;
 
   contains(point:Point,above=-1){
-    const bin=this.cover.get(location(point));
-    if(bin)for(const building of bin)if(building.lod>above&&inBox(point,building.box))return true;
+    const key=location(point);
+    for(let lod=above+1;lod<this.cover.length;lod++){
+      const bin=this.cover[lod].get(key);
+      if(bin)for(const building of bin)if(inBox(point,building.box))return true;
+    }
     return false;
   }
 
@@ -58,13 +61,17 @@ export class SurveyCoverage {
     const pending=Array.from({length:5},()=>new Set<Building>());
     let coverageChanged=false,featureChanged=false;
     const invalidate=(box:Box,above:number)=>{
-      visitCells(box,k=>{
-        const bin=this.centers.get(k);
-        if(bin)for(const b of bin)if(b.lod<above&&inBox(b.center,box))pending[b.lod].add(b);
-      });
+      for(let lod=0;lod<above;lod++){
+        const centers=this.centers[lod];
+        if(!centers.size)continue;
+        visitCells(box,k=>{
+          const bin=centers.get(k);
+          if(bin)for(const b of bin)if(inBox(b.center,box))pending[lod].add(b);
+        });
+      }
     };
     const cover=(b:Building,on:boolean)=>{
-      visitCells(b.box,k=>indexBuilding(this.cover,k,b,on));
+      visitCells(b.box,k=>indexBuilding(this.cover[b.lod],k,b,on));
       invalidate(b.box,b.lod);
       coverageChanged=true;
     };
@@ -86,7 +93,7 @@ export class SurveyCoverage {
         if(!b){
           const center:Point=[(box[0]+box[2])/2,(box[1]+box[3])/2];
           b={key,lod,box,center,members:new Set(),shown:false};
-          this.groups.set(key,b);indexBuilding(this.centers,location(center),b,true);
+          this.groups.set(key,b);indexBuilding(this.centers[lod],location(center),b,true);
           pending[lod].add(b);
         }
         m.group=b;b.members.add(m);added.push(m);
@@ -98,7 +105,7 @@ export class SurveyCoverage {
       for(const m of this.records.get(content)??[]){
         const b=m.group!;b.members.delete(m);m.group=undefined;
         if(b.members.size)continue;
-        this.groups.delete(b.key);indexBuilding(this.centers,location(b.center),b,false);
+        this.groups.delete(b.key);indexBuilding(this.centers[b.lod],location(b.center),b,false);
         if(b.shown)cover(b,false);
       }
     }
