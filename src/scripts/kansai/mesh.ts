@@ -7,6 +7,8 @@ export type RGB=[number,number,number];
 export class Mesh {
   positions:number[]=[]; normals:number[]=[]; colors:number[]=[];
   uv:number[]=[];
+  wallCode=128;
+  wallDatum=0;
   surfaceType: 'land'|'wall'|'roof'='land';
   constructor(private width=1,private depth=1){}
   triangle(a:XYZ,b:XYZ,c:XYZ,color:RGB){
@@ -16,9 +18,9 @@ export class Mesh {
     this.positions.push(...a,...b,...c);
     for(const [x,y,z] of [a,b,c]){
       this.normals.push(nx/len,ny/len,nz/len);
-      this.colors.push(...color,this.surfaceType==='roof'?255:this.surfaceType==='wall'?128:0);
+      this.colors.push(...color,this.surfaceType==='roof'?255:this.surfaceType==='wall'?this.wallCode:0);
       if(this.surfaceType==='roof')this.uv.push(x/this.width+.5,y/this.depth+.5);
-      else this.uv.push((-ny*x+nx*y)/len,z);
+      else this.uv.push((-ny*x+nx*y)/len,z-(this.surfaceType==='wall'?this.wallDatum:0));
     }
   }
   quad(a:XYZ,b:XYZ,c:XYZ,d:XYZ,color:RGB){this.triangle(a,b,c,color);this.triangle(a,c,d,color);}

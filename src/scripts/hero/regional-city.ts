@@ -55,16 +55,27 @@ function cityMaterial(env:Env,boundary:Awaited<ReturnType<typeof boundaryUniform
           // The aerial already contains daylight; calibrate it to the terrain reflectance first.
           albedo=mix(albedo,surveyed*.68,.62);
         }
-        if(vSurface.a>.4 && vSurface.a<.6){
-          vec2 cell=vUv/vec2(4.,3.2);
+        if(vSurface.a>.39 && vSurface.a<.72){
+          bool surveyed=abs(vSurface.a-.502)>.035;
+          float office=step(.65,vSurface.a), midrise=step(.58,vSurface.a);
+          vec2 pitch=surveyed?mix(vec2(2.9,2.9),mix(vec2(3.45,3.12),vec2(2.15,3.62),office),midrise):vec2(4.,3.2);
+          vec2 cell=vUv/pitch;
           vec2 edge=abs(fract(cell)-.5),aa=max(fwidth(cell),vec2(.01));
-          vec2 pane=1.-smoothstep(vec2(.22)-aa*.5,vec2(.22)+aa*.5,edge);
+          vec2 opening=surveyed?mix(vec2(.29,.26),vec2(.444,.35),office):vec2(.22);
+          vec2 pane=1.-smoothstep(opening-aa*.5,opening+aa*.5,edge);
           float near=1.-smoothstep(.25,1.,max(aa.x,aa.y));
           float lit=step(hash12(floor(cell)+floor(vWorld.xz/30.)),uLit);
           emit=vec3(1.15,.77,.40)*uCity*mix(.16*uLit,pane.x*pane.y*lit,near);
           // Keep the dark window-to-wall ratio even when individual panes fall below one pixel.
-          float glass=mix(.19,pane.x*pane.y,near);
-          albedo*=1.-.47*glass;
+          float glass=mix(4.*opening.x*opening.y,pane.x*pane.y,near);
+          if(surveyed){
+            // Shadow beneath each sill and mullions between office panes. Blend to their average when unresolved.
+            float floorJoint=1.-smoothstep(.022-aa.y*.5,.022+aa.y*.5,abs(fract(cell.y+.41)-.5));
+            float mullion=1.-smoothstep(.021-aa.x*.5,.021+aa.x*.5,edge.x);
+            albedo*=1.-.26*mix(.044,floorJoint,near);
+            glass*=1.-office*.68*mix(.042,mullion,near);
+            albedo=mix(albedo,albedo*vec3(.23,.31,.37),glass);
+          }else albedo*=1.-.47*glass;
           vec3 incident=normalize(vWorld-cameraPosition);
           float fresnel=.035+.17*pow(1.-max(dot(-incident,n),0.),4.);
           vec3 reflection=reflect(incident,n);

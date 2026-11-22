@@ -1,4 +1,5 @@
 import {lonLat,tileXY,type Point} from '../kansai/coordinates';
+import {roofSurvey,drawSurveyedRoof,type RoofRecord} from '../kansai/surveyed-roofs';
 import {building,Mesh} from '../kansai/mesh';
 import {inflate} from '../kansai/sources';
 import {ORIGIN,M_PER_DEG_LAT,M_PER_DEG_LON,toLocal,type Box} from './geo';
@@ -13,11 +14,11 @@ export type Skyline={
 };
 
 export async function compileSkyline({x,y,legacy}:Request,sample:Heights,cooperate:()=>Promise<boolean>):Promise<Skyline|null>{
-  const response=await fetch('/kansai/skyline/'+x+'-'+y+'.json.gz');
+  const [response,survey]=await Promise.all([fetch('/kansai/skyline/'+x+'-'+y+'.json.gz'),roofSurvey(x,y)]);
   if(!response.ok)throw new Error('Skyline survey '+response.status);
   const rows:Row[]=JSON.parse(new TextDecoder().decode(await inflate(new Uint8Array(await response.arrayBuffer()))));
   const [lon,lat]=lonLat(x+.5,y+.5,12),center=toLocal(lat,lon);
-  const buildings:{polygons:Point[][];x:number;z:number;tile:string;height:number;min:number;style:number}[]=[];
+  const buildings:{polygons:Point[][];x:number;z:number;tile:string;height:number;min:number;style:number;roof?:RoofRecord}[]=[];
   const mesh=new Mesh(),ranges:Range[]=[],bounds=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];
   let deadline=performance.now()+3;
   for(let i=0;i<rows.length;i++){
@@ -37,7 +38,13 @@ export async function compileSkyline({x,y,legacy}:Request,sample:Heights,coopera
     const px=center.x+(w+e)/2,pz=center.z-(s+n)/2;
     if(legacy.some(b=>px>=b[0]&&pz>=b[1]&&px<=b[2]&&pz<=b[3]))continue;
     const [tx,ty]=tileXY(ORIGIN.lon+px/M_PER_DEG_LON,ORIGIN.lat-pz/M_PER_DEG_LAT,16).map(Math.floor);
-    buildings.push({polygons,x:px,z:pz,tile:'16/'+tx+'/'+ty,height,min,style:((i*16807)%997)/997});
+    let roof:RoofRecord|undefined;
+    if(survey && !min){
+      const r=rings[0];let w=Infinity,n=Infinity,e=-Infinity,s=-Infinity;
+      for(let k=0;k<r.length;k+=2){w=Math.min(w,r[k]);e=Math.max(e,r[k]);n=Math.min(n,r[k+1]);s=Math.max(s,r[k+1]);}
+      roof=survey(w,n,e,s);
+    }
+    buildings.push({roof,polygons,x:px,z:pz,tile:'16/'+tx+'/'+ty,height,min,style:((i*16807)%997)/997});
     bounds[0]=Math.min(bounds[0],w);bounds[1]=Math.min(bounds[1],s);
     bounds[3]=Math.max(bounds[3],e);bounds[4]=Math.max(bounds[4],n);
     if(performance.now()>deadline){if(!await cooperate())return null;deadline=performance.now()+3;}
@@ -49,8 +56,11 @@ export async function compileSkyline({x,y,legacy}:Request,sample:Heights,coopera
   if(!heights.length)return null;
   for(const [i,b] of buildings.entries()){
     const base=heights[i],start=mesh.positions.length/3;
-    building(mesh,b.polygons,base+b.min,base+b.height,0,b.style,'flat',base+b.min);
-    bounds[2]=Math.min(bounds[2],base+b.min);bounds[5]=Math.max(bounds[5],base+b.height);
+    const local=([lo,la]:Point):Point=>{const p=toLocal(la,lo);return [p.x-center.x,center.z-p.z];};
+    if(!b.roof || !drawSurveyedRoof(mesh,b.polygons,b.roof,base,base,b.style,x,y,local,'flat')){
+      building(mesh,b.polygons,base+b.min,base+b.height,0,b.style,'flat',base+b.min);
+    }
+    bounds[2]=Math.min(bounds[2],base+b.min);bounds[5]=Math.max(bounds[5],base+b.height,base+(b.roof?Math.max(b.roof[5],...b.roof[6].map(t=>t[0]))*.5:0));
     ranges.push({start,count:mesh.positions.length/3-start,tile:b.tile});
     if(performance.now()>deadline){if(!await cooperate())return null;deadline=performance.now()+3;}
   }

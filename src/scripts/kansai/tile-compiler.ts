@@ -3,6 +3,7 @@ import {lonLat,inPolygon,tileMetresPerDegree,type Point,type Ring} from './coord
 import {Mesh,building,tree,noise,strip,type XYZ,type RGB,type PackedMesh} from './mesh';
 import {modelSources,type BuildingTag} from './sources';
 import {drawGround,roadWidth} from './ground';
+import {roofSurvey,matchRoof,drawSurveyedRoof} from './surveyed-roofs';
 import {hyogoHeights} from './lidar';
 import {regionalHeights} from './building-heights';
 import {railStructure} from './rail';
@@ -52,9 +53,9 @@ export function tileCompiler(){
     const corners:Point[]=[nw,se,[west,south],[east,north]];
 
     const ground=terrainSampler(elevations,west,south,east,north);
-    const [tile,fields,tags,canopy,surfaces,edges,lidar,heightsByBuilding]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
+    const [tile,fields,tags,canopy,surfaces,edges,lidar,heightsByBuilding,survey]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
       includeTrees?sources.canopy(corners):null,sources.surfaces(x>>1,y>>1),sources.edges(x,y),
-      hyogoHeights(x,y),heightSources(x,y,corners)]);
+      hyogoHeights(x,y),heightSources(x,y,corners),roofSurvey(x>>4,y>>4)]);
     const [mx,my]=tileMetresPerDegree(center[1]);
     const local=([lon,lat]:Point):Point=>[(lon-center[0])*mx,(lat-center[1])*my];
     const here=([lon,lat]:Point)=>lon>=west&&lon<east&&lat>south&&lat<=north;
@@ -87,7 +88,10 @@ export function tileCompiler(){
       const ridge=['gabled','hipped','half-hipped','gambrel','pyramidal','mansard','skillion'].includes(roofShape)?
         Math.min(height*.38,tag?.roofHeight??(tag?.roofLevels?tag.roofLevels*2:Math.sqrt(size)*.14)):0;
       const mesh=new Mesh((east-west)*mx,(north-south)*my),low=minimum?base+minimum:Math.min(base,...rings[0].map(ground))-.5;
-      building(mesh,projected,base+minimum,base+height-ridge,ridge,style,roofShape,low);
+      const measuredRoof=survey && !tag?.part && !minimum && matchRoof(survey,rings[0],x>>4,y>>4);
+      if(!measuredRoof || !drawSurveyedRoof(mesh,projected,measuredRoof,base,low,style,x>>4,y>>4,local,roofShape,mapped)){
+        building(mesh,projected,base+minimum,base+height-ridge,ridge,style,roofShape,low);
+      }
       const instance=mesh.buffers(String(locations.length));if(instance){meshes.push(instance);locations.push(p);}
     };
     // Keep tagged parts separate from parent footprints (e.g. towers over station podiums).
