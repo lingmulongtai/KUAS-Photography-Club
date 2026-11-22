@@ -67,7 +67,8 @@ export async function regionalLandmarks(scene:THREE.Scene,env:Env,lights:{sun:TH
         .finally(()=>{r.pending=false;pending--;});
     }
   }
-  return {update,excludesTree,get revision(){return revision;},contains(p:Point){
+  const siteAt=(p:Point)=>rows.find(r=>Math.abs(r.lon-p[0])<.008 && Math.abs(r.lat-p[1])<.007 && r.rings.some(ring=>inRing(p,ring)));
+  return {update,excludesTree,siteAt,get revision(){return revision;},contains(p:Point){
     return rows.some(r=>r.group && Math.abs(r.lon-p[0])<.008 && Math.abs(r.lat-p[1])<.007 && r.rings.some(ring=>inRing(p,ring)));
   }};
 }

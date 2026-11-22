@@ -52,12 +52,18 @@ export function matchRoof(find:ReturnType<typeof roofFootprints>,ring:Ring,x:num
   return find(w,n,e,s);
 }
 
+export function surveyFits(row:RoofRecord,preferredHeight?:number){
+  const peak=row[7]?row[7][2]+row[7][3]:0;
+  const top=Math.max(row[5],peak,...row[6].map(t=>t[0]))*.5;
+  return !preferredHeight || (preferredHeight<=top*1.4+4 && preferredHeight>=top*.6-4);
+}
+
 /** The lowest measured roof spans the building. Higher surfaces retain their surveyed outlines and courtyards. */
 export function drawSurveyedRoof(mesh:Mesh,rings:Ring[],row:RoofRecord,base:number,low:number,style:number,
   x:number,y:number,local:(p:Point)=>Point,shape:string,preferredHeight?:number){
   const terraces=row[6],measuredTop=Math.max(row[5],row[7]?row[7][2]+row[7][3]:0,...terraces.map(t=>t[0]))*.5;
   // A newer mapped tower or an elevated building part can postdate the airborne survey.
-  if(preferredHeight && (preferredHeight>measuredTop*1.4+4 || preferredHeight<measuredTop*.6-4))return false;
+  if(!surveyFits(row,preferredHeight))return false;
   const raised=terraces.length>0;
   const simpleRise=raised||shape==='flat'?0:Math.min((row[5]-row[4])*.5,row[4]*.16);
   // Store a facade family in the existing material byte and align floors to the actual footing.

@@ -256,7 +256,7 @@ const POLY_VS = /* glsl */ `
   }
 `;
 
-const BUILDING_FS = /* glsl */ `
+export const BUILDING_FS = /* glsl */ `
   ${ENV_GLSL}
   ${SHADOW_GLSL}
   ${BUILT_GLSL}
@@ -435,6 +435,7 @@ const DEPTH_FS = /* glsl */ `
 /* ---------- building the meshes ---------- */
 
 function roofFor(b: BoxBuilding) {
+  if (b.roof) return b.roof;
   if ((b.kind & 3) !== CLASS.wooden || b.h > 16) return { type: 0, rh: 0 };
   const area = b.w * b.d;
   if (area > 260) {
@@ -572,7 +573,7 @@ function instanceShape(shape: THREE.InstancedBufferGeometry, source: THREE.Insta
   return geometry;
 }
 
-export function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate=()=>false, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>) {
+export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate=()=>false, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>) {
   const group = new THREE.Group();
   const fallback = new THREE.Group();
   if (replaceable) group.add(fallback);
@@ -717,6 +718,14 @@ export function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep:
   complete=true;
   return {
     group, overview, fallback,
+    // Streamed street tiles also own materials for details that are created later.
+    materials: [instMat, polyMat, stepMat, detailMat],
+    dispose(){
+      group.traverse(object=>{if(object instanceof THREE.Mesh)object.geometry.dispose();});
+      overview?.traverse(object=>{if(object instanceof THREE.Mesh)object.geometry.dispose();});
+      for(const material of [instMat,polyMat,stepMat,detailMat,instDepth,polyDepth,stepDepth,proxyMaterial])material?.dispose();
+      flat.dispose();pitched.dispose();stepped.dispose();
+    },
     /**
      * Swap stepped and plain roofs, and show facade details, by distance from the camera; call once
      * a frame. True when the roofs changed (the sun's shadow map needs redrawing).
@@ -771,13 +780,13 @@ export function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep:
 
 type CityData = { boxes: BoxBuilding[]; polys: PolyBuilding[] };
 type CityPredicate = (b: BoxBuilding | PolyBuilding) => boolean;
-export function buildCity(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean=()=>true,quality=1,dressed:CityPredicate=()=>false) {
+export function buildCity(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,keep:(b:BoxBuilding)=>boolean=()=>true,quality=1,dressed:CityPredicate=()=>false) {
   const steps=buildCitySteps(env,hf,data,keep,quality,dressed);
   for(;;){const step=steps.next();if(step.done)return step.value;}
 }
 
 /** Keep the renderer responsive while a neighbouring region builds its city. */
-export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye,replaceable?:ReadonlySet<BoxBuilding | PolyBuilding>) {
+export async function buildCityAsync(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye,replaceable?:ReadonlySet<BoxBuilding | PolyBuilding>) {
   const steps=buildCitySteps(env,hf,data,keep,quality,dressed,panoramaEye,replaceable);
   try {
     while(current()){
@@ -791,7 +800,7 @@ export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(
 
 /** Resident rooflines use the same outlines, roof shapes and night windows as the core.
  * Only nearby regional models need individual balconies, stepped tiles and shadow-map submissions. */
-export async function buildResidentCity(env:Env,hf:Heightfield,data:CityData,extent?:Box) {
+export async function buildResidentCity(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,extent?:Box) {
   const mesh=new THREE.Group();
   const uniforms={...env,uDetailBox:{value:new THREE.Vector4()}};
   const material=(vertexShader:string)=>new THREE.ShaderMaterial({

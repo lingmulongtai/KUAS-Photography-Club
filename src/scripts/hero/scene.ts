@@ -867,7 +867,7 @@ export function createHero(
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
         terrain.uniforms.uSurveyOn.value=1;
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
-          module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,result.imagery,prepare)
+          module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,prepare)
         ).then(city=>{regionalCity=city;refreshForest();}).catch(error=>console.warn('Regional city index unavailable',error));
       }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
     idle(()=>void ensureRegionalGround?.());
@@ -1333,7 +1333,7 @@ export function createHero(
       if(regionalCity){
         camera.getWorldDirection(regionalDirection);
         const horizontal=Math.hypot(regionalDirection.x,regionalDirection.z)||1;
-        regionalCity.update(detailEye.x,detailEye.z,regionalDirection.x/horizontal,regionalDirection.z/horizontal,regionalTime,activeRegionBox);
+        regionalCity.update(detailEye.x,detailEye.z,regionalDirection.x/horizontal,regionalDirection.z/horizontal,regionalTime,activeRegionBox,camera.position);
       }
       const expoDistance=Math.hypot(camera.position.x-expoAnchor.x,camera.position.z-expoAnchor.z);
       if(expoDistance<4800 && !expo && !preparingExpo && regionalTime>=retryExpoAt){

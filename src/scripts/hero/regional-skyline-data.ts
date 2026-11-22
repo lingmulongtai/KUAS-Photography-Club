@@ -1,6 +1,7 @@
 import {lonLat,tileXY,type Point} from '../kansai/coordinates';
 import {roofSurvey,drawSurveyedRoof,type RoofRecord} from '../kansai/surveyed-roofs';
 import {building,Mesh} from '../kansai/mesh';
+import {facadeKind} from '../kansai/city-footprint';
 import {inflate} from '../kansai/sources';
 import {ORIGIN,M_PER_DEG_LAT,M_PER_DEG_LON,toLocal,type Box} from './geo';
 
@@ -9,7 +10,7 @@ export type Heights=(centers:Float32Array<ArrayBuffer>)=>Promise<Float32Array<Ar
 export type Request={x:number;y:number;legacy:Box[]};
 export type Range={start:number;count:number;tile:string};
 export type Skyline={
-  positions:Float32Array<ArrayBuffer>;normals:Float32Array<ArrayBuffer>;uv:Float32Array<ArrayBuffer>;colors:Uint8Array<ArrayBuffer>;
+  positions:Float32Array<ArrayBuffer>;normals:Float32Array<ArrayBuffer>;uv:Float32Array<ArrayBuffer>;colors:Uint8Array<ArrayBuffer>;identity:Uint16Array<ArrayBuffer>;
   ranges:Range[];center:{x:number;z:number};bounds:number[];
 };
 
@@ -19,7 +20,7 @@ export async function compileSkyline({x,y,legacy}:Request,sample:Heights,coopera
   const rows:Row[]=JSON.parse(new TextDecoder().decode(await inflate(new Uint8Array(await response.arrayBuffer()))));
   const [lon,lat]=lonLat(x+.5,y+.5,12),center=toLocal(lat,lon);
   const buildings:{polygons:Point[][];x:number;z:number;tile:string;height:number;min:number;style:number;roof?:RoofRecord}[]=[];
-  const mesh=new Mesh(),ranges:Range[]=[],bounds=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];
+  const identity:number[]=[],mesh=new Mesh(),ranges:Range[]=[],bounds=[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];
   let deadline=performance.now()+3;
   for(let i=0;i<rows.length;i++){
     const [height,min,,,rings]=rows[i];
@@ -57,13 +58,18 @@ export async function compileSkyline({x,y,legacy}:Request,sample:Heights,coopera
   for(const [i,b] of buildings.entries()){
     const base=heights[i],start=mesh.positions.length/3;
     const local=([lo,la]:Point):Point=>{const p=toLocal(la,lo);return [p.x-center.x,center.z-p.z];};
+    mesh.wallDatum=base;
     if(!b.roof || !drawSurveyedRoof(mesh,b.polygons,b.roof,base,base,b.style,x,y,local,'flat')){
       building(mesh,b.polygons,base+b.min,base+b.height,0,b.style,'flat',base+b.min);
     }
     bounds[2]=Math.min(bounds[2],base+b.min);bounds[5]=Math.max(bounds[5],base+b.height,base+(b.roof?Math.max(b.roof[5],b.roof[7]?b.roof[7][2]+b.roof[7][3]:0,...b.roof[6].map(t=>t[0]))*.5:0));
+    const footprint=b.polygons[0];
+    const area=Math.abs(footprint.reduce((sum,p,k)=>{const q=footprint[(k+1)%footprint.length];return sum+p[0]*q[1]-q[0]*p[1];},0))*.5;
+    const kind=facadeKind(true,area,b.height);
+    for(let j=start;j<mesh.positions.length/3;j++)identity.push(kind,Math.round(b.style*65535),Math.round(b.height*4));
     ranges.push({start,count:mesh.positions.length/3-start,tile:b.tile});
     if(performance.now()>deadline){if(!await cooperate())return null;deadline=performance.now()+3;}
   }
   return {positions:new Float32Array(mesh.positions),normals:new Float32Array(mesh.normals),
-    uv:new Float32Array(mesh.uv),colors:new Uint8Array(mesh.colors),ranges,bounds,center};
+    uv:new Float32Array(mesh.uv),colors:new Uint8Array(mesh.colors),identity:new Uint16Array(identity),ranges,bounds,center};
 }

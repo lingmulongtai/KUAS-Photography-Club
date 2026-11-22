@@ -13,6 +13,8 @@ export interface BoxBuilding {
   w: number;
   d: number;
   angle: number;
+  /** Surveyed roof family and ridge height above the eaves, in metres. */
+  roof?: {type:0|1|2; rh:number};
   h: number;
   ground: number;
   kind: number;

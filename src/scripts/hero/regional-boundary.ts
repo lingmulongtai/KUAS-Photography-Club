@@ -24,3 +24,10 @@ export const HOME_BOUNDARY=`
       +metre*vec2(${2048/M_PER_DEG_LON},${-2048/M_PER_DEG_LAT});
     return prefecture(ivec2(floor(grid)),fract(grid));
   }`;
+
+/** Apply the administrative boundary to the same city material used inside Kyoto. */
+export function clipCityMaterial(material:THREE.ShaderMaterial, boundary:Awaited<ReturnType<typeof boundaryUniforms>>){
+  material.uniforms={...material.uniforms,...boundary};
+  material.fragmentShader=HOME_BOUNDARY+'\n'+material.fragmentShader.replace('gl_FragColor =','if(owner(vWorld.xz)==0) discard; gl_FragColor =');
+  return material;
+}

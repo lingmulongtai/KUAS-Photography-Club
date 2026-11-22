@@ -1,9 +1,10 @@
+import {cityFootprint,facadeKind,type StreetBuilding} from './city-footprint';
 import {classifyRings,type VectorTileFeature} from '@mapbox/vector-tile';
 import {lonLat,inPolygon,tileMetresPerDegree,type Point,type Ring} from './coordinates';
 import {Mesh,building,tree,noise,strip,type XYZ,type RGB,type PackedMesh} from './mesh';
 import {modelSources,type BuildingTag} from './sources';
 import {drawGround,roadWidth} from './ground';
-import {roofSurvey,matchRoof,drawSurveyedRoof} from './surveyed-roofs';
+import {roofSurvey,matchRoof,drawSurveyedRoof,surveyFits} from './surveyed-roofs';
 import {hyogoHeights} from './lidar';
 import {regionalHeights} from './building-heights';
 import {railStructure} from './rail';
@@ -40,7 +41,7 @@ function terrainSampler(elevations:Float64Array,west:number,south:number,east:nu
 }
 
 export interface TileRequest {datum?:VerticalDatum;includeTrees?:boolean;id:number;x:number;y:number;elevations:Float64Array<ArrayBuffer>}
-export interface CompiledTile {center:Point;geometry?:TileGeometry;locations:Point[]}
+export interface CompiledTile {center:Point;geometry?:TileGeometry;locations:Point[];city?:StreetBuilding[];facades?:number[][]}
 
 export function tileCompiler(){
   let data:Promise<[Awaited<ReturnType<typeof modelSources>>,Awaited<ReturnType<typeof regionalHeights>>]>|undefined;
@@ -62,6 +63,7 @@ export function tileCompiler(){
     const xyz=(p:Point,h:number):XYZ=>[...local(p),h];
     const meshes:PackedMesh[]=[],locations:Point[]=[],groundMesh=new Mesh((east-west)*mx,(north-south)*my);
     const inWater=drawGround(groundMesh,x,y,surfaces,edges,ground,xyz);
+    const city:StreetBuilding[]=[],facades:number[][]=[];
     const occupied=new Map<number,Ring[][]>();
     const bin=(v:number)=>Math.max(0,Math.min(7,Math.floor(v*8)));
     const col=(p:Point)=>bin((p[0]-west)/(east-west)),row=(p:Point)=>bin((p[1]-south)/(north-south));
@@ -87,12 +89,30 @@ export function tileCompiler(){
       const roofShape=tag?.roof??(!solid&&size<320?(style>.65?'hipped':'gabled'):'flat');
       const ridge=['gabled','hipped','half-hipped','gambrel','pyramidal','mansard','skillion'].includes(roofShape)?
         Math.min(height*.38,tag?.roofHeight??(tag?.roofLevels?tag.roofLevels*2:Math.sqrt(size)*.14)):0;
-      const mesh=new Mesh((east-west)*mx,(north-south)*my),low=minimum?base+minimum:Math.min(base,...rings[0].map(ground))-.5;
-      const measuredRoof=survey && !tag?.part && !minimum && matchRoof(survey,rings[0],x>>4,y>>4);
+      const low=minimum?base+minimum:Math.min(base,...rings[0].map(ground))-.5;
+      const measuredRoof=survey && !tag?.part && !minimum ? matchRoof(survey,rings[0],x>>4,y>>4) : undefined;
+      const kind=facadeKind(solid,size,height);
+      if(datum==='orthometric' && !minimum && rings.length===1 && !measuredRoof?.[6].length){
+        const profile=measuredRoof && surveyFits(measuredRoof,mapped)?measuredRoof:undefined;
+        const pitch=profile?.[7];
+        let eaves=height-ridge,rh=ridge;
+        let type:0|1|2=roofShape.includes('hip')?2:1;
+        if(pitch){
+          eaves=pitch[2]*.5;rh=pitch[3]*.5;type=pitch[0]===0?1:2;
+        }else if(profile){
+          eaves=profile[4]*.5;
+          rh=roofShape==='flat'?0:Math.min((profile[5]-profile[4])*.5,eaves*.32);
+        }
+        const record=cityFootprint(rings[0],eaves+rh*.5,base,kind,{type:rh?type:0,rh},pitch?-pitch[1]*Math.PI/256:undefined);
+        // Kyoto extrudes irregular flat outlines. Retain the surveyed roof planes of an irregular pitched house.
+        if(record && ('x' in record || rh===0)){city.push(record);return;}
+      }
+      const mesh=new Mesh((east-west)*mx,(north-south)*my);
+      if(datum==='orthometric')mesh.wallDatum=base;
       if(!measuredRoof || !drawSurveyedRoof(mesh,projected,measuredRoof,base,low,style,x>>4,y>>4,local,roofShape,mapped)){
         building(mesh,projected,base+minimum,base+height-ridge,ridge,style,roofShape,low);
       }
-      const instance=mesh.buffers(String(locations.length));if(instance){meshes.push(instance);locations.push(p);}
+      const instance=mesh.buffers(String(locations.length));if(instance){meshes.push(instance);locations.push(p);if(datum==='orthometric')facades.push([kind,Math.round(style*65535),Math.round(height*4)]);}
     };
     // Keep tagged parts separate from parent footprints (e.g. towers over station podiums).
     const relevant=tags.flatMap(tag=>tag.polygons.filter(r=>r[0]?.some(([lon,lat])=>lon>=west-.003&&lon<=east+.003&&lat>=south-.003&&lat<=north+.003))
@@ -174,6 +194,6 @@ export function tileCompiler(){
       const [px,py]=local(p);tree(groundMesh,px,py,ground(p),noise(iy,ix+6));
     }
     const terrain=groundMesh.buffers();if(terrain)meshes.push(terrain);
-    return {center,locations,geometry:combineTileMeshes(meshes)};
+    return {center,locations,...(datum==='orthometric'?{city,facades}:{}),geometry:combineTileMeshes(meshes)};
   };
 }
