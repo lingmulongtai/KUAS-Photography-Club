@@ -12,7 +12,8 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
   const isolated = new THREE.Scene();
   const proxy = new THREE.Mesh(clouds.geometry, original);
   proxy.frustumCulled = false;
-  isolated.add(proxy);
+  // Match main scene light counts so Three's program cache reuses the precompiled CLOUDS program.
+  isolated.add(proxy, new THREE.DirectionalLight(0), new THREE.HemisphereLight(0, 0));
   const uniforms = {
     ...original.uniforms,
     uCloud: { value: target.texture },
