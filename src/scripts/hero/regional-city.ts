@@ -148,14 +148,15 @@ async function readSkyline(x:number,y:number,material:THREE.Material,ground:Grou
   return {mesh,mask};
 }
 
-export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legacy:Box[],lite:boolean){
+export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legacy:Box[],lite:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const [{tiles},{prefectures},architecture,boundary]=await Promise.all([
     json<{tiles:string[]}>('skyline/index.json'),
     json<{prefectures:Record<string,string[]>}>('network/index.json'),
-    regionalLandmarks(scene,env,ground),boundaryUniforms(),
+    regionalLandmarks(scene,env,ground,prepare),boundaryUniforms(),
   ]);
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
   const queue=tileQueue(),material=cityMaterial(env,boundary);
+  let shaderReady:Promise<unknown>|undefined;
   type Entry={mesh:THREE.Mesh|null;mask?:(near:ReadonlySet<string>)=>void};
   const loaded=new Map<string,Entry>(),loading=new Set<string>(),retry=new Map<string,number>();
   let wanted=new Map<string,Layer>(),last='',next=0;
@@ -209,7 +210,8 @@ export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legac
       const job=t.zoom===16?queue.compile(t.x,t.y,sampleTile(t.x,t.y,ground))
         .then(tile=>nearMesh(tile,material,architecture.contains)):
         readSkyline(t.x,t.y,material,ground,legacy,()=>wanted.has(id));
-      void job.then(result=>{
+      void job.then(async result=>{
+        if(result?.mesh)await (shaderReady??=prepare(result.mesh));
         if(!wanted.has(id)){result?.mesh?.geometry.dispose();return;}
         loaded.set(id,result??{mesh:null});
         if(result?.mesh){

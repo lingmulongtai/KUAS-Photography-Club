@@ -9,12 +9,13 @@ import {toLocal} from './geo';
 const anchor=toLocal(EXPO.lat,EXPO.lon);
 
 /** Orient the archive's ECEF coordinates in the existing Kyoto camera frame. */
-export function expoGrounds(scene:THREE.Scene,camera:THREE.PerspectiveCamera,renderer:THREE.WebGLRenderer){
+export function expoGrounds(scene:THREE.Scene,camera:THREE.PerspectiveCamera,renderer:THREE.WebGLRenderer,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const ktx=new KTX2Loader().setWorkerLimit(2).detectSupport(renderer);
   const sets=['bldg','frn'].map(kind=>{
     const tiles=new TilesRenderer('/kansai/expo-models/'+kind+'/tileset.json');
     tiles.registerPlugin(new GLTFExtensionsPlugin({ktxLoader:ktx,meshoptDecoder:MeshoptDecoder,metadata:false,rtc:true,autoDispose:false}));
     tiles.registerPlugin(new UpdateOnChangePlugin());
+    tiles.registerPlugin({processTileModel:prepare});
     tiles.parseQueue.maxJobs=1;
     tiles.errorTarget=kind==='bldg'?3:5;
     tiles.setCamera(camera);

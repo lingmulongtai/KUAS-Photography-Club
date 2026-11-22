@@ -31,7 +31,7 @@ function dispose(group:THREE.Object3D){
   for(const image of images)image.close();
 }
 
-export async function regionalLandmarks(scene:THREE.Scene,env:Env,ground:(x:number,z:number)=>number){
+export async function regionalLandmarks(scene:THREE.Scene,env:Env,ground:(x:number,z:number)=>number,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const catalogue=await json<Record[]>('landmarks/index.json');
   const rows=catalogue.filter(row=>!kyoto.has(row.id)).map(row=>({...row,...toLocal(row.lat,row.lon),group:null as THREE.Object3D|null,
     distance:Infinity,pending:false,retry:0}));
@@ -56,7 +56,8 @@ export async function regionalLandmarks(scene:THREE.Scene,env:Env,ground:(x:numb
       if(pending>=2 || r.distance>3100)break;
       if(r.group || r.pending || r.retry>now)continue;
       r.pending=true;pending++;
-      void loader.loadAsync(r.file).then(({scene:model})=>{
+      void loader.loadAsync(r.file).then(async({scene:model})=>{
+        await prepare(model);
         if(r.distance>4200){dispose(model);return;}
         model.position.set(r.x,ground(r.x,r.z),r.z);
         model.name=r.id;

@@ -80,7 +80,7 @@ const fragmentShader = `
     gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
   }`;
 
-export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(photo:RegionalPhoto|null)=>void) {
+export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(photo:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>) {
   const {grid,patches}=await loadJSON<GroundSurvey>('kansai/ground.json');
   const [heights,boundary]=await Promise.all([loadGrid(grid),boundaryUniforms()]);
   const kyoto=hf.bounds;
@@ -105,6 +105,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
     uCloseBox.value.fromArray(sheet?.box??[0,0,0,0]);
     onPhoto(sheet);
   });
+  let shaderReady:Promise<unknown>|undefined;
   let running=0,last= -Infinity;
   function update(x:number,z:number,y:number,now:number) {
     if(now-last<.15)return;
@@ -125,10 +126,12 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       if(state.mesh || state.pending || state.retry>now)continue;
       state.pending=true;
       running++;
-      void loadTexture(state.patch.file,aniso).then(photo=>{
+      void loadTexture(state.patch.file,aniso).then(async photo=>{
         if(state.distance>65000){photo.dispose();return;}
         const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox},vertexShader,fragmentShader});
         const mesh=new THREE.Mesh(patchGeometry(state.patch.box,kyoto,ground),material);
+        await (shaderReady??=prepare(mesh));
+        if(state.distance>65000){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
         mesh.name='regional-ground';
         state.mesh=mesh;
         scene.add(mesh);

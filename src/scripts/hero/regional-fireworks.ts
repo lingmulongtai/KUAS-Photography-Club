@@ -4,7 +4,7 @@ import {particles,simulation,pointShape} from '../kansai/firework-particles';
 import type {Env} from './env';
 import {toLocal} from './geo';
 
-export function regionalFireworks(scene:THREE.Scene,env:Env,ground:(x:number,z:number)=>number,reducedMotion:boolean){
+export function regionalFireworks(scene:THREE.Scene,env:Env,ground:(x:number,z:number)=>number,reducedMotion:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const river=OUTINGS.find(p=>p.id==='setagawa')!;
   const shows=[river,BIWA_FIREWORKS].map(place=>{
     const wide=place===BIWA_FIREWORKS,p=toLocal(place.lat,place.lon);
@@ -38,11 +38,13 @@ export function regionalFireworks(scene:THREE.Scene,env:Env,ground:(x:number,z:n
         }`});
     const points=new THREE.Points(geometry,material);
     points.position.copy(anchor);points.name=place.id;points.visible=false;
-    scene.add(points);
-    return {points,uniforms};
+    const show={points,uniforms,ready:false};
+    void prepare(points).then(()=>{show.ready=true;scene.add(points);});
+    return show;
   });
   return (camera:THREE.PerspectiveCamera,dt:number,pixels:number)=>{
-    for(const {points,uniforms} of shows){
+    for(const {points,uniforms,ready} of shows){
+      if(!ready)continue;
       points.visible=env.uCity.value>.15 && camera.position.distanceToSquared(points.position)<6000**2;
       if(!points.visible)continue;
       if(!reducedMotion)uniforms.u_elapsed.value+=dt;

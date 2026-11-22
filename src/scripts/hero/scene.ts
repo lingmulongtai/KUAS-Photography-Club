@@ -186,6 +186,9 @@ export function createHero(
   let regionalCity:Awaited<ReturnType<typeof import('./regional-city').regionalCity>>|undefined;
   const expoAnchor=toLocal(EXPO.lat,EXPO.lon);
   let expo:ReturnType<typeof import('./regional-expo').expoGrounds>|undefined;
+  const prepare = (object: THREE.Object3D) => post.prepare(object).catch(error => {
+    console.warn('Scene shaders will compile on first draw', error);
+  });
   let preparingExpo=false,retryExpoAt=0;
   let updateFireworks:ReturnType<typeof import('./regional-fireworks').regionalFireworks>|undefined;
   let ensureRegionalGround:(()=>Promise<void>)|undefined;
@@ -223,9 +226,6 @@ export function createHero(
     const metadata = loading.track(loadJSON<TerrainMeta>('terrain.json'));
     const cityRegions=loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
       .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
-    const prepare = (object: THREE.Object3D) => post.prepare(object).catch(error => {
-      console.warn('Panorama shaders will compile on first draw', error);
-    });
     const cloudProgram = Promise.all([prepare(clouds.mesh), prepare(clouds.columnMesh)]);
     const meta = await metadata;
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
@@ -787,12 +787,12 @@ export function createHero(
         const legacy=[BUILDINGS_BOX,...(await cityRegions).regions.map(r=>r.box)];
         return regionalGround(scene,env,hf,aniso,legacy,sheet=>{
           regionalPhoto=sheet;sharedSlot?.setOverride(localPhoto??regionalPhoto);
-        });
+        },prepare);
       })
       .then(result=>{
         regional=result;
         void import('./regional-fireworks').then(({regionalFireworks})=>{
-          updateFireworks=regionalFireworks(scene,env,result.ground,!!opts.reducedMotion);
+          updateFireworks=regionalFireworks(scene,env,result.ground,!!opts.reducedMotion,prepare);
         }).catch(error=>console.warn('Regional fireworks unavailable',error));
         // moveExplorer keeps a 500 m safety margin inside its camera bounds.
         const [w,n,e,s]=result.bounds;
@@ -800,7 +800,7 @@ export function createHero(
         groundAt=result.ground;
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
-          module.regionalCity(scene,env,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite)
+          module.regionalCity(scene,env,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,prepare)
         ).then(city=>{regionalCity=city;}).catch(error=>console.warn('Regional city index unavailable',error));
       }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
     idle(()=>void ensureRegionalGround?.());
@@ -1266,7 +1266,7 @@ export function createHero(
       const expoDistance=Math.hypot(camera.position.x-expoAnchor.x,camera.position.z-expoAnchor.z);
       if(expoDistance<4800 && !expo && !preparingExpo && regionalTime>=retryExpoAt){
         preparingExpo=true;
-        void import('./regional-expo').then(({expoGrounds})=>{expo=expoGrounds(scene,camera,renderer);})
+        void import('./regional-expo').then(({expoGrounds})=>{expo=expoGrounds(scene,camera,renderer,prepare);})
           .catch(error=>{retryExpoAt=performance.now()/1000+20;console.warn('Expo archive unavailable',error);})
           .finally(()=>{preparingExpo=false;});
       }
