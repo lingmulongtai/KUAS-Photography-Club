@@ -10,7 +10,8 @@ import {regionalLandmarks} from './regional-landmarks';
 import {skylineReader} from './regional-skyline';
 import type {Skyline} from './regional-skyline-data';
 import {json} from '../kansai/sources';
-import {ENV_GLSL, type Env} from './env';
+import {SHADOW_LAYER} from './shadow';
+import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
 import {M_PER_DEG_LAT, M_PER_DEG_LON, ORIGIN, toLocal, type Box} from './geo';
 
 type Ground=(x:number,z:number)=>number;
@@ -44,12 +45,12 @@ function streetMaterial(env:Env,boundary:Boundary){
         vNormal=mat3(modelMatrix)*normal;vColor=surface.rgb;
         gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);
       }`,
-    fragmentShader:`${ENV_GLSL} ${HOME_BOUNDARY}
+    fragmentShader:`${ENV_GLSL} ${SHADOW_GLSL} ${HOME_BOUNDARY}
       varying vec3 vWorld,vNormal,vColor;
       void main(){
         if(owner(vWorld.xz)==0)discard;
         vec3 n=normalize(vNormal);
-        vec3 color=shade(seasonalSurface(pow(vColor,vec3(2.2)),n,vWorld),n,vWorld,1.);
+        vec3 color=shade(seasonalSurface(pow(vColor,vec3(2.2)),n,vWorld),n,vWorld,sunShadow(vWorld,n));
         gl_FragColor=vec4(applyHaze(color,vec3(0.),vWorld),1.);
       }`});
 }
@@ -120,7 +121,7 @@ function streetMesh(tile:CompiledTile,materials:THREE.Material[],contains:(p:Poi
 async function nearMesh(tile:CompiledTile,materials:THREE.Material[],env:Env,boundary:Boundary,ground:Ground,
   architecture:Architecture,lite:boolean,current:()=>boolean):Promise<Entry|null>{
   const group=new THREE.Group(),street=streetMesh(tile,materials,architecture.contains);
-  if(street)group.add(street.mesh);
+  if(street){group.add(street.mesh);street.mesh.layers.enable(SHADOW_LAYER);}
   type Site=ReturnType<Architecture['siteAt']>;
   const sites=new Map<Site,{boxes:BoxBuilding[];polys:PolyBuilding[]}>();
   for(const b of tile.city??[]){
@@ -149,6 +150,7 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],env:Env,bou
       if(!city){dispose();return null;}
       cities.push({site,city});
       for(const mat of city.materials)clipCityMaterial(mat,boundary);
+      city.group.traverse(o=>{if(o.userData.depthMaterial)o.layers.enable(SHADOW_LAYER);});
       city.group.name='regional-kyoto-buildings';
       group.add(city.group);
     }
@@ -196,7 +198,7 @@ function skylineMesh(g:Skyline,material:THREE.Material){
   return {mesh,mask,dispose:()=>geometry.dispose()};
 }
 
-export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.DirectionalLight;sky:THREE.HemisphereLight},ground:Ground,legacy:Box[],lite:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>){
+export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.DirectionalLight;sky:THREE.HemisphereLight},ground:Ground,legacy:Box[],lite:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>,invalidateShadow:()=>void){
   const [{tiles},{prefectures},architecture,boundary,neighborhoods]=await Promise.all([
     json<{tiles:string[]}>('skyline/index.json'),
     json<{prefectures:Record<string,string[]>}>('network/index.json'),
@@ -206,6 +208,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
   const readSkyline=skylineReader(ground);
   const queue=tileQueue(false,'orthometric'),material=surveyedMaterial(env,boundary);
   const streetMaterials=[material,streetMaterial(env,boundary)];
+  let shadowDirty=false,nextShadow=0;
   let shaderReady:Promise<unknown>|undefined;
 
   const loaded=new Map<string,Entry>(),loading=new Set<string>(),retry=new Map<string,number>();
@@ -248,6 +251,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
     }
     for(const [id,entry] of loaded)if(!wanted.has(id)){
       if(entry.mesh)scene.remove(entry.mesh);
+      if(id.startsWith('16/') && entry.mesh)shadowDirty=true;
       entry.dispose?.();
       loaded.delete(id);
     }
@@ -257,14 +261,15 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
   function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null,eye:Eye){
     let pick: {distance:number;build?:()=>void}={distance:Infinity};
     const schedule:ScheduleDetail=(distance,build)=>{if(distance<pick.distance)pick={distance,build};};
-    for(const entry of loaded.values())entry.lod?.(eye,schedule);
+    for(const entry of loaded.values())if(entry.lod?.(eye,schedule))shadowDirty=true;
     pick.build?.();
+    if(shadowDirty && now>=nextShadow){invalidateShadow();shadowDirty=false;nextShadow=now+.25;}
     if(now<next)return;
     next=now+.09;
     architecture.update(x,z,now);
     neighborhoods.update(x,z,dirX,dirZ,now,detail,eye);
     if(landmarkRevision!==architecture.revision){
-      landmarkRevision=architecture.revision;
+      landmarkRevision=architecture.revision;shadowDirty=true;
       for(const [id,entry] of loaded)if(id.startsWith('16/'))entry.mask?.(near);
     }
     plan(x,z,eye);
@@ -278,7 +283,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
       void job.then(async result=>{
         if(result?.mesh)await (shaderReady??=prepare(result.mesh));
         if(!wanted.has(id)){result?.dispose?.();return;}
-        if(t.zoom===16)result?.mask?.(near);
+        if(t.zoom===16 && result){result.mask?.(near);shadowDirty=true;}
         loaded.set(id,result??{mesh:null});
         if(result?.mesh){
           scene.add(result.mesh);

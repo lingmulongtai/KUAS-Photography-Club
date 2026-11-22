@@ -867,7 +867,7 @@ export function createHero(
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
         terrain.uniforms.uSurveyOn.value=1;
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
-          module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,prepare)
+          module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,prepare,shadow.invalidate)
         ).then(city=>{regionalCity=city;refreshForest();}).catch(error=>console.warn('Regional city index unavailable',error));
       }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
     idle(()=>void ensureRegionalGround?.());

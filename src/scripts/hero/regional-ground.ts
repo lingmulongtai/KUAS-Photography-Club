@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {decodeTreeCover} from './tree-cover';
 import {loadBinary,loadGrid, loadJSON, loadTexture, type GridMeta} from './data';
-import {ENV_GLSL, type Env} from './env';
+import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
 import type {Box} from './geo';
 import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
 import {regionalPhoto,type RegionalPhoto} from './regional-photo';
@@ -85,6 +85,7 @@ const fragmentShader = `
   varying vec2 vUv;
   varying vec3 vWorld,vNormal;
   ${ENV_GLSL}
+  ${SHADOW_GLSL}
   ${HOME_BOUNDARY}
   ${districtSampling}
   void main(){
@@ -104,7 +105,7 @@ const fragmentShader = `
     photo.rgb=overlay(photo.rgb,uClose,uCloseBox,vWorld.xz);
     vec3 n=normalize(vNormal);
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
-    vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,1.);
+    vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sunShadow(vWorld,n));
     gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
   }`;
 
