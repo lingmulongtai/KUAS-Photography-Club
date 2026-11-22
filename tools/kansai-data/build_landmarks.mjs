@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {createServer} from 'vite';
+import {roofNormalUri,tileCoordinates} from './roof-tile-material.mjs';
 import {portTower} from './port-tower.mjs';
 import {districtModel} from './nankinmachi.mjs';
 import {kasugaBuildings} from './kasuga.mjs';
@@ -20,17 +21,21 @@ globalThis.fetch=async url=>typeof url==='string'&&url.startsWith('/kyoto/')?
   new Response(await fs.readFile(new URL(url.slice(7),kyoto))):oldFetch(url);
 function glb(parts){
   const p=[],normal=[],color=[],indices=[],min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
-  for(const {geo,color:rgb} of parts){
+  const tiled=parts.some(part=>part.tiles),uv=[],roofIndices=[];
+  for(const {geo,color:rgb,tiles} of parts){
+    const faces=tiles?roofIndices:indices;
     const pos=geo.getAttribute('position'),norm=geo.getAttribute('normal'),start=p.length/3;
     for(let i=0;i<pos.count;i++){
       const v=[pos.getX(i),pos.getY(i),pos.getZ(i)];p.push(...v);
       for(let j=0;j<3;j++){min[j]=Math.min(min[j],v[j]);max[j]=Math.max(max[j],v[j]);}
+      if(tiled)uv.push(...(tiles?tileCoordinates(v,[norm.getX(i),norm.getY(i),norm.getZ(i)]):[0,0]));
       normal.push(norm.getX(i),norm.getY(i),norm.getZ(i));color.push(...rgb.map(c=>Math.round(Math.min(1,c)*255)),255);
     }
-    if(geo.index)for(const i of geo.index.array)indices.push(start+i);
-    else for(let i=0;i<pos.count;i++)indices.push(start+i);
+    if(geo.index)for(const i of geo.index.array)faces.push(start+i);
+    else for(let i=0;i<pos.count;i++)faces.push(start+i);
   }
   const arrays=[new Float32Array(p),new Float32Array(normal),new Uint8Array(color),new Uint32Array(indices)];
+  if(tiled)arrays.push(new Float32Array(uv),new Uint32Array(roofIndices));
   let offset=0;
   const views=arrays.map(a=>{const v={buffer:0,byteOffset:offset,byteLength:a.byteLength};offset+=a.byteLength;return v;});
   const doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1,COLOR_0:2},indices:3,material:0}]}],
@@ -38,6 +43,15 @@ function glb(parts){
     accessors:[{bufferView:0,componentType:5126,count:p.length/3,type:'VEC3',min,max},
       {bufferView:1,componentType:5126,count:p.length/3,type:'VEC3'},{bufferView:2,componentType:5121,normalized:true,count:p.length/3,type:'VEC4'},
       {bufferView:3,componentType:5125,count:indices.length,type:'SCALAR'}]};
+  if(tiled){
+    doc.accessors.push({bufferView:4,componentType:5126,count:uv.length/2,type:'VEC2'},
+      {bufferView:5,componentType:5125,count:roofIndices.length,type:'SCALAR'});
+    doc.images=[{uri:roofNormalUri}];
+    doc.samplers=[{magFilter:9729,minFilter:9987,wrapS:10497,wrapT:10497}];
+    doc.textures=[{source:0,sampler:0}];
+    doc.materials.push({...doc.materials[0],name:'Fired tile courses',normalTexture:{index:0}});
+    doc.meshes[0].primitives.push({attributes:{POSITION:0,NORMAL:1,COLOR_0:2,TEXCOORD_0:4},indices:5,material:1});
+  }
   const text=Buffer.from(JSON.stringify(doc)),n=(text.length+3)&~3,header=Buffer.alloc(20),chunk=Buffer.alloc(8);
   header.write('glTF');header.writeUInt32LE(2,4);header.writeUInt32LE(28+n+offset,8);header.writeUInt32LE(n,12);header.write('JSON',16);
   chunk.writeUInt32LE(offset);chunk.writeUInt32LE(0x004e4942,4);

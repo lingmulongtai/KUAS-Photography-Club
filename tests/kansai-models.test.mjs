@@ -24,6 +24,9 @@ test('Todaiji roofs and landmark masks remain aligned with the two surveyed buil
     const pos=doc.accessors[doc.meshes[0].primitives[0].attributes.POSITION];
     assert.ok(Math.abs(pos.max[1]-height)<.2);
     assert.ok(pos.count>3500);
+    const roof=doc.meshes[0].primitives.find(p=>doc.materials[p.material].normalTexture);
+    assert.equal(doc.accessors[roof.attributes.TEXCOORD_0].count,pos.count);
+    assert.equal(doc.samplers[0].minFilter,9987);
   }
 });
 

@@ -9,6 +9,12 @@ function post(parts,x,z,r,base,height){
   parts.push({geo,color:timber});
 }
 
+function tileRoof(roof,parts,...dimensions){
+  const first=parts.length;
+  roof(parts,...dimensions);
+  parts[first].tiles=true;
+}
+
 // The copper karahafu rises in the centre and curls upwards again at either end.
 function copperGable(parts,block){
   const positions=[],span=8.8,sections=24;
@@ -46,7 +52,7 @@ export function greatBuddhaHall(block,roof){
     }
     for(let i=0;i<=6;i++)post(parts,side*width*.5,(i/6-.5)*depth,.6,1.55,16.3);
   }
-  roof(parts,73.8,65.4,12.1,17.6,0,tile);
+  tileRoof(roof,parts,73.8,65.4,12.1,17.6,0,tile);
   block(parts,46,13.2,36,0,25,0,timber);
   for(const side of [-1,1]){
     for(let i=-2;i<=2;i++){
@@ -57,7 +63,7 @@ export function greatBuddhaHall(block,roof){
     block(parts,5.3,5.35,.42,0,27.5,side*18.72,shadow);
   }
   block(parts,46.8,.7,37.4,0,30.7,0,endGrain);
-  roof(parts,62.4,52.6,14.15,30.6,0,tile);
+  tileRoof(roof,parts,62.4,52.6,14.15,30.6,0,tile);
   copperGable(parts,block);
   for(const side of [-1,1]){
     for(let i=0;i<8;i++){
@@ -90,8 +96,8 @@ export function nandaimon(block,roof){
     block(parts,5.5,7.9,7.4,x,4.7,0,shadow);
     for(let i=-3;i<=3;i++)block(parts,.18,7.9,.24,x+i*.73,4.7,3.9,timber);
   }
-  roof(parts,39.5,22.8,5.4,9.4,0,tile);
-  roof(parts,41.1,23.6,6.402,base+height,0,tile);
+  tileRoof(roof,parts,39.5,22.8,5.4,9.4,0,tile);
+  tileRoof(roof,parts,41.1,23.6,6.402,base+height,0,tile);
   for(const {geo} of parts)geo.rotateY(.6*Math.PI/180);
   return parts;
 }
