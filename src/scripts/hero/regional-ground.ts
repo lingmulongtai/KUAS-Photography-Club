@@ -156,11 +156,13 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   });
   let shaderReady:Promise<unknown>|undefined;
   let running=0,last= -Infinity;
-  function update(x:number,z:number,y:number,now:number) {
+  function update(x:number,z:number,y:number,now:number,destination?:{x:number;z:number}) {
     if(now-last<.15)return;
     last=now;
-    const surveyed=districts(x,z,now);
-    photos(x,z,y-ground(x,z),now,!surveyed && !legacy.some(b=>boxDistance(x,z,b)===0));
+    // Preserve continuous base terrain under the moving camera. Stage the detailed
+    // survey at the landing point instead of uploading cities crossed for a fraction of a second.
+    const surveyed=districts(destination?.x??x,destination?.z??z,now);
+    photos(x,z,y-ground(x,z),now,!destination && !surveyed && !legacy.some(b=>boxDistance(x,z,b)===0));
     for(const state of states){
       state.distance=boxDistance(x,z,state.patch.box);
       if(state.mesh && state.distance>65000){

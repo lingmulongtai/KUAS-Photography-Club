@@ -1303,7 +1303,7 @@ export function createHero(
       updateBasinLod?.();
       updateFireworks?.(camera,dt,pxPerM);
       const regionalTime=performance.now()/1000;
-      regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime);
+      regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime,flight?.p3);
       const detailEye=flight?.p3??camera.position;
       if(regionalCity){
         camera.getWorldDirection(regionalDirection);
