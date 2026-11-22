@@ -19,7 +19,7 @@ export const districtSampling=`
     return mix(base,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
   }`;
 
-export function districtImagery(districts:District[],aniso:number,onChange:(broad:RegionalPhoto|null,inset:RegionalPhoto|null)=>void){
+export function districtImagery(districts:District[],aniso:number,prepare:(photo:THREE.Texture,needed:()=>boolean)=>Promise<boolean>,onChange:(broad:RegionalPhoto|null,inset:RegionalPhoto|null)=>void){
   const entries=districts.map(record=>({...record,sheet:null as RegionalPhoto|null,pending:false,retry:0,distance:Infinity}));
   let broad:RegionalPhoto|null=null,inset:RegionalPhoto|null=null;
   return (x:number,z:number,now:number)=>{
@@ -33,7 +33,12 @@ export function districtImagery(districts:District[],aniso:number,onChange:(broa
     for(const e of [wide,close]){
       if(!e||e.sheet||e.pending||now<e.retry)continue;
       e.pending=true;
-      void loadTexture(e.file,aniso).then(photo=>{e.sheet={photo,box:e.box};})
+      void loadTexture(e.file,aniso).then(async photo=>{
+        try{
+          if(await prepare(photo,()=>e.distance<(e.zoom>15?6500:19000)))e.sheet={photo,box:e.box};
+          else photo.dispose();
+        }catch(error){photo.dispose();throw error;}
+      })
         .catch(()=>{e.retry=performance.now()/1000+12;}).finally(()=>{e.pending=false;});
     }
     if(broad!==(wide?.sheet??null)||inset!==(close?.sheet??null)){

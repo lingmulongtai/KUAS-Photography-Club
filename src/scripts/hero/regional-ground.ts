@@ -108,7 +108,7 @@ const fragmentShader = `
     gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
   }`;
 
-export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>) {
+export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture)=>void) {
   const [{grid,patches},surveys]=await Promise.all([loadJSON<GroundSurvey>('kansai/ground.json'),loadJSON<District[]>('kansai/districts/index.json')]);
   const [heights,boundary,cover,fine]=await Promise.all([
     loadGrid(grid),boundaryUniforms(),loadBinary('kansai/canopy.bin').then(decodeTreeCover),
@@ -143,7 +143,21 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   const uDistrict={value:null as THREE.Texture|null},uDistrictBox={value:new THREE.Vector4()};
   const uInset={value:null as THREE.Texture|null},uInsetBox={value:new THREE.Vector4()};
   let broad:RegionalPhoto|null=null,inset:RegionalPhoto|null=null,live:RegionalPhoto|null=null;
-  const districts=districtImagery(surveys,aniso,(base,detail)=>{
+  // A first draw would upload every newly finished orthophoto at once. Keep the old
+  // coverage visible and prepare at most one full-resolution sheet per animation frame.
+  let uploads=Promise.resolve();
+  function preparePhoto(photo:THREE.Texture,needed:()=>boolean){
+    const next=uploads.then(async()=>{
+      if(!needed())return false;
+      await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+      if(!needed())return false;
+      upload(photo);
+      return true;
+    });
+    uploads=next.then(()=>{},()=>{});
+    return next;
+  }
+  const districts=districtImagery(surveys,aniso,preparePhoto,(base,detail)=>{
     broad=base;inset=detail;
     uDistrict.value=base?.photo??null;uDistrictBox.value.fromArray(base?.box??[0,0,0,0]);
     uInset.value=detail?.photo??null;uInsetBox.value.fromArray(detail?.box??[0,0,0,0]);
@@ -179,7 +193,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       state.pending=true;
       running++;
       void loadTexture(state.patch.file,aniso).then(async photo=>{
-        if(state.distance>65000){photo.dispose();return;}
+        if(!await preparePhoto(photo,()=>state.distance<=65000)){photo.dispose();return;}
         const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=65000);
         if(!geometry){photo.dispose();return;}
         const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});

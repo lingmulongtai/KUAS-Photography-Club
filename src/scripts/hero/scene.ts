@@ -847,7 +847,7 @@ export function createHero(
             terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
           }
           regionalPhoto=detail??base;sharedSlot?.setOverride(localPhoto??regionalPhoto);
-        },prepare);
+        },prepare,photo=>renderer.initTexture(photo));
       })
       .then(result=>{
         regional=result;
