@@ -136,11 +136,11 @@ function skylineMesh(g:Skyline,material:THREE.Material){
   return {mesh,mask};
 }
 
-export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legacy:Box[],lite:boolean,imagery:DistrictUniforms,prepare:(model:THREE.Object3D)=>Promise<unknown>){
+export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.DirectionalLight;sky:THREE.HemisphereLight},ground:Ground,legacy:Box[],lite:boolean,imagery:DistrictUniforms,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const [{tiles},{prefectures},architecture,boundary,neighborhoods]=await Promise.all([
     json<{tiles:string[]}>('skyline/index.json'),
     json<{prefectures:Record<string,string[]>}>('network/index.json'),
-    regionalLandmarks(scene,env,ground,prepare),boundaryUniforms(),regionalNeighborhoods(scene,env,ground,lite,prepare),
+    regionalLandmarks(scene,env,lights,ground,prepare),boundaryUniforms(),regionalNeighborhoods(scene,env,ground,lite,prepare),
   ]);
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
   const readSkyline=skylineReader(ground);

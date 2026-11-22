@@ -31,13 +31,12 @@ function dispose(group:THREE.Object3D){
   for(const image of images)image.close();
 }
 
-export async function regionalLandmarks(scene:THREE.Scene,env:Env,ground:(x:number,z:number)=>number,prepare:(model:THREE.Object3D)=>Promise<unknown>){
+export async function regionalLandmarks(scene:THREE.Scene,env:Env,lights:{sun:THREE.DirectionalLight;sky:THREE.HemisphereLight},ground:(x:number,z:number)=>number,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const catalogue=await json<Record[]>('landmarks/index.json');
   const rows=catalogue.filter(row=>!kyoto.has(row.id)).map(row=>({...row,...toLocal(row.lat,row.lon),group:null as THREE.Object3D|null,
     distance:Infinity,pending:false,retry:0}));
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const sun=new THREE.DirectionalLight(),sky=new THREE.HemisphereLight();
-  scene.add(sun,sky);
+  const {sun,sky}=lights;
   let revision=0,pending=0,next=0;
   function update(x:number,z:number,now:number){
     if(now<next)return;

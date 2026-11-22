@@ -136,6 +136,9 @@ export function createHero(
 ): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void;setSeason(season:Season):void; setLanguage(lang: 'ja' | 'en'): void; setExploring(enabled:boolean):void; setTouchMove(forward:number,side:number,up:number,fast:boolean):void; readonly exploring:boolean; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
   const env = createEnv();
   const scene = new THREE.Scene();
+  // Light counts are part of Three's program cache key, including custom terrain shaders.
+  const landmarkLights={sun:new THREE.DirectionalLight(0),sky:new THREE.HemisphereLight(0,0)};
+  scene.add(landmarkLights.sun,landmarkLights.sky);
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
   // away depends on it, and too little of it makes neighbouring rooftops flicker
   const camera = new THREE.PerspectiveCamera(40, 1, 20, 60000);
@@ -855,13 +858,13 @@ export function createHero(
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
         terrain.uniforms.uSurveyOn.value=1;
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
-          module.regionalCity(scene,env,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,result.imagery,prepare)
+          module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,result.imagery,prepare)
         ).then(city=>{regionalCity=city;}).catch(error=>console.warn('Regional city index unavailable',error));
       }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
     idle(()=>void ensureRegionalGround?.());
     startGroundRelief=() => idle(() => {
       const ground=(x:number,z:number)=>hf.height(x,z);
-      const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,ground(x,z)),refreshForest);
+      const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,ground(x,z)),refreshForest,prepare);
       scene.add(relief.group);
       cultivated=relief.containsField;
       updateGroundRelief=relief.update;

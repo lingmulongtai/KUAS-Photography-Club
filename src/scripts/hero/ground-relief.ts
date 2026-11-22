@@ -106,10 +106,12 @@ interface Cell {
 
 /** A camera can cross sheets during a fetch. Keep only current cells, keep
  * their inputs in a bounded cache, and build them in short main-thread tasks. */
-export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevation, bankGround: Elevation, fieldsChanged: () => void) {
+export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevation, bankGround: Elevation, fieldsChanged: () => void,prepare:(mesh:THREE.Object3D)=>Promise<unknown>) {
   const group = new THREE.Group();
   group.name = 'ground-relief';
   const material = groundMaterial(env,roads);
+  // Link against the actual HDR pass while the survey downloads, before exposing its first field.
+  const program=prepare(new THREE.Mesh(new THREE.BufferGeometry(),material));
   const sheets = new Map<string, ReturnType<typeof readGroundSheet>>();
   const failed = new Map<string,number>();
   const fields=createFieldInteriors();
@@ -143,6 +145,8 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
         deadline=performance.now()+4;
       }
     }
+    await program;
+    if(!desired.has(cell.key))return;
     const geometry=out.geometry();
     const mesh=geometry ? new THREE.Mesh(geometry,material) : null;
     if(mesh) {
