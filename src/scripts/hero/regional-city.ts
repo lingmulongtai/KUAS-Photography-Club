@@ -1,4 +1,4 @@
-import {BUILDING_FS,buildCityAsync} from './buildings';
+import {BUILDING_FS,buildCityAsync,prepareCityMaterials} from './buildings';
 import type {BoxBuilding,PolyBuilding} from './buildings-data';
 import {regionalNeighborhoods} from './regional-neighborhoods';
 import * as THREE from 'three';
@@ -32,7 +32,7 @@ type Boundary=Awaited<ReturnType<typeof boundaryUniforms>>;
 type Architecture=Awaited<ReturnType<typeof regionalLandmarks>>;
 type Eye={x:number;y:number;z:number};
 type ScheduleDetail=(distance:number,build:()=>void)=>void;
-type Entry={mesh:THREE.Object3D|null;mask?:(near:ReadonlySet<string>)=>void;dispose?:()=>void;lod?:(eye:Eye,schedule:ScheduleDetail)=>boolean};
+type Entry={mesh:THREE.Object3D|null;cityMaterials?:THREE.Material[];mask?:(near:ReadonlySet<string>)=>void;dispose?:()=>void;lod?:(eye:Eye,schedule:ScheduleDetail)=>boolean};
 
 function streetMaterial(env:Env,boundary:Boundary){
   return new THREE.ShaderMaterial({
@@ -156,7 +156,7 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],env:Env,bou
     }
     const mask=()=>{street?.mask();for(const {site,city} of cities)city.group.visible=!site?.group;};
     mask();
-    return group.children.length?{mesh:group,mask,dispose,lod:(eye,schedule)=>{
+    return group.children.length?{mesh:group,cityMaterials:cities[0]?.city.materials,mask,dispose,lod:(eye,schedule)=>{
       let changed=false;
       for(const {city} of cities)if(city.group.visible)changed=city.updateLod(eye,0,schedule)||changed;
       return changed;
@@ -209,7 +209,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
   const queue=tileQueue(false,'orthometric'),material=surveyedMaterial(env,boundary);
   const streetMaterials=[material,streetMaterial(env,boundary)];
   let shadowDirty=false,nextShadow=0;
-  let shaderReady:Promise<unknown>|undefined;
+  let skylineReady:Promise<unknown>|undefined,streetReady:Promise<unknown>|undefined,cityReady:Promise<unknown>|undefined;
 
   const loaded=new Map<string,Entry>(),loading=new Set<string>(),retry=new Map<string,number>();
   let wanted=new Map<string,Layer>(),last='',next=0;
@@ -281,7 +281,12 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
         .then(tile=>wanted.has(id)?nearMesh(tile,streetMaterials,env,boundary,ground,architecture,lite,()=>wanted.has(id)):null):
         readSkyline({x:t.x,y:t.y,legacy},()=>wanted.has(id)).then(data=>data && wanted.has(id)?skylineMesh(data,material):null);
       void job.then(async result=>{
-        if(result?.mesh)await (shaderReady??=prepare(result.mesh));
+        if(result?.mesh){
+          if(t.zoom===16){
+            await (streetReady??=prepareCityMaterials(streetMaterials,prepare));
+            if('cityMaterials' in result && result.cityMaterials)await (cityReady??=prepareCityMaterials(result.cityMaterials,prepare));
+          }else await (skylineReady??=prepare(result.mesh));
+        }
         if(!wanted.has(id)){result?.dispose?.();return;}
         if(t.zoom===16 && result){result.mask?.(near);shadowDirty=true;}
         loaded.set(id,result??{mesh:null});

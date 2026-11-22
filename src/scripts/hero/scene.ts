@@ -21,7 +21,7 @@ import { createPost } from './post';
 import { createPanoramaCity } from './panorama-city';
 import { loadBuildings } from './buildings-data';
 import { buildingCutout } from './building-cutout';
-import { buildCity, buildCityAsync, buildCitySteps, buildResidentCity } from './buildings';
+import { buildCity, buildCityAsync, buildCitySteps, buildResidentCity, prepareCityMaterials } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import {prepareSteps} from './task-yield';
 import { buildLampsSteps,type buildLamps } from './lights';
@@ -447,6 +447,7 @@ export function createHero(
       new Set([...stationMatches.boxes.map(([i]) => buildings.boxes[i]), ...stationMatches.polys.map(([i]) => buildings.polys[i])]),
     );
     if (!city) throw new Error('Initial city preparation cancelled');
+    const streetPrograms=prepareCityMaterials(city.materials,prepare);
     city.fallback.name = 'Station district fallback';
     panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
       eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });
@@ -839,7 +840,7 @@ export function createHero(
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
     const openingTamba=view==='kameokaTerrace';
-    await Promise.all([cloudProgram,scenePrograms,openingRegion,residentSouth,residentWest,residentEast,residentEastFill,loadOverview('south'),
+    await Promise.all([cloudProgram,scenePrograms,streetPrograms,openingRegion,residentSouth,residentWest,residentEast,residentEastFill,loadOverview('south'),
       openingTamba?loadOverview('tamba'):undefined]);
     loading.built();
     let regionalLoad:Promise<void>|undefined;

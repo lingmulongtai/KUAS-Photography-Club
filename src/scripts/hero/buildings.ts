@@ -813,6 +813,15 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
   }
 }
 
+/** Street furniture on facades is built on approach. Link its material with the roofs
+ * before rendering the first close-up, without allocating any of the detail geometry. */
+export function prepareCityMaterials(materials:THREE.Material[],prepare:(mesh:THREE.Object3D)=>Promise<unknown>){
+  const layout=new THREE.BufferGeometry();
+  layout.setAttribute('position',new THREE.Float32BufferAttribute([],3));
+  layout.setAttribute('normal',new THREE.Float32BufferAttribute([],3));
+  return prepare(new THREE.Mesh(layout,materials)).finally(()=>layout.dispose());
+}
+
 type CityData = { boxes: BoxBuilding[]; polys: PolyBuilding[] };
 type CityPredicate = (b: BoxBuilding | PolyBuilding) => boolean;
 export function buildCity(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,keep:(b:BoxBuilding)=>boolean=()=>true,quality=1,dressed:CityPredicate=()=>false) {
