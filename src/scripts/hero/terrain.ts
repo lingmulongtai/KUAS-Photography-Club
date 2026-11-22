@@ -188,6 +188,12 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 nr=texture2D(uRegionalNormal,boxUv(uRegionalBox,p)).xyz*2.-1.;
         n=normalize(mix(n,nr,regional));
 
+        float outerDistrict=uSurveyOn*(1.-basin);
+        if(outerDistrict>.5){
+          vec3 face=normalize(cross(dFdx(vWorld),dFdy(vWorld)));
+          n=normalize(mix(n,face*sign(face.y),.65));
+        }
+
         // aerial photo: the sharper city sheet where we have it
         // Composite front to back. An opaque local sheet completely covers the coarser samples.
         vec3 photo=vec3(0.);

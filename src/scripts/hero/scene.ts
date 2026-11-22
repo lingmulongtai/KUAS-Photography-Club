@@ -611,6 +611,7 @@ export function createHero(
     };
     // Reuse the regional photo slot for the eastern basin between detailed regions.
     // Keep its texture alive while a different region temporarily owns that slot.
+    let districtBase:Sheet|null=null;
     let eastTexture:Promise<THREE.Texture>|undefined;
     let eastBackdrop:{photo:THREE.Texture;box:Box}|null=null;
     const loadRegionalPhoto=(r:CityRegion)=>{
@@ -618,7 +619,7 @@ export function createHero(
       if(r.id!=='yamashina')return loadTexture(file,aniso);
       return eastTexture??=loadTexture(file,aniso).then(photo=>{
         eastBackdrop={photo,box:r.photo.box};
-        if(!detailRegion)terrain.setPhoto(0,photo,r.photo.box);
+        if(!detailRegion && !districtBase)terrain.setPhoto(0,photo,r.photo.box);
         return photo;
       }).catch(error=>{eastTexture=undefined;throw error;});
     };
@@ -693,7 +694,8 @@ export function createHero(
         terrain.uniforms.uRegionRoadsOn.value=0;
         terrain.uniforms.uRegionRoads.value=wide;
         terrain.uniforms.uRegionClose.value=0;
-        terrain.setPhoto(0,eastBackdrop?.photo??null,eastBackdrop?.box);
+        const backdrop=districtBase??eastBackdrop;
+        terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
         env.uBuilt.value=coreBuilt;env.uRegionBuiltTexel.value=0;
         outerExcluded=()=>false;
         if(forestMaskChanged)refreshForest();
@@ -817,8 +819,13 @@ export function createHero(
     ensureRegionalGround=()=>regionalLoad??=import('./regional-ground')
       .then(async({regionalGround})=>{
         const legacy=[BUILDINGS_BOX,...(await cityRegions).regions.map(r=>r.box)];
-        return regionalGround(scene,env,hf,aniso,legacy,sheet=>{
-          regionalPhoto=sheet;sharedSlot?.setOverride(localPhoto??regionalPhoto);
+        return regionalGround(scene,env,hf,aniso,legacy,(base,detail)=>{
+          districtBase=base;
+          if(!detailRegion){
+            const backdrop=base??eastBackdrop;
+            terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
+          }
+          regionalPhoto=detail??base;sharedSlot?.setOverride(localPhoto??regionalPhoto);
         },prepare);
       })
       .then(result=>{

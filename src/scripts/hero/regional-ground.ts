@@ -5,7 +5,8 @@ import {ENV_GLSL, type Env} from './env';
 import type {Box} from './geo';
 import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
 import {regionalPhoto,type RegionalPhoto} from './regional-photo';
-import type {Heightfield} from './heightfield';
+import {Grid,type Heightfield} from './heightfield';
+import {districtImagery,type District} from './regional-districts';
 
 interface Patch {box: Box; file: string}
 interface GroundSurvey {grid: GridMeta; patches: Patch[]}
@@ -15,16 +16,20 @@ export function boxDistance(x:number,z:number,b:Box) {
   return Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]));
 }
 
-function patchAxis(lo:number,hi:number,edge0:number,edge1:number,step:number) {
+function patchAxis(lo:number,hi:number,edge0:number,edge1:number,step:number,fine:number[][]) {
   const values = new Set([lo,hi]);
   for(let n=lo+step;n<hi;n+=step)values.add(n);
+  for(const [start,end] of fine){
+    for(let n=Math.max(lo,start);n<Math.min(hi,end);n+=40)values.add(n);
+  }
   for(const edge of [edge0,edge1])if(edge>lo && edge<hi)values.add(edge);
   return [...values].sort((a,b)=>a-b);
 }
 
-function patchGeometry(box:Box, kyoto:Box, ground:Ground) {
-  const xs=patchAxis(box[0],box[2],kyoto[0],kyoto[2],200);
-  const zs=patchAxis(box[1],box[3],kyoto[1],kyoto[3],200);
+function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[]) {
+  const overlap=fine.map(g=>g.meta.box).filter(b=>b[0]<box[2] && b[2]>box[0] && b[1]<box[3] && b[3]>box[1]);
+  const xs=patchAxis(box[0],box[2],kyoto[0],kyoto[2],200,overlap.map(b=>[b[0],b[2]]));
+  const zs=patchAxis(box[1],box[3],kyoto[1],kyoto[3],200,overlap.map(b=>[b[1],b[3]]));
   const pos=new Float32Array(xs.length*zs.length*3),uv=new Float32Array(xs.length*zs.length*2);
   const indices:number[]=[];
   for(let j=0;j<zs.length;j++)for(let i=0;i<xs.length;i++){
@@ -52,12 +57,19 @@ const vertexShader = `
     gl_Position=projectionMatrix*viewMatrix*vec4(position,1.);
   }`;
 const fragmentShader = `
-  uniform sampler2D uPhoto,uClose;
-  uniform vec4 uCloseBox;
+  uniform sampler2D uPhoto,uClose,uDistrict,uInset;
+  uniform vec4 uCloseBox,uDistrictBox,uInsetBox;
   varying vec2 vUv;
   varying vec3 vWorld,vNormal;
   ${ENV_GLSL}
   ${HOME_BOUNDARY}
+  vec3 overlay(vec3 base,sampler2D map,vec4 box){
+    vec2 uv=(vWorld.xz-box.xy)/max(vec2(1.),box.zw-box.xy);
+    if(any(lessThanEqual(uv,vec2(0.))) || any(greaterThanEqual(uv,vec2(1.))))return base;
+    vec4 aerial=texture2D(map,vec2(uv.x,1.-uv.y));
+    vec2 edge=min(uv,1.-uv);
+    return mix(base,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
+  }
   void main(){
     vec4 photo=texture2D(uPhoto,vUv);
     if(photo.a<.18)discard;
@@ -70,22 +82,20 @@ const fragmentShader = `
       return;
     }
     if(prefectureCode==0)discard;
-    vec2 uv=(vWorld.xz-uCloseBox.xy)/max(vec2(1.),uCloseBox.zw-uCloseBox.xy);
-    if(all(greaterThan(uv,vec2(0.))) && all(lessThan(uv,vec2(1.)))){
-      vec4 aerial=texture2D(uClose,vec2(uv.x,1.-uv.y));
-      vec2 edge=min(uv,1.-uv);
-      photo.rgb=mix(photo.rgb,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
-    }
+    photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox);
+    photo.rgb=overlay(photo.rgb,uInset,uInsetBox);
+    photo.rgb=overlay(photo.rgb,uClose,uCloseBox);
     vec3 n=normalize(vNormal);
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
     vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,1.);
     gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
   }`;
 
-export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(photo:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>) {
-  const {grid,patches}=await loadJSON<GroundSurvey>('kansai/ground.json');
-  const [heights,boundary,cover]=await Promise.all([
+export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>) {
+  const [{grid,patches},surveys]=await Promise.all([loadJSON<GroundSurvey>('kansai/ground.json'),loadJSON<District[]>('kansai/districts/index.json')]);
+  const [heights,boundary,cover,fine]=await Promise.all([
     loadGrid(grid),boundaryUniforms(),loadBinary('kansai/canopy.bin').then(decodeTreeCover),
+    Promise.all(surveys.flatMap(s=>s.grid?[s.grid]:[]).map(async grid=>new Grid(grid,await loadGrid(grid)))),
   ]);
   const step=(cover.box[2]-cover.box[0])/cover.width;
   function canopy(x:number,z:number){
@@ -101,7 +111,11 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
     const i=Math.min(Math.floor(u),grid.nx-2),j=Math.min(Math.floor(v),grid.nz-2),k=j*grid.nx+i;
     const low=THREE.MathUtils.lerp(heights[k],heights[k+1],u-i);
     const high=THREE.MathUtils.lerp(heights[k+grid.nx],heights[k+grid.nx+1],u-i);
-    const h=THREE.MathUtils.lerp(low,high,v-j);
+    let h=THREE.MathUtils.lerp(low,high,v-j);
+    for(const g of fine){
+      const [w,n,e,s]=g.meta.box,edge=Math.min(x-w,e-x,z-n,s-z);
+      if(edge>0)h=THREE.MathUtils.lerp(h,g.sample(x,z),THREE.MathUtils.smoothstep(edge,0,320));
+    }
     if(d>=600)return h;
     const rim=hf.height(THREE.MathUtils.clamp(x,kyoto[0],kyoto[2]),THREE.MathUtils.clamp(z,kyoto[1],kyoto[3]));
     return THREE.MathUtils.lerp(rim,h,THREE.MathUtils.smoothstep(d,0,600));
@@ -109,17 +123,27 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
 
   const states=patches.map(p=>({patch:p,distance:Infinity,pending:false,retry:0,mesh:null as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>|null}));
   const uClose={value:null as THREE.Texture|null},uCloseBox={value:new THREE.Vector4()};
+  const uDistrict={value:null as THREE.Texture|null},uDistrictBox={value:new THREE.Vector4()};
+  const uInset={value:null as THREE.Texture|null},uInsetBox={value:new THREE.Vector4()};
+  let broad:RegionalPhoto|null=null,inset:RegionalPhoto|null=null,live:RegionalPhoto|null=null;
+  const districts=districtImagery(surveys,aniso,(base,detail)=>{
+    broad=base;inset=detail;
+    uDistrict.value=base?.photo??null;uDistrictBox.value.fromArray(base?.box??[0,0,0,0]);
+    uInset.value=detail?.photo??null;uInsetBox.value.fromArray(detail?.box??[0,0,0,0]);
+    onPhoto(broad,inset??live);
+  });
   const photos=regionalPhoto(aniso,sheet=>{
-    uClose.value=sheet?.photo??null;
+    live=sheet;uClose.value=sheet?.photo??null;
     uCloseBox.value.fromArray(sheet?.box??[0,0,0,0]);
-    onPhoto(sheet);
+    onPhoto(broad,inset??live);
   });
   let shaderReady:Promise<unknown>|undefined;
   let running=0,last= -Infinity;
   function update(x:number,z:number,y:number,now:number) {
     if(now-last<.15)return;
     last=now;
-    photos(x,z,y-ground(x,z),now,!legacy.some(b=>boxDistance(x,z,b)===0));
+    const surveyed=districts(x,z,now);
+    photos(x,z,y-ground(x,z),now,!surveyed && !legacy.some(b=>boxDistance(x,z,b)===0));
     for(const state of states){
       state.distance=boxDistance(x,z,state.patch.box);
       if(state.mesh && state.distance>65000){
@@ -137,8 +161,8 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       running++;
       void loadTexture(state.patch.file,aniso).then(async photo=>{
         if(state.distance>65000){photo.dispose();return;}
-        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox},vertexShader,fragmentShader});
-        const mesh=new THREE.Mesh(patchGeometry(state.patch.box,kyoto,ground),material);
+        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});
+        const mesh=new THREE.Mesh(patchGeometry(state.patch.box,kyoto,ground,fine),material);
         await (shaderReady??=prepare(mesh));
         if(state.distance>65000){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
         mesh.name='regional-ground';

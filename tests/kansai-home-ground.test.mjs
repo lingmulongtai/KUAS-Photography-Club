@@ -34,3 +34,15 @@ test('the seasonal forest samples the lake, Awaji, northern Kyoto and the southe
   assert.equal(density(35.29,136.10),0);
   for(const [lat,lon] of [[34.429,134.885],[35.72,135.20],[33.97,135.86]])assert.ok(density(lat,lon)>8);
 });
+
+test('the Kobe and Nara city and park photographs cover the foreground at distinct survey scales',()=>{
+  const districts=JSON.parse(asset('kyoto/kansai/districts/index.json'));
+  for(const [wide,close,lat,lon] of [['kobe','kobe-port',34.6826,135.1867],['nara','nara-park',34.689,135.8399]]){
+    const city=districts.find(d=>d.id===wide),detail=districts.find(d=>d.id===close),p=toLocal(lat,lon);
+    assert.ok(inside(p,city.box)&&inside(p,detail.box));
+    assert.ok(detail.zoom>=city.zoom+2);
+    assert.equal(city.grid.step,40);
+    assert.equal(gunzipSync(asset('kyoto/'+city.grid.file)).length,city.grid.nx*city.grid.nz*2);
+    for(const d of [city,detail])assert.equal(asset('kyoto/'+d.file).toString('ascii',8,12),'WEBP');
+  }
+});
