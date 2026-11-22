@@ -187,9 +187,11 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
 
   const failKey = (c: Cell) => c.kyoto ? c.sheet.key : 'rf:' + c.cx + ',' + c.cz;
 
+  let pumpPromise: Promise<void> | null = null;
   async function pump() {
     if (running || performance.now()<manifestRetry) return;
     running=true;
+    const work = (async () => {
     try {
       if (!index) {
         const [kyotoIndex] = await Promise.all([
@@ -219,7 +221,11 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     } finally {
       retryAt=Math.min(Infinity,...failed.values());
       running=false;
+      pumpPromise=null;
     }
+    })();
+    pumpPromise = work;
+    return work;
   }
 
   function update(x: number, z: number) {
@@ -259,5 +265,17 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     }
     void pump();
   }
-  return {group,update,containsField:fields.contains};
+  /** Load the relief index and build the opening viewpoint's nearby cells before first reveal. */
+  async function prepareInitial(x: number, z: number) {
+    if (!index) await (pumpPromise ?? pump());
+    if (!index) return;
+    update(x, z);
+    await (pumpPromise ?? Promise.resolve());
+    if (notifyFields) {
+      clearTimeout(notifyFields);
+      notifyFields = undefined;
+      fieldsChanged();
+    }
+  }
+  return {group,update,prepareInitial,containsField:fields.contains};
 }
