@@ -14,6 +14,19 @@ const root=new URL('../public/kansai/',import.meta.url);
 const json=file=>JSON.parse(readFileSync(new URL(file,root),'utf8'));
 const owner=prefectureLookup(json('prefectures.json').features);
 
+test('Todaiji roofs and landmark masks remain aligned with the two surveyed buildings',()=>{
+  for(const [id,lat,lon,height] of [['todaiji',34.68899310,135.83987322,48.742],
+                                     ['todaiji-nandaimon',34.68579835,135.83987561,26.21]]){
+    const b=json('landmarks/index.json').find(row=>row.id===id);
+    assert.equal(b.pref,'29');assert.ok(inPolygon([lon,lat],b.rings));
+    const bytes=readFileSync(new URL('landmarks/'+id+'.glb',root));
+    const doc=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
+    const pos=doc.accessors[doc.meshes[0].primitives[0].attributes.POSITION];
+    assert.ok(Math.abs(pos.max[1]-height)<.2);
+    assert.ok(pos.count>3500);
+  }
+});
+
 test('Nara Park places four Kasuga sanctuaries and the open dance hall on their mapped footprints',()=>{
   const source=json('landmarks/kasuga-footprints.geojson').features;
   const models=json('landmarks/index.json').filter(b=>b.id.startsWith('kasuga-'));

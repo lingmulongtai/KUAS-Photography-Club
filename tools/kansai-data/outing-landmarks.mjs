@@ -1,21 +1,5 @@
 import {BoxGeometry,BufferGeometry,Float32BufferAttribute,IcosahedronGeometry,ShapeUtils,Vector2} from 'three';
 
-// The hall dimensions and twin ridge ornaments follow https://www.todaiji.or.jp/information/daibutsuden/.
-// The larger eaves follow the mapped outer roof of OSM way 43558119. Joinery and colours are illustrative.
-export function greatBuddhaHall(templeHall){
-  const parts=templeHall(73.8,65.4,45,true);
-  for(const p of parts){
-    if(p.color[0]===.045)p.color=[.072,.079,.075];
-  }
-  for(const side of [-1,1]){
-    for(let i=0;i<7;i++){
-      const geo=new BoxGeometry(.95-.07*i,.68,1.2-i*.09);
-      geo.translate(side*(7.5+i*.42),44.55+i*.6,0);parts.push({geo,color:[.72,.40,.055]});
-    }
-  }
-  return parts;
-}
-
 // Hikone City's preservation plan, figures 2.2.1–2.2.2, and the outer roof in OSM way 363244224.
 // The three floors, white plaster and changing eaves sit on the stone platform in the terrain.
 export function hikoneKeep(block,roof){

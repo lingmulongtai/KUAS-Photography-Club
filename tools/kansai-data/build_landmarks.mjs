@@ -6,7 +6,8 @@ import {portTower} from './port-tower.mjs';
 import {districtModel} from './nankinmachi.mjs';
 import {kasugaBuildings} from './kasuga.mjs';
 import {flightAviary} from './aviary.mjs';
-import {greatBuddhaHall,hikoneKeep,harborHotel,roseGarden} from './outing-landmarks.mjs';
+import {greatBuddhaHall,nandaimon} from './todaiji.mjs';
+import {hikoneKeep,harborHotel,roseGarden} from './outing-landmarks.mjs';
 
 const project=fileURLToPath(new URL('../../',import.meta.url));
 const output=new URL('../../public/kansai/landmarks/',import.meta.url);
@@ -90,12 +91,14 @@ try{
   const hotel=JSON.parse(await fs.readFile(new URL('harbor-hotel.json',import.meta.url)));
   const hotelMask=hotel.floorOutlines[0].map(([x,z])=>[hotel.lon+x/91644,hotel.lat-z/110940]);
   await save('kobe-harbor-hotel',harborHotel(hotel),hotel.lon,hotel.lat,[hotelMask],'28');
-  const {templeHall,block}=await load('compound-models'),{roof}=await load('temple-models');
+  const {block}=await load('compound-models'),{roof}=await load('temple-models');
   for(const site of JSON.parse(await fs.readFile(new URL('nankinmachi.json',output)))){
     const {id,parts}=districtModel(site,block);
     await save(id,parts,...site.center,[site.ring],'28');
   }
-  await save('todaiji',greatBuddhaHall(templeHall),135.83987322,34.68899310,undefined,'29');
+  await save('todaiji',greatBuddhaHall(block,roof),135.83987322,34.68899310,undefined,'29');
+  const gateOutline=[[135.84009871,34.68590614],[135.84010139,34.68569441],[135.83965212,34.68569110],[135.83964944,34.68590173]];
+  await save('todaiji-nandaimon',nandaimon(block,roof),135.83987561,34.68579835,[gateOutline],'29');
   const kasuga=JSON.parse(await fs.readFile(new URL('kasuga-footprints.geojson',output)));
   for(const {id,parts,lon,lat,ring} of kasugaBuildings(kasuga.features,block)){
     await save(id,parts,lon,lat,[ring],'29');
