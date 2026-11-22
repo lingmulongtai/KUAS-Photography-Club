@@ -15,11 +15,12 @@ function setup() {
 }
 
 test('weather columns stay aligned to the world as the wind, eye and season change', () => {
-  const {columns, renderer, draws} = setup(), weather = {}, u = columns.uniforms;
+  const {columns, renderer, gl, draws} = setup(), weather = {}, u = columns.uniforms;
   const x = -21.45, z = 145.63;
   columns.update(renderer, x, z, weather);
   const initial = u.uColumnAnchor.value.clone(), size = u.uCloudColumns.value.image.height;
   assert.equal(u.uColumnsReady.value, true);
+  gl.checkFramebufferStatus = () => assert.fail('fixed targets were already verified for this context');
   columns.update(renderer, x + 1200 * WEATHER_SCALE, z, weather);
   assert.equal(draws(), 2);
   // Include one bilinear footprint, anchor drift, tower displacement and the longest sun probe.

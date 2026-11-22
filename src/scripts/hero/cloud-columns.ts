@@ -196,12 +196,12 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
       try {
         renderer.setRenderTarget(target);
         const gl = renderer.getContext();
-        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
+        if (!uniforms.uColumnsReady.value && gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
         renderer.debug.onShaderError = (...args) => { failed = true; onError?.(...args); };
         renderer.render(scene, camera);
         if (failed) return;
         renderer.setRenderTarget(ceilings);
-        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
+        if (!uniforms.uColumnsReady.value && gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
         mesh.material = maxMaterial;
         renderer.render(scene, camera);
         lastWeather = weather;
