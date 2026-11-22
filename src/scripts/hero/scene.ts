@@ -355,8 +355,9 @@ export function createHero(
       sharedSlot?.select(v==='tennozan');
     };
     ensureRegionalPhoto(view);
-    terrainRecenter = terrain.recenter;
-    terrainRecenterAsync = center => { void terrain.recenterAsync(center, () => shadow.invalidate()); };
+    const inKyoto=(p:{x:number;z:number})=>p.x>=hf.bounds[0] && p.z>=hf.bounds[1] && p.x<=hf.bounds[2] && p.z<=hf.bounds[3];
+    terrainRecenter = (center,anchored)=>{if(inKyoto(center))terrain.recenter(center,anchored);};
+    terrainRecenterAsync = center => { if(inKyoto(center))void terrain.recenterAsync(center, () => shadow.invalidate()); };
     cancelTerrainRecenter = terrain.cancelRecenter;
     // Prepare other viewpoints only when visited. Warming all six after startup
     // blocks scrolling and evicts earlier meshes from the four-entry terrain cache.
@@ -464,8 +465,8 @@ export function createHero(
     const planted = (work: Promise<void> | undefined) => {
       void work?.then(() => shadow.invalidate()).catch(error => console.warn('Forest planting failed',error));
     };
-    plantTreesAsync = (eye,bearing) => planted(forest.plantAsync(eye,bearing));
-    followForest = (eye,bearing) => planted(forest.follow(eye,bearing));
+    plantTreesAsync = (eye,bearing) => {if(inKyoto(eye))planted(forest.plantAsync(eye,bearing));};
+    followForest = (eye,bearing) => {if(inKyoto(eye))planted(forest.follow(eye,bearing));};
     cancelTreePlanting = forest.cancelPlant;
     scene.add(forest.group);
     campusModel = buildCampus(env, hf).mesh;
@@ -785,7 +786,9 @@ export function createHero(
       })
       .then(result=>{
         regional=result;
-        travelBounds=result.bounds;
+        // moveExplorer keeps a 500 m safety margin inside its camera bounds.
+        const [w,n,e,s]=result.bounds;
+        travelBounds=[w-500,n-500,e+500,s+500];
         groundAt=result.ground;
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
@@ -1249,7 +1252,8 @@ export function createHero(
       placeCamera(t, dt);
       const regionalTime=performance.now()/1000;
       regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime);
-      regionalCity?.update(camera.position.x,camera.position.z,regionalTime);
+      const detailEye=flight?.p3??camera.position;
+      regionalCity?.update(detailEye.x,detailEye.z,regionalTime);
       clouds.prepareField(renderer,camera.position);
       if (dt > 0) driveCars?.(dt);
       if (dt > 0 && !opts.reducedMotion) aircraft.update(dt);
