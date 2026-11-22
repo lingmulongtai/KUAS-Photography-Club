@@ -258,6 +258,24 @@ test('Maya cable stations follow their two distinct footprints and the upper clo
   }
 });
 
+test('the Old Settlement museum replaces its footprint with six eastern columns and a higher western vault',()=>{
+  const row=json('landmarks/index.json').find(r=>r.id==='kobe-city-museum');
+  assert.equal(row.pref,'28');assert.ok(inPolygon([135.19292572,34.68728169],row.rings));
+  const bytes=readFileSync(new URL('landmarks/kobe-city-museum.glb',root));
+  const length=bytes.readUInt32LE(12),gltf=JSON.parse(bytes.toString('utf8',20,20+length));
+  const p=gltf.accessors[0],offset=28+length+gltf.bufferViews[p.bufferView].byteOffset,ang=1.9*Math.PI/180;
+  const columns=new Set();let westTop=0,eastTop=0;
+  for(let i=0;i<p.count;i++){
+    const px=bytes.readFloatLE(offset+i*12),y=bytes.readFloatLE(offset+i*12+4),pz=bytes.readFloatLE(offset+i*12+8);
+    const x=px*Math.cos(ang)+pz*Math.sin(ang),z=pz*Math.cos(ang)-px*Math.sin(ang);
+    if(x>26.58 && Math.abs(y-8.9)<.01)columns.add(Math.round(z/3)*3);
+    if(x<0)westTop=Math.max(westTop,y);
+    else eastTop=Math.max(eastTop,y);
+  }
+  assert.deepEqual([...columns].sort((a,b)=>a-b),[-15,-9,-3,3,9,15]);
+  assert.ok(westTop>26 && westTop<27 && eastTop>14 && eastTop<15);
+});
+
 test('Kobe Maritime Museum replaces its waterfront footprint with an open 45 metre space frame',()=>{
   const row=json('landmarks/index.json').find(r=>r.id==='kobe-maritime-museum');
   assert.equal(row.pref,'28');
