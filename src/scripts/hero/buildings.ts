@@ -863,7 +863,7 @@ export async function buildCityAsync(env:Env,hf:Pick<Heightfield,'height'>,data:
 
 /** Resident rooflines use the same outlines, roof shapes and night windows as the core.
  * Only nearby regional models need individual balconies, stepped tiles and shadow-map submissions. */
-export async function buildResidentCity(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,extent?:Box) {
+export async function buildResidentCity(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,extent?:Box,step:()=>Promise<void>=yieldTask) {
   const mesh=new THREE.Group();
   const uniforms={...env,uDetailBox:{value:new THREE.Vector4()}};
   const material=(vertexShader:string)=>new THREE.ShaderMaterial({
@@ -883,12 +883,12 @@ export async function buildResidentCity(env:Env,hf:Pick<Heightfield,'height'>,da
   for(const [i,b] of data.boxes.entries()){
     const tile=tileAt(b.x,b.z);
     (roofFor(b).type?tile.pitched:tile.flat).push({b,y:hf.height(b.x,b.z)+b.ground,seed:hash1(i*7+3)});
-    if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+    if(performance.now()>deadline){await step();deadline=performance.now()+5;}
   }
   for(const [i,p] of data.polys.entries()){
     const x=p.ring[0],z=p.ring[1];
     tileAt(x,z).polys.push({p,y:hf.height(x,z)+p.ground,seed:hash1(i*13+5)});
-    if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+    if(performance.now()>deadline){await step();deadline=performance.now()+5;}
   }
   const batches:THREE.Mesh[]=[];
   for(const t of tiles.values()){
@@ -897,12 +897,12 @@ export async function buildResidentCity(env:Env,hf:Pick<Heightfield,'height'>,da
     if(t.polys.length){
       const steps=extrudedSteps(t.polys);
       for(;;){
-        const step=steps.next();
-        if(step.done){batches.push(new THREE.Mesh(step.value,polygons));break;}
-        if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+        const next=steps.next();
+        if(next.done){batches.push(new THREE.Mesh(next.value,polygons));break;}
+        if(performance.now()>deadline){await step();deadline=performance.now()+5;}
       }
     }
-    if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+    if(performance.now()>deadline){await step();deadline=performance.now()+5;}
   }
   for(const batch of batches){
     if(!batch.geometry.boundingBox)batch.geometry.computeBoundingBox();

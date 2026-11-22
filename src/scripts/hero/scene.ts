@@ -236,7 +236,8 @@ export function createHero(
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   let heroOpened = false;
-  const postOpenUpgrades: (() => Promise<void>)[] = [];
+  let upgradeOrder = 0;
+  const postOpenUpgrades: { priority: number; order: number; task: () => Promise<void> }[] = [];
   let runningUpgrades = false;
   const drainPostOpenUpgrades = () => {
     if (!heroOpened || runningUpgrades) return;
@@ -244,7 +245,12 @@ export function createHero(
     void (async () => {
       try {
         while (postOpenUpgrades.length) {
-          const task = postOpenUpgrades.shift()!;
+          let best = 0;
+          for (let i = 1; i < postOpenUpgrades.length; i++) {
+            const a = postOpenUpgrades[i], b = postOpenUpgrades[best];
+            if (a.priority < b.priority || (a.priority === b.priority && a.order < b.order)) best = i;
+          }
+          const { task } = postOpenUpgrades.splice(best, 1)[0];
           try { await task(); }
           catch (error) { console.warn('Background texture upgrade skipped', error); }
         }
@@ -254,8 +260,8 @@ export function createHero(
       }
     })();
   };
-  const schedulePostOpenUpgrade = (task: () => Promise<void>) => {
-    postOpenUpgrades.push(task);
+  const schedulePostOpenUpgrade = (task: () => Promise<void>, priority = 1) => {
+    postOpenUpgrades.push({ priority, order: upgradeOrder++, task });
     if (heroOpened) drainPostOpenUpgrades();
   };
   const loading = createHeroLoading({
@@ -344,7 +350,7 @@ export function createHero(
             eastTexture = Promise.resolve(full);
             applyEastBackdrop?.(full, region.photo.box);
             if (prev && prev !== full) prev.dispose();
-          });
+          }, 0);
         }
         return photo;
       }).catch(error => { eastTexture = undefined; throw error; });
@@ -465,7 +471,7 @@ export function createHero(
             await uploadPhoto(renderer,full,()=>true);
             tennozanSlot?.setChosen({photo:full,box:meta.tennozan!.box});
             photo.dispose();
-          });
+          },0);
         }
         return {photo,box:meta.tennozan!.box};
       },
@@ -490,7 +496,7 @@ export function createHero(
                 if(i===sharedPhoto&&sharedSlot)sharedSlot.setFallback({photo:full,box:r.meta.box});
                 else terrain.setPhoto(i+1,full,r.meta.box);
                 photo.dispose();
-              });
+              },0);
             }
           }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
           regionalPhotos[i]=job;
@@ -520,21 +526,21 @@ export function createHero(
         const full = await loadTexture(targetBasinVariant.file, aniso, 'low');
         await uploadPhoto(renderer, full, () => true);
         terrain.setAerialCity(full, targetBasinVariant.sheets);
-      });
+      }, 1);
     }
     if (fullWideFile !== initialWideFile) {
       schedulePostOpenUpgrade(async () => {
         const full = await loadTexture(fullWideFile, aniso, 'low');
         await uploadPhoto(renderer, full, () => true);
         terrain.setAerialWide(full);
-      });
+      }, 2);
     }
     if (outer && fullOuterFile !== initialOuterFile) {
       schedulePostOpenUpgrade(async () => {
         const full = await loadTexture(fullOuterFile, aniso, 'low');
         await uploadPhoto(renderer, full, () => true);
         terrain.setOuterPhoto(full);
-      });
+      }, 3);
     }
     const inKyoto=(p:{x:number;z:number})=>p.x>=hf.bounds[0] && p.z>=hf.bounds[1] && p.x<=hf.bounds[2] && p.z<=hf.bounds[3];
     terrainRecenter = (center,anchored=false)=>{
@@ -985,7 +991,7 @@ export function createHero(
           data.setPhoto(full);
           terrain.setPhoto(0,full,r.photo.box);
           initialPhoto.dispose();
-        });
+        },0);
       }
       terrain.uniforms.uRegionClose.value=(detailedCampus||r.id==='uji-detail')?1:0;
       env.uBuilt.value=built;env.uRegionBuiltBox.value.set(...r.box);
@@ -1067,10 +1073,11 @@ export function createHero(
       southOuterRemove = installOverview(next);
     };
 
+    const residentYield = () => loading.canDraw ? new Promise<void>(resolve => requestAnimationFrame(() => resolve())) : yieldToBrowser();
     let residentSouthJob: Promise<boolean> | undefined;
     const ensureResidentSouth = (priority?: RequestPriority) => residentSouthJob ??= getSouthSurvey(priority).then(async survey=>{
       if(!survey)return false;
-      const skyline=await buildResidentCity(env,hf,survey.buildings,survey.region.box);
+      const skyline=await buildResidentCity(env,hf,survey.buildings,survey.region.box,residentYield);
       skyline.mesh.name='southern-basin-buildings';
       await prepare(skyline.mesh);
       basinLod.register(survey.buildings);
@@ -1081,7 +1088,7 @@ export function createHero(
     let residentEastJob: Promise<void> | undefined;
     const ensureResidentEast = (priority?: RequestPriority) => residentEastJob ??= getEastSurvey(priority).then(async survey=>{
       if(!survey)return;
-      const skyline=await buildResidentCity(env,hf,survey.buildings);
+      const skyline=await buildResidentCity(env,hf,survey.buildings,undefined,residentYield);
       skyline.mesh.name='yamashina-survey';
       await prepare(skyline.mesh);
       const update=(region:CityRegion|null)=>{skyline.mesh.visible=region?.id!=='yamashina';};
@@ -1091,7 +1098,7 @@ export function createHero(
     let residentEastFillJob: Promise<void> | undefined;
     const ensureResidentEastFill = (priority?: RequestPriority) => residentEastFillJob ??= getEastFill(priority).then(async data=>{
       // These footprints have no detailed counterpart on either side of the ward edge.
-      const skyline=await buildResidentCity(env,hf,data);
+      const skyline=await buildResidentCity(env,hf,data,undefined,residentYield);
       skyline.mesh.name='yamashina-basin';
       await prepare(skyline.mesh);
       basinLod.register(data);basinLod.detail.add(skyline.mesh);
@@ -1100,8 +1107,8 @@ export function createHero(
     const ensureResidentWest = (name: 'otokuni' | 'otokuni-tennozan', priority?: RequestPriority) =>
       residentWestJobs[name] ??= getWestSurvey(name, priority).then(async data=>{
         if(!data)return null;
-        const sampledRoofMask=name==='otokuni-tennozan'?await createBuildingMaskAsync(data.boxes,data.polys,yieldToBrowser):null;
-        const skyline=await buildResidentCity(env,hf,data);
+        const sampledRoofMask=name==='otokuni-tennozan'?await createBuildingMaskAsync(data.boxes,data.polys,residentYield):null;
+        const skyline=await buildResidentCity(env,hf,data,undefined,residentYield);
         skyline.mesh.name=name;
         await prepare(skyline.mesh);
         if(name==='otokuni-tennozan'){
@@ -1133,7 +1140,7 @@ export function createHero(
       { tier: priorities.biwa, run: () => ensureLake() },
     ];
     for (const item of deferredSurveys) {
-      if (item.tier === 'afterOpen') schedulePostOpenUpgrade(async () => { await item.run(); });
+      if (item.tier === 'afterOpen') schedulePostOpenUpgrade(async () => { await item.run(); }, 4);
     }
     const warmDeferredSurveys = () => {
       for (const item of deferredSurveys) {
