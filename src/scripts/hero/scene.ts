@@ -21,7 +21,7 @@ import { createPost } from './post';
 import { createPanoramaCity } from './panorama-city';
 import { loadBuildings } from './buildings-data';
 import { buildingCutout } from './building-cutout';
-import { buildCity, buildCityAsync, buildResidentCity } from './buildings';
+import { buildCity, buildCityAsync, buildCitySteps, buildResidentCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
 import {prepareSteps} from './task-yield';
 import { buildLampsSteps,type buildLamps } from './lights';
@@ -29,7 +29,7 @@ import { buildCarsSteps,type buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
-import { biwaSurface, buildWaterAsync } from './water';
+import { biwaSurface, buildWaterAsync, waterSteps } from './water';
 import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
@@ -659,7 +659,11 @@ export function createHero(
       return {buildings:b.value,lines:l.value,photo:p.value,forest:forest.status==='fulfilled'?forest.value:null,coverage:coverage.status==='fulfilled'?coverage.value:null,dispose:disposePhoto};
     },async(r,data,current,releasePrevious)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
-      const step=async()=>{await yieldToBrowser();if(!current())throw new Error('Region superseded');};
+      const step=async()=>{
+        if(loading.canDraw)await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+        else await yieldToBrowser();
+        if(!current())throw new Error('Region superseded');
+      };
       let campusNormal:THREE.Texture|null=null;
       let road!:ReturnType<typeof buildRoadField>,built!:THREE.Texture;
       let city:ReturnType<typeof buildCity>,lamps:ReturnType<typeof buildLamps>,traffic:ReturnType<typeof buildCars>;
@@ -671,15 +675,12 @@ export function createHero(
       }):data.buildings.polys;
       const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
       await step();
-      const preparedCity=await buildCityAsync(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||r.id==='tennozan'||r.id==='yamashina'||b.w*b.d>65||b.h>10),opts.quality,current);
-      if(!preparedCity)throw new Error('Region superseded');
-      city=preparedCity;
+      city=await prepareSteps(buildCitySteps(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||r.id==='tennozan'||r.id==='yamashina'||b.w*b.d>65||b.h>10),opts.quality),step);
       group.add(city.group);
       await step();
       const wideWater=r.id==='tennozan'||r.id==='osaka';
       const waterEdge=wideWater?(lite?80:60):(lite?36:24);
-      const water=await buildWaterAsync(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||wideWater,current);
-      if(!water)throw new Error('Region superseded');
+      const water=await prepareSteps(waterSteps(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||wideWater),step);
       group.add(water);
       group.add(buildIslands(env,hf,data.lines));
       await step();

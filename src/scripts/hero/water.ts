@@ -26,7 +26,7 @@ type WaterRoads = {
   uRegionRoadsOn:{value:number};
 };
 
-function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: WaterRoads,
+export function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: WaterRoads,
   regionalEdge=18,channel?:KamoChannel,regionalSurface=false) {
   const pos: number[] = [];
   const stable:number[]=[],profiles:number[]=[];

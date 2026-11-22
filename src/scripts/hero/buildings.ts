@@ -572,7 +572,7 @@ function instanceShape(shape: THREE.InstancedBufferGeometry, source: THREE.Insta
   return geometry;
 }
 
-function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>) {
+export function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate=()=>false, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>) {
   const group = new THREE.Group();
   const fallback = new THREE.Group();
   if (replaceable) group.add(fallback);
