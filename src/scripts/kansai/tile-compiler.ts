@@ -192,7 +192,7 @@ export function tileCompiler(){
         drawRailPolyline(groundMesh,pts,bounds,ground,xyz,{raised:structure==='raised',doubleTrack,shinkansen:false,monorail:false,tram:false,lvorder});
       }
     }
-    for(const f of fields){
+    if(datum!=='orthometric')for(const f of fields){
         for(const rings of polygons(f,x>>4,y>>4,12)){
           const color:RGB=f.properties.kind===1?[128,128,84]:[141,119,81];
           // Trace the real bunds above the aerial image so field crops retain their photographed colour.

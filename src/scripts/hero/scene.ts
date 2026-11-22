@@ -873,8 +873,8 @@ export function createHero(
       }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
     idle(()=>void ensureRegionalGround?.());
     startGroundRelief=() => idle(() => {
-      const ground=(x:number,z:number)=>hf.height(x,z);
-      const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,ground(x,z)),refreshForest,prepare);
+      const ground=(x:number,z:number)=>groundAt?groundAt(x,z):hf.height(x,z);
+      const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,hf.height(x,z)),refreshForest,prepare,()=>Boolean(regional));
       scene.add(relief.group);
       cultivated=relief.containsField;
       updateGroundRelief=relief.update;

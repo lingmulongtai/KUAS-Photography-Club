@@ -6,6 +6,7 @@ import type {buildTerrain} from './terrain';
 import {BANK, PADDY, RELIEF_CELL, groundSheet, readGroundSheet, type GroundFeature, type GroundIndex} from './ground-relief-data';
 import {addBank, addField, addPaddyBanks, GroundGeometry, type Elevation} from './ground-relief-geometry';
 import {createFieldInteriors} from './field-interiors';
+import {createRegionalFields} from './regional-fields';
 import {yieldTask} from './task-yield';
 
 type RoadUniforms = Pick<ReturnType<typeof buildTerrain>['uniforms'],
@@ -102,11 +103,13 @@ interface Cell {
   layer: 'surface'|'edges'|'rows';
   distance: number;
   sheet: ReturnType<typeof groundSheet>;
+  kyoto: boolean;
+  regional: boolean;
 }
 
 /** A camera can cross sheets during a fetch. Keep only current cells, keep
  * their inputs in a bounded cache, and build them in short main-thread tasks. */
-export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevation, bankGround: Elevation, fieldsChanged: () => void,prepare:(mesh:THREE.Object3D)=>Promise<unknown>) {
+export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevation, bankGround: Elevation, fieldsChanged: () => void,prepare:(mesh:THREE.Object3D)=>Promise<unknown>,hasRegionalGround:()=>boolean=()=>false) {
   const group = new THREE.Group();
   group.name = 'ground-relief';
   const material = groundMaterial(env,roads);
@@ -118,36 +121,49 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
   layout.setAttribute('aSurface',new THREE.Float32BufferAttribute([],4));
   const program=prepare(new THREE.Mesh(layout,material)).finally(()=>layout.dispose());
   const sheets = new Map<string, ReturnType<typeof readGroundSheet>>();
+  const regionalFields = createRegionalFields();
   const failed = new Map<string,number>();
   const fields=createFieldInteriors();
   let notifyFields: ReturnType<typeof setTimeout> | undefined;
   const visible = new Map<string, THREE.Mesh|null>();
   let index: GroundIndex | undefined, desired = new Map<string,Cell>(), running=false;
   let lastX=Infinity,lastZ=Infinity, retryAt=Infinity, manifestRetry=0;
+  let regionalReady=false;
 
   async function build(cell: Cell) {
-    const sheet = cell.sheet;
-    let data = sheets.get(sheet.key);
-    if (!data) data = readGroundSheet(await loadBinary('ground-relief/'+sheet.key+'.bin'),sheet.x,sheet.z);
-    sheets.delete(sheet.key);
-    sheets.set(sheet.key,data);
-    if (sheets.size>12) sheets.delete(sheets.keys().next().value!);
-    if (!desired.has(cell.key)) return;
+    const sources: Iterable<GroundFeature>[] = [];
+    if (cell.kyoto) {
+      const sheet = cell.sheet;
+      let data = sheets.get(sheet.key);
+      if (!data) data = readGroundSheet(await loadBinary('ground-relief/'+sheet.key+'.bin'),sheet.x,sheet.z);
+      sheets.delete(sheet.key);
+      sheets.set(sheet.key,data);
+      if (sheets.size>12) sheets.delete(sheets.keys().next().value!);
+      if (!desired.has(cell.key)) return;
+      sources.push(data.features(sheet.cell));
+    }
+    if (cell.regional) {
+      const extra = await regionalFields.features(cell.cx, cell.cz);
+      if (!desired.has(cell.key)) return;
+      if (extra.length) sources.push(extra);
+    }
     const out = new GroundGeometry();
     const parcels:GroundFeature['paths'][]=[];
     let deadline = performance.now()+4;
-    for (const feature of data.features(sheet.cell)) {
-      if(cell.layer==='edges') {
-        if(feature.kind===BANK)addBank(out,feature,bankGround);
-        if(feature.kind===PADDY)addPaddyBanks(out,feature,ground);
-      } else if(feature.kind!==BANK) {
-        addField(out,feature,ground,cell.layer==='rows',false);
-        if(cell.layer==='surface')parcels.push(feature.paths);
-      }
-      if (performance.now()>=deadline) {
-        await yieldTask();
-        if (!desired.has(cell.key)) return;
-        deadline=performance.now()+4;
+    for (const list of sources) {
+      for (const feature of list) {
+        if(cell.layer==='edges') {
+          if(feature.kind===BANK)addBank(out,feature,bankGround);
+          if(feature.kind===PADDY)addPaddyBanks(out,feature,ground);
+        } else if(feature.kind!==BANK) {
+          addField(out,feature,ground,cell.layer==='rows',false);
+          if(cell.layer==='surface')parcels.push(feature.paths);
+        }
+        if (performance.now()>=deadline) {
+          await yieldTask();
+          if (!desired.has(cell.key)) return;
+          deadline=performance.now()+4;
+        }
       }
     }
     await program;
@@ -167,21 +183,31 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     }
   }
 
+  const failKey = (c: Cell) => c.kyoto ? c.sheet.key : 'rf:' + c.cx + ',' + c.cz;
+
   async function pump() {
     if (running || performance.now()<manifestRetry) return;
     running=true;
     try {
-      index ??= await loadJSON<GroundIndex>('ground-relief/index.json');
+      if (!index) {
+        const [kyotoIndex] = await Promise.all([
+          loadJSON<GroundIndex>('ground-relief/index.json'),
+          regionalFields.ensureIndex().catch(error => { console.warn('Regional field index unavailable', error); }),
+        ]);
+        index = kyotoIndex;
+      } else if (!regionalFields.ready()) {
+        await regionalFields.ensureIndex().catch(() => {});
+      }
       for (;;) {
         const now=performance.now();
-        const cell=[...desired.values()].find(c=>!visible.has(c.key) && (failed.get(c.sheet.key)??0)<=now);
+        const cell=[...desired.values()].find(c=>!visible.has(c.key) && (failed.get(failKey(c))??0)<=now);
         if (!cell) return;
         try {
           await build(cell);
-          failed.delete(cell.sheet.key);
+          failed.delete(failKey(cell));
         } catch(error) {
-          failed.set(cell.sheet.key,performance.now()+5000);
-          console.warn('Ground sheet unavailable: '+cell.sheet.key,error);
+          failed.set(failKey(cell),performance.now()+5000);
+          console.warn('Ground sheet unavailable: '+failKey(cell),error);
         }
         await yieldTask();
       }
@@ -196,6 +222,8 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
 
   function update(x: number, z: number) {
     if (!index) { void pump(); return; }
+    const nowRegional = hasRegionalGround() && regionalFields.ready();
+    if (nowRegional !== regionalReady) { regionalReady = nowRegional; lastX = Infinity; }
     if (Math.abs(x-lastX)<48 && Math.abs(z-lastZ)<48) {
       if (performance.now()>=retryAt) { retryAt=Infinity; void pump(); }
       return;
@@ -206,20 +234,23 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
     for(let cx=Math.floor((x-radius)/RELIEF_CELL); cx<=Math.floor((x+radius)/RELIEF_CELL); cx++){
       for(let cz=Math.floor((z-radius)/RELIEF_CELL); cz<=Math.floor((z+radius)/RELIEF_CELL); cz++){
         const sheet=groundSheet(cx,cz);
-        if (!index[sheet.key]?.includes(sheet.cell)) continue;
+        const kyoto=Boolean(index[sheet.key]?.includes(sheet.cell));
+        const regional=nowRegional && regionalFields.hasCell(cx,cz);
+        if (!kyoto && !regional) continue;
         const dx=Math.max(0,cx*RELIEF_CELL-x,x-(cx+1)*RELIEF_CELL);
         const dz=Math.max(0,cz*RELIEF_CELL-z,z-(cz+1)*RELIEF_CELL);
         const distance=Math.hypot(dx,dz);
         if (distance>radius) continue;
         const key=cx+','+cz;
-        cells.push({key,cx,cz,sheet,distance,layer:'surface'});
-        if (distance<1400) cells.push({key:key+'/edges',cx,cz,sheet,distance:distance+16,layer:'edges'});
-        if (distance<445) cells.push({key:key+'/rows',cx,cz,sheet,distance:distance+32,layer:'rows'});
+        cells.push({key,cx,cz,sheet,kyoto,regional,distance,layer:'surface'});
+        if (distance<1400) cells.push({key:key+'/edges',cx,cz,sheet,kyoto,regional,distance:distance+16,layer:'edges'});
+        if (distance<445) cells.push({key:key+'/rows',cx,cz,sheet,kyoto,regional,distance:distance+32,layer:'rows'});
       }
     }
     cells.sort((a,b)=>a.distance-b.distance);
     desired=new Map(cells.map(c=>[c.key,c]));
-    for(const key of failed.keys()) if (!cells.some(c=>c.sheet.key===key)) failed.delete(key);
+    const activeKeys=new Set(cells.map(failKey));
+    for(const key of failed.keys()) if (!activeKeys.has(key)) failed.delete(key);
     for(const [key,mesh] of visible) if (!desired.has(key)) {
       if(mesh){group.remove(mesh);mesh.geometry.dispose();}
       visible.delete(key);
