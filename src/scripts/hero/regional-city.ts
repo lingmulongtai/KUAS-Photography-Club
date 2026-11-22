@@ -50,9 +50,10 @@ function cityMaterial(env:Env,boundary:Awaited<ReturnType<typeof boundaryUniform
         vec3 n=normalize(vNormal),albedo=pow(vSurface.rgb,vec3(2.2));
         vec3 emit=vec3(0.);
         if(vSurface.a>.9){
-          vec3 surveyed=overlay(albedo,uDistrict,uDistrictBox,vWorld.xz);
+          vec3 surveyed=overlay(albedo/.68,uDistrict,uDistrictBox,vWorld.xz);
           surveyed=overlay(surveyed,uInset,uInsetBox,vWorld.xz);
-          albedo=mix(albedo,surveyed,.70);
+          // The aerial already contains daylight; calibrate it to the terrain reflectance first.
+          albedo=mix(albedo,surveyed*.68,.62);
         }
         if(vSurface.a>.4 && vSurface.a<.6){
           vec2 cell=vUv/vec2(4.,3.2);
