@@ -55,6 +55,7 @@ import { buildOcclusion, occlusionFile, occlusionTexture } from './building-occl
 import { buildIslands } from './islands';
 import { islandMask } from './island-mask';
 import { LINE, loadLines } from './lines-data';
+import {todaijiClearing} from './todaiji-grounds';
 import { withoutTunnels } from './tunnels';
 import {createRegionalLoader,regionAt,regionInView,type CityRegion} from './regional-loader';
 import {replacesHeianFootprint} from './heian-shrine';
@@ -481,7 +482,7 @@ export function createHero(
       if(x>=b[0] && x<b[2] && z>=b[1] && z<b[3])return woodlandRaster.sample(x,z) || (island(x,z)?1:0);
       return regional?.canopy(x,z)??0;
     },
-    (x,z) => !!cultivated?.(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
+    (x,z) => !!cultivated?.(x,z) || todaijiClearing(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
       replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
     [...campusTreeSpots(hf),...cherries], !cover);
     let forestRefreshPending=false;
