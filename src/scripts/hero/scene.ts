@@ -293,6 +293,8 @@ export function createHero(
     const coverageFor=(file:string)=>loadBinary(occlusionFile(file,builtSize)).then(
       bytes=>bytes.length===builtSize*builtSize?bytes:null,()=>null);
     const cityCoverage=coverageFor('buildings.bin');
+    const forestBits=(file:string,lake=false)=>loadBinary('forest-masks/'+file.replace(/\.bin$/,lake?'-lake.bin':'.bin')).catch(()=>null);
+    const coreForestBits=forestBits('lines.bin');
     const cityData=Promise.all([basinPhoto, loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
     // Join the original promise below; attach a handler now for an early failure.
     void cityData.catch(()=>{});
@@ -455,7 +457,7 @@ export function createHero(
     let outerExcluded:(x:number,z:number)=>boolean=()=>false;
     const forestMaskBox=regions.reduce<Box>((a,{meta:{box:b}})=>[Math.min(a[0],b[0]),Math.min(a[1],b[1]),
       Math.max(a[2],b[2]),Math.max(a[3],b[3])],BUILDINGS_BOX);
-    const roadsAndWater = infrastructureMask(lines, forestMaskBox);
+    const roadsAndWater = infrastructureMask(lines, forestMaskBox,await coreForestBits);
     await yieldToBrowser();
     scene.add(buildDaimonji(env,hf));
     // the water mask is too coarse for garden islands, so they are tested on their outlines
@@ -632,14 +634,14 @@ export function createHero(
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
       const lakeRemainder=r.id==='yamashina' && await ensureLake()?'kansai/yamashina-lake-remainder.json.gz':undefined;
       const results=await Promise.allSettled([loadRegionalBuildings(r),
-        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file)] as const);
-      const [b,l,p,coverage]=results;
+        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file),forestBits(r.lines.file,Boolean(lakeRemainder))] as const);
+      const [b,l,p,coverage,forest]=results;
       const disposePhoto=()=>{if(p.status==='fulfilled'&&r.id!=='yamashina')p.value.dispose();};
       if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){
         disposePhoto();
         throw results.find(result=>result.status==='rejected')!.reason;
       }
-      return {buildings:b.value,lines:l.value,photo:p.value,coverage:coverage.status==='fulfilled'?coverage.value:null,dispose:disposePhoto};
+      return {buildings:b.value,lines:l.value,photo:p.value,forest:forest.status==='fulfilled'?forest.value:null,coverage:coverage.status==='fulfilled'?coverage.value:null,dispose:disposePhoto};
     },async(r,data,current,releasePrevious)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
       const step=async()=>{await yieldToBrowser();if(!current())throw new Error('Region superseded');};
@@ -682,7 +684,7 @@ export function createHero(
       built=data.coverage?occlusionTexture(data.coverage,builtSize,coreBuilt):buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
       await step();
       mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
-      infrastructure=infrastructureMask(data.lines,r.box);
+      infrastructure=infrastructureMask(data.lines,r.box,data.forest);
       await step();
       } catch(error) {
         disposeGroup(group);road?.dispose();built?.dispose();campusNormal?.dispose();
