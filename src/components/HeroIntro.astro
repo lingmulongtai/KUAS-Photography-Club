@@ -51,7 +51,7 @@ const city = [
       -->
       <div class="intro-ring" aria-hidden="true">
         <div class="intro-half is-low"><div class="intro-turn"><svg viewBox="0 0 100 100"><path d="M97 50 A47 47 0 0 1 3 50" /></svg></div></div>
-        <div class="intro-half is-high"><div class="intro-turn"><svg viewBox="0 0 100 100"><path d="M3 50 A47 47 0 0 1 97 50" /></svg></div></div>
+        <div class="intro-half is-high"><div class="intro-turn"><svg viewBox="0 0 100 100"><path d="M4.82 37.05 A47 47 0 0 1 97 50" /></svg></div></div>
         <div class="intro-turn intro-ring-dot"><span></span></div>
       </div>
     </div>
@@ -93,11 +93,13 @@ const city = [
     const flash = intro.querySelector('.intro-flash');
     const turns = [intro.querySelector('.is-low .intro-turn'), intro.querySelector('.is-high .intro-turn'), intro.querySelector('.intro-ring-dot')];
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
-    const MAX_MODAL_MS = 4000;
+    const STALL_TIMEOUT_MS = 6000;
+    const HARD_MAX_MS = 20000;
     const animates = el => !!el && typeof el.animate === 'function';
     const ringOnCompositor = turns.every(animates);
     let finished = false;
     let timeout;
+    let deadline = 0;
     // Loading arrives in jumps (15% to 60% at once). The picture glides through them along a
     // curve fixed in time, so the ring can be handed to the compositor and keep moving even
     // while the scenery is built on the main thread.
@@ -114,14 +116,30 @@ const city = [
       const t = Math.min(1, Math.max(0, (now - glide.start) / glide.duration));
       return glide.from + (glide.to - glide.from) * glide.ease(t);
     };
+    const armTimeout = (ms) => {
+      clearTimeout(timeout);
+      const now = performance.now();
+      const cap = openedAt + HARD_MAX_MS;
+      deadline = Math.min(cap, now + ms);
+      timeout = setTimeout(() => dismiss(), Math.max(0, deadline - now));
+    };
     // The bright line runs about 94% of the way round, the length of the logo's; the dot leads it
-    // and settles in the gap.
+    // and settles in the gap. Hidden half-arcs stay at opacity 0 so no cap or AA seam shows at 50%.
     const SWEEP = 337.7, LEAD = 3.6, HALF = (180 + LEAD) / SWEEP;
     const pose = p => {
       const sweep = Math.max(0, SWEEP * p - LEAD);
-      return [`rotate(${Math.min(sweep, 180) - 180}deg)`, `rotate(${Math.max(0, sweep - 180) - 180}deg)`, `rotate(${342 * p}deg)`];
+      return [
+        {transform: `rotate(${Math.min(sweep, 180) - 180}deg)`, opacity: sweep > 0 ? 1 : 0},
+        {transform: `rotate(${Math.max(0, sweep - 180) - 180}deg)`, opacity: sweep > 180 ? 1 : 0},
+        {transform: `rotate(${342 * p}deg)`},
+      ];
     };
-    const place = p => pose(p).forEach((transform, i) => { if (turns[i]?.style) turns[i].style.transform = transform; });
+    const place = p => pose(p).forEach((frame, i) => {
+      const style = turns[i]?.style;
+      if (!style) return;
+      style.transform = frame.transform;
+      if ('opacity' in frame) style.opacity = String(frame.opacity);
+    });
     let ring = [];
     const glideTo = (to, duration, ease) => {
       const now = performance.now();
@@ -129,17 +147,17 @@ const city = [
       glide = {from, to, start: now, duration, ease};
       if (motion.matches || !ringOnCompositor) return;
       ring.forEach(animation => animation.cancel());
-      // The eased path is sampled finely, with an exact stop where the line passes halfway, so the
-      // two half rings hand over without a gap.
+      // The eased path is sampled finely, with exact stops around the halfway handover so the
+      // second half-ring stays invisible until the line actually crosses 180 degrees.
       const offsets = Array.from({length: 25}, (_, i) => i / 24);
       if (from < HALF && to > HALF) {
         let lo = 0, hi = 1;
         for (let k = 0; k < 24; k++) { const mid = (lo + hi) / 2; if (from + (to - from) * ease(mid) < HALF) lo = mid; else hi = mid; }
-        offsets.push(hi);
+        offsets.push(lo, hi);
         offsets.sort((a, b) => a - b);
       }
       const frames = turns.map(() => []);
-      for (const offset of offsets) pose(from + (to - from) * ease(offset)).forEach((transform, i) => frames[i].push({transform, offset}));
+      for (const offset of offsets) pose(from + (to - from) * ease(offset)).forEach((frame, i) => frames[i].push({...frame, offset}));
       ring = turns.map((el, i) => {
         const animation = el.animate(frames[i], {duration, fill: 'both'});
         // Pin the start to the same clock as the count, even if the main thread is busy now.
@@ -201,7 +219,7 @@ const city = [
     const tick = (now) => {
       frame = 0;
       if (finished) return;
-      if (now >= openedAt + MAX_MODAL_MS) return dismiss();
+      if (now >= deadline) return dismiss();
       shown = motion.matches ? target : Math.min(target, at(now));
       show();
       if (closing && (motion.matches || now >= closeAt + closeDuration)) dismiss();
@@ -216,26 +234,29 @@ const city = [
     const update = (event) => {
       const value = Math.min(1, Math.max(0, event.detail));
       if (!Number.isFinite(value) || finished || closing) return;
-      if (performance.now() >= openedAt + MAX_MODAL_MS) return dismiss();
+      if (performance.now() >= openedAt + HARD_MAX_MS) return dismiss();
       if (value <= target) return;
       target = value;
       progress.setAttribute('aria-valuenow', String(Math.round(target * 100)));
-      // slow and soft: about two seconds for the whole circle
+      armTimeout(STALL_TIMEOUT_MS);
       const gap = target - at(performance.now());
-      glideTo(target, Math.min(1600, Math.max(450, gap * 2200)), easeOut);
+      glideTo(target, Math.min(1100, Math.max(300, gap * 1600)), easeOut);
       follow();
     };
     const ready = () => {
       if (finished || closing) return;
-      const remaining = openedAt + MAX_MODAL_MS - performance.now();
+      const now = performance.now();
+      const remaining = openedAt + HARD_MAX_MS - now;
       if (remaining <= 0) return dismiss();
       target = 1;
       progress.setAttribute('aria-valuenow', '100');
       if (motion.matches) return dismiss();
-      // Finish the short opening sequence, even if the scene was ready very quickly.
+      // Finish the ring glide promptly once the real 3D scene has rendered cleanly.
       closing = true;
-      closeAt = performance.now();
-      closeDuration = Math.min(remaining, Math.max(650, openedAt + 2600 - closeAt));
+      closeAt = now;
+      const gap = Math.max(0, 1 - at(now));
+      closeDuration = Math.min(remaining, Math.max(320, Math.min(620, gap * 800)));
+      armTimeout(closeDuration + 150);
       glideTo(1, closeDuration, smooth);
       follow();
     };
@@ -249,8 +270,8 @@ const city = [
       intro.showModal();
       openedAt = performance.now();
       root.classList.add('hero-intro-open');
-      // One fixed deadline: progress and readiness never extend the modal's lifetime.
-      timeout = setTimeout(() => dismiss(), MAX_MODAL_MS);
+      // Release if startup stalls with no progress, while letting active loads finish cleanly.
+      armTimeout(STALL_TIMEOUT_MS);
     } catch { cleanup(); }
   })();
 </script>
@@ -305,9 +326,9 @@ const city = [
   .intro-half { position: absolute; inset: 0; }
   .intro-half.is-low { clip-path: inset(50% 0 0 0); }
   .intro-half.is-high { clip-path: inset(0 0 50% 0); }
-  .intro-turn { position: absolute; inset: 0; will-change: transform; }
-  .intro-half .intro-turn { transform: rotate(-180deg); }
-  .intro-turn path { fill: none; stroke: #fff; stroke-width: 1.5; stroke-linecap: round; }
+  .intro-turn { position: absolute; inset: 0; will-change: transform, opacity; }
+  .intro-half .intro-turn { transform: rotate(-180deg); opacity: 0; }
+  .intro-turn path { fill: none; stroke: #fff; stroke-width: 1.5; stroke-linecap: butt; }
   .intro-ring-dot span { position: absolute; left: 94.7%; top: 47.7%; width: 4.6%; height: 4.6%; border-radius: 50%; background: #fff; }
   .intro-title {
     margin-top: clamp(14px, 2.8vh, 28px);
