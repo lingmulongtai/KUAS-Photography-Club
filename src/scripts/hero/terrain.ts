@@ -424,12 +424,12 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     // Keep one GPU attribute while switching equal-sized terrain grids.
     setPositions(prepare(c,anchored));
   };
-  const recenterAsync = async (c: { x: number; z: number }, onReady: () => void) => {
-    const request = ++generation, target = { x: c.x, z: c.z }, key = `travel:${target.x},${target.z}`;
+  const recenterAsync = async (c: { x: number; z: number }, onReady: () => void,anchored=true) => {
+    const request = ++generation, target = { x: c.x, z: c.z }, key = `${anchored?'travel:':''}${target.x},${target.z}`;
     const prepared = cache.get(key) ?? await terrainPositionsAsync(hf, target, segments, channel,
-      () => request === generation, () => new Promise<void>(resolve => setTimeout(resolve, 0)));
+      () => request === generation, () => new Promise<void>(resolve => setTimeout(resolve, 0)),anchored);
     if (!prepared || request !== generation) return;
-    activeCenter = target;activeAnchored=true;
+    activeCenter = target;activeAnchored=anchored;
     cache.delete(key);cache.set(key,prepared);
     if(cache.size>4)cache.delete(cache.keys().next().value!);
     setPositions(prepared);onReady();

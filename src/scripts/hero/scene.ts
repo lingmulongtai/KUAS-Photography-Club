@@ -198,7 +198,6 @@ export function createHero(
   let travelBounds:Box=[-34000,-19000,13000,20000];
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number },anchored?:boolean) => void) | null = null;
-  let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let ensureCityRegion:((center:{x:number;z:number},bearing?:number)=>Promise<void>|undefined)|null=null;
@@ -363,8 +362,10 @@ export function createHero(
     };
     ensureRegionalPhoto(view);
     const inKyoto=(p:{x:number;z:number})=>p.x>=hf.bounds[0] && p.z>=hf.bounds[1] && p.x<=hf.bounds[2] && p.z<=hf.bounds[3];
-    terrainRecenter = (center,anchored)=>{if(inKyoto(center))terrain.recenter(center,anchored);};
-    terrainRecenterAsync = center => { if(inKyoto(center))void terrain.recenterAsync(center, () => shadow.invalidate()); };
+    terrainRecenter = (center,anchored=false)=>{
+      if(inKyoto(center))void terrain.recenterAsync(center,()=>shadow.invalidate(),anchored);
+      else terrain.cancelRecenter();
+    };
     cancelTerrainRecenter = terrain.cancelRecenter;
     // Prepare other viewpoints only when visited. Warming all six after startup
     // blocks scrolling and evicts earlier meshes from the four-entry terrain cache.
@@ -1148,7 +1149,7 @@ export function createHero(
         nextAreaCheck=now+250;
       }
       if(freeCenter.distanceTo(freePosition)>600){
-        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);
+        freeCenter.copy(freePosition);terrainRecenter?.(freePosition,true);
         prefetchCityRegion?.({x:freePosition.x+Math.sin(yaw)*1200,z:freePosition.z-Math.cos(yaw)*1200});
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }

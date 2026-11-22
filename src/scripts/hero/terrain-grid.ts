@@ -53,8 +53,8 @@ export function terrainPositions(hf: Heightfield, center: { x: number; z: number
 
 /** Keep the current terrain visible while preparing a replacement in short browser tasks. */
 export async function terrainPositionsAsync(hf: Heightfield, center: { x: number; z: number }, segments: number,
-  channel: KamoChannel | undefined, current: () => boolean, yieldTask: () => Promise<void>) {
-  const grid = terrainGrid(hf, center, segments, channel,true);
+  channel: KamoChannel | undefined, current: () => boolean, yieldTask: () => Promise<void>,anchored=true) {
+  const grid = terrainGrid(hf, center, segments, channel,anchored);
   for (let row = 0; row < grid.n; row += 12) {
     if (!current()) return null;
     grid.write(row, Math.min(row + 12, grid.n));

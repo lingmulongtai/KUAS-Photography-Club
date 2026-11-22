@@ -70,3 +70,13 @@ test('viewpoints beyond the fallback DEM keep the terrain inside its surveyed bo
     }
   }
 });
+
+
+test('a flight prepares the same shaped terrain as a fixed panorama between frames',async()=>{
+  const hf={bounds:[-35000,-20000,14000,36000],height:(x,z)=>x*.03+z*.07};
+  const center={x:-7001,z:11922};
+  let yields=0;
+  const grid=await terrainPositionsAsync(hf,center,96,undefined,()=>true,async()=>{yields++;},false);
+  assert.ok(yields>1);
+  assert.deepEqual(grid,terrainPositions(hf,center,96,undefined,false));
+});
