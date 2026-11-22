@@ -760,7 +760,8 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
      * Swap stepped and plain roofs, and show facade details, by distance from the camera; call once
      * a frame. True when the roofs changed (the sun's shadow map needs redrawing).
      */
-    updateLod(eye: { x: number; y: number; z: number }, panoramaFocalPixels = 0) {
+    updateLod(eye: { x: number; y: number; z: number }, panoramaFocalPixels = 0,
+      scheduleDetail?:(distance:number,build:()=>void)=>void) {
       let changed = false;
       for (const block of blocks) {
         // Keep full geometry where a 1.5 m detail still spans a screen pixel.
@@ -790,9 +791,13 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
         if (t.near) t.near.visible = d < detailNear;
       }
       if (next) {
-        modelDetails(next);
-        if (next.mid) next.mid.visible = true;
-        if (next.near) next.near.visible = nextD < detailNear;
+        const tile=next;
+        const build=()=>{
+          modelDetails(tile);
+          if (tile.mid) tile.mid.visible = true;
+          if (tile.near) tile.near.visible = nextD < detailNear;
+        };
+        if(scheduleDetail)scheduleDetail(nextD,build);else build();
       }
       return changed;
     },

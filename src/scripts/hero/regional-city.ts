@@ -30,7 +30,8 @@ function sampleTile(x:number,y:number,ground:Ground){
 type Boundary=Awaited<ReturnType<typeof boundaryUniforms>>;
 type Architecture=Awaited<ReturnType<typeof regionalLandmarks>>;
 type Eye={x:number;y:number;z:number};
-type Entry={mesh:THREE.Object3D|null;mask?:(near:ReadonlySet<string>)=>void;dispose?:()=>void;lod?:(eye:Eye)=>void};
+type ScheduleDetail=(distance:number,build:()=>void)=>void;
+type Entry={mesh:THREE.Object3D|null;mask?:(near:ReadonlySet<string>)=>void;dispose?:()=>void;lod?:(eye:Eye,schedule:ScheduleDetail)=>boolean};
 
 function streetMaterial(env:Env,boundary:Boundary){
   return new THREE.ShaderMaterial({
@@ -153,8 +154,10 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],env:Env,bou
     }
     const mask=()=>{street?.mask();for(const {site,city} of cities)city.group.visible=!site?.group;};
     mask();
-    return group.children.length?{mesh:group,mask,dispose,lod:eye=>{
-      for(const {city} of cities)if(city.group.visible)city.updateLod(eye);
+    return group.children.length?{mesh:group,mask,dispose,lod:(eye,schedule)=>{
+      let changed=false;
+      for(const {city} of cities)if(city.group.visible)changed=city.updateLod(eye,0,schedule)||changed;
+      return changed;
     }}:null;
   }catch(error){dispose();throw error;}
 }
@@ -252,6 +255,10 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
     remask();
   }
   function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null,eye:Eye){
+    let pick: {distance:number;build?:()=>void}={distance:Infinity};
+    const schedule:ScheduleDetail=(distance,build)=>{if(distance<pick.distance)pick={distance,build};};
+    for(const entry of loaded.values())entry.lod?.(eye,schedule);
+    pick.build?.();
     if(now<next)return;
     next=now+.09;
     architecture.update(x,z,now);
@@ -261,7 +268,6 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
       for(const [id,entry] of loaded)if(id.startsWith('16/'))entry.mask?.(near);
     }
     plan(x,z,eye);
-    for(const entry of loaded.values())entry.lod?.(eye);
     for(const [id,t] of wanted){
       if(loading.size>=2)break;
       if(loaded.has(id)||loading.has(id)||(retry.get(id)??0)>now)continue;
