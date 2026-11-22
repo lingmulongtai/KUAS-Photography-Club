@@ -597,7 +597,9 @@ export function createHero(
     };
     const setOverviewDetail=(region:CityRegion|null)=>{
       detailRegion=region;
-      activeRegionBox=region?.box??null;
+      // These two resident surveys are removed footprint by footprint at bake time.
+      // Their bounding boxes also contain streets outside the survey.
+      activeRegionBox=region && region.id!=='south' && region.id!=='yamashina'?region.box:null;
       for(const update of overviews)update(region);
     };
     const disposeGroup=(group:THREE.Object3D)=>{
