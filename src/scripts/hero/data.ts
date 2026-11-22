@@ -33,8 +33,8 @@ function binaryWorker(){
  * Fetch a gzip-compressed .bin file and return its bytes. Some servers send such files with
  * Content-Encoding: gzip and the browser has already unpacked them, so check the magic bytes.
  */
-export async function loadBinary(file: string) {
-  const res = await fetch(BASE + file);
+export async function loadBinary(file: string,priority?:RequestPriority) {
+  const res = await fetch(BASE + file,priority?{priority}:undefined);
   if (!res.ok) throw new Error(`${file}: ${res.status}`);
   const bytes = new Uint8Array(await res.arrayBuffer());
   if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return bytes;
