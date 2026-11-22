@@ -84,6 +84,10 @@ test('both sides of a prefectural line, the lake and offshore islands survive at
   }
   const sites=[[135.8332,35.005,26],[135.8348,35.005,25],
     [135.81,34.716,29],[135.81,34.718,26],[135.678,34.678,27],[135.679,34.678,29],
+    // The remaining three shared prefectural borders: Yamazaki, Osaka airport and northern Tamba.
+    [135.678999,34.8920189,26],[135.678199,34.8920189,27],
+    [135.4427175,34.7846847,27],[135.4419175,34.7844847,28],
+    [135.0896053,35.2540672,28],[135.0894053,35.2548672,26],
     [134.96,34.5761,0],[134.96,34.5749,28],
     // Opposite sides of a sub-metre Hyogo rock fall within the same old raster texel.
     [134.7469631452888,35.66152332,28],[134.746956,35.66152332,0],
