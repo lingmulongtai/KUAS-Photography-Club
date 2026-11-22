@@ -1,3 +1,4 @@
+import { MAP_PLACES } from '../../data/kansai-outings.ts';
 import { PLACES, toLocal } from './geo.ts';
 import type { OrbitSite } from './landmark-orbit.ts';
 import { KYOTO_TOWER_LOCATION, SPOTS, type SpotId } from '../../data/spots.ts';
@@ -42,8 +43,24 @@ function spotOrbit(id: SpotId, distance: number, above: number, bearing: number,
     bearing:(bearing+180)%360,pitch:-15,orbit:{center,targetHeight}};
 }
 
+// The same coordinate frame lets both the spot picker and free flight reach these places.
+const represented = new Set(['kiyomizu','byodoin','philosopher','gyoen','arashiyama']);
+export const REGIONAL_PLACES = MAP_PLACES.filter(p=>!represented.has(p.id));
+type RegionalView = `region-${typeof MAP_PLACES[number]['id']}`;
+const regionalViews=Object.fromEntries(REGIONAL_PLACES.map(p=>{
+  const center=toLocal(p.lat,p.lon);
+  const pitch='pitch' in p?p.pitch:-21;
+  const targetHeight='targetHeight' in p?p.targetHeight:8;
+  const distance=p.range*Math.cos(pitch*RAD);
+  const eye=ahead(center,p.heading+180,distance);
+  const view:ViewDef={ja:p.ja,en:p.en,ref:center,eye,bearing:p.heading,pitch,
+    above:targetHeight-p.range*Math.sin(pitch*RAD),orbit:{center,targetHeight}};
+  return ['region-'+p.id,view];
+})) as Record<RegionalView,ViewDef>;
+
 /** The viewpoints. Coordinates from OpenStreetMap; heights from the elevation data. */
 export const VIEWS = {
+  ...regionalViews,
   /** From just in front of the Shogunzuka stage, so the temple grounds stay out of frame. */
   shogunzuka: { ja: '将軍塚', en: 'Shogunzuka', eye: ahead(PLACES.shogunzuka, 265, 120), ref: PLACES.shogunzuka, above: 44, bearing: 265, pitch: -5 },
   inariRidge: { ja:'稲荷山・京都一望', en:'Mt. Inari / Kyoto panorama', eye:INARI_EAST, ref:INARI_EAST, above:612, bearing:314.7, pitch:-9.3 },

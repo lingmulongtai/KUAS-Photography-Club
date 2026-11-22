@@ -16,7 +16,7 @@ const local = (href: string) => languagePath(href, lang);
 import { credit, getTrips } from '../lib/trips';
 import { completeSpotPreviews } from '../data/spot-samples';
 import { SPOTS } from '../data/spots';
-import { PANORAMA_VIEWS, VIEWS } from '../scripts/hero/views';
+import { REGIONAL_PLACES, PANORAMA_VIEWS, VIEWS } from '../scripts/hero/views';
 const pinTrips = completeSpotPreviews((await getTrips())
   .filter((t) => t.data.spot)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
@@ -44,6 +44,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <select id="hero-spot" class="spot-select" disabled>
         <option value="" selected disabled>{en ? 'Explore a place' : 'スポットへ移動'}</option>
         {SPOTS.map(spot => <option value={spot.id}>{spot[lang]}</option>)}
+        {REGIONAL_PLACES.map(p => <option value={'region-'+p.id}>{p[lang]}</option>)}
       </select>
       <button type="button" class="spot-return" hidden>{en ? 'Back to view' : '展望へ戻る'}</button>
       <a class="spot-records" hidden>{en ? 'Outing records' : '活動記録'}</a>
@@ -160,7 +161,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     </div>
   </div>
 
-  <p class="credit">地形・航空写真：国土地理院　建物：国土地理院・PLATEAU（国土交通省）　森林：© OpenStreetMap contributors・ESA WorldCover 2021</p>
+  <p class="credit">地形・航空写真：国土地理院　建物：国土地理院・PLATEAU（国土交通省）　森林：© OpenStreetMap contributors・ESA WorldCover 2021　<a href={local('/map-sources/')}>{en?'Sources':'出典'}</a></p>
   <a class="scroll-cue" href="#intro"><span>{en ? 'About the club' : '写真部の紹介へ'}</span></a>
 </section>
 
@@ -174,7 +175,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { mountGlassRefraction } from '../scripts/hero/glisse-refraction';
   import { createExploreButtons } from '../scripts/hero/explore-touch';
   import { SPOTS, type SpotId } from '../data/spots';
-  import { PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
+  import { REGIONAL_PLACES, PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
   import type {Season} from '../scripts/hero/seasons';
 
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
@@ -389,7 +390,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       if (atPanorama && demo) panorama=demo.view;
       viewArrived = arrived;
       const selected = describeView(mode, arrived);
-      spotSelect.value=atPanorama?'':selected?.id??'';
+      spotSelect.value=atPanorama?'':selected?.id??(demo?.view.startsWith('region-')?demo.view:'');
       spotReturn.hidden=mode==='campus'||atPanorama;
       spotRecords.hidden=spotReturn.hidden||!selected;
       viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(mode==='city' && b.dataset.view===demo?.view)));
@@ -529,7 +530,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
     back.addEventListener('click', returnToPanorama);
     spotReturn.addEventListener('click', returnToPanorama);
     spotSelect.addEventListener('change',()=>{
-      if (SPOTS.some(spot=>spot.id===spotSelect.value)) demo?.flyTo(spotDestination(spotSelect.value as SpotId));
+      if (REGIONAL_PLACES.some(p=>'region-'+p.id===spotSelect.value)) demo?.flyTo(spotSelect.value as HeroView);
+      else if (SPOTS.some(spot=>spot.id===spotSelect.value)) demo?.flyTo(spotDestination(spotSelect.value as SpotId));
     });
     hero.addEventListener('keydown', (e) => {
       if(e.key==='Escape'&&demo?.exploring){demo.setExploring(false);exploreToggle.focus({preventScroll:true});}
@@ -1078,6 +1080,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
     opacity: 0.55;
     pointer-events: none;
   }
+
+  .credit a { pointer-events: auto; text-decoration: underline; }
 
   /* names what comes next, so the page reads as continuing below the scenery */
   .scroll-cue {

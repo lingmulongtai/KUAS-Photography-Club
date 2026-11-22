@@ -181,6 +181,9 @@ export function createHero(
   let VIEW: ViewDef = VIEWS.shogunzuka;
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   let groundAt: ((x: number, z: number) => number) | null = null;
+  let regional:Awaited<ReturnType<typeof import('./regional-ground').regionalGround>> | undefined;
+  let ensureRegionalGround:(()=>Promise<void>)|undefined;
+  let flightRequest=0;
   let travelBounds:Box=[-34000,-19000,13000,20000];
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number },anchored?:boolean) => void) | null = null;
@@ -385,7 +388,7 @@ export function createHero(
     terrain.uniforms.uWoodlandOn.value = 1;
     const lite = opts.quality < 0.75;
     scene.add(buildKiyomizuBeam(env,(x,z)=>hf.height(x,z)));
-    const eyes = Object.values(VIEWS).map((v) => v.eye);
+    const eyes = Object.values(VIEWS).map(v=>v.eye).filter(p=>p.x>=BUILDINGS_BOX[0]-3000 && p.z>=BUILDINGS_BOX[1]-3000 && p.x<=BUILDINGS_BOX[2]+3000 && p.z<=BUILDINGS_BOX[3]+3000);
     const kawaramachi = kawaramachiFacades(buildings,hf), gion = gionStreetscape(buildings,hf);
     const katsura=katsuraStation(buildings.polys,(x,z)=>hf.height(x,z));
     const landmarks = buildLandmarks(env, hf,[...kawaramachi.parts,...gion.parts,...katsura.parts]);
@@ -769,6 +772,16 @@ export function createHero(
     await Promise.all([cloudProgram,scenePrograms,openingRegion,residentSouth,residentWest,residentEast,residentEastFill,loadOverview('south'),
       openingTamba?loadOverview('tamba'):undefined]);
     loading.built();
+    let regionalLoad:Promise<void>|undefined;
+    ensureRegionalGround=()=>regionalLoad??=import('./regional-ground')
+      .then(({regionalGround})=>regionalGround(scene,env,hf,aniso))
+      .then(result=>{
+        regional=result;
+        travelBounds=result.bounds;
+        groundAt=result.ground;
+        terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
+      }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
+    idle(()=>void ensureRegionalGround?.());
     startGroundRelief=() => idle(() => {
       const ground=(x:number,z:number)=>hf.height(x,z);
       const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,ground(x,z)),refreshForest);
@@ -991,6 +1004,15 @@ export function createHero(
 
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
+    const request=++flightRequest;
+    if(target.startsWith('region-') && !regional && ensureRegionalGround){
+      opts.onAreaLoading?.(true);
+      void ensureRegionalGround().then(()=>{
+        opts.onAreaLoading?.(false);
+        if(regional && request===flightRequest)flyTo(target,clock);
+      });
+      return;
+    }
     stopIntroCamera();
     const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
     if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
@@ -1214,6 +1236,7 @@ export function createHero(
       const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
+      regional?.update(camera.position.x,camera.position.z,performance.now()/1000);
       clouds.prepareField(renderer,camera.position);
       if (dt > 0) driveCars?.(dt);
       if (dt > 0 && !opts.reducedMotion) aircraft.update(dt);

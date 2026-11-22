@@ -1,32 +1,15 @@
 ---
 import Base from '../layouts/Base.astro';
-import { KANSAI } from '../data/kansai';
-import { BIWA_FIREWORKS, EXPO, OUTINGS } from '../data/kansai-outings';
 import surveySources from '../../public/kansai/surveys/sources.json';
 interface Props {lang:'ja'|'en'}
 const {lang}=Astro.props;
 const en=lang==='en';
-const title=en?'Kansai in 3D':'関西の撮影地を3Dで巡る';
+const title=en?'Map data credits':'地図データの出典';
 ---
 <Base {lang} {title}>
-  <link slot="head" rel="stylesheet" href="/kansai-engine/Widgets/widgets.css" />
-  <section class="atlas" {lang}>
-    <div class="controls">
-      <h1>{title}</h1>
-      <label>{en?'Prefecture':'府県'}<select id="map-prefecture">{KANSAI.map(p=><option value={p.code} selected={p.code==='26'}>{p[lang]}</option>)}</select></label>
-      <label>{en?'Outings and exhibits':'撮影地・展示'}<select id="map-outing">
-        <option value="">{en?'Choose a place':'場所を選ぶ'}</option>
-        {KANSAI.map(p=><optgroup label={p[lang]}>{OUTINGS.filter(o=>o.pref===p.code).map(o=><option value={o.id}>{o[lang]}</option>)}</optgroup>)}
-        <optgroup label={en?'Exhibits':'特別展示'}>{[EXPO,BIWA_FIREWORKS].map(p=><option value={p.id}>{p[lang]}</option>)}</optgroup>
-      </select></label>
-    </div>
-    <div class="globe" aria-label={title}></div>
-    <div class="caption"><span role="status">{en?'Loading the map…':'地図を読み込んでいます…'}</span>
-      <a data-expo-view hidden href="https://plateauview.mlit.go.jp/?share=01kk0nchk9snn6w374ethhbvb8">{en?'Open the official Expo 2025 3D archive':'万博会場の公式3Dアーカイブを開く'}</a>
-      <button type="button" data-fireworks hidden>{en?'Pause fireworks':'花火を一時停止'}</button>
-      <span>{en?'Drag to pan · Wheel to zoom · Ctrl + drag or two fingers to tilt':'ドラッグで移動・ホイールで拡大・Ctrl＋ドラッグまたは2本指で傾ける'}</span></div>
-    <details><summary>{en?'Model detail and map sources':'モデルの精度・地図の出典'}</summary>
-      <p>{en?'Published PLATEAU surveys supply detailed buildings and bridges. Elsewhere we model the mapped footprints, using recorded height, floor count and roof shape when available. Other heights and individual trees are estimates. Camera targets mark representative views of the outing areas.':'建物・橋は公開されているPLATEAUの実測モデルを優先しています。ほかの地域では建物の実際の外形に、記録のある高さ・階数・屋根形状を反映しています。高さの記録がない建物と森林内の個々の木は推定です。撮影地を選ぶと、その周辺を見渡せる代表地点に移動します。'}</p>
+  <article class="sources">
+    <h1>{title}</h1>
+    <p>データソース：Landsat8画像（GSI,TSIC,GEO Grid/AIST）, Landsat8画像（courtesy of the U.S. Geological Survey）, 海底地形（GEBCO）</p>
       <p><a href="https://docs.plateauview.mlit.go.jp/datasets/3d-tiles/">PLATEAU</a> · <a href="https://docs.plateauview.mlit.go.jp/datasets/terrain/">PLATEAU | Mapterhorn | 国土地理院</a> · <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院（全国最新写真・最適化ベクトルタイルを加工）</a> · <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2026.html">国土数値情報（行政区域）</a> · <a href="https://www.maff.go.jp/j/tokei/census/shuraku_data/2025/mb/index.html">農林水産省統計部「筆ポリゴンデータ（2026年）」を加工して作成</a></p>
       <p>{en?'Eight roofs at Daikaku-ji, Nanzen-ji, Kurama-dera and Eikan-do combine Kyoto Prefecture’s 0.5 m laser surveys with GSI aerial photography. Sheltered framing and the bell are reconstructed.':'大覚寺の御影堂・宸殿、南禅寺の三門・法堂、鞍馬寺の転法輪堂、永観堂の釈迦堂・古方丈・鐘楼は、京都府の0.5mレーザー測量と地理院の航空写真から屋根を作成しました。軒下の木組みと鐘は復元表現です。'}
         <a href="https://www.geospatial.jp/ckan/dataset/dchm05_kyoto">{en?'Kyoto Prefecture survey':'京都府・レーザー測量データ'}</a> ·
@@ -66,27 +49,11 @@ const title=en?'Kansai in 3D':'関西の撮影地を3Dで巡る';
       <p>{en?'Seta-no-Karahashi follows the published spans of the two bridges and the widened east footway. The finials use the construction drawing. Deck elevations are estimated from the approaches. Water obscured by the original decks in the GSI aerial photo is interpolated from either side.':'瀬田の唐橋は、大橋・小橋の支間割りと東詰の歩道拡幅を反映し、擬宝珠を施工図の寸法で復元しています。橋面の高さは両岸の地盤高から推定し、地理院の航空写真で橋に隠れた水面は、橋の両側の水面から補間しました。'}
         <a href="https://www.kkr.mlit.go.jp/plan/happyou/thesises/2023/lbhrsn000000m74g-att/a1684913814372.pdf">{en?'Otsu Civil Engineering Office construction report':'大津土木事務所の施工報告'}</a> ·
         <a href="https://www.jasbc.or.jp/technique/nijihashiback/files/nijihashi23.pdf">{en?'Bridge specifications':'日本橋梁建設協会・橋梁諸元'}</a></p>
-    </details>
-  </section>
-  <script is:inline src="/kansai-engine/Cesium.js"></script>
-  <script>
-    import {startMap} from '../scripts/kansai/viewer';
-    const root=document.querySelector<HTMLElement>('.atlas')!;
-    startMap(root).catch(error=>{
-      console.error(error);
-      root.querySelector('[role=status]')!.textContent=root.lang==='en'?'Map unavailable. Check the connection and WebGL support.':'地図を開けませんでした。通信とブラウザのWebGL設定をご確認ください。';
-    });
-  </script>
+
+  </article>
 </Base>
 <style>
-.atlas{margin:auto;max-width:1800px;padding:clamp(1rem,3vw,3rem);color:var(--ink)}
-.controls,.caption{display:flex;align-items:center;flex-wrap:wrap;gap:.7rem 1.35rem}
-.controls{margin-bottom:1rem;align-items:flex-end}
-h1{margin:0 auto 0 0;line-height:1.16;font-size:clamp(1.5rem,3.6vw,3.5rem)}
-label{display:grid;gap:.25rem;font-size:.85rem}
-select{padding:.55rem .8rem;max-width:100%;font:inherit;color:inherit;background:var(--paper,#fff);border:1px solid currentColor;border-radius:.4rem}
-.globe{position:relative;width:100%;height:clamp(320px,68svh,900px);overflow:hidden;background:#1a2d34;border-radius:.55rem}
-.caption{justify-content:space-between;font-size:.82rem;margin:.6rem 0 1.1rem}
-details{max-width:95ch;font-size:.85rem;line-height:1.6}summary{cursor:pointer}details p{margin:.65rem 0}
-@media(max-width:620px){h1{width:100%}.controls{gap:.55rem}.controls label:last-child{flex:1;min-width:0}.globe{height:62svh}}
+  .sources{max-width:76ch;margin:auto;padding:6rem 1rem 3rem}
+  .sources p{margin:1em 0}
+  .sources a{text-decoration:underline}
 </style>
