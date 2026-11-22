@@ -111,7 +111,12 @@ export function createGroundRelief(env: Env, roads: RoadUniforms, ground: Elevat
   group.name = 'ground-relief';
   const material = groundMaterial(env,roads);
   // Link against the actual HDR pass while the survey downloads, before exposing its first field.
-  const program=prepare(new THREE.Mesh(new THREE.BufferGeometry(),material));
+  // Three includes the presence of the position attribute in its shader-program key.
+  // Warm the field variant that the first real patch will draw.
+  const layout=new THREE.BufferGeometry();
+  layout.setAttribute('position',new THREE.Float32BufferAttribute([],3));
+  layout.setAttribute('aSurface',new THREE.Float32BufferAttribute([],4));
+  const program=prepare(new THREE.Mesh(layout,material)).finally(()=>layout.dispose());
   const sheets = new Map<string, ReturnType<typeof readGroundSheet>>();
   const failed = new Map<string,number>();
   const fields=createFieldInteriors();
