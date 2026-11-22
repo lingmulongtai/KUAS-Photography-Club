@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {lonLat, tileMetresPerDegree, tileXY, type Point} from '../kansai/coordinates';
 import {tileQueue} from '../kansai/tile-queue';
 import {type CompiledTile} from '../kansai/tile-compiler';
+import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
 import {regionalLandmarks} from './regional-landmarks';
 import {Mesh, building} from '../kansai/mesh';
 import {inflate,json} from '../kansai/sources';
@@ -23,9 +24,9 @@ function sampleTile(x:number,y:number,ground:Ground){
   return grid;
 }
 
-function cityMaterial(env:Env){
+function cityMaterial(env:Env,boundary:Awaited<ReturnType<typeof boundaryUniforms>>){
   return new THREE.ShaderMaterial({
-    uniforms:{...env},
+    uniforms:{...env,...boundary},
     vertexShader:`
       attribute vec4 surface;
       varying vec4 vSurface; varying vec2 vUv; varying vec3 vWorld,vNormal;
@@ -37,8 +38,10 @@ function cityMaterial(env:Env){
       }`,
     fragmentShader:`
       ${ENV_GLSL}
+      ${HOME_BOUNDARY}
       varying vec4 vSurface; varying vec2 vUv; varying vec3 vWorld,vNormal;
       void main(){
+        if(owner(vWorld.xz)==0)discard;
         vec3 n=normalize(vNormal),albedo=pow(vSurface.rgb,vec3(2.2));
         vec3 emit=vec3(0.);
         if(vSurface.a>.4 && vSurface.a<.6){
@@ -146,13 +149,13 @@ async function readSkyline(x:number,y:number,material:THREE.Material,ground:Grou
 }
 
 export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legacy:Box[],lite:boolean){
-  const [{tiles},{prefectures},architecture]=await Promise.all([
+  const [{tiles},{prefectures},architecture,boundary]=await Promise.all([
     json<{tiles:string[]}>('skyline/index.json'),
     json<{prefectures:Record<string,string[]>}>('network/index.json'),
-    regionalLandmarks(scene,env,ground),
+    regionalLandmarks(scene,env,ground),boundaryUniforms(),
   ]);
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
-  const queue=tileQueue(),material=cityMaterial(env);
+  const queue=tileQueue(),material=cityMaterial(env,boundary);
   type Entry={mesh:THREE.Mesh|null;mask?:(near:ReadonlySet<string>)=>void};
   const loaded=new Map<string,Entry>(),loading=new Set<string>(),retry=new Map<string,number>();
   let wanted=new Map<string,Layer>(),last='',next=0;
