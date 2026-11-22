@@ -1,3 +1,4 @@
+import {regionalNeighborhoods} from './regional-neighborhoods';
 import * as THREE from 'three';
 import {lonLat, tileMetresPerDegree, tileXY, type Point} from '../kansai/coordinates';
 import {tileQueue} from '../kansai/tile-queue';
@@ -149,10 +150,10 @@ async function readSkyline(x:number,y:number,material:THREE.Material,ground:Grou
 }
 
 export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legacy:Box[],lite:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>){
-  const [{tiles},{prefectures},architecture,boundary]=await Promise.all([
+  const [{tiles},{prefectures},architecture,boundary,neighborhoods]=await Promise.all([
     json<{tiles:string[]}>('skyline/index.json'),
     json<{prefectures:Record<string,string[]>}>('network/index.json'),
-    regionalLandmarks(scene,env,ground,prepare),boundaryUniforms(),
+    regionalLandmarks(scene,env,ground,prepare),boundaryUniforms(),regionalNeighborhoods(scene,env,ground,lite,prepare),
   ]);
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
   const queue=tileQueue(false,'orthometric'),material=cityMaterial(env,boundary);
@@ -163,6 +164,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legac
   let near=new Set<string>(),landmarkRevision=0;
   function remask(){
     near=new Set([...loaded].filter(([k,e])=>k.startsWith('16/') && e.mesh).map(([k])=>k));
+    neighborhoods.setNear(near);
     for(const [id,entry] of loaded)if(id.startsWith('12/'))entry.mask?.(near);
   }
   function plan(px:number,pz:number){
@@ -174,7 +176,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legac
     const jobs:Layer[]=[];
     const insideKyoto=legacy.some(b=>px>b[0]+1400 && px<b[2]-1400 && pz>b[1]+1400 && pz<b[3]-1400);
     const radius=lite?2:3;
-    for(const zoom of insideKyoto?[]:[16,12]){
+    for(const zoom of insideKyoto?[12]:[16,12]){
       const r=zoom===16?radius:2;
       const [ax,ay]=zoom===16?[cx,cy]:[cx>>4,cy>>4];
       for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){
@@ -194,10 +196,11 @@ export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legac
     for(const id of retry.keys())if(!wanted.has(id))retry.delete(id);
     remask();
   }
-  function update(x:number,z:number,now:number){
+  function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null){
     if(now<next)return;
     next=now+.09;
     architecture.update(x,z,now);
+    neighborhoods.update(x,z,dirX,dirZ,now,detail);
     if(landmarkRevision!==architecture.revision){
       landmarkRevision=architecture.revision;
       for(const [id,entry] of loaded)if(id.startsWith('16/'))entry.mask?.(near);

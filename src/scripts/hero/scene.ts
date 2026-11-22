@@ -184,6 +184,8 @@ export function createHero(
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   let groundAt: ((x: number, z: number) => number) | null = null;
   let regional:Awaited<ReturnType<typeof import('./regional-ground').regionalGround>> | undefined;
+  const regionalDirection=new THREE.Vector3();
+  let activeRegionBox:Box|null=null;
   let regionalCity:Awaited<ReturnType<typeof import('./regional-city').regionalCity>>|undefined;
   const expoAnchor=toLocal(EXPO.lat,EXPO.lon);
   let expo:ReturnType<typeof import('./regional-expo').expoGrounds>|undefined;
@@ -595,6 +597,7 @@ export function createHero(
     };
     const setOverviewDetail=(region:CityRegion|null)=>{
       detailRegion=region;
+      activeRegionBox=region?.box??null;
       for(const update of overviews)update(region);
     };
     const disposeGroup=(group:THREE.Object3D)=>{
@@ -1293,7 +1296,11 @@ export function createHero(
       const regionalTime=performance.now()/1000;
       regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime);
       const detailEye=flight?.p3??camera.position;
-      regionalCity?.update(detailEye.x,detailEye.z,regionalTime);
+      if(regionalCity){
+        camera.getWorldDirection(regionalDirection);
+        const horizontal=Math.hypot(regionalDirection.x,regionalDirection.z)||1;
+        regionalCity.update(detailEye.x,detailEye.z,regionalDirection.x/horizontal,regionalDirection.z/horizontal,regionalTime,activeRegionBox);
+      }
       const expoDistance=Math.hypot(camera.position.x-expoAnchor.x,camera.position.z-expoAnchor.z);
       if(expoDistance<4800 && !expo && !preparingExpo && regionalTime>=retryExpoAt){
         preparingExpo=true;
