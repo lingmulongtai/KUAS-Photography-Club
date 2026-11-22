@@ -68,7 +68,7 @@ export function tileCompiler(){
     const occupied=new Map<number,Ring[][]>();
     const bin=(v:number)=>Math.max(0,Math.min(7,Math.floor(v*8)));
     const col=(p:Point)=>bin((p[0]-west)/(east-west)),row=(p:Point)=>bin((p[1]-south)/(north-south));
-    const appendBuilding=(rings:Ring[],p:Point,tag?:BuildingTag,solid=false)=>{
+    const appendBuilding=(rings:Ring[],p:Point,tag?:BuildingTag,solid=false,highRise=false,shed=false)=>{
       const projected=rings.map(r=>openRing(r).map(local)).filter(r=>r.length>=3);
       if(!projected.length)return;
       const size=area(projected[0]);if(size<1)return;
@@ -81,18 +81,18 @@ export function tileCompiler(){
       const style=noise(Math.round(p[0]*1e6),Math.round(p[1]*1e6));
       const mapped=tag?.height&&tag.height>0?tag.height:undefined;
       const measured=()=>tag?.part?undefined:lidar(rings);
-      const inferred=solid?Math.min(33,8+Math.sqrt(size)*.24):size>360?8+style*3:5.6+style*2.2;
+      const inferred=highRise?Math.max(32,18+Math.sqrt(size)*.4):shed?3.2+style*1.1:solid?Math.min(33,8+Math.sqrt(size)*.24):size>360?8+style*3:5.6+style*2.2;
       const block=heightsByBuilding.block(p);
-      const fallback=block&&block>0?Math.max(inferred*.5,Math.min(inferred*2,(inferred+block)/2)):inferred;
-      const height=mapped??measured()??(tag?.levels?tag.levels*3.1:undefined)??heightsByBuilding.predicted(rings)??fallback;
+      const fallback=block&&block>0&&!shed?Math.max(inferred*.5,Math.min(inferred*2,(inferred+block)/2)):inferred;
+      const height=mapped??measured()??(tag?.levels?tag.levels*3.1:undefined)??(shed?undefined:heightsByBuilding.predicted(rings))??fallback;
       const base=ground(p),minimum=tag?.minHeight??(tag?.minLevel??0)*3.1;
       if(height<=minimum)return;
-      const roofShape=tag?.roof??(!solid&&size<320?(style>.65?'hipped':'gabled'):'flat');
+      const roofShape=tag?.roof??(!solid&&!shed&&size<320?(style>.65?'hipped':'gabled'):'flat');
       const ridge=['gabled','hipped','half-hipped','gambrel','pyramidal','mansard','skillion'].includes(roofShape)?
         Math.min(height*.38,tag?.roofHeight??(tag?.roofLevels?tag.roofLevels*2:Math.sqrt(size)*.14)):0;
       const low=minimum?base+minimum:Math.min(base,...rings[0].map(ground))-.5;
       const measuredRoof=survey && !tag?.part && !minimum ? matchRoof(survey,rings[0],x>>4,y>>4) : undefined;
-      const kind=facadeKind(solid,size,height);
+      const kind=facadeKind(solid,size,height,tag?.use,shed);
       if(datum==='orthometric' && !minimum && rings.length===1 && !measuredRoof?.[6].length){
         const profile=measuredRoof && surveyFits(measuredRoof,mapped)?measuredRoof:undefined;
         const pitch=profile?.[7];
@@ -124,17 +124,18 @@ export function tileCompiler(){
       .map(rings=>({tag,rings,point:midpoint(rings[0])})));
     const outlines=relevant.filter(row=>!row.tag.part),parts=relevant.filter(row=>row.tag.part);
     const taggedHeight=(tag:BuildingTag)=>tag.height??(tag.levels===undefined?0:tag.levels*3.1);
-    const matched=new Set<string>();
+    const matchedSolid=new Set<string>(),matchedHighRise=new Set<string>();
     const buildings=tile?.layers.BldA;
     for(let i=0;i<(buildings?.length??0);i++){
-      const f=buildings!.feature(i);
+      const f=buildings!.feature(i),code=Number(f.properties.vt_code);
+      const isSolid=code===3102||code===3103||code===3112,isHighRise=code===3103,isShed=code===3111;
       for(const rings of polygons(f,x,y,16)){
         const p=midpoint(rings[0]);if(!here(p))continue;
         const row=outlines.find(r=>inPolygon(p,r.rings)||inPolygon(r.point,rings));
         // Model an attributed outline once, even when GSI split it at a tile edge.
-        if(row){matched.add(row.tag.id);continue;}
+        if(row){if(isSolid)matchedSolid.add(row.tag.id);if(isHighRise)matchedHighRise.add(row.tag.id);continue;}
         if(parts.some(r=>inPolygon(p,r.rings)))continue;
-        appendBuilding(rings,p,undefined,Number(f.properties.vt_code)===3102);
+        appendBuilding(rings,p,undefined,isSolid,isHighRise,isShed);
       }
     }
     for(const row of relevant){
@@ -143,7 +144,8 @@ export function tileCompiler(){
       // are represented by their individual parts in both near and distant views.
       if(!row.tag.part && parts.some(part=>inPolygon(part.point,row.rings)
         && taggedHeight(part.tag)>=.95*taggedHeight(row.tag)))continue;
-      appendBuilding(row.rings,row.point,row.tag,matched.has(row.tag.id)&&row.tag.levels!==undefined&&row.tag.levels>3);
+      const isSolid=matchedSolid.has(row.tag.id)||(row.tag.levels!==undefined&&row.tag.levels>3)||(row.tag.height!==undefined&&row.tag.height>=13)||(row.tag.use!==undefined&&row.tag.use>=2);
+      appendBuilding(row.rings,row.point,row.tag,isSolid,matchedHighRise.has(row.tag.id),false);
     }
     const karahashi=y===25964&&(x===57508||x===57509);
     const bounds:[number,number,number,number]=[west,south,east,north];

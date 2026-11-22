@@ -23,3 +23,9 @@ test('concave Kobe office footprints stay polygons on the Kyoto renderer',()=>{
   assert.equal(b.ring.length,12);
   assert.equal(b.h,24);assert.equal(b.kind,1);
 });
+test('mapped building usage and GSI shed classes map onto Kyoto facade kinds',()=>{
+  assert.equal(facadeKind(false,40,3.5,undefined,true),3);
+  assert.equal(facadeKind(true,300,18,2),1|(2<<2));
+  assert.equal(facadeKind(true,400,28,4),1|(4<<2));
+  assert.equal(facadeKind(false,120,7,1),0|(1<<2));
+});

@@ -2,8 +2,13 @@ import {CLASS, USAGE, type BoxBuilding, type PolyBuilding} from '../hero/buildin
 import {toLocal} from '../hero/geo.ts';
 import type {Ring} from './coordinates';
 
-/** The regional survey has footprint class and height, but often no recorded use. */
-export function facadeKind(solid:boolean, area:number, height:number){
+/** The regional survey has footprint class and height, plus optional mapped OSM usage. */
+export function facadeKind(solid:boolean, area:number, height:number, use?:number, shed=false){
+  if(shed)return CLASS.shed;
+  if(use!==undefined && use!==USAGE.unknown){
+    if(use===USAGE.house && !solid && height<=12)return CLASS.wooden | USAGE.house<<2;
+    return CLASS.sturdy | use<<2;
+  }
   if(!solid && height<=12 && area<320)return CLASS.wooden | USAGE.house<<2;
   if(height<4.5 && area<60)return CLASS.shed;
   return CLASS.sturdy | USAGE.unknown<<2;

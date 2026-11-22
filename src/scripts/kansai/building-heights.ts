@@ -32,15 +32,18 @@ export async function regionalHeights(){
         if(!image)return;
         const r=rings[0],xs=r.map(p=>p[0]),ys=r.map(p=>p[1]);
         const w=Math.min(...xs),s=Math.min(...ys),dx=Math.max(...xs)-w,dy=Math.max(...ys)-s;
-        const pixels=new Set<number>(),votes=new Map<number,number>();
+        const pixels=new Set<number>(),values:number[]=[];
         for(let i=0;i<5;i++)for(let j=0;j<5;j++){
           const pt:Point=[w+dx*(i+.5)/5,s+dy*(j+.5)/5];if(!inPolygon(pt,rings))continue;
           const [u,v]=tileXY(...pt,15);if(Math.floor(u)!==imgX||Math.floor(v)!==imgY)continue;
           const k=4*(Math.floor((v%1)*256)*256+Math.floor((u%1)*256)),dm=image.data[k]*256+image.data[k+1];
           if(pixels.has(k))continue;
-          pixels.add(k);if(dm>=20)votes.set(dm,1+(votes.get(dm)??0));
+          pixels.add(k);if(dm>=20)values.push(dm);
         }
-        for(const [dm,n] of votes)if(n>=3&&n*2>pixels.size)return dm*.1;
+        if(!values.length || values.length*2<pixels.size)return;
+        values.sort((a,b)=>a-b);
+        const mid=values.length>>1;
+        return (values.length%2?values[mid]:(values[mid-1]+values[mid])*.5)*.1;
       },
     };
   };

@@ -28,7 +28,7 @@ export function cache<T>(capacity:number, read:(key:string)=>Promise<T>) {
 }
 export interface BuildingTag {
   id:string; polygons:Ring[][]; height?:number; levels?:number; minHeight?:number; minLevel?:number;
-  roof?:string; roofHeight?:number; roofLevels?:number; part?:boolean;
+  roof?:string; roofHeight?:number; roofLevels?:number; part?:boolean; use?:number;
 }
 type GridIndex={tiles:Point[]};
 type PackedIndex={prefectures:Record<string,string[]>;zoom:number;packZoom:number};
