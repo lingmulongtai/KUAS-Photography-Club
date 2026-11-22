@@ -38,6 +38,21 @@ TAGS = (*METRES, *LEVELS, "roof:shape")
 UNITS = {"": 1, "m": 1, "metre": 1, "metres": 1, "meter": 1, "meters": 1,
          "cm": 0.01, "ft": 0.3048, "feet": 0.3048, "foot": 0.3048}
 PREFECTURES = {"25", "26", "27", "28", "29"}
+# Maps real OSM building=* values onto Kyoto's USAGE enum (buildings-data.ts).
+BUILDING_USE = {
+    "house": 1, "detached": 1, "residential": 1, "semidetached_house": 1, "terrace": 1, "bungalow": 1, "farm": 1,
+    "apartments": 2, "dormitory": 2, "flats": 2, "condominium": 2,
+    "retail": 3, "commercial": 3, "supermarket": 3, "mall": 3, "department_store": 3, "kiosk": 3,
+    "office": 4, "bank": 4,
+    "hotel": 5, "motel": 5, "hostel": 5, "guest_house": 5, "ryokan": 5,
+    "public": 6, "civic": 6, "government": 6, "school": 6, "university": 6, "college": 6,
+    "kindergarten": 6, "hospital": 6, "clinic": 6, "library": 6, "museum": 6,
+    "train_station": 6, "station": 6, "transportation": 6, "fire_station": 6, "police": 6,
+    "stadium": 6, "sports_hall": 6, "grandstand": 6, "community_centre": 6,
+    "industrial": 7, "warehouse": 7, "factory": 7, "manufacture": 7, "parking": 7, "hangar": 7,
+}
+# Include non-house sturdy building types even when height/levels are not yet mapped in OSM.
+STANDALONE_USES = {2, 3, 4, 5, 6, 7}
 
 
 def number(value, distance):
@@ -71,6 +86,9 @@ def mapped_attributes(tags):
     roof = tags.get("roof:shape", "").strip().lower()
     if re.fullmatch(r"[a-z][a-z0-9_\-]{0,39}", roof) and roof not in {"yes", "no", "unknown"}:
         attrs["roof"] = roof
+    use = BUILDING_USE.get(tags.get("building", "").strip().lower())
+    if use is not None and (attrs or use in STANDALONE_USES):
+        attrs["use"] = use
     return attrs
 
 
@@ -140,11 +158,14 @@ def generate(source, output):
     # Assemble relations before filtering so older multipolygons can inherit outer-way tags.
     processor = osmium.FileProcessor(str(source)).with_areas()
     processor.with_filter(osmium.filter.EntityFilter(osmium.osm.AREA))
-    processor.with_filter(building_filter).with_filter(osmium.filter.KeyFilter(*TAGS))
+    processor.with_filter(building_filter)
     for area in processor:
         tags = area.tags
         is_part = tags.get("building:part", "no") not in {"no", "0", "false"}
-        if not is_part and tags.get("building", "no") in {"no", "0", "false"}:
+        b_val = tags.get("building", "no").strip().lower()
+        if not is_part and b_val in {"no", "0", "false"}:
+            continue
+        if b_val not in BUILDING_USE and not any(k in tags for k in TAGS):
             continue
         attrs = mapped_attributes(tags)
         if not attrs:
@@ -240,7 +261,7 @@ def verify(output):
                 raise ValueError(f"Feature is outside all five prefectures {ident}")
             membership.update(owners)
             totals["features"] += 1
-            for field in (*METRES.values(), *LEVELS.values(), "roof"):
+            for field in (*METRES.values(), *LEVELS.values(), "roof", "use"):
                 if field in row:
                     totals[field] += 1
             if row.get("part"):
