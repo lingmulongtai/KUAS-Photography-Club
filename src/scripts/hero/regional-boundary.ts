@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import {decodedTexture} from './data';
 import {BOUNDARY_LOOKUP} from '../kansai/boundary-lookup';
 import {M_PER_DEG_LAT,M_PER_DEG_LON,ORIGIN} from './geo';
 
 const names={coarse:'prefectures',districts:'districts',edges:'edges',islets:'islets'};
 async function textures(){
   const entries=await Promise.all(Object.entries(names).map(async([key,name])=>{
-    const texture=await new THREE.TextureLoader().loadAsync('/kansai/borders/'+name+'.png');
+    const texture=await decodedTexture('/kansai/borders/'+name+'.png');
     texture.magFilter=texture.minFilter=THREE.NearestFilter;
     texture.generateMipmaps=false;
     return [key,{value:texture}] as const;

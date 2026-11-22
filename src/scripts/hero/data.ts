@@ -84,13 +84,17 @@ export async function loadGrid(meta: GridMeta) {
   return h;
 }
 
-/** Decode aerial photography before it can be submitted by an animation frame. */
-export async function loadTexture(file:string,maxAniso:number){
-  const url=BASE+file;
+/** Decode before the first GPU upload. Data maps retain their original colour channels. */
+export async function decodedTexture(url:string){
+  const loadImage=async(source:string)=>{
+    const value=await new THREE.TextureLoader().loadAsync(source);
+    await (value.image as HTMLImageElement).decode?.();
+    return value;
+  };
   let texture:THREE.Texture;
   if(typeof createImageBitmap==='function'){
     const res=await fetch(url);
-    if(!res.ok)throw new Error(file+' '+res.status);
+    if(!res.ok)throw new Error(url+' '+res.status);
     const blob=await res.blob();
     // WebGL unpack flags do not flip an ImageBitmap. Apply the same orientation as TextureLoader here.
     const bitmap=await createImageBitmap(blob,{imageOrientation:'flipY',premultiplyAlpha:'none',colorSpaceConversion:'none'}).catch(()=>null);
@@ -100,13 +104,18 @@ export async function loadTexture(file:string,maxAniso:number){
       texture.addEventListener('dispose',()=>bitmap.close());
     }else{
       const objectUrl=URL.createObjectURL(blob);
-      try{texture=await new THREE.TextureLoader().loadAsync(objectUrl);await texture.image.decode?.();}
+      try{texture=await loadImage(objectUrl);}
       finally{URL.revokeObjectURL(objectUrl);}
     }
   }else{
-    texture=await new THREE.TextureLoader().loadAsync(url);
-    await texture.image.decode?.();
+    texture=await loadImage(url);
   }
+  texture.needsUpdate=true;
+  return texture;
+}
+
+export async function loadTexture(file:string,maxAniso:number){
+  const texture=await decodedTexture(BASE+file);
   texture.colorSpace=THREE.SRGBColorSpace;
   texture.anisotropy=maxAniso;
   texture.generateMipmaps=true;
