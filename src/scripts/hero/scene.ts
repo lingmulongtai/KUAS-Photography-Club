@@ -183,6 +183,7 @@ export function createHero(
   let groundAt: ((x: number, z: number) => number) | null = null;
   let regional:Awaited<ReturnType<typeof import('./regional-ground').regionalGround>> | undefined;
   let regionalCity:Awaited<ReturnType<typeof import('./regional-city').regionalCity>>|undefined;
+  let updateFireworks:ReturnType<typeof import('./regional-fireworks').regionalFireworks>|undefined;
   let ensureRegionalGround:(()=>Promise<void>)|undefined;
   let flightRequest=0;
   let travelBounds:Box=[-34000,-19000,13000,20000];
@@ -786,6 +787,9 @@ export function createHero(
       })
       .then(result=>{
         regional=result;
+        void import('./regional-fireworks').then(({regionalFireworks})=>{
+          updateFireworks=regionalFireworks(scene,env,result.ground,!!opts.reducedMotion);
+        }).catch(error=>console.warn('Regional fireworks unavailable',error));
         // moveExplorer keeps a 500 m safety margin inside its camera bounds.
         const [w,n,e,s]=result.bounds;
         travelBounds=[w-500,n-500,e+500,s+500];
@@ -1250,6 +1254,7 @@ export function createHero(
       const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
+      updateFireworks?.(camera,dt,pxPerM);
       const regionalTime=performance.now()/1000;
       regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime);
       const detailEye=flight?.p3??camera.position;
