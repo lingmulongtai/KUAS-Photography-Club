@@ -122,7 +122,7 @@ export async function loadGrid(meta: GridMeta) {
 }
 
 /** Decode before the first GPU upload. Data maps retain their original colour channels. */
-export async function decodedTexture(url:string){
+export async function decodedTexture(url:string,priority?:RequestPriority){
   const loadImage=async(source:string)=>{
     const value=await new THREE.TextureLoader().loadAsync(source);
     await (value.image as HTMLImageElement).decode?.();
@@ -130,7 +130,7 @@ export async function decodedTexture(url:string){
   };
   let texture:THREE.Texture;
   if(typeof createImageBitmap==='function'){
-    const res=await fetch(url);
+    const res=await (priority?fetch(url,{priority}):fetch(url));
     if(!res.ok)throw new Error(url+' '+res.status);
     const blob=await res.blob();
     // WebGL unpack flags do not flip an ImageBitmap. Apply the same orientation as TextureLoader here.
@@ -151,8 +151,8 @@ export async function decodedTexture(url:string){
   return texture;
 }
 
-export async function loadTexture(file:string,maxAniso:number){
-  const texture=await decodedTexture(BASE+file);
+export async function loadTexture(file:string,maxAniso:number,priority?:RequestPriority){
+  const texture=await decodedTexture(BASE+file,priority);
   texture.colorSpace=THREE.SRGBColorSpace;
   texture.anisotropy=maxAniso;
   texture.generateMipmaps=true;

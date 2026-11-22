@@ -10,13 +10,18 @@ export function createSharedPhotoSlot<T>(load:()=>Promise<T>,apply:(photo:T|null
       fallback=photo;
       if(!selected)applyCurrent();
     },
+    setChosen(photo:T) {
+      chosen=photo;
+      pending=undefined;
+      if(selected)applyCurrent();
+    },
     setOverride(photo:T|null) {override=photo;applyCurrent();},
     select(next:boolean) {
-      if(selected===next&&(!next||pending))return;
+      if(selected===next&&(!next||chosen!==null||pending))return;
       selected=next;
-      if(!selected){applyCurrent();return;}
+      if(!selected||chosen!==null){applyCurrent();return;}
       const request=pending??=load();
-      void request.then(photo=>{if(pending===request){chosen=photo;if(selected)applyCurrent();}})
+      void request.then(photo=>{if(pending===request&&chosen===null){chosen=photo;if(selected)applyCurrent();}})
         .catch(error=>{if(pending===request)pending=undefined;onError(error);});
     },
   };

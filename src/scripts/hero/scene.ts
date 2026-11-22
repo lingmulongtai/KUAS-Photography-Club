@@ -234,7 +234,37 @@ export function createHero(
   };
   const landscapeCenter = (v: ViewDef) => v.orbit?.center ?? v.eye;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const loading = createHeroLoading(opts, 16, 1);
+  let heroOpened = false;
+  const postOpenUpgrades: (() => Promise<void>)[] = [];
+  let runningUpgrades = false;
+  const drainPostOpenUpgrades = () => {
+    if (!heroOpened || runningUpgrades) return;
+    runningUpgrades = true;
+    void (async () => {
+      try {
+        while (postOpenUpgrades.length) {
+          const task = postOpenUpgrades.shift()!;
+          try { await task(); }
+          catch (error) { console.warn('Background texture upgrade skipped', error); }
+        }
+      } finally {
+        runningUpgrades = false;
+        if (postOpenUpgrades.length) drainPostOpenUpgrades();
+      }
+    })();
+  };
+  const schedulePostOpenUpgrade = (task: () => Promise<void>) => {
+    postOpenUpgrades.push(task);
+    if (heroOpened) drainPostOpenUpgrades();
+  };
+  const loading = createHeroLoading({
+    ...opts,
+    onReady: () => {
+      heroOpened = true;
+      opts.onReady?.();
+      setTimeout(drainPostOpenUpgrades, 0);
+    },
+  }, 16, 1);
   // A task boundary lets the intro paint and accept input between expensive setup steps.
   const yieldToBrowser = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
@@ -301,19 +331,35 @@ export function createHero(
     // Start downloading the Yamashina eastern backdrop as soon as regions.json returns.
     let eastTexture: Promise<THREE.Texture> | undefined;
     let eastBackdrop: { photo: THREE.Texture; box: Box } | null = null;
+    let eastPhotoUpgraded = lite;
+    let applyEastBackdrop: ((photo: THREE.Texture, box: Box) => void) | undefined;
     const earlyEastPhoto = cityRegions.then(index => {
       const region = index.regions.find(r => r.id === 'yamashina');
       if (!region) return null;
-      const file = lite ? region.photo.mobile.file : region.photo.file;
+      const progressive = !lite && !heroOpened;
+      const file = lite || progressive ? region.photo.mobile.file : region.photo.file;
       eastTexture ??= loadTexture(file, aniso).then(photo => {
         eastBackdrop = { photo, box: region.photo.box };
+        if (progressive && !eastPhotoUpgraded) {
+          eastPhotoUpgraded = true;
+          schedulePostOpenUpgrade(async () => {
+            const full = await loadTexture(region.photo.file, aniso, 'low');
+            await uploadPhoto(renderer, full, () => true);
+            const prev = eastBackdrop?.photo;
+            eastBackdrop = { photo: full, box: region.photo.box };
+            eastTexture = Promise.resolve(full);
+            applyEastBackdrop?.(full, region.photo.box);
+            if (prev && prev !== full) prev.dispose();
+          });
+        }
         return photo;
       }).catch(error => { eastTexture = undefined; throw error; });
       return eastTexture;
     }).catch(error => { console.warn('Eastern basin imagery unavailable', error); return null; });
 
     const meta = await metadata;
-    const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
+    const fullWideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
+    const initialWideFile = meta.aerialWide.file;
     const elevation = loading.track(loadHeightfield(meta));
     const normalGrids = [meta.far, meta.near];
     if (meta.arashiyama) normalGrids.push(meta.arashiyama.elevation);
@@ -329,20 +375,24 @@ export function createHero(
     void normals.catch(() => {});
 
     // Start all meta-dependent imagery and transport downloads immediately alongside elevation.
-    const widePromise = loading.track(loadTexture(wideFile, aniso));
+    // Load the compact/mobile WebP tier first for fast opening, then upgrade to full resolution after hero:ready.
+    const widePromise = loading.track(loadTexture(initialWideFile, aniso));
+    const fullOuterFile = lite ? 'kansai/basin-mobile.webp' : 'kansai/basin.webp';
+    const initialOuterFile = 'kansai/basin-mobile.webp';
     const outerPromise = loading.track(meta.aerialOuter
-      ? loadTexture(lite ? 'kansai/basin-mobile.webp' : 'kansai/basin.webp', aniso)
+      ? loadTexture(initialOuterFile, aniso)
           .catch(error => { console.warn('Outer imagery unavailable; retaining Kyoto imagery', error); return null; })
       : Promise.resolve(null));
     const waterFiles=[...(meta.arashiyama?[meta.arashiyama.water.file]:[]),'water-kamo.json.gz'];
     const atlas=meta.aerialBasin;
-    const variant=atlas && (renderer.capabilities.maxTextureSize < 4096 ? atlas.mobile : lite ? atlas.compact : atlas);
+    const targetBasinVariant=atlas && (renderer.capabilities.maxTextureSize < 4096 ? atlas.mobile : lite ? atlas.compact : atlas);
+    const initialBasinVariant=atlas ? atlas.mobile : undefined;
     const citySheet={id:'city',box:meta.aerialCity.box,uv:[0,0,1,1] as Box};
-    const basinPhoto=loading.track(variant
-      ? loadTexture(variant.file,aniso).then(texture=>({texture,sheets:variant.sheets})).catch(async()=>{
-          return {texture:await loadTexture(meta.aerialCity.file,aniso),sheets:[citySheet]};
+    const basinPhoto=loading.track(initialBasinVariant
+      ? loadTexture(initialBasinVariant.file,aniso).then(texture=>({texture,sheets:initialBasinVariant.sheets,atlas:true})).catch(async()=>{
+          return {texture:await loadTexture(meta.aerialCity.file,aniso),sheets:[citySheet],atlas:false};
         })
-      : loadTexture(meta.aerialCity.file,aniso).then(texture=>({texture,sheets:[citySheet]})));
+      : loadTexture(meta.aerialCity.file,aniso).then(texture=>({texture,sheets:[citySheet],atlas:false})));
     const linesPromise = loading.track(withoutTunnels(loadLines(waterFiles)));
     const basinTransport=meta.basinTransport?loadLines(undefined,meta.basinTransport.file,meta.basinTransport.box,meta.basinTransport.q)
       .catch(error=>{console.warn('Basin street network unavailable',error);return [];}):Promise.resolve([]);
@@ -390,21 +440,44 @@ export function createHero(
     // Tennozan and Arashiyama are disjoint, so reuse one sampler to stay within
     // WebGL's minimum texture-unit limit rather than adding a fourth photo slot.
     const sharedPhoto=regions.findIndex(r=>r.key==='arashiyama');
-    const sharedSlot=meta.tennozan&&sharedPhoto>=0?createSharedPhotoSlot(
-      async()=>({photo:await loadTexture(lite?meta.tennozan!.mobile.file:meta.tennozan!.file,aniso),box:meta.tennozan!.box}),
+    let tennozanSlot: ReturnType<typeof createSharedPhotoSlot<Sheet>> | null = null;
+    const sharedSlot=meta.tennozan&&sharedPhoto>=0?(tennozanSlot=createSharedPhotoSlot(
+      async()=>{
+        const progressive=!lite&&!heroOpened;
+        const photo=await loadTexture(lite||progressive?meta.tennozan!.mobile.file:meta.tennozan!.file,aniso);
+        if(progressive){
+          schedulePostOpenUpgrade(async()=>{
+            const full=await loadTexture(meta.tennozan!.file,aniso,'low');
+            await uploadPhoto(renderer,full,()=>true);
+            tennozanSlot?.setChosen({photo:full,box:meta.tennozan!.box});
+            photo.dispose();
+          });
+        }
+        return {photo,box:meta.tennozan!.box};
+      },
       value=>terrain.setPhoto(sharedPhoto+1,value?.photo??null,value?.box),
       error=>console.warn('Tennozan imagery unavailable',error),
-    ):null;
+    )):null;
     const loadViewRegionalPhotos = (v: HeroView) => {
       const pending: Promise<unknown>[] = [];
       regions.forEach((r, i) => {
         if (!r.views.includes(v)) return;
         let job = regionalPhotos[i];
         if (!job) {
-          const file=lite?r.meta.mobile.file:r.meta.file;
+          const progressive=!lite&&!heroOpened;
+          const file=lite||progressive?r.meta.mobile.file:r.meta.file;
           job=loadTexture(file,aniso).then(photo=>{
             if(i===sharedPhoto&&sharedSlot)sharedSlot.setFallback({photo,box:r.meta.box});
             else terrain.setPhoto(i+1,photo,r.meta.box);
+            if(progressive){
+              schedulePostOpenUpgrade(async()=>{
+                const full=await loadTexture(r.meta.file,aniso,'low');
+                await uploadPhoto(renderer,full,()=>true);
+                if(i===sharedPhoto&&sharedSlot)sharedSlot.setFallback({photo:full,box:r.meta.box});
+                else terrain.setPhoto(i+1,full,r.meta.box);
+                photo.dispose();
+              });
+            }
           }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
           regionalPhotos[i]=job;
         }
@@ -427,6 +500,28 @@ export function createHero(
     };
     const openingRegionalPhoto = loadViewRegionalPhotos(view);
     sharedSlot?.select(view==='tennozan');
+    // Queue progressive high-res base terrain upgrades in visual priority order after opening local imagery.
+    if (basin.atlas && targetBasinVariant && initialBasinVariant && targetBasinVariant !== initialBasinVariant) {
+      schedulePostOpenUpgrade(async () => {
+        const full = await loadTexture(targetBasinVariant.file, aniso, 'low');
+        await uploadPhoto(renderer, full, () => true);
+        terrain.setAerialCity(full, targetBasinVariant.sheets);
+      });
+    }
+    if (fullWideFile !== initialWideFile) {
+      schedulePostOpenUpgrade(async () => {
+        const full = await loadTexture(fullWideFile, aniso, 'low');
+        await uploadPhoto(renderer, full, () => true);
+        terrain.setAerialWide(full);
+      });
+    }
+    if (outer && fullOuterFile !== initialOuterFile) {
+      schedulePostOpenUpgrade(async () => {
+        const full = await loadTexture(fullOuterFile, aniso, 'low');
+        await uploadPhoto(renderer, full, () => true);
+        terrain.setOuterPhoto(full);
+      });
+    }
     const inKyoto=(p:{x:number;z:number})=>p.x>=hf.bounds[0] && p.z>=hf.bounds[1] && p.x<=hf.bounds[2] && p.z<=hf.bounds[3];
     terrainRecenter = (center,anchored=false)=>{
       if(inKyoto(center))void terrain.recenterAsync(center,()=>shadow.invalidate(),anchored);
@@ -736,26 +831,38 @@ export function createHero(
     // Reuse the regional photo slot for the eastern basin between detailed regions.
     // Keep its texture alive while a different region temporarily owns that slot.
     let districtBase:Sheet|null=null;
+    applyEastBackdrop=(photo,box)=>{
+      if((!detailRegion && !districtBase) || detailRegion?.id==='yamashina')terrain.setPhoto(0,photo,box);
+    };
     const loadRegionalPhoto=(r:CityRegion)=>{
-      const file=lite?r.photo.mobile.file:r.photo.file;
-      if(r.id!=='yamashina')return loadTexture(file,aniso);
-      return eastTexture??=loadTexture(file,aniso).then(photo=>{
+      const progressive=r.id!=='yamashina'&&!lite&&!heroOpened;
+      const file=lite||progressive?r.photo.mobile.file:r.photo.file;
+      if(r.id!=='yamashina')return loadTexture(file,aniso).then(photo=>({photo,upgradeFile:progressive?r.photo.file:null}));
+      return (eastTexture??=loadTexture(file,aniso).then(photo=>{
         eastBackdrop={photo,box:r.photo.box};
         if(!detailRegion && !districtBase)terrain.setPhoto(0,photo,r.photo.box);
         return photo;
-      }).catch(error=>{eastTexture=undefined;throw error;});
+      }).catch(error=>{eastTexture=undefined;throw error;})).then(photo=>({photo,upgradeFile:null as string|null}));
     };
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
       const lakeRemainder=r.id==='yamashina' && await ensureLake()?'kansai/yamashina-lake-remainder.json.gz':undefined;
       const results=await Promise.allSettled([loadRegionalBuildings(r),
         withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file),forestBits(r.lines.file,Boolean(lakeRemainder))] as const);
       const [b,l,p,coverage,forest]=results;
-      const disposePhoto=()=>{if(p.status==='fulfilled'&&r.id!=='yamashina')p.value.dispose();};
+      let livePhoto=p.status==='fulfilled'?p.value.photo:null;
+      const upgradeFile=p.status==='fulfilled'?p.value.upgradeFile:null;
+      const disposePhoto=()=>{if(livePhoto&&r.id!=='yamashina')livePhoto.dispose();};
       if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){
         disposePhoto();
         throw results.find(result=>result.status==='rejected')!.reason;
       }
-      return {buildings:b.value,lines:l.value,photo:p.value,forest:forest.status==='fulfilled'?forest.value:null,coverage:coverage.status==='fulfilled'?coverage.value:null,dispose:disposePhoto};
+      return {
+        buildings:b.value,lines:l.value,photo:p.value.photo,upgradeFile,
+        setPhoto(next:THREE.Texture){livePhoto=next;},
+        forest:forest.status==='fulfilled'?forest.value:null,
+        coverage:coverage.status==='fulfilled'?coverage.value:null,
+        dispose:disposePhoto,
+      };
     },async(r,data,current,releasePrevious)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
       const step=async()=>{
@@ -820,14 +927,15 @@ export function createHero(
       const detailedCampus=r.id==='kameoka-campus';
       releasePrevious();
       const oldNormal=terrain.uniforms.uRegionalNormal.value,oldNormalBox=terrain.uniforms.uRegionalBox.value.clone(),oldNormalOn=terrain.uniforms.uRegionalOn.value;
-      let forestMaskChanged=false;
+      let forestMaskChanged=false,released=false;
       const release=(releaseData=true)=>{
+        released=true;
         setOverviewDetail(null);
         cityLods.delete(city);
         regionalDrive=null;scene.remove(group);disposeGroup(group);
         for(const layer of [lamps.uniforms,traffic.uniforms]){const i=pointLayers.indexOf(layer);if(i>=0)pointLayers.splice(i,1);}
         terrain.uniforms.uRegionRoadsOn.value=0;
-        terrain.uniforms.uRegionRoads.value=wide;
+        terrain.uniforms.uRegionRoads.value=terrain.uniforms.uAerialWide.value;
         terrain.uniforms.uRegionClose.value=0;
         const backdrop=districtBase??eastBackdrop;
         terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
@@ -845,6 +953,19 @@ export function createHero(
       terrain.uniforms.uRegionRoadBox.value.set(...r.box);
       terrain.uniforms.uRegionRoadsOn.value=1;
       terrain.setPhoto(0,data.photo,r.photo.box);
+      if(data.upgradeFile){
+        const upgradeFile=data.upgradeFile,initialPhoto=data.photo;
+        schedulePostOpenUpgrade(async()=>{
+          if(released)return;
+          const full=await loadTexture(upgradeFile,aniso,'low');
+          if(released){full.dispose();return;}
+          await uploadPhoto(renderer,full,()=>!released);
+          if(released){full.dispose();return;}
+          data.setPhoto(full);
+          terrain.setPhoto(0,full,r.photo.box);
+          initialPhoto.dispose();
+        });
+      }
       terrain.uniforms.uRegionClose.value=(detailedCampus||r.id==='uji-detail')?1:0;
       env.uBuilt.value=built;env.uRegionBuiltBox.value.set(...r.box);
       env.uRegionBuiltTexel.value=(r.box[2]-r.box[0])/builtSize;
