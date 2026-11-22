@@ -109,9 +109,9 @@ test('skip, Escape and a required-data error each dismiss without waiting for a 
   }
 });
 
-test('a missing main bundle cannot block the site beyond four seconds, even without animation frames',()=>{
-  const state=mount();assert.equal(state.delay,4000);
-  state.advance(3999);assert.equal(state.intro.open,true);state.advance(1);
+test('a missing main bundle cannot block the site beyond the stall watchdog, even without animation frames',()=>{
+  const state=mount();assert.equal(state.delay,6000);
+  state.advance(5999);assert.equal(state.intro.open,true);state.advance(1);
   assert.equal(state.intro.open,false);assert.ok(state.cleared);
   state.emit('hero:ready');assert.equal(state.intro.closed,1);
 });
@@ -129,66 +129,76 @@ test('a jump in loading is counted through on screen, never snapped or run ahead
   state.emit('hero:progress',.15);state.run(1);assert.equal(state.percent.textContent,'15%');
   state.emit('hero:progress',.6);assert.equal(state.attributes.get('aria-valuenow'),'60','assistive technology hears the real value');
   const seen=[];
-  for(let i=0;i<150;i++){state.run(1/60);seen.push(parseInt(state.percent.textContent));}
-  assert.ok(seen[5]<30,'no snap to the new value');
+  for(let i=0;i<120;i++){state.run(1/60);seen.push(parseInt(state.percent.textContent));}
+  assert.ok(seen[5]<35,'no snap to the new value');
   assert.ok(seen.every((value,i)=>i===0||value>=seen[i-1]),'never runs backwards');
-  assert.ok(seen.filter(value=>value>15&&value<60).length>20,'passes through the values between');
+  assert.ok(seen.filter(value=>value>15&&value<60).length>15,'passes through the values between');
   assert.equal(Math.max(...seen),60,'never ahead of the real progress');
   assert.equal(seen.at(-1),60);
   assert.equal(state.styles.get('--progress'),'0.6');
 });
 
-test('readiness lets the count reach 100% before the scene opens, but never holds the page for long',()=>{
+test('readiness lets the count reach 100% before the scene opens, and opens promptly without artificial delay',()=>{
   const state=mount({reduced:false});
-  state.emit('hero:progress',.6);state.run(3);state.emit('hero:ready');
+  state.emit('hero:progress',.6);state.run(2);state.emit('hero:ready');
   assert.equal(state.intro.open,true,'the count finishes first');
-  state.run(.7);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
-  // frames stop in a background tab: the page still opens soon after readiness
+  state.run(.5);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
+  // frames stop in a background tab: the page still opens promptly after readiness
   const stalled=mount({reduced:false});stalled.emit('hero:progress',.3);stalled.emit('hero:ready');
-  assert.equal(stalled.delay,4000);stalled.expire();assert.equal(stalled.intro.open,false);
+  assert.ok(stalled.delay<=800,'background tab closes promptly after ready');stalled.expire();assert.equal(stalled.intro.open,false);
   // skipping does not wait for the count
   const skipped=mount({reduced:false});skipped.emit('hero:progress',.4);skipped.emit('hero:ready');
   skipped.button.dispatchEvent(new Event('click'));assert.equal(skipped.intro.open,false);
 });
 
-test('a fast load plays a continuous short opening without counting ahead of real work',()=>{
+test('a fast load plays a brief continuous glide to 100% without holding a multi-second floor',()=>{
   const state=mount({reduced:false});
   state.emit('hero:progress',.2);state.run(.2);
   assert.ok(parseInt(state.percent.textContent)<=20);
   state.emit('hero:ready');
   const seen=[];
-  for(let i=0;i<100;i++){state.run(1/60);seen.push(parseInt(state.percent.textContent));}
+  for(let i=0;i<24;i++){state.run(1/60);seen.push(parseInt(state.percent.textContent));}
   assert.equal(state.intro.open,true);
-  assert.ok(seen.at(-1)<100,'the count stays in motion during the opening');
+  assert.ok(seen.at(-1)<100,'the count stays in motion during the glide');
   assert.ok(seen.every((value,i)=>i===0||value>=seen[i-1]));
-  assert.ok(new Set(seen).size>50,'the count advances through the sequence');
-  state.run(1);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
+  assert.ok(new Set(seen).size>10,'the count advances smoothly to 100%');
+  state.run(.4);assert.equal(state.percent.textContent,'100%');assert.equal(state.intro.open,false);
 });
 
-test('ongoing progress cannot extend the fixed four-second deadline',()=>{
+test('active progress extends the stall watchdog until readiness, bounded by the hard cap',()=>{
   const state=mount({reduced:false});
-  state.advance(1000);state.emit('hero:progress',.2);
-  state.advance(1500);state.emit('hero:progress',.6);
-  state.advance(1499);state.emit('hero:progress',.9);
+  state.advance(3000);state.emit('hero:progress',.3);
+  state.advance(3500);state.emit('hero:progress',.7);
+  // Still open past 6.5 s because real progress is arriving
   assert.equal(state.intro.open,true);
-  assert.equal(state.scheduledTimers,1,'progress never replaces or extends the original timer');
+  // Stalling for 6 s without further progress dismisses cleanly
+  state.advance(5999);assert.equal(state.intro.open,true);
   state.advance(1);assert.equal(state.intro.open,false);
-  const percent=state.percent.textContent;
-  state.emit('hero:progress',1);state.emit('hero:ready');state.emit('hero:error');
-  assert.equal(state.intro.closed,1);assert.equal(state.percent.textContent,percent);
+  // Continuous trickle still cannot exceed the 20 s hard cap
+  const capped=mount({reduced:false});
+  for(let step=1;step<=10;step++){
+    capped.advance(2000);
+    if(step<10){capped.emit('hero:progress',step*.09);assert.equal(capped.intro.open,true);}
+  }
+  assert.equal(capped.intro.open,false);
+  const percent=capped.percent.textContent;
+  capped.emit('hero:progress',1);capped.emit('hero:ready');capped.emit('hero:error');
+  assert.equal(capped.intro.closed,1);assert.equal(capped.percent.textContent,percent);
 });
 
-test('late readiness and duplicate ready events cannot push the count animation past the deadline',()=>{
-  const state=mount({reduced:false});state.run(3.8);state.emit('hero:ready');
-  assert.equal(state.scheduledTimers,1);
-  state.run(.1);state.emit('hero:ready');assert.equal(state.intro.open,true);
-  state.run(.1);assert.equal(state.intro.open,false);assert.equal(state.intro.closed,1);
+test('late readiness and duplicate ready events still close cleanly within the hard cap',()=>{
+  const state=mount({reduced:false});
+  state.advance(4000);state.emit('hero:progress',.5);
+  state.advance(5000);state.emit('hero:progress',.85);
+  state.advance(4000);state.emit('hero:ready');
+  state.run(.2);state.emit('hero:ready');assert.equal(state.intro.open,true);
+  state.run(.6);assert.equal(state.intro.open,false);assert.equal(state.intro.closed,1);
 });
 
-test('the deadline releases the modal at once and still opens onto the page with the iris',()=>{
+test('the watchdog releases the modal at once and still opens onto the page with the iris',()=>{
   const state=mount({reduced:false,animated:true});
   state.emit('hero:progress',.4);
-  state.advance(4000);
+  state.advance(6000);
   assert.equal(state.intro.open,false);assert.equal(state.intro.closed,1);
   assert.equal(state.document.documentElement.classList.contains('hero-intro-open'),false,'scrolling is released immediately');
   assert.ok(state.intro.classList.contains('is-leaving'),'no cut straight to the page');
@@ -206,29 +216,38 @@ test('an early exit closes the modal before its animation and bounds the remaini
 
 test('a late but successful load still plays the whole opening instead of skipping it',()=>{
   const state=mount({reduced:false,animated:true});
-  state.run(3.8);state.emit('hero:ready');state.run(.4);
+  state.advance(4000);state.emit('hero:progress',.8);
+  state.run(1);state.emit('hero:ready');state.run(.8);
   assert.equal(state.intro.open,false);
   assert.ok(state.animations.some(({duration})=>duration===900),'the iris keeps its full length');
 });
 
-test('the ring is handed to the compositor as one transform glide per loading step',()=>{
+test('the ring is handed to the compositor and keeps the upper half hidden before halfway so no 50% dot leaks',()=>{
   const state=mount({reduced:false,animated:true});
-  state.emit('hero:progress',.6);
-  assert.equal(state.ring.length,3,'both half rings and the dot');
-  for(const {frames,options} of state.ring){
+  state.emit('hero:progress',.45);
+  const [,highEarly]=state.ring;
+  assert.ok(highEarly.frames.every(frame=>frame.opacity===0),'upper half stays invisible before 50% handover');
+  state.emit('hero:progress',.65);
+  assert.equal(state.ring.length,6,'two glides of three ring layers');
+  const [low,high]=state.ring.slice(-3),deg=frame=>parseFloat(frame.transform.slice(7));
+  for(const {frames,options} of state.ring.slice(-3)){
     assert.ok(frames.every(frame=>/^rotate\(-?[\d.e-]+deg\)$/.test(frame.transform)),'transforms only');
-    assert.equal(options.fill,'both');assert.ok(options.duration>=450&&options.duration<=1600);
+    assert.equal(options.fill,'both');assert.ok(options.duration>=300&&options.duration<=1100);
   }
-  // the low half is complete and the high half starts exactly when the line passes halfway
-  const [low,high]=state.ring,deg=frame=>parseFloat(frame.transform.slice(7));
+  // the low half is complete and the high half stays opacity 0 until crossing halfway
   const handover=low.frames.findIndex(frame=>deg(frame)===0);
   assert.ok(handover>0);assert.ok(Math.abs(deg(high.frames[handover])+180)<.01);
+  assert.ok(high.frames.slice(0,handover).every(frame=>frame.opacity===0),'hidden right up to handover');
+  assert.equal(high.frames.at(-1).opacity,1,'visible once past halfway');
   assert.ok(deg(high.frames.at(-1))>-180,'past halfway the high half turns in');
-  state.emit('hero:progress',.5);assert.equal(state.ring.length,3,'no step backwards');
+  state.emit('hero:progress',.5);assert.equal(state.ring.length,6,'no step backwards');
 });
 
-test('without compositor animations the ring is still placed every frame',()=>{
+test('without compositor animations the ring is still placed every frame and hides the upper half before halfway',()=>{
   const state=mount({reduced:false});
   state.emit('hero:progress',.3);state.run(2);
   assert.match(state.turns['.intro-ring-dot'].style.transform,/rotate\(102.6deg\)/);
+  assert.equal(state.turns['.is-high .intro-turn'].style.opacity,'0');
+  state.emit('hero:progress',.7);state.run(2);
+  assert.equal(state.turns['.is-high .intro-turn'].style.opacity,'1');
 });

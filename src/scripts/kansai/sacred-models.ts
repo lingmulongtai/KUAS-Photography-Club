@@ -50,16 +50,32 @@ const GOLD: Color = [0.58, 0.4, 0.09];
 const SKIRT = 3.2;
 
 class SacredBuilder {
-  positions: number[] = [];
-  normals: number[] = [];
-  colors: number[] = [];
-  glows: number[] = [];
+  private cap = 4096;
+  private count = 0;
+  private pos = new Float32Array(this.cap * 3);
+  private nrm = new Float32Array(this.cap * 3);
+  private col = new Float32Array(this.cap * 3);
+  private glw = new Float32Array(this.cap);
 
   private ox = 0;
   private oy = 0;
   private oz = 0;
   private cos = 1;
   private sin = 0;
+
+  private ensure(extra: number) {
+    const need = this.count + extra;
+    if (need <= this.cap) return;
+    let next = this.cap;
+    while (next < need) next <<= 1;
+    const grow3 = (src: Float32Array) => { const dst = new Float32Array(next * 3); dst.set(src.subarray(0, this.count * 3)); return dst; };
+    const grow1 = (src: Float32Array) => { const dst = new Float32Array(next); dst.set(src.subarray(0, this.count)); return dst; };
+    this.pos = grow3(this.pos);
+    this.nrm = grow3(this.nrm);
+    this.col = grow3(this.col);
+    this.glw = grow1(this.glw);
+    this.cap = next;
+  }
 
   setFrame(x: number, y: number, z: number, angle: number) {
     this.ox = x;
@@ -69,78 +85,126 @@ class SacredBuilder {
     this.sin = Math.sin(angle);
   }
 
-  private world(lx: number, ly: number, lz: number): [number, number, number] {
-    return [
-      this.ox + this.cos * lx - this.sin * lz,
-      this.oy + ly,
-      this.oz + this.sin * lx + this.cos * lz,
-    ];
-  }
-
-  tri(a: [number, number, number], b: [number, number, number], c: [number, number, number], color: Color, glow = 0.16) {
-    const wa = this.world(a[0], a[1], a[2]);
-    const wb = this.world(b[0], b[1], b[2]);
-    const wc = this.world(c[0], c[1], c[2]);
-    const ux = wb[0] - wa[0], uy = wb[1] - wa[1], uz = wb[2] - wa[2];
-    const vx = wc[0] - wa[0], vy = wc[1] - wa[1], vz = wc[2] - wa[2];
+  tri(ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, color: Color, glow = 0.16) {
+    const ox = this.ox, oy = this.oy, oz = this.oz, cs = this.cos, sn = this.sin;
+    const wax = ox + cs * ax - sn * az, way = oy + ay, waz = oz + sn * ax + cs * az;
+    const wbx = ox + cs * bx - sn * bz, wby = oy + by, wbz = oz + sn * bx + cs * bz;
+    const wcx = ox + cs * cx - sn * cz, wcy = oy + cy, wcz = oz + sn * cx + cs * cz;
+    const ux = wbx - wax, uy = wby - way, uz = wbz - waz;
+    const vx = wcx - wax, vy = wcy - way, vz = wcz - waz;
     const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     const len = Math.hypot(nx, ny, nz);
     if (len < 1e-6) return;
     const inv = 1 / len;
-    this.positions.push(wa[0], wa[1], wa[2], wb[0], wb[1], wb[2], wc[0], wc[1], wc[2]);
-    for (let i = 0; i < 3; i++) {
-      this.normals.push(nx * inv, ny * inv, nz * inv);
-      this.colors.push(color[0], color[1], color[2]);
-      this.glows.push(glow);
-    }
+    const enx = nx * inv, eny = ny * inv, enz = nz * inv;
+    const r = color[0], g = color[1], b = color[2];
+    this.ensure(3);
+    const o3 = this.count * 3, o1 = this.count;
+    const pos = this.pos, nrm = this.nrm, col = this.col, glw = this.glw;
+    pos[o3] = wax; pos[o3 + 1] = way; pos[o3 + 2] = waz;
+    pos[o3 + 3] = wbx; pos[o3 + 4] = wby; pos[o3 + 5] = wbz;
+    pos[o3 + 6] = wcx; pos[o3 + 7] = wcy; pos[o3 + 8] = wcz;
+    nrm[o3] = enx; nrm[o3 + 1] = eny; nrm[o3 + 2] = enz;
+    nrm[o3 + 3] = enx; nrm[o3 + 4] = eny; nrm[o3 + 5] = enz;
+    nrm[o3 + 6] = enx; nrm[o3 + 7] = eny; nrm[o3 + 8] = enz;
+    col[o3] = r; col[o3 + 1] = g; col[o3 + 2] = b;
+    col[o3 + 3] = r; col[o3 + 4] = g; col[o3 + 5] = b;
+    col[o3 + 6] = r; col[o3 + 7] = g; col[o3 + 8] = b;
+    glw[o1] = glow; glw[o1 + 1] = glow; glw[o1 + 2] = glow;
+    this.count += 3;
   }
 
-  quad(a: [number, number, number], b: [number, number, number], c: [number, number, number], d: [number, number, number], color: Color, glow = 0.16) {
-    this.tri(a, b, c, color, glow);
-    this.tri(a, c, d, color, glow);
+  quad(
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number,
+    dx: number, dy: number, dz: number,
+    color: Color, glow = 0.16,
+  ) {
+    this.tri(ax, ay, az, bx, by, bz, cx, cy, cz, color, glow);
+    this.tri(ax, ay, az, cx, cy, cz, dx, dy, dz, color, glow);
   }
 
   box(w: number, h: number, d: number, cx: number, cy: number, cz: number, color: Color, glow = 0.16) {
+    if (w < 1e-5 || h < 1e-5 || d < 1e-5) return;
     const x0 = cx - w * 0.5, x1 = cx + w * 0.5;
-    const y0 = cy - h * 0.5, y1 = cy + h * 0.5;
+    const y0 = this.oy + cy - h * 0.5, y1 = this.oy + cy + h * 0.5;
     const z0 = cz - d * 0.5, z1 = cz + d * 0.5;
+    const ox = this.ox, oz = this.oz, cs = this.cos, sn = this.sin;
+    // Four horizontal corners in world space (00: x0,z0; 10: x1,z0; 11: x1,z1; 01: x0,z1)
+    const x00 = ox + cs * x0 - sn * z0, z00 = oz + sn * x0 + cs * z0;
+    const x10 = ox + cs * x1 - sn * z0, z10 = oz + sn * x1 + cs * z0;
+    const x11 = ox + cs * x1 - sn * z1, z11 = oz + sn * x1 + cs * z1;
+    const x01 = ox + cs * x0 - sn * z1, z01 = oz + sn * x0 + cs * z1;
+    this.ensure(36);
+    const pos = this.pos, nrm = this.nrm, col = this.col, glw = this.glw;
+    const r = color[0], g = color[1], b = color[2];
+    let o3 = this.count * 3, o1 = this.count;
+    const face = (
+      ax: number, ay: number, az: number,
+      bx: number, by: number, bz: number,
+      ex: number, ey: number, ez: number,
+      dx: number, dy: number, dz: number,
+      nx: number, ny: number, nz: number,
+    ) => {
+      pos[o3] = ax; pos[o3 + 1] = ay; pos[o3 + 2] = az;
+      pos[o3 + 3] = bx; pos[o3 + 4] = by; pos[o3 + 5] = bz;
+      pos[o3 + 6] = ex; pos[o3 + 7] = ey; pos[o3 + 8] = ez;
+      pos[o3 + 9] = ax; pos[o3 + 10] = ay; pos[o3 + 11] = az;
+      pos[o3 + 12] = ex; pos[o3 + 13] = ey; pos[o3 + 14] = ez;
+      pos[o3 + 15] = dx; pos[o3 + 16] = dy; pos[o3 + 17] = dz;
+      for (let k = 0; k < 18; k += 3) {
+        nrm[o3 + k] = nx; nrm[o3 + k + 1] = ny; nrm[o3 + k + 2] = nz;
+        col[o3 + k] = r; col[o3 + k + 1] = g; col[o3 + k + 2] = b;
+      }
+      glw[o1] = glow; glw[o1 + 1] = glow; glw[o1 + 2] = glow;
+      glw[o1 + 3] = glow; glw[o1 + 4] = glow; glw[o1 + 5] = glow;
+      o3 += 18; o1 += 6;
+    };
     // +Z front, -Z back, +X right, -X left, +Y top, -Y bottom
-    this.quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], color, glow);
-    this.quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], color, glow);
-    this.quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], color, glow);
-    this.quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], color, glow);
-    this.quad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], color, glow);
-    this.quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], color, glow);
+    face(x01, y0, z01, x11, y0, z11, x11, y1, z11, x01, y1, z01, -sn, 0, cs);
+    face(x10, y0, z10, x00, y0, z00, x00, y1, z00, x10, y1, z10, sn, 0, -cs);
+    face(x11, y0, z11, x10, y0, z10, x10, y1, z10, x11, y1, z11, cs, 0, sn);
+    face(x00, y0, z00, x01, y0, z01, x01, y1, z01, x00, y1, z00, -cs, 0, -sn);
+    face(x01, y1, z01, x11, y1, z11, x10, y1, z10, x00, y1, z00, 0, 1, 0);
+    face(x00, y0, z00, x10, y0, z10, x11, y0, z11, x01, y0, z01, 0, -1, 0);
+    this.count += 36;
   }
 
   /** Curved Japanese sweeping roof (irimoya/yosemune/pyramidal) with upturned eaves and ridge beam. */
   curvedRoof(w: number, d: number, h: number, y: number, color: Color, pyramidal = false, glow = 0.18) {
     const outline: [number, number][] = [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]];
     const profile: [number, number][] = [[1, 0], [0.92, 0.045], [0.78, 0.19], [0.58, 0.46], [0.36, 0.78], [0.22, 1]];
-    const rings: [number, number, number][][] = [];
+    const rings = new Float64Array(profile.length * 8 * 3);
     const cornerTurn = Math.min(0.45, Math.max(0.12, h * 0.085));
-    for (const [scale, t] of profile) {
-      const ring: [number, number, number][] = [];
-      for (const [ox, oz] of outline) {
-        const turn = ox !== 0 && oz !== 0 ? cornerTurn * Math.max(0, (scale - 0.78) / 0.22) : 0;
-        const sx = t === 1 && pyramidal ? 0.02 : scale;
-        const sz = t === 1 ? 0.02 : scale;
-        ring.push([ox * w * 0.5 * sx, y + h * t + turn, oz * d * 0.5 * sz]);
-      }
-      rings.push(ring);
-    }
-    for (let r = 0; r < rings.length - 1; r++) {
+    for (let r = 0; r < profile.length; r++) {
+      const [scale, t] = profile[r];
+      const sx = t === 1 && pyramidal ? 0.02 : scale;
+      const sz = t === 1 ? 0.02 : scale;
+      const turnAmt = cornerTurn * Math.max(0, (scale - 0.78) / 0.22);
+      const baseY = y + h * t;
       for (let i = 0; i < 8; i++) {
-        const next = (i + 1) % 8;
-        this.tri(rings[r][i], rings[r + 1][i], rings[r][next], color, glow);
-        this.tri(rings[r][next], rings[r + 1][i], rings[r + 1][next], color, glow);
+        const [ox, oz] = outline[i];
+        const k = (r * 8 + i) * 3;
+        rings[k] = ox * w * 0.5 * sx;
+        rings[k + 1] = baseY + (ox !== 0 && oz !== 0 ? turnAmt : 0);
+        rings[k + 2] = oz * d * 0.5 * sz;
       }
     }
-    const top = rings[rings.length - 1];
-    const apex: [number, number, number] = [0, y + h, 0];
+    for (let r = 0; r < profile.length - 1; r++) {
+      for (let i = 0; i < 8; i++) {
+        const next = (i + 1) & 7;
+        const a = (r * 8 + i) * 3, b = ((r + 1) * 8 + i) * 3, c = (r * 8 + next) * 3, e = ((r + 1) * 8 + next) * 3;
+        this.tri(rings[a], rings[a + 1], rings[a + 2], rings[b], rings[b + 1], rings[b + 2], rings[c], rings[c + 1], rings[c + 2], color, glow);
+        this.tri(rings[c], rings[c + 1], rings[c + 2], rings[b], rings[b + 1], rings[b + 2], rings[e], rings[e + 1], rings[e + 2], color, glow);
+      }
+    }
+    const topBase = (profile.length - 1) * 8;
+    const apexY = y + h;
     for (let i = 0; i < 8; i++) {
-      const next = (i + 1) % 8;
-      this.tri(apex, top[next], top[i], color, glow);
+      const next = (i + 1) & 7;
+      const tn = (topBase + next) * 3, ti = (topBase + i) * 3;
+      this.tri(0, apexY, 0, rings[tn], rings[tn + 1], rings[tn + 2], rings[ti], rings[ti + 1], rings[ti + 2], color, glow);
     }
     // Overhanging eave fascia underside + main ridge beam (mune) + end caps (onigawara)
     this.box(w * 0.98, Math.max(0.16, h * 0.05), d * 0.98, 0, y - Math.max(0.08, h * 0.025), 0, color, glow);
@@ -167,22 +231,15 @@ class SacredBuilder {
         const [s0, t0] = profile[i], [s1, t1] = profile[i + 1];
         const z0 = side * halfD * s0, z1 = side * halfD * s1;
         const y0 = y + h * t0, y1 = y + h * t1;
-        const a: [number, number, number] = [-halfW, y0, z0];
-        const b: [number, number, number] = [halfW, y0, z0];
-        const c: [number, number, number] = [halfW, y1, z1];
-        const e: [number, number, number] = [-halfW, y1, z1];
-        if (side > 0) this.quad(a, b, c, e, roofColor, glow);
-        else this.quad(b, a, e, c, roofColor, glow);
+        if (side > 0) this.quad(-halfW, y0, z0, halfW, y0, z0, halfW, y1, z1, -halfW, y1, z1, roofColor, glow);
+        else this.quad(halfW, y0, z0, -halfW, y0, z0, -halfW, y1, z1, halfW, y1, z1, roofColor, glow);
       }
     }
     // Gable wall triangles on both x ends
     for (const end of [-1, 1]) {
       const x = end * halfW * 0.92;
-      const l: [number, number, number] = [x, y, -halfD * 0.82];
-      const r: [number, number, number] = [x, y, halfD * 0.82];
-      const apex: [number, number, number] = [x, ridgeY, 0];
-      if (end > 0) this.tri(r, l, apex, trimColor, glow);
-      else this.tri(l, r, apex, trimColor, glow);
+      if (end > 0) this.tri(x, y, halfD * 0.82, x, y, -halfD * 0.82, x, ridgeY, 0, trimColor, glow);
+      else this.tri(x, y, -halfD * 0.82, x, y, halfD * 0.82, x, ridgeY, 0, trimColor, glow);
     }
     // Eave underside & prominent ridge log (munagi)
     this.box(w * 1.02, Math.max(0.14, h * 0.045), d * 1.04, 0, y - 0.08, 0, roofColor, glow);
@@ -425,12 +482,12 @@ class SacredBuilder {
         case SACRED.toriiStone: this.torii(b, true); break;
       }
     }
-    if (!this.positions.length) return null;
+    if (!this.count) return null;
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(this.normals, 3));
-    geometry.setAttribute('aColor', new THREE.Float32BufferAttribute(this.colors, 3));
-    geometry.setAttribute('aGlow', new THREE.Float32BufferAttribute(this.glows, 1));
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.pos.subarray(0, this.count * 3), 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(this.nrm.subarray(0, this.count * 3), 3));
+    geometry.setAttribute('aColor', new THREE.BufferAttribute(this.col.subarray(0, this.count * 3), 3));
+    geometry.setAttribute('aGlow', new THREE.BufferAttribute(this.glw.subarray(0, this.count), 1));
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
     return geometry;

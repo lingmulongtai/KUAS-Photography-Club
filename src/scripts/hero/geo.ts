@@ -34,6 +34,7 @@ export const CAMPUS_OUTLINE: [number, number][] = [
 export const CAMPUS_CENTER = { x: -3755, z: -700 };
 
 export function inCampus(x: number, z: number) {
+  if (x < -3876 || x > -3660 || z < -797 || z > -608) return false;
   let inside = false;
   const p = CAMPUS_OUTLINE;
   for (let i = 0, j = p.length - 1; i < p.length; j = i++) {

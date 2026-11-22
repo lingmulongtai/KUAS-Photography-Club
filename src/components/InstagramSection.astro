@@ -26,15 +26,47 @@ const embedUrl = new URL('embed/', `${club.instagram.url.replace(/\/$/, '')}/`);
     </div>
     <div class="embed">
       <iframe
-        src={embedUrl.href}
+        data-instagram-embed
+        data-src={embedUrl.href}
         title={en ? 'KUAS Photography Club Instagram profile and posts' : '京都先端科学大学 写真部の Instagram プロフィールと投稿'}
         width="540"
         height="648"
         loading="lazy"
       ></iframe>
+      <noscript>
+        <iframe
+          src={embedUrl.href}
+          title={en ? 'KUAS Photography Club Instagram profile and posts' : '京都先端科学大学 写真部の Instagram プロフィールと投稿'}
+          width="540"
+          height="648"
+        ></iframe>
+      </noscript>
     </div>
   </div>
 </section>
+<script>
+  const frames = document.querySelectorAll<HTMLIFrameElement>('iframe[data-instagram-embed][data-src]');
+  const load = (frame: HTMLIFrameElement) => {
+    const src = frame.dataset.src;
+    if (!src || frame.src) return;
+    frame.src = src;
+  };
+  if (frames.length) {
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const frame = entry.target as HTMLIFrameElement;
+          observer.unobserve(frame);
+          load(frame);
+        }
+      }, { rootMargin: '500px 0px' });
+      frames.forEach(frame => observer.observe(frame));
+    } else {
+      frames.forEach(load);
+    }
+  }
+</script>
 
 <style>
   .grid {

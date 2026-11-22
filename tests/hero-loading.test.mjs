@@ -34,3 +34,16 @@ test('required downloads retain their rejection and readiness ignores later fail
   await loading.track(Promise.resolve());loading.built();loading.frame();loading.fail(Error('optional photo'));
   assert.equal(ready,1);assert.equal(errors,0);
 });
+
+test('multi-frame readiness waits until the requested number of scene frames have rendered',()=>{
+  const progress=[];let ready=0;
+  const loading=createHeroLoading({onProgress:p=>progress.push(p),onReady:()=>ready++},2,2);
+  loading.step();loading.step();
+  assert.deepEqual(progress,[1/3,2/3]);
+  loading.built();
+  loading.frame();
+  assert.equal(ready,0,'first frame uploads buffers and shadows before opening the intro');
+  loading.frame();
+  assert.equal(ready,1);
+  assert.deepEqual(progress,[1/3,2/3,1]);
+});

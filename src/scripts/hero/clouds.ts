@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import { cloudWeather, LOWEST_CLOUD_BASE } from './cloud-weather';
-import { CLOUD_COLUMN_GLSL, CLOUD_COLUMN_LOOKUP, createCloudColumns, WEATHER_SCALE } from './cloud-columns.ts';
+import { CLOUD_COLUMN_LOOKUP, createCloudColumns, WEATHER_SCALE } from './cloud-columns.ts';
 import { cloudNoiseTexture } from './cloud-noise.ts';
 import type { Climate } from './seasons';
 import { CIRRUS_Y, HIGH_CLOUD_GLSL } from './high-clouds.ts';
@@ -49,7 +49,6 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
     `,
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
-      ${CLOUD_COLUMN_GLSL}
       ${CLOUD_COLUMN_LOOKUP}
       uniform mediump sampler3D uCloudNoise;
       uniform float uBase;
@@ -89,8 +88,8 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
         if (tower){
           // Towering summer thunderheads lean and bulge into stacked overhanging cauliflower lobes.
           vec3 pShift = pos - vec3(uWind.x, 0., uWind.y) / K;
-          vec3 w0 = texture(uCloudNoise, pShift * .00018).rgb - .5;
-          vec3 w1 = texture(uCloudNoise, pShift * .00048 + vec3(.31, .17, .73)).rgb - .5;
+          vec3 w0 = textureLod(uCloudNoise, pShift * .00018, 0.).rgb - .5;
+          vec3 w1 = textureLod(uCloudNoise, pShift * .00048 + vec3(.31, .17, .73), 0.).rgb - .5;
           xz += (w0.xz * .18 + w1.xz * .07) * (uTop - uBase) * smoothstep(.05, .85, h);
         }
         vec3 column = lookupColumn(xz * K - uWind + uOffset);
@@ -117,7 +116,7 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
       float lumps(vec3 pos){
         float env = coarse(pos);
         if (env <= .001) return 0.;
-        vec4 n = texture(uCloudNoise, cloudCoord(pos));
+        vec4 n = textureLod(uCloudNoise, cloudCoord(pos), 0.);
         float fbmLow = n.g * .625 + n.b * .25 + n.a * .125;
         float shape = clamp(remap(n.r, -(1. - fbmLow) * .72, 1., 0., 1.), 0., 1.);
         float boost = (isStyle(3.) || isStyle(4.)) ? 1.04 : 1.18;
@@ -126,13 +125,12 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
       }
 
       /** Full 3D volumetric cloud density with multi-scale cauliflower billows & frothy wisps. */
-      float density(vec3 pos, float dist){
-        float env = coarse(pos);
+      float density(vec3 pos, float dist, float env){
         if (env <= .001) return 0.;
         bool tower = isStyle(3.) || isStyle(4.);
         float h = clamp((pos.y - uBase) / (uTop - uBase), 0., 1.);
         vec3 q = cloudCoord(pos);
-        vec4 baseN = texture(uCloudNoise, q);
+        vec4 baseN = textureLod(uCloudNoise, q, 0.);
         float fbmLow = baseN.g * .625 + baseN.b * .25 + baseN.a * .125;
         // Perlin-Worley base shape forms bold cauliflower heads and deep sculptural crevices.
         float shape = clamp(remap(baseN.r, -(1. - fbmLow) * (tower ? .78 : .65), 1., 0., 1.), 0., 1.);
@@ -144,7 +142,7 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
         float detailFade = 1. - smoothstep(tower ? 18000. : 9000., tower ? 38000. : 24000., dist);
         if (detailFade > .001){
           vec3 curl = (baseN.gbr - .5) * (tower ? .32 : .26);
-          vec4 hiN = texture(uCloudNoise, q * (tower ? 2.45 : 2.75) + curl + vec3(0., h * .18, 0.));
+          vec4 hiN = textureLod(uCloudNoise, q * (tower ? 2.45 : 2.75) + curl + vec3(0., h * .18, 0.), 0.);
           float hiFbm = hiN.g * .625 + hiN.b * .25 + hiN.a * .125;
           float hiMod = mix(hiFbm, 1. - hiFbm, smoothstep(.04, .24, h));
           float edgeMask = 1. - d * (tower ? .36 : .48);
@@ -155,7 +153,7 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
           #if DETAIL > 1
           float closeFade = 1. - smoothstep(tower ? 8000. : 3800., tower ? 20000. : 10500., dist);
           if (closeFade > .001 && d > .001){
-            vec4 fineN = texture(uCloudNoise, q * 6.8 + curl * 2.0 + hiN.rgb * .16);
+            vec4 fineN = textureLod(uCloudNoise, q * 6.8 + curl * 2.0 + hiN.rgb * .16, 0.);
             float fineFbm = fineN.g * .55 + fineN.b * .30 + fineN.a * .15;
             float wispErode = (1. - fineFbm) * .44 * closeFade * (1. - d * .50);
             d = clamp(remap(d, wispErode, 1., 0., 1.), 0., 1.);
@@ -250,10 +248,10 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
                 // and cannot drop back to coarse before crossing the confirmed hit.
                 float tLo = max(t0, t - dt * .5);
                 float tHi = t + dt * .5;
-                float m1 = .5 * (tLo + tHi);
-                if (coarse(ro + rd * m1) > .001) tHi = m1; else tLo = m1;
-                float m2 = .5 * (tLo + tHi);
-                if (coarse(ro + rd * m2) > .001) tHi = m2; else tLo = m2;
+                for (int b = 0; b < 2; ++b) {
+                  float mid = .5 * (tLo + tHi);
+                  if (coarse(ro + rd * mid) > .001) tHi = mid; else tLo = mid;
+                }
                 t = tLo;
                 fineUntil = tHi + fineStep;
                 fineMode = true;
@@ -274,28 +272,31 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
               continue;
             }
             emptyFine = 0;
-            float d = density(pos, t + dt * .5);
+            float d = density(pos, t + dt * .5, envVal);
             if (d <= .0008) {
               t += dt;
               continue;
             }
 
             float h = clamp((pos.y - uBase) / layerDepth, 0., 1.);
-            // Exponential sun-ray optical depth: 3D billow probes carve sculptural shadows between cumulus heads.
+            // Exponential sun-ray optical depth: looped probes keep HLSL compact for fast D3D11 compilation.
+            float od = 0.;
             #if DETAIL > 1
-            float od = (
-              lumps(pos + uSunDir * (22. * ls)) * 28. +
-              lumps(pos + uSunDir * (64. * ls)) * 58. +
-              lumps(pos + uSunDir * (145. * ls)) * 96. +
-              coarse(pos + uSunDir * (310. * ls)) * 180.
-            ) * ls * extinction * .95;
+            const float sunDist[4] = float[4](22., 64., 145., 310.);
+            const float sunW[4] = float[4](28., 58., 96., 180.);
+            for (int s = 0; s < 4; ++s) {
+              vec3 sp = pos + uSunDir * (sunDist[s] * ls);
+              od += (s < 3 ? lumps(sp) : coarse(sp)) * sunW[s];
+            }
             #else
-            float od = (
-              lumps(pos + uSunDir * (34. * ls)) * 45. +
-              lumps(pos + uSunDir * (110. * ls)) * 95. +
-              coarse(pos + uSunDir * (280. * ls)) * 175.
-            ) * ls * extinction * .95;
+            const float sunDist[3] = float[3](34., 110., 280.);
+            const float sunW[3] = float[3](45., 95., 175.);
+            for (int s = 0; s < 3; ++s) {
+              vec3 sp = pos + uSunDir * (sunDist[s] * ls);
+              od += (s < 2 ? lumps(sp) : coarse(sp)) * sunW[s];
+            }
             #endif
+            od *= ls * extinction * .95;
 
             // 3-octave multiple scattering: bright sunlit tops, silver rims, and soft blue-grey shadowed bellies.
             float atten = 1., contrib = 1., ecc = 1.;

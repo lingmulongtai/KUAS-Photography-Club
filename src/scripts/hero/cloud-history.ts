@@ -181,7 +181,7 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
 
       let shaderFailed = false;
       const oldHandler = renderer.debug.onShaderError,diagnostics=renderer.debug.checkShaderErrors;
-      if(!verified)renderer.debug.checkShaderErrors=true;
+      if(!verified && diagnostics!==false)renderer.debug.checkShaderErrors=true;
       if (!verified) renderer.debug.onShaderError = (...args) => { shaderFailed = true; oldHandler?.(...args); };
       try {
         try {

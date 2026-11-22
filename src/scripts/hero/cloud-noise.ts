@@ -10,24 +10,22 @@ import * as THREE from 'three';
  */
 const SIZE = 48;
 
-function hash3(ix: number, iy: number, iz: number, seed: number): [number, number, number] {
-  let h = (Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(iz, 2147483647) ^ Math.imul(seed, 1274126177)) >>> 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
-  const x = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-  h = Math.imul(h ^ 0x9e3779b9, 2246822519) >>> 0;
-  const y = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-  h = Math.imul(h ^ 0x85ebca6b, 3266489917) >>> 0;
-  const z = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-  return [x, y, z];
-}
-
 function buildWorleyGrid(period: number, seed: number) {
   const count = period * period * period;
   const pts = new Float32Array(count * 3);
+  const s = Math.imul(seed, 1274126177);
   for (let z = 0; z < period; z++) {
+    const hz = Math.imul(z, 2147483647) ^ s;
     for (let y = 0; y < period; y++) {
+      const hy = Math.imul(y, 668265263) ^ hz;
       for (let x = 0; x < period; x++) {
-        const [rx, ry, rz] = hash3(x, y, z, seed);
+        let h = (Math.imul(x, 374761393) ^ hy) >>> 0;
+        h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+        const rx = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+        h = Math.imul(h ^ 0x9e3779b9, 2246822519) >>> 0;
+        const ry = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+        h = Math.imul(h ^ 0x85ebca6b, 3266489917) >>> 0;
+        const rz = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
         const i = ((z * period + y) * period + x) * 3;
         pts[i] = x + 0.12 + rx * 0.76;
         pts[i + 1] = y + 0.12 + ry * 0.76;
@@ -42,38 +40,51 @@ function worleyField(size: number, period: number, seed: number) {
   const pts = buildWorleyGrid(period, seed);
   const out = new Float32Array(size * size * size);
   const scale = period / size;
-  const invP = period;
+  const p2 = period * period;
+  // Precompute neighbor wrap indices and offsets for each voxel coordinate along an axis.
+  const wrapIdx = new Int32Array(size * 3);
+  const wrapOff = new Int32Array(size * 3);
+  const coord = new Float32Array(size);
+  for (let v = 0; v < size; v++) {
+    const f = (v + 0.5) * scale;
+    const c = Math.floor(f);
+    coord[v] = f;
+    for (let d = -1; d <= 1; d++) {
+      const n = ((c + d) % period + period) % period;
+      wrapIdx[v * 3 + d + 1] = n;
+      wrapOff[v * 3 + d + 1] = c + d - n;
+    }
+  }
   for (let vz = 0; vz < size; vz++) {
-    const fz = (vz + 0.5) * scale;
-    const cz = Math.floor(fz);
+    const fz = coord[vz];
+    const zBase = vz * 3;
+    const zOut = vz * size * size;
     for (let vy = 0; vy < size; vy++) {
-      const fy = (vy + 0.5) * scale;
-      const cy = Math.floor(fy);
+      const fy = coord[vy];
+      const yBase = vy * 3;
+      const yOut = zOut + vy * size;
       for (let vx = 0; vx < size; vx++) {
-        const fx = (vx + 0.5) * scale;
-        const cx = Math.floor(fx);
+        const fx = coord[vx];
+        const xBase = vx * 3;
         let minD2 = 9;
-        for (let dz = -1; dz <= 1; dz++) {
-          const nz = ((cz + dz) % invP + invP) % invP;
-          const oz = cz + dz - nz;
-          for (let dy = -1; dy <= 1; dy++) {
-            const ny = ((cy + dy) % invP + invP) % invP;
-            const oy = cy + dy - ny;
-            for (let dx = -1; dx <= 1; dx++) {
-              const nx = ((cx + dx) % invP + invP) % invP;
-              const ox = cx + dx - nx;
-              const i = ((nz * invP + ny) * invP + nx) * 3;
-              const px = pts[i] + ox - fx;
-              const py = pts[i + 1] + oy - fy;
-              const pz = pts[i + 2] + oz - fz;
+        for (let dz = 0; dz < 3; dz++) {
+          const nz = wrapIdx[zBase + dz] * p2;
+          const oz = wrapOff[zBase + dz] - fz;
+          for (let dy = 0; dy < 3; dy++) {
+            const ny = (nz + wrapIdx[yBase + dy] * period);
+            const oy = wrapOff[yBase + dy] - fy;
+            for (let dx = 0; dx < 3; dx++) {
+              const i = (ny + wrapIdx[xBase + dx]) * 3;
+              const px = pts[i] + wrapOff[xBase + dx] - fx;
+              const py = pts[i + 1] + oy;
+              const pz = pts[i + 2] + oz;
               const d2 = px * px + py * py + pz * pz;
               if (d2 < minD2) minD2 = d2;
             }
           }
         }
         // Inverted cellular distance: bright rounded puffy cores (1) and crisp dark creases (0).
-        const d = Math.min(1, Math.sqrt(minD2));
-        out[(vz * size + vy) * size + vx] = Math.max(0, 1 - d * d);
+        out[yOut + vx] = minD2 >= 1 ? 0 : 1 - minD2;
       }
     }
   }
@@ -82,11 +93,19 @@ function worleyField(size: number, period: number, seed: number) {
 
 function gradField(size: number, period: number, seed: number) {
   const grads = new Float32Array(period * period * period * 3);
+  const s = Math.imul(seed, 1274126177);
   for (let z = 0; z < period; z++) {
+    const hz = Math.imul(z, 2147483647) ^ s;
     for (let y = 0; y < period; y++) {
+      const hy = Math.imul(y, 668265263) ^ hz;
       for (let x = 0; x < period; x++) {
-        const [rx, ry, rz] = hash3(x, y, z, seed);
-        const gx = rx * 2 - 1, gy = ry * 2 - 1, gz = rz * 2 - 1;
+        let h = (Math.imul(x, 374761393) ^ hy) >>> 0;
+        h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+        const gx = (((h ^ (h >>> 16)) >>> 0) / 4294967296) * 2 - 1;
+        h = Math.imul(h ^ 0x9e3779b9, 2246822519) >>> 0;
+        const gy = (((h ^ (h >>> 16)) >>> 0) / 4294967296) * 2 - 1;
+        h = Math.imul(h ^ 0x85ebca6b, 3266489917) >>> 0;
+        const gz = (((h ^ (h >>> 16)) >>> 0) / 4294967296) * 2 - 1;
         const inv = 1 / Math.max(1e-5, Math.hypot(gx, gy, gz));
         const i = ((z * period + y) * period + x) * 3;
         grads[i] = gx * inv;
