@@ -232,6 +232,32 @@ test('pitched roof planes retain the courtyard opening and meet at the recorded 
   }
 });
 
+test('Maya cable stations follow their two distinct footprints and the upper clock pavilion stands above the arcade',()=>{
+  for(const [id,lat,lon] of [['maya-cable-station',34.7199073,135.2161210],['maya-cable-niji',34.7272595,135.2122112]]){
+    const b=json('landmarks/index.json').find(row=>row.id===id);
+    assert.equal(b.pref,'28');
+    assert.ok(inPolygon([lon,lat],b.rings));
+    const bytes=readFileSync(new URL('landmarks/'+id+'.glb',root));
+    const length=bytes.readUInt32LE(12),gltf=JSON.parse(bytes.toString('utf8',20,20+length));
+    const pos=gltf.accessors[gltf.meshes[0].primitives[0].attributes.POSITION];
+    if(id==='maya-cable-niji'){
+      const offset=28+length+(gltf.bufferViews[pos.bufferView].byteOffset??0),peak=pos.max[1];
+      assert.ok(peak>11 && peak<13);
+      let topX=0,topZ=0,count=0;
+      for(let i=0;i<pos.count;i++){
+        if(Math.abs(bytes.readFloatLE(offset+i*12+4)-peak)>.01)continue;
+        topX+=bytes.readFloatLE(offset+i*12);topZ+=bytes.readFloatLE(offset+i*12+8);count++;
+      }
+      // The four-sided clock is on the uphill half, behind the southwest-facing entrance.
+      const angle=324.9*Math.PI/180,x=topX/count,z=topZ/count;
+      assert.ok(Math.abs(x*Math.cos(angle)+z*Math.sin(angle)+1.3)<.4);
+      assert.ok(Math.abs(x*Math.sin(angle)-z*Math.cos(angle)-4.4)<.4);
+    }else{
+      assert.ok(pos.max[1]>6 && pos.max[1]<9 && pos.min[1]<-2);
+    }
+  }
+});
+
 test('Kobe Maritime Museum replaces its waterfront footprint with an open 45 metre space frame',()=>{
   const row=json('landmarks/index.json').find(r=>r.id==='kobe-maritime-museum');
   assert.equal(row.pref,'28');

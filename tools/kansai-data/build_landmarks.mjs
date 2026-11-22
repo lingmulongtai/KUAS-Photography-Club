@@ -5,6 +5,7 @@ import {createServer} from 'vite';
 import {roofNormalUri,tileCoordinates} from './roof-tile-material.mjs';
 import {maritimeMuseum,museumParts} from './maritime-museum.mjs';
 import {portTower} from './port-tower.mjs';
+import {mayaStations} from './maya-stations.mjs';
 import {districtModel} from './nankinmachi.mjs';
 import {kasugaBuildings} from './kasuga.mjs';
 import {flightAviary} from './aviary.mjs';
@@ -102,6 +103,9 @@ try{
     const a=b.angle*Math.PI/180;return geo(b.x+x*Math.cos(a)-z*Math.sin(a),b.z+x*Math.sin(a)+z*Math.cos(a));
   }));
   await save('inari',inari,...geo(anchor.x,anchor.z),inariMasks);
+  for(const station of mayaStations()){
+    await save(station.id,station.parts,station.lon,station.lat,[station.ring],'28');
+  }
   await save('kobe-port-tower',portTower(),135.1867241,34.6826279,undefined,'28');
   const hotel=JSON.parse(await fs.readFile(new URL('harbor-hotel.json',import.meta.url)));
   const hotelMask=hotel.floorOutlines[0].map(([x,z])=>[hotel.lon+x/91644,hotel.lat-z/110940]);
