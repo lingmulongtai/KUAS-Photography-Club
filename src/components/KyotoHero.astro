@@ -30,7 +30,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       <source type="image/webp" srcset="/brand/kyoto-preview-640.webp 640w, /brand/kyoto-preview-960.webp 960w, /brand/kyoto-preview-1250.webp 1250w" sizes="100vw" />
       <img class="hero-poster" src="/brand/kyoto-thumbnail.jpg" width="1250" height="710" alt="" fetchpriority="high" decoding="async" />
     </picture>
-    <canvas aria-label={en ? 'Explore Kyoto in 3D using real terrain and building data. Drag to look around and select a place to move closer.' : '実際の地形と建物データから作った京都の3D。ドラッグで見回し、地点を選ぶと近づけます。'}></canvas>
+    <canvas aria-label={en ? 'Explore Kyoto, Shiga, Osaka, Nara and Hyogo using real terrain and building data. Drag to look around or select a place to fly there.' : '京都・滋賀・大阪・奈良・兵庫の地形と街並みを巡る3D風景。ドラッグで見回し、地点を選ぶと移動できます。'}></canvas>
     <nav class="views" aria-label={en ? 'Scenic viewpoints' : '展望地点'}>
       <span class="views-label">VIEW</span>
       <div class="view-options">
