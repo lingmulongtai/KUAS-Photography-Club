@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {loadGrid, loadJSON, loadTexture, type GridMeta} from './data';
+import {decodeTreeCover} from './tree-cover';
+import {loadBinary,loadGrid, loadJSON, loadTexture, type GridMeta} from './data';
 import {ENV_GLSL, type Env} from './env';
 import type {Box} from './geo';
 import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
@@ -76,13 +77,22 @@ const fragmentShader = `
       photo.rgb=mix(photo.rgb,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
     }
     vec3 n=normalize(vNormal);
-    vec3 lit=shade(seasonalSurface(photo.rgb*.68,n,vWorld),n,vWorld,1.);
+    float green=smoothstep(.006,.035,photo.g-min(photo.r,photo.b));
+    vec3 albedo=photo.rgb*.68*mix(vec3(1.),vec3(1.65,.72,.38),green*uAutumn*.6);
+    vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,1.);
     gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
   }`;
 
 export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(photo:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>) {
   const {grid,patches}=await loadJSON<GroundSurvey>('kansai/ground.json');
-  const [heights,boundary]=await Promise.all([loadGrid(grid),boundaryUniforms()]);
+  const [heights,boundary,cover]=await Promise.all([
+    loadGrid(grid),boundaryUniforms(),loadBinary('kansai/canopy.bin').then(decodeTreeCover),
+  ]);
+  const step=(cover.box[2]-cover.box[0])/cover.width;
+  function canopy(x:number,z:number){
+    const col=Math.floor((x-cover.box[0])/step),row=Math.floor((z-cover.box[1])/step);
+    return col<0 || row<0 || col>=cover.width || row>=cover.height ? 0 : cover.cells[row*cover.width+col]/15;
+  }
   const kyoto=hf.bounds;
   const ground:Ground=(x,z)=>{
     const d=boxDistance(x,z,kyoto);
@@ -138,5 +148,5 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       }).catch(()=>{state.retry=last+10;}).finally(()=>{state.pending=false;running--;});
     }
   }
-  return {bounds:grid.box,ground,update};
+  return {bounds:grid.box,ground,canopy,update};
 }

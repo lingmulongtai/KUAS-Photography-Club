@@ -1,6 +1,6 @@
 import type {TileRequest,CompiledTile} from './tile-compiler';
 
-export function tileQueue(){
+export function tileQueue(includeTrees=true){
   const jobs=new Map<number,{resolve:(tile:CompiledTile)=>void;reject:(error:Error)=>void}>();
   let sequence=0,disposed=false,worker:Worker|undefined;
   let local:Promise<ReturnType<typeof import('./tile-compiler').tileCompiler>>|undefined;
@@ -28,7 +28,7 @@ export function tileQueue(){
   return {
     compile(x:number,y:number,elevations:Float64Array<ArrayBuffer>){
       if(disposed)return Promise.reject(Error('Map closed'));
-      const request={id:++sequence,x,y,elevations};
+      const request={id:++sequence,x,y,elevations,includeTrees};
       if(!worker)return fallback(request);
       return new Promise<CompiledTile>((resolve,reject)=>{
         jobs.set(sequence,{resolve,reject});

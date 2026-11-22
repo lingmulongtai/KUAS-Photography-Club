@@ -155,7 +155,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legac
     regionalLandmarks(scene,env,ground,prepare),boundaryUniforms(),
   ]);
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
-  const queue=tileQueue(),material=cityMaterial(env,boundary);
+  const queue=tileQueue(false),material=cityMaterial(env,boundary);
   let shaderReady:Promise<unknown>|undefined;
   type Entry={mesh:THREE.Mesh|null;mask?:(near:ReadonlySet<string>)=>void};
   const loaded=new Map<string,Entry>(),loading=new Set<string>(),retry=new Map<string,number>();

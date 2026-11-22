@@ -11,7 +11,7 @@ import { SHADOW_LAYER } from './shadow';
 /** Ground photographs tint the crowns. The planting map is independent of the visited views. */
 export function createForest(
   env: Env,
-  hf: Heightfield,
+  hf: Pick<Heightfield,'height'|'bounds'|'normal'>,
   quality: number,
   photos: { photo: HTMLImageElement | ImageBitmap; box: Box; uv?:Box }[],
   coverage: (x: number, z: number) => number,

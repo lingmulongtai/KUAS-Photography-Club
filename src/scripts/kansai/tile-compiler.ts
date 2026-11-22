@@ -38,12 +38,12 @@ function terrainSampler(elevations:Float64Array,west:number,south:number,east:nu
   };
 }
 
-export interface TileRequest {id:number;x:number;y:number;elevations:Float64Array<ArrayBuffer>}
+export interface TileRequest {includeTrees?:boolean;id:number;x:number;y:number;elevations:Float64Array<ArrayBuffer>}
 export interface CompiledTile {center:Point;geometry?:TileGeometry;locations:Point[]}
 
 export function tileCompiler(){
   let data:Promise<[Awaited<ReturnType<typeof modelSources>>,Awaited<ReturnType<typeof regionalHeights>>]>|undefined;
-  return async({x,y,elevations}:TileRequest):Promise<CompiledTile>=>{
+  return async({x,y,elevations,includeTrees=true}:TileRequest):Promise<CompiledTile>=>{
     data??=Promise.all([modelSources(),regionalHeights()]).catch(error=>{data=undefined;throw error;});
     const [sources,heightSources]=await data;
     const nw=lonLat(x,y,16),se=lonLat(x+1,y+1,16),[west,north]=nw,[east,south]=se;
@@ -53,7 +53,7 @@ export function tileCompiler(){
 
     const ground=terrainSampler(elevations,west,south,east,north);
     const [tile,fields,tags,canopy,surfaces,edges,lidar,heightsByBuilding]=await Promise.all([sources.network(x,y),sources.fields(key,slot),sources.tags(key,slot),
-      sources.canopy(corners),sources.surfaces(x>>1,y>>1),sources.edges(x,y),
+      includeTrees?sources.canopy(corners):null,sources.surfaces(x>>1,y>>1),sources.edges(x,y),
       hyogoHeights(x,y),heightSources(x,y,corners)]);
     const [mx,my]=tileMetresPerDegree(center[1]);
     const local=([lon,lat]:Point):Point=>[(lon-center[0])*mx,(lat-center[1])*my];
@@ -68,9 +68,11 @@ export function tileCompiler(){
       const projected=rings.map(r=>openRing(r).map(local)).filter(r=>r.length>=3);
       if(!projected.length)return;
       const size=area(projected[0]);if(size<1)return;
-      const cols=rings[0].map(col),rows=rings[0].map(row);
-      for(let j=Math.min(...rows);j<=Math.max(...rows);j++)for(let i=Math.min(...cols);i<=Math.max(...cols);i++){
-        const k=j*8+i;if(!occupied.has(k))occupied.set(k,[]);occupied.get(k)!.push(rings);
+      if(includeTrees){
+        const cols=rings[0].map(col),rows=rings[0].map(row);
+        for(let j=Math.min(...rows);j<=Math.max(...rows);j++)for(let i=Math.min(...cols);i<=Math.max(...cols);i++){
+          const k=j*8+i;if(!occupied.has(k))occupied.set(k,[]);occupied.get(k)!.push(rings);
+        }
       }
       const style=noise(Math.round(p[0]*1e6),Math.round(p[1]*1e6));
       const mapped=tag?.height&&tag.height>0?tag.height:undefined;
@@ -161,7 +163,7 @@ export function tileCompiler(){
         }
     }
     const side=28;
-    for(let i=0;i<side;i++)for(let j=0;j<side;j++){
+    if(canopy)for(let i=0;i<side;i++)for(let j=0;j<side;j++){
       const ix=x*side+i,iy=y*side+j,seed=noise(ix,iy);
       const p=lonLat(x+(i+.1+.8*noise(ix+17,iy))/side,y+(j+.1+.8*noise(ix,iy+31))/side,16);
       if(seed>canopy(p)*.96||inWater(p)||occupied.get(row(p)*8+col(p))?.some(r=>inPolygon(p,r)))continue;

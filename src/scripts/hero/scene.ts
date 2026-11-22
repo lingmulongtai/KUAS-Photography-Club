@@ -450,11 +450,20 @@ export function createHero(
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
     let cultivated:((x:number,z:number)=>boolean)|undefined;
-    const forest = createForest(env, hf, opts.quality, [
+    const forestTerrain={
+      get bounds(){return regional?.bounds??hf.bounds;},
+      height:(x:number,z:number)=>regional?regional.ground(x,z):hf.height(x,z),
+      normal:hf.normal.bind(hf),
+    };
+    const forest = createForest(env, forestTerrain, opts.quality, [
       { photo: basin.texture.image as HTMLImageElement, box: meta.aerialCity.box, uv:basin.sheets[0].uv },
       { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box },
       ...(outer && meta.aerialOuter ? [{ photo: outer.image as HTMLImageElement, box: meta.aerialOuter.box }] : []),
-    ], (x,z) => woodlandRaster.sample(x,z) || (island(x,z) ? 1 : 0),
+    ], (x,z) => {
+      const b=woodlandRaster.box;
+      if(x>=b[0] && x<b[2] && z>=b[1] && z<b[3])return woodlandRaster.sample(x,z) || (island(x,z)?1:0);
+      return regional?.canopy(x,z)??0;
+    },
     (x,z) => !!cultivated?.(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
       replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
     [...campusTreeSpots(hf),...cherries], !cover);
@@ -470,8 +479,8 @@ export function createHero(
     const planted = (work: Promise<void> | undefined) => {
       void work?.then(() => shadow.invalidate()).catch(error => console.warn('Forest planting failed',error));
     };
-    plantTreesAsync = (eye,bearing) => {if(inKyoto(eye))planted(forest.plantAsync(eye,bearing));};
-    followForest = (eye,bearing) => {if(inKyoto(eye))planted(forest.follow(eye,bearing));};
+    plantTreesAsync = (eye,bearing) => {if(regional || inKyoto(eye))planted(forest.plantAsync(eye,bearing));};
+    followForest = (eye,bearing) => {if(regional || inKyoto(eye))planted(forest.follow(eye,bearing));};
     cancelTreePlanting = forest.cancelPlant;
     scene.add(forest.group);
     campusModel = buildCampus(env, hf).mesh;
