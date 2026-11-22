@@ -112,7 +112,9 @@ export function mayaStations(){
       }
     }
     for(const {geo} of parts)geo.rotateY(-angle);
-    const ring=s.footprint.map(([x,u])=>[s.lon+(x*Math.cos(angle)+u*Math.sin(angle))/91594,s.lat+(u*Math.cos(angle)-x*Math.sin(angle))/110942]);
-    return {...s,parts,ring};
+    const geographic=([x,u])=>[s.lon+(x*Math.cos(angle)+u*Math.sin(angle))/91594,s.lat+(u*Math.cos(angle)-x*Math.sin(angle))/110942];
+    const approach=index===0?[[-2.2,-12.3],[5.5,-12.3],[5.5,-18],[-2.2,-18]]:
+      [[-6.6,11.8],[-6.6,3.4],[-14.7,2.8],[-17,6.6],[-12.4,9.3]];
+    return {...s,parts,ring:s.footprint.map(geographic),approaches:[approach.map(geographic)]};
   });
 }

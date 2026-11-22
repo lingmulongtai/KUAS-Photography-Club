@@ -69,11 +69,11 @@ try{
   const meta=JSON.parse(await fs.readFile(new URL('terrain.json',kyoto)));
   const hf=await loadHeightfield(meta),ground=(x,z)=>hf.height(x,z);
   await fs.mkdir(output,{recursive:true});
-  async function save(id,parts,lon,lat,masks,pref='26'){
+  async function save(id,parts,lon,lat,masks,pref='26',approaches){
     const {data,min,max}=glb(parts),dx=M_PER_DEG_LON,dy=M_PER_DEG_LAT;
     await fs.writeFile(new URL(id+'.glb',output),data);
     const rings=masks??[rect(lon+min[0]/dx,lat-max[2]/dy,lon+max[0]/dx,lat-min[2]/dy)];
-    manifest.push({id,pref,lon,lat,file:'/kansai/landmarks/'+id+'.glb',rings});
+    manifest.push({id,pref,lon,lat,file:'/kansai/landmarks/'+id+'.glb',rings,approaches});
   }
   for(const [name,l] of Object.entries(LANDMARKS)){
     if(name==='kyotoStation')continue;
@@ -104,7 +104,7 @@ try{
   }));
   await save('inari',inari,...geo(anchor.x,anchor.z),inariMasks);
   for(const station of mayaStations()){
-    await save(station.id,station.parts,station.lon,station.lat,[station.ring],'28');
+    await save(station.id,station.parts,station.lon,station.lat,[station.ring],'28',station.approaches);
   }
   await save('kobe-port-tower',portTower(),135.1867241,34.6826279,undefined,'28');
   const hotel=JSON.parse(await fs.readFile(new URL('harbor-hotel.json',import.meta.url)));

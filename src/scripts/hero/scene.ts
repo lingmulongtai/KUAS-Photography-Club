@@ -486,7 +486,7 @@ export function createHero(
       if(x>=b[0] && x<b[2] && z>=b[1] && z<b[3])return woodlandRaster.sample(x,z) || (island(x,z)?1:0);
       return regional?.canopy(x,z)??0;
     },
-    (x,z) => !!cultivated?.(x,z) || todaijiClearing(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
+    (x,z) => !!cultivated?.(x,z) || regionalCity?.excludesTree(x,z)===true || todaijiClearing(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
       replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
     [...campusTreeSpots(hf),...cherries], !cover);
     let forestRefreshPending=false;
@@ -862,7 +862,7 @@ export function createHero(
         terrain.uniforms.uSurveyOn.value=1;
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
           module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,result.imagery,prepare)
-        ).then(city=>{regionalCity=city;}).catch(error=>console.warn('Regional city index unavailable',error));
+        ).then(city=>{regionalCity=city;refreshForest();}).catch(error=>console.warn('Regional city index unavailable',error));
       }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
     idle(()=>void ensureRegionalGround?.());
     startGroundRelief=() => idle(() => {

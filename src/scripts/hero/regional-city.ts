@@ -224,5 +224,5 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
         .finally(()=>loading.delete(id));
     }
   }
-  return {update};
+  return {update,excludesTree:architecture.excludesTree};
 }

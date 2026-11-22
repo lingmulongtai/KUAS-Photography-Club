@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {inRing, type Point, type Ring} from '../kansai/coordinates';
+import {landmarkClearings} from './landmark-clearings';
 import {json} from '../kansai/sources';
 import {toLocal} from './geo';
 import type {Env} from './env';
 
-interface Record {id:string;lon:number;lat:number;file:string;rings:Ring[]}
+interface Record {id:string;lon:number;lat:number;file:string;rings:Ring[];approaches?:Ring[]}
 // These structures already use Kyoto's bespoke materials or its station cutout.
 const kyoto=new Set(['station-district','kyotoTower','toji','tojiKondo','tojiKodo','tojiJikido','yasaka','kiyomizu',
   'heianTorii','heianShrine','goldenPavilion','shishinden','ryoanji','kiyomizuHall','togetsukyo','imperial-palace','nijo-castle','byodoin','inari']);
@@ -33,6 +34,7 @@ function dispose(group:THREE.Object3D){
 
 export async function regionalLandmarks(scene:THREE.Scene,env:Env,lights:{sun:THREE.DirectionalLight;sky:THREE.HemisphereLight},ground:(x:number,z:number)=>number,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const catalogue=await json<Record[]>('landmarks/index.json');
+  const excludesTree=landmarkClearings(catalogue.filter(r=>r.approaches?.length));
   const rows=catalogue.filter(row=>!kyoto.has(row.id)).map(row=>({...row,...toLocal(row.lat,row.lon),group:null as THREE.Object3D|null,
     distance:Infinity,pending:false,retry:0}));
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -65,7 +67,7 @@ export async function regionalLandmarks(scene:THREE.Scene,env:Env,lights:{sun:TH
         .finally(()=>{r.pending=false;pending--;});
     }
   }
-  return {update,get revision(){return revision;},contains(p:Point){
+  return {update,excludesTree,get revision(){return revision;},contains(p:Point){
     return rows.some(r=>r.group && Math.abs(r.lon-p[0])<.008 && Math.abs(r.lat-p[1])<.007 && r.rings.some(ring=>inRing(p,ring)));
   }};
 }
