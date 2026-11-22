@@ -340,10 +340,12 @@ export function createHero(
         else terrain.setPhoto(i+1,photo,r.meta.box);
       }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
     });
+    type Sheet={photo:THREE.Texture;box:Box};
+    let localPhoto:Sheet|null=null,regionalPhoto:Sheet|null=null;
     const closePhotos=createNearbyPhotos(
       async()=> (await loadJSON<{photos:PhotoSheet[]}>('photos-osaka.json')).photos,
       async sheet=>({photo:await loadTexture(opts.quality<.75?sheet.mobile.file:sheet.file,aniso),box:sheet.box}),
-      photo=>sharedSlot?.setOverride(photo),value=>value.photo.dispose(),
+      photo=>{localPhoto=photo;sharedSlot?.setOverride(localPhoto??regionalPhoto);},value=>value.photo.dispose(),
       error=>console.warn('Close transport imagery unavailable; retaining regional photo',error),
       meta.otokuni?[meta.otokuni]:[],
     );
@@ -775,7 +777,12 @@ export function createHero(
     loading.built();
     let regionalLoad:Promise<void>|undefined;
     ensureRegionalGround=()=>regionalLoad??=import('./regional-ground')
-      .then(({regionalGround})=>regionalGround(scene,env,hf,aniso))
+      .then(async({regionalGround})=>{
+        const legacy=[BUILDINGS_BOX,...(await cityRegions).regions.map(r=>r.box)];
+        return regionalGround(scene,env,hf,aniso,legacy,sheet=>{
+          regionalPhoto=sheet;sharedSlot?.setOverride(localPhoto??regionalPhoto);
+        });
+      })
       .then(result=>{
         regional=result;
         travelBounds=result.bounds;
@@ -1241,7 +1248,7 @@ export function createHero(
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
       const regionalTime=performance.now()/1000;
-      regional?.update(camera.position.x,camera.position.z,regionalTime);
+      regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime);
       regionalCity?.update(camera.position.x,camera.position.z,regionalTime);
       clouds.prepareField(renderer,camera.position);
       if (dt > 0) driveCars?.(dt);

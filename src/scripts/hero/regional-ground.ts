@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import {loadGrid, loadJSON, loadTexture, type GridMeta} from './data';
 import {ENV_GLSL, type Env} from './env';
 import type {Box} from './geo';
+import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
+import {regionalPhoto,type RegionalPhoto} from './regional-photo';
 import type {Heightfield} from './heightfield';
 
 interface Patch {box: Box; file: string}
@@ -49,20 +51,38 @@ const vertexShader = `
     gl_Position=projectionMatrix*viewMatrix*vec4(position,1.);
   }`;
 const fragmentShader = `
-  uniform sampler2D uPhoto;
+  uniform sampler2D uPhoto,uClose;
+  uniform vec4 uCloseBox;
   varying vec2 vUv;
   varying vec3 vWorld,vNormal;
   ${ENV_GLSL}
+  ${HOME_BOUNDARY}
   void main(){
     vec4 photo=texture2D(uPhoto,vUv);
-    if(photo.a<.5)discard;
-    vec3 lit=shade(photo.rgb,normalize(vNormal),vWorld,1.);
+    if(photo.a<.18)discard;
+    int prefectureCode=owner(vWorld.xz);
+    if(photo.a<.62 && prefectureCode==0){
+      vec3 direction=normalize(vWorld-cameraPosition);
+      float fresnel=pow(1.-clamp(-direction.y,0.,1.),3.);
+      vec3 water=mix(shade(vec3(.024,.086,.105),vec3(0.,1.,0.),vWorld,1.),skyColor(reflect(direction,vec3(0.,1.,0.))),.09+.45*fresnel);
+      gl_FragColor=vec4(applyHaze(water,vec3(0.),vWorld),1.);
+      return;
+    }
+    if(prefectureCode==0)discard;
+    vec2 uv=(vWorld.xz-uCloseBox.xy)/max(vec2(1.),uCloseBox.zw-uCloseBox.xy);
+    if(all(greaterThan(uv,vec2(0.))) && all(lessThan(uv,vec2(1.)))){
+      vec4 aerial=texture2D(uClose,vec2(uv.x,1.-uv.y));
+      vec2 edge=min(uv,1.-uv);
+      photo.rgb=mix(photo.rgb,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
+    }
+    vec3 n=normalize(vNormal);
+    vec3 lit=shade(seasonalSurface(photo.rgb*.68,n,vWorld),n,vWorld,1.);
     gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
   }`;
 
-export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number) {
+export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(photo:RegionalPhoto|null)=>void) {
   const {grid,patches}=await loadJSON<GroundSurvey>('kansai/ground.json');
-  const heights=await loadGrid(grid);
+  const [heights,boundary]=await Promise.all([loadGrid(grid),boundaryUniforms()]);
   const kyoto=hf.bounds;
   const ground:Ground=(x,z)=>{
     const d=boxDistance(x,z,kyoto);
@@ -79,10 +99,17 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   };
 
   const states=patches.map(p=>({patch:p,distance:Infinity,pending:false,retry:0,mesh:null as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>|null}));
+  const uClose={value:null as THREE.Texture|null},uCloseBox={value:new THREE.Vector4()};
+  const photos=regionalPhoto(aniso,sheet=>{
+    uClose.value=sheet?.photo??null;
+    uCloseBox.value.fromArray(sheet?.box??[0,0,0,0]);
+    onPhoto(sheet);
+  });
   let running=0,last= -Infinity;
-  function update(x:number,z:number,now:number) {
+  function update(x:number,z:number,y:number,now:number) {
     if(now-last<.15)return;
     last=now;
+    photos(x,z,y-ground(x,z),now,!legacy.some(b=>boxDistance(x,z,b)===0));
     for(const state of states){
       state.distance=boxDistance(x,z,state.patch.box);
       if(state.mesh && state.distance>65000){
@@ -100,7 +127,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       running++;
       void loadTexture(state.patch.file,aniso).then(photo=>{
         if(state.distance>65000){photo.dispose();return;}
-        const material=new THREE.ShaderMaterial({uniforms:{...env,uPhoto:{value:photo}},vertexShader,fragmentShader});
+        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox},vertexShader,fragmentShader});
         const mesh=new THREE.Mesh(patchGeometry(state.patch.box,kyoto,ground),material);
         mesh.name='regional-ground';
         state.mesh=mesh;
