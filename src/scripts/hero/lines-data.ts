@@ -1,3 +1,4 @@
+import {prepareSteps} from './task-yield.ts';
 import { loadBinary } from './data.ts';
 import { BUILDINGS_BOX, type Box } from './geo.ts';
 import {applyWaterDetails,waterChecksum,type WaterDetail} from './water-detail.ts';
@@ -16,6 +17,19 @@ export interface LineFeature {
 
 export async function loadLines(waterFile?:string|string[],file='lines.bin',box:Box=BUILDINGS_BOX,q=.5) {
   const bytes = await loadBinary(file);
+  const out=await prepareSteps(decodeLines(bytes,box,q));
+  if(!waterFile) return out;
+  try {
+    const details=await Promise.all((Array.isArray(waterFile)?waterFile:[waterFile]).map(async file=>
+      JSON.parse(new TextDecoder().decode(await loadBinary(file))) as WaterDetail));
+    return applyWaterDetails(out,details,waterChecksum(bytes));
+  } catch(error) {
+    console.warn('Regional water unavailable; retaining base water',error);
+    return out;
+  }
+}
+
+function* decodeLines(bytes:Uint8Array,box:Box,q:number){
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const count = dv.getUint32(0, true);
   let o = 4;
@@ -37,6 +51,7 @@ export async function loadLines(waterFile?:string|string[],file='lines.bin',box:
   let z = 0;
   let k = 0;
   for (let i = 0; i < count; i++) {
+    if((i&255)===255)yield;
     const pts = new Float32Array(ns[i] * 2);
     for (let j = 0; j < ns[i]; j++, k++) {
       x += read(ox, k);
@@ -46,13 +61,5 @@ export async function loadLines(waterFile?:string|string[],file='lines.bin',box:
     }
     out[i] = { kind: kinds[i], attr: attrs[i], pts };
   }
-  if(!waterFile) return out;
-  try {
-    const details=await Promise.all((Array.isArray(waterFile)?waterFile:[waterFile]).map(async file=>
-      JSON.parse(new TextDecoder().decode(await loadBinary(file))) as WaterDetail));
-    return applyWaterDetails(out,details,waterChecksum(bytes));
-  } catch(error) {
-    console.warn('Regional water unavailable; retaining base water',error);
-    return out;
-  }
+  return out;
 }

@@ -1,3 +1,4 @@
+import {finishSteps,prepareSteps} from './task-yield.ts';
 import { loadBinary } from './data.ts';
 import type { LineFeature } from './lines-data.ts';
 
@@ -30,7 +31,9 @@ export function loadTunnels() {
 /** Lines as the scene draws them: roads without the stretches inside tunnels. */
 export async function withoutTunnels(lines: Promise<LineFeature[]>) {
   const [l, t] = await Promise.all([lines, loadTunnels()]);
-  return cutTunnels(l, t);
+  if(!t.length)return l;
+  sharedCut??=tunnelIndex(t);
+  return prepareSteps(cutRoads(l,sharedCut,0));
 }
 
 /**
@@ -40,6 +43,11 @@ export async function withoutTunnels(lines: Promise<LineFeature[]>) {
  */
 export function cutTunnels(lines: LineFeature[], tunnels: TunnelLine[], roadKind = 0) {
   if (!tunnels.length) return lines;
+  return finishSteps(cutRoads(lines,tunnelIndex(tunnels),roadKind));
+}
+
+let sharedCut:ReturnType<typeof tunnelIndex>|undefined;
+function tunnelIndex(tunnels:TunnelLine[]){
   const grid = new Map<number, number[]>();
   const key = (cx: number, cz: number) => (cx + 4096) * 8192 + cz + 4096;
   const segs: number[] = [];
@@ -76,8 +84,13 @@ export function cutTunnels(lines: LineFeature[], tunnels: TunnelLine[], roadKind
     return false;
   };
 
+  return {near,inside};
+}
+
+function* cutRoads(lines:LineFeature[],{near,inside}:ReturnType<typeof tunnelIndex>,roadKind:number){
   const out: LineFeature[] = [];
-  for (const f of lines) {
+  for (const [i,f] of lines.entries()) {
+    if((i&127)===127)yield;
     if (f.kind !== roadKind || !near(f.pts)) { out.push(f); continue; }
     const p = f.pts;
     // sample the road at its vertices and every STEP metres between them
