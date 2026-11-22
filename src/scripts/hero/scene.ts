@@ -246,7 +246,7 @@ export function createHero(
     // The base imagery can fail before normal generation is joined below.
     void normals.catch(() => {});
     const [hf, wide, outer] = await Promise.all([elevation, loading.track(loadTexture(wideFile, aniso)),
-      loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
+      loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?'kansai/basin-mobile.webp':'kansai/basin.webp',aniso)
         .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : Promise.resolve(null))]);
     // Download the city while normals and terrain are prepared, rather than
     // starting a second network waterfall after that CPU work.
@@ -820,6 +820,7 @@ export function createHero(
         travelBounds=[w-500,n-500,e+500,s+500];
         groundAt=result.ground;
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
+        terrain.uniforms.uSurveyOn.value=1;
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
           module.regionalCity(scene,env,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,prepare)
         ).then(city=>{regionalCity=city;}).catch(error=>console.warn('Regional city index unavailable',error));

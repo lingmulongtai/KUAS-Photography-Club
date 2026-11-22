@@ -10,6 +10,7 @@ const radius=1,size=(radius*2+1)*256;
 export function regionalPhoto(aniso:number,onChange:(sheet:RegionalPhoto|null)=>void){
   let controller:AbortController|undefined,active:RegionalPhoto|null=null;
   let requested='',candidate='',since=0,retryAt=0;
+  let lastX=NaN,lastZ=NaN,lastTime=0,fastUntil=0;
   function install(sheet:RegionalPhoto|null){
     const previous=active;active=sheet;onChange(sheet);previous?.photo.dispose();
   }
@@ -46,7 +47,7 @@ export function regionalPhoto(aniso:number,onChange:(sheet:RegionalPhoto|null)=>
   return (x:number,z:number,height:number,now:number,enabled:boolean)=>{
     if(!enabled){
       controller?.abort();controller=undefined;
-      candidate=requested='';
+      candidate=requested='';lastX=NaN;
       if(active)install(null);
       return;
     }
@@ -64,7 +65,9 @@ export function regionalPhoto(aniso:number,onChange:(sheet:RegionalPhoto|null)=>
       }).catch(()=>{if(requested==='expo'){requested='';retryAt=performance.now()/1000+8;}});
       return;
     }
-    const zoom=height>450?15:16;
+    if(now>lastTime && Math.hypot(x-lastX,z-lastZ)>(now-lastTime)*250)fastUntil=now+1.2;
+    lastX=x;lastZ=z;lastTime=now;
+    const zoom=height>450 || now<fastUntil ? 15 : 16;
     const [cx,cy]=tileXY(ORIGIN.lon+x/M_PER_DEG_LON,ORIGIN.lat-z/M_PER_DEG_LAT,zoom).map(Math.floor);
     const key=zoom+'/'+cx+'/'+cy;
     if(candidate!==key){candidate=key;since=now;}

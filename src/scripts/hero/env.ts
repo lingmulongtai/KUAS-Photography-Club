@@ -199,6 +199,10 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wp, float sh){
 }
 
 /* A light dusting on upward-facing surfaces, strongest in the higher hills. */
+vec3 surveyedGroundAlbedo(vec3 photo){
+  float green=smoothstep(.006,.035,photo.g-min(photo.r,photo.b));
+  return photo*.68*mix(vec3(1.),vec3(1.65,.72,.38),green*uAutumn*.6);
+}
 vec3 seasonalSurface(vec3 albedo,vec3 n,vec3 wp){
   float cover=uSnow*smoothstep(.4,.85,n.y)*(.3+.7*smoothstep(100.,550.,wp.y));
   return mix(albedo,vec3(.67,.72,.76),cover*(.75+.25*vnoise(wp.xz*.025)));

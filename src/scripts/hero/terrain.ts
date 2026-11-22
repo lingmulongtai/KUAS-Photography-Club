@@ -59,6 +59,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   const uniforms = {
     ...env,
     uTerrainBounds: { value: v4(hf.bounds) },
+    uSurveyOn: { value: 0 },
     uAerialWide: { value: tex.aerialWide },
     uAerialWideBox: { value: v4(tex.aerialWideBox) },
     uAerialCity: { value: tex.aerialCity ?? tex.aerialWide },
@@ -111,6 +112,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       ${ENV_GLSL}
       ${SHADOW_GLSL}
       uniform vec4 uTerrainBounds;
+      uniform float uSurveyOn;
       uniform sampler2D uAerialWide;
       uniform vec4 uAerialWideBox;
       uniform sampler2D uAerialCity;
@@ -207,7 +209,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float outer=uOuterOn*(1.-inside(uAerialWideBox,p,300.));
           if(outer<1.)photo+=remaining*(1.-outer)*blockPhoto(uAerialWide,uAerialWideBox,p,fp,dx,dy);
           if(outer>0.){
-            float mapped=inside(uOuterBox,p,1000.);
+            float mapped=max(uSurveyOn,inside(uOuterBox,p,1000.));
             vec3 background=vec3(.22,.25,.22);
             if(mapped>0.)background=mix(background,blockPhoto(uOuterPhoto,uOuterBox,p,fp,dx,dy),mapped);
             photo+=remaining*outer*background;
@@ -224,6 +226,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           detail = max(detail, k);
         }`).join('')}
 
+        vec3 surveyPhoto=photo;
         // forest: green and dark in the photo. Up close add canopy texture the photo can't resolve.
         float photoGreen = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * (1. - smoothstep(.05, .2, dot(photo, vec3(.33))));
         float green = max(photoGreen, mappedForest);
@@ -391,6 +394,11 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         // Discard after screen derivatives and shadows, so shoreline pixels keep
         // valid derivatives. Physical bridge decks cover the river independently.
         if(river.r>.5)discard;
+        float basinEdge=boxInset(uOuterBox,p);
+        if(uSurveyOn*uOuterOn>.5 && basinEdge<1400.){
+          vec3 albedoAtEdge=seasonalSurface(surveyedGroundAlbedo(surveyPhoto),n,vWorld);
+          col=mix(shade(albedoAtEdge,n,vWorld,1.),col,smoothstep(0.,1400.,basinEdge));
+        }
         vec3 ground = applyHaze(col, emit, vWorld);
         float inset = boxInset(uTerrainBounds, p);
         // Soften the map boundary in the distance. Keep the ground under a

@@ -77,8 +77,7 @@ const fragmentShader = `
       photo.rgb=mix(photo.rgb,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
     }
     vec3 n=normalize(vNormal);
-    float green=smoothstep(.006,.035,photo.g-min(photo.r,photo.b));
-    vec3 albedo=photo.rgb*.68*mix(vec3(1.),vec3(1.65,.72,.38),green*uAutumn*.6);
+    vec3 albedo=surveyedGroundAlbedo(photo.rgb);
     vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,1.);
     gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
   }`;
