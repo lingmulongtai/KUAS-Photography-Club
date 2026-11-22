@@ -6,14 +6,14 @@ import {tileQueue} from '../kansai/tile-queue';
 import {type CompiledTile} from '../kansai/tile-compiler';
 import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
 import {regionalLandmarks} from './regional-landmarks';
-import {Mesh, building} from '../kansai/mesh';
-import {inflate,json} from '../kansai/sources';
+import {skylineReader} from './regional-skyline';
+import type {Skyline} from './regional-skyline-data';
+import {json} from '../kansai/sources';
 import {ENV_GLSL, type Env} from './env';
 import {M_PER_DEG_LAT, M_PER_DEG_LON, ORIGIN, toLocal, type Box} from './geo';
 
 type Ground=(x:number,z:number)=>number;
 type Layer={x:number;y:number;zoom:number;distance:number};
-type Spot=[number,number,unknown,unknown,number[][]];
 const key=(t:Layer)=>t.zoom+'/'+t.x+'/'+t.y;
 
 function sampleTile(x:number,y:number,ground:Ground){
@@ -102,43 +102,10 @@ function nearMesh(tile:CompiledTile,material:THREE.Material,contains:(p:Point)=>
   return {mesh,mask};
 }
 
-async function readSkyline(x:number,y:number,material:THREE.Material,ground:Ground,legacy:Box[],current:()=>boolean){
-  const url='/kansai/skyline/'+x+'-'+y+'.json.gz';
-  const response=await fetch(url);
-  if(!response.ok)throw new Error(url+' '+response.status);
-  const rows:Spot[]=JSON.parse(new TextDecoder().decode(await inflate(new Uint8Array(await response.arrayBuffer()))));
-  const [lon,lat]=lonLat(x+.5,y+.5,12),center=toLocal(lat,lon);
-  const meshData=new Mesh();
-  const ranges:{start:number;count:number;tile:string}[]=[];
-  for(let i=0;i<rows.length;i++){
-    if(i%96===0){
-      await new Promise(resolve=>setTimeout(resolve,0));
-      if(!current())return null;
-    }
-    const [height,min,,,rings]=rows[i];
-    const polygons=rings.map(r=>{
-      const ring:Point[]=[];
-      for(let k=0;k<r.length;k+=2){
-        const [lo,la]=lonLat(x+r[k]/16384,y+r[k+1]/16384,12),p=toLocal(la,lo);
-        ring.push([p.x-center.x,center.z-p.z]);
-      }
-      return ring;
-    });
-    const outline=polygons[0];
-    if(!outline?.length)continue;
-    const xs=outline.map(p=>p[0]),ys=outline.map(p=>p[1]);
-    const dx=(Math.min(...xs)+Math.max(...xs))/2,dy=(Math.min(...ys)+Math.max(...ys))/2;
-    const px=center.x+dx,pz=center.z-dy;
-    if(legacy.some(b=>px>=b[0]&&pz>=b[1]&&px<=b[2]&&pz<=b[3]))continue;
-    const base=ground(px,pz),start=meshData.positions.length/3;
-    building(meshData,polygons,base+min,base+height,0,((i*16807)%997)/997,'flat',base+min);
-    const [tx,ty]=tileXY(ORIGIN.lon+px/M_PER_DEG_LON,ORIGIN.lat-pz/M_PER_DEG_LAT,16).map(Math.floor);
-    ranges.push({start,count:meshData.positions.length/3-start,tile:'16/'+tx+'/'+ty});
-  }
-  const g=meshData.buffers();
-  if(!g)return null;
+function skylineMesh(g:Skyline,material:THREE.Material){
+  const {center,bounds,ranges}=g;
   const geometry=new THREE.BufferGeometry();
-  geometry.setAttribute('position',new THREE.Float32BufferAttribute(g.positions,3));
+  geometry.setAttribute('position',new THREE.BufferAttribute(g.positions,3));
   geometry.setAttribute('normal',new THREE.BufferAttribute(g.normals,3));
   geometry.setAttribute('uv',new THREE.BufferAttribute(g.uv,2));
   geometry.setAttribute('surface',new THREE.BufferAttribute(g.colors,4,true));
@@ -146,14 +113,18 @@ async function readSkyline(x:number,y:number,material:THREE.Material,ground:Grou
   mesh.rotation.x=-Math.PI/2;
   mesh.position.set(center.x,0,center.z);
   mesh.name='regional-skyline';
+  geometry.boundingSphere=new THREE.Box3(new THREE.Vector3(bounds[0],bounds[1],bounds[2]),
+    new THREE.Vector3(bounds[3],bounds[4],bounds[5])).getBoundingSphere(new THREE.Sphere());
+  const children=[...new Set(ranges.map(r=>r.tile))];
   let signature='';
   const indices=new Uint32Array(g.positions.length/3);
   const index=new THREE.BufferAttribute(indices,1).setUsage(THREE.DynamicDrawUsage);
-  geometry.setIndex(index);
   const mask=(near:ReadonlySet<string>)=>{
-    const next=[...new Set(ranges.map(r=>r.tile).filter(k=>near.has(k)))].join(',');
-    if(next===signature && index.version)return;
+    const next=children.filter(k=>near.has(k)).join(',');
+    if(next===signature)return;
     signature=next;
+    if(!next){geometry.setIndex(null);geometry.setDrawRange(0,Infinity);return;}
+    geometry.setIndex(index);
     let count=0;
     for(const range of ranges)if(!near.has(range.tile)){
       for(let i=range.start;i<range.start+range.count;i++)indices[count++]=i;
@@ -171,6 +142,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legac
     regionalLandmarks(scene,env,ground,prepare),boundaryUniforms(),regionalNeighborhoods(scene,env,ground,lite,prepare),
   ]);
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
+  const readSkyline=skylineReader(ground);
   const queue=tileQueue(false,'orthometric'),material=cityMaterial(env,boundary,imagery);
   let shaderReady:Promise<unknown>|undefined;
   type Entry={mesh:THREE.Mesh|null;mask?:(near:ReadonlySet<string>)=>void};
@@ -227,7 +199,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legac
       loading.add(id);
       const job=t.zoom===16?queue.compile(t.x,t.y,sampleTile(t.x,t.y,ground))
         .then(tile=>nearMesh(tile,material,architecture.contains)):
-        readSkyline(t.x,t.y,material,ground,legacy,()=>wanted.has(id));
+        readSkyline({x:t.x,y:t.y,legacy},()=>wanted.has(id)).then(data=>data && wanted.has(id)?skylineMesh(data,material):null);
       void job.then(async result=>{
         if(result?.mesh)await (shaderReady??=prepare(result.mesh));
         if(!wanted.has(id)){result?.mesh?.geometry.dispose();return;}
