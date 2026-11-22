@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {lonLat, tileMetresPerDegree, tileXY, type Point} from '../kansai/coordinates';
 import {tileQueue} from '../kansai/tile-queue';
 import {type CompiledTile} from '../kansai/tile-compiler';
+import {regionalLandmarks} from './regional-landmarks';
 import {Mesh, building} from '../kansai/mesh';
 import {inflate,json} from '../kansai/sources';
 import {ENV_GLSL, type Env} from './env';
@@ -53,7 +54,7 @@ function cityMaterial(env:Env){
       }`});
 }
 
-function nearMesh(tile:CompiledTile,material:THREE.Material) {
+function nearMesh(tile:CompiledTile,material:THREE.Material,contains:(p:Point)=>boolean) {
   const g=tile.geometry;
   if(!g)return null;
   const geometry=new THREE.BufferGeometry();
@@ -67,7 +68,19 @@ function nearMesh(tile:CompiledTile,material:THREE.Material) {
   mesh.scale.set(M_PER_DEG_LON/mx,M_PER_DEG_LAT/my,1);
   mesh.position.set(p.x,0,p.z);
   mesh.name='regional-streets';
-  return mesh;
+  let masked='';
+  function mask(){
+    const hidden=new Set(tile.locations.flatMap((p,i)=>contains(p)?[i+1]:[]));
+    const signature=[...hidden].join(',');
+    if(masked===signature)return;
+    masked=signature;
+    if(!hidden.size){geometry.setIndex(null);return;}
+    const indices=[];
+    for(let i=0;i<g!.ids.length;i++)if(!hidden.has(g!.ids[i]))indices.push(i);
+    geometry.setIndex(indices);
+  }
+  mask();
+  return {mesh,mask};
 }
 
 async function readSkyline(x:number,y:number,material:THREE.Material,ground:Ground,legacy:Box[],current:()=>boolean){
@@ -133,19 +146,20 @@ async function readSkyline(x:number,y:number,material:THREE.Material,ground:Grou
 }
 
 export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legacy:Box[],lite:boolean){
-  const [{tiles},{prefectures}]=await Promise.all([
+  const [{tiles},{prefectures},architecture]=await Promise.all([
     json<{tiles:string[]}>('skyline/index.json'),
     json<{prefectures:Record<string,string[]>}>('network/index.json'),
+    regionalLandmarks(scene,env,ground),
   ]);
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
   const queue=tileQueue(),material=cityMaterial(env);
   type Entry={mesh:THREE.Mesh|null;mask?:(near:ReadonlySet<string>)=>void};
   const loaded=new Map<string,Entry>(),loading=new Set<string>(),retry=new Map<string,number>();
   let wanted=new Map<string,Layer>(),last='',next=0;
-  let near=new Set<string>();
+  let near=new Set<string>(),landmarkRevision=0;
   function remask(){
     near=new Set([...loaded].filter(([k,e])=>k.startsWith('16/') && e.mesh).map(([k])=>k));
-    for(const entry of loaded.values())entry.mask?.(near);
+    for(const [id,entry] of loaded)if(id.startsWith('12/'))entry.mask?.(near);
   }
   function plan(px:number,pz:number){
     const lo=ORIGIN.lon+px/M_PER_DEG_LON,la=ORIGIN.lat-pz/M_PER_DEG_LAT;
@@ -179,13 +193,18 @@ export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legac
   function update(x:number,z:number,now:number){
     if(now<next)return;
     next=now+.09;
+    architecture.update(x,z,now);
+    if(landmarkRevision!==architecture.revision){
+      landmarkRevision=architecture.revision;
+      for(const [id,entry] of loaded)if(id.startsWith('16/'))entry.mask?.(near);
+    }
     plan(x,z);
     for(const [id,t] of wanted){
       if(loading.size>=2)break;
       if(loaded.has(id)||loading.has(id)||(retry.get(id)??0)>now)continue;
       loading.add(id);
       const job=t.zoom===16?queue.compile(t.x,t.y,sampleTile(t.x,t.y,ground))
-        .then(tile=>({mesh:nearMesh(tile,material)})):
+        .then(tile=>nearMesh(tile,material,architecture.contains)):
         readSkyline(t.x,t.y,material,ground,legacy,()=>wanted.has(id));
       void job.then(result=>{
         if(!wanted.has(id)){result?.mesh?.geometry.dispose();return;}
