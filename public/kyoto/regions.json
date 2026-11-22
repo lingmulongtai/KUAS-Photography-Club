@@ -89,18 +89,18 @@
     ],
     "file": "aerial-osaka.webp",
     "size": [
-     2048,
-     2048
+     1536,
+     1536
     ],
-    "bytes": 594838,
-    "zoom": 13,
+    "bytes": 589740,
+    "zoom": 14,
     "mobile": {
      "file": "aerial-osaka-mobile.webp",
      "size": [
-      1024,
-      1024
+      768,
+      768
      ],
-     "bytes": 218056
+     "bytes": 200294
     }
    }
   },

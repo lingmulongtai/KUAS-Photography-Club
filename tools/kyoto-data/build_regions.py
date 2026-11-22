@@ -29,13 +29,13 @@ from extract_buildings import decode_tile
 REGIONS = {
     # Uji precedes overlapping ward data: Kyoto PLATEAU does not cover Uji City.
     'uji': {'box': (0,10000,11000,19000), 'ja':'宇治・平等院', 'en':'Uji / Byodoin'},
-    'osaka': {'box': (-30000,20000,-14000,36000), 'ja':'大阪北部・梅田', 'en':'North Osaka / Umeda'},
+    'osaka': {'box': (-30000,20000,-14000,36000), 'ja':'大阪北部・梅田', 'en':'North Osaka / Umeda', 'photoZoom':14, 'photoSize':1536},
     # Prioritize the confluence over the Kyoto-only south PLATEAU region.
     'tennozan': {'box': (-14000,8500,500,23000), 'ja':'天王山・三川合流域', 'en':'Tennozan / Three Rivers'},
     'kameoka': {'box': (-24000,-8000,-9000,4000), 'ja':'亀岡・保津峡', 'en':'Kameoka / Hozukyo'},
     'sonobe': {'box': (-33000,-18000,-21000,-8000), 'ja':'園部・八木', 'en':'Sonobe / Yagi'},
     'yamashina': {'box': (4600,-2500,12500,8500), 'ja':'山科', 'en':'Yamashina', 'wards':['26110_yamashina-ku'],
-                  'photoBox': (2250,-2500,12500,10000), 'photoZoom':15},
+                  'photoBox': (2250,-2500,12500,10000), 'photoZoom':15, 'photoSize':1792},
     'south': {'box': (-9000,6200,4600,19000), 'ja':'京都南部', 'en':'Southern Kyoto', 'wards':['26107_minami-ku','26109_fushimi-ku']},
     'north': {'box': (-8200,-20000,8100,-7000), 'ja':'京都北部・洛北', 'en':'Northern Kyoto / Rakuhoku',
               'wards':['26101_kita-ku','26103_sakyo-ku'], 'fillOutlines':True, 'photoZoom':14},
@@ -260,7 +260,7 @@ def export_lines(key,box,*,track_box=None,tracks=()):
 def build_photo(key,region):
     box=region.get('photoBox',region['box'])
     width,depth=box[2]-box[0],box[3]-box[1]
-    longest=1792 if key=='yamashina' else 2048
+    longest=region.get('photoSize',2048)
     dims=(round(longest*width/max(width,depth)),round(longest*depth/max(width,depth)))
     zoom=region.get('photoZoom',13)
     if key=='yamashina':
