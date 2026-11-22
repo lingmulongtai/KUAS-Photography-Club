@@ -26,7 +26,7 @@ import { buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
-import { buildWaterAsync } from './water';
+import { biwaSurface, buildWaterAsync } from './water';
 import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
@@ -549,6 +549,13 @@ export function createHero(
     terrain.uniforms.uRoadsOn.value = 1;
     const water = await buildWaterAsync(env, hf, lines, terrain.uniforms,lite?28:18,channel,false,()=>true);
     if (water) scene.add(water);
+    let lakeReady:Promise<boolean>|undefined;
+    const ensureLake=()=>lakeReady??=biwaSurface(env,terrain.uniforms).then(async lake=>{
+      await prepare(lake);
+      scene.add(lake);
+      return true;
+    }).catch(error=>{lakeReady=undefined;console.warn('Lake survey unavailable',error);return false;});
+    idle(()=>void ensureLake());
     scene.add(buildIslands(env, hf, lines));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, labelLanguage);
     const lamps = buildLamps(env, streetGround, lines, opts.quality);
@@ -613,8 +620,9 @@ export function createHero(
       }).catch(error=>{eastTexture=undefined;throw error;});
     };
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
+      const lakeRemainder=r.id==='yamashina' && await ensureLake()?'kansai/yamashina-lake-remainder.json.gz':undefined;
       const results=await Promise.allSettled([loadRegionalBuildings(r),
-        withoutTunnels(loadLines(undefined,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r)] as const);
+        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r)] as const);
       const [b,l,p]=results;
       const disposePhoto=()=>{if(p.status==='fulfilled'&&r.id!=='yamashina')p.value.dispose();};
       if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){

@@ -5,6 +5,7 @@ import { LINE, type LineFeature } from './lines-data';
 import { ROAD_GLSL } from './roads';
 import {refineWaterSurfaceSteps} from './water-surface';
 import {toLocal} from './geo';
+import {loadBinary} from './data';
 import {yieldTask} from './task-yield';
 import type {KamoChannel} from './kamo-channel';
 
@@ -153,6 +154,32 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number){
       }
     `,
   });
+}
+
+// The lake and the Seta reach above the weir share a surveyed 84.6 m surface.
+// Its small lift matches the detailed water in the basin, with no per-tile camera bias.
+export async function biwaSurface(env:Env,roads:WaterRoads){
+  const bytes=await loadBinary('kansai/biwa-water.bin'),view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const group=new THREE.Group();
+  group.name='lake-biwa-and-seta';
+  let offset=8;
+  for(const [i,profile] of [[0,[2,.83,.56]],[1,[1,-.16,.987]]] as const){
+    const count=view.getUint32(4*i,true);
+    const positions=new Float32Array(count*3);
+    for(let n=0;n<count;n++){
+      positions[n*3]=view.getFloat32(offset,true);
+      positions[n*3+1]=85;
+      positions[n*3+2]=view.getFloat32(offset+4,true);
+      offset+=8;
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+    geometry.computeBoundingSphere();
+    const material=waterMaterial(env,roads,.35);
+    Object.assign(material.defaultAttributeValues,{aStable:[0],aWater:[...profile]});
+    group.add(new THREE.Mesh(geometry,material));
+  }
+  return group;
 }
 
 export function buildWater(env:Env,hf:Heightfield,lines:LineFeature[],roads:WaterRoads,
