@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOcclusion } from '../src/scripts/hero/building-occlusion.ts';
+import { buildOcclusion, occlusionTexture, occlusionFile } from '../src/scripts/hero/building-occlusion.ts';
 
 // 64 texels over 640 m: 10 m texels, rows running from north (minZ) to south
 const box = [0, 0, 640, 640];
@@ -40,4 +40,25 @@ test('rotated boxes follow the building angle and polygons their outline', () =>
   assert.equal(at(tex, 105, 505), 255);
   assert.equal(at(tex, 155, 555), 0);
   assert.ok(tex.image.data.every((v) => v >= 0 && v <= 255));
+});
+
+test('the shipped district coverages have both resolutions and preserve the surveyed footprints', async t=>{
+  const {readFile}=await import('node:fs/promises');
+  const {gunzipSync}=await import('node:zlib');
+  const {loadBuildings}=await import('../src/scripts/hero/buildings-data.ts');
+  const root=new URL('../public/kyoto/',import.meta.url);
+  const {regions}=JSON.parse(await readFile(new URL('regions.json',root)));
+  t.mock.method(globalThis,'fetch',async url=>new Response(await readFile(new URL(url.slice('/kyoto/'.length),root))));
+  for(const {buildings} of [{buildings:{file:'buildings.bin'}},...regions]){
+    for(const size of [1024,2048]){
+      const raw=gunzipSync(await readFile(new URL(occlusionFile(buildings.file,size),root)));
+      assert.equal(raw.length,size*size);
+    }
+  }
+  const {buildings,box}=regions.find(r=>r.id==='south');
+  const size=1024;
+  const raw=gunzipSync(await readFile(new URL(occlusionFile(buildings.file,size),root)));
+  const core=occlusionTexture(gunzipSync(await readFile(new URL(occlusionFile('buildings.bin',size),root))),size);
+  const data=await loadBuildings(buildings.meta,buildings.file);
+  assert.deepEqual(occlusionTexture(raw,size,core).image.data,buildOcclusion(data,box,size,core).image.data);
 });

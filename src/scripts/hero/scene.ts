@@ -51,7 +51,7 @@ import { createSharedPhotoSlot } from './shared-photo';
 import { VIEWS, flightLift, openingPanorama, viewBelowClouds, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
-import { buildOcclusion } from './building-occlusion';
+import { buildOcclusion, occlusionFile, occlusionTexture } from './building-occlusion';
 import { buildIslands } from './islands';
 import { islandMask } from './island-mask';
 import { LINE, loadLines } from './lines-data';
@@ -289,6 +289,10 @@ export function createHero(
     const basinTransport=meta.basinTransport?loadLines(undefined,meta.basinTransport.file,meta.basinTransport.box,meta.basinTransport.q)
       .catch(error=>{console.warn('Basin street network unavailable',error);return [];}):Promise.resolve([]);
     void elevatedData.catch(()=>{});
+    const builtSize = opts.quality < .75 ? 1024 : 2048;
+    const coverageFor=(file:string)=>loadBinary(occlusionFile(file,builtSize)).then(
+      bytes=>bytes.length===builtSize*builtSize?bytes:null,()=>null);
+    const cityCoverage=coverageFor('buildings.bin');
     const cityData=Promise.all([basinPhoto, loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
     // Join the original promise below; attach a handler now for an early failure.
     void cityData.catch(()=>{});
@@ -441,8 +445,8 @@ export function createHero(
       panoramaCity.prepare();
     }
     await yieldToBrowser();
-    const builtSize = lite ? 1024 : 2048;
-    const coreBuilt = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
+    const coverage = await cityCoverage;
+    const coreBuilt = coverage ? occlusionTexture(coverage, builtSize) : buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
     env.uBuilt.value = coreBuilt;
     env.uBuiltBox.value.set(...BUILDINGS_BOX);
     env.uBuiltTexel.value = (BUILDINGS_BOX[2] - BUILDINGS_BOX[0]) / builtSize;
@@ -628,14 +632,14 @@ export function createHero(
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
       const lakeRemainder=r.id==='yamashina' && await ensureLake()?'kansai/yamashina-lake-remainder.json.gz':undefined;
       const results=await Promise.allSettled([loadRegionalBuildings(r),
-        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r)] as const);
-      const [b,l,p]=results;
+        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file)] as const);
+      const [b,l,p,coverage]=results;
       const disposePhoto=()=>{if(p.status==='fulfilled'&&r.id!=='yamashina')p.value.dispose();};
       if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){
         disposePhoto();
         throw results.find(result=>result.status==='rejected')!.reason;
       }
-      return {buildings:b.value,lines:l.value,photo:p.value,dispose:disposePhoto};
+      return {buildings:b.value,lines:l.value,photo:p.value,coverage:coverage.status==='fulfilled'?coverage.value:null,dispose:disposePhoto};
     },async(r,data,current,releasePrevious)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
       const step=async()=>{await yieldToBrowser();if(!current())throw new Error('Region superseded');};
@@ -675,7 +679,7 @@ export function createHero(
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
       await step();
-      built=buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
+      built=data.coverage?occlusionTexture(data.coverage,builtSize,coreBuilt):buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
       await step();
       mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
       infrastructure=infrastructureMask(data.lines,r.box);
