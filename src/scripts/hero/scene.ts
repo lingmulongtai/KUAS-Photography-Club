@@ -10,6 +10,7 @@ import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
 import { createFrameQueue } from './frame-queue';
 import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
+import {prepareRegionBuffers} from './region-upload';
 import {uploadPhoto} from './upload-photo';
 import {createGroundRelief} from './ground-relief';
 import { initialNormals } from './initial-normals';
@@ -699,6 +700,7 @@ export function createHero(
       mask=await createBuildingMaskAsync(data.buildings.boxes,data.buildings.polys,step);
       infrastructure=infrastructureMask(data.lines,r.box,data.forest);
       await programs;
+      await prepareRegionBuffers(renderer,camera,group,current);
       await step();
       } catch(error) {
         disposeGroup(group);road?.dispose();built?.dispose();campusNormal?.dispose();
