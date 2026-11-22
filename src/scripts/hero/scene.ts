@@ -52,6 +52,7 @@ import { landmarkOrbit } from './landmark-orbit';
 import { createIntroCameraMotion } from './intro-camera';
 import { createSharedPhotoSlot } from './shared-photo';
 import { VIEWS, flightLift, openingPanorama, viewBelowClouds, type ViewDef, type HeroView } from './views';
+import { openingPriorities } from './opening-priority';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
 import { buildOcclusion, occlusionFile, occlusionTexture } from './building-occlusion';
@@ -296,50 +297,43 @@ export function createHero(
     const coreSacredPromise = sacredForBox(BUILDINGS_BOX);
     // A resident skyline and the corresponding detailed streets share one survey decode.
     const buildingCache=new Map<string,ReturnType<typeof loadBuildings>>();
-    const loadRegionalBuildings=(region:CityRegion)=>{
+    const loadRegionalBuildings=(region:CityRegion,priority?:RequestPriority)=>{
       const file=region.buildings.file;
-      if(region.id!=='south'&&region.id!=='yamashina')return loadBuildings(region.buildings.meta,file);
+      if(region.id!=='south'&&region.id!=='yamashina')return loadBuildings(region.buildings.meta,file,priority);
       let result=buildingCache.get(file);
       if(!result){
-        result=loadBuildings(region.buildings.meta,file).catch(error=>{buildingCache.delete(file);throw error;});
+        result=loadBuildings(region.buildings.meta,file,priority).catch(error=>{buildingCache.delete(file);throw error;});
         buildingCache.set(file,result);
       }
       return result;
     };
-    const fetchSurvey=(id:string)=>cityRegions.then(async index=>{
+    const fetchSurvey=(id:string,priority?:RequestPriority)=>cityRegions.then(async index=>{
       const region=index.regions.find(r=>r.id===id);
-      return region?{region,buildings:await loadRegionalBuildings(region)}:null;
+      return region?{region,buildings:await loadRegionalBuildings(region,priority)}:null;
     });
-    const southSurvey=fetchSurvey('south'),eastSurvey=fetchSurvey('yamashina');
-    const eastFill=loadBuildings('buildings-yamashina-basin.json','buildings-yamashina-basin.bin');
-    const westSurveys=(['otokuni','otokuni-tennozan'] as const).map(name=>({
-      name,buildings:loadBuildings(`buildings-${name}.json`,`buildings-${name}.bin`).catch(error=>{
-        console.warn(`Western basin survey unavailable: ${name}`,error);return null;
-      }),
-    }));
     const overviewFiles = Object.fromEntries((['south','osaka','north','tamba'] as const).map(area => [
       area, loadBinary(`buildings-${area}-lod.json.gz`).catch(error => {
         console.warn(`City overview unavailable: ${area}`, error);
         return null;
       }),
     ])) as Record<'south'|'osaka'|'north'|'tamba', Promise<Uint8Array | null>>;
-    for(const pending of [southSurvey,eastSurvey,eastFill,elevatedData,railwaysData])void pending.catch(()=>{});
+    for(const pending of [elevatedData,railwaysData])void pending.catch(()=>{});
     const earlyPrograms: Promise<unknown>[] = [
       ...[sky.mesh, celestial.group, meteors.group, snow.points, aircraft.mesh, clouds.mesh, clouds.columnMesh, cloudBlur.compositeMesh, cloudHistory.compositeMesh].map(prepare),
     ];
     const warmProgram = (object: THREE.Object3D) => { earlyPrograms.push(prepare(object)); };
-    // Start downloading the Yamashina eastern backdrop as soon as regions.json returns.
     let eastTexture: Promise<THREE.Texture> | undefined;
     let eastBackdrop: { photo: THREE.Texture; box: Box } | null = null;
     let eastPhotoUpgraded = lite;
     let applyEastBackdrop: ((photo: THREE.Texture, box: Box) => void) | undefined;
-    const earlyEastPhoto = cityRegions.then(index => {
+    const ensureEastBackdrop = (priority?: RequestPriority) => cityRegions.then(index => {
       const region = index.regions.find(r => r.id === 'yamashina');
       if (!region) return null;
       const progressive = !lite && !heroOpened;
       const file = lite || progressive ? region.photo.mobile.file : region.photo.file;
-      eastTexture ??= loadTexture(file, aniso).then(photo => {
+      eastTexture ??= loadTexture(file, aniso, priority).then(photo => {
         eastBackdrop = { photo, box: region.photo.box };
+        applyEastBackdrop?.(photo, region.photo.box);
         if (progressive && !eastPhotoUpgraded) {
           eastPhotoUpgraded = true;
           schedulePostOpenUpgrade(async () => {
@@ -405,6 +399,26 @@ export function createHero(
     groundAt = (x, z) => hf.height(x, z);
     view=openingPanorama(groundAt,clouds.weather.base,opts.previousOpening??null,opts.requestedOpening??null);
     VIEW=currentView(view);
+    const priorities=openingPriorities(VIEW);
+    // Start only the surrounding resident surveys actually visible in the opening foreground right away.
+    let southSurveyPromise: ReturnType<typeof fetchSurvey> | undefined;
+    const getSouthSurvey = (priority?: RequestPriority) => southSurveyPromise ??= fetchSurvey('south', priority);
+    let eastSurveyPromise: ReturnType<typeof fetchSurvey> | undefined;
+    const getEastSurvey = (priority?: RequestPriority) => eastSurveyPromise ??= fetchSurvey('yamashina', priority);
+    let eastFillPromise: ReturnType<typeof loadBuildings> | undefined;
+    const getEastFill = (priority?: RequestPriority) => eastFillPromise ??= loadBuildings('buildings-yamashina-basin.json', 'buildings-yamashina-basin.bin', priority);
+    const westSurveyPromises: Partial<Record<'otokuni' | 'otokuni-tennozan', Promise<Awaited<ReturnType<typeof loadBuildings>> | null>>> = {};
+    const getWestSurvey = (name: 'otokuni' | 'otokuni-tennozan', priority?: RequestPriority) =>
+      westSurveyPromises[name] ??= loadBuildings(`buildings-${name}.json`, `buildings-${name}.bin`, priority).catch(error => {
+        console.warn(`Western basin survey unavailable: ${name}`, error);
+        return null;
+      });
+    if (priorities.south === 'opening') void getSouthSurvey().catch(() => {});
+    if (priorities.yamashina === 'opening') void getEastSurvey().catch(() => {});
+    if (priorities.yamashinaBasin === 'opening') void getEastFill().catch(() => {});
+    if (priorities.otokuni === 'opening') void getWestSurvey('otokuni');
+    if (priorities.otokuniTennozan === 'opening') void getWestSurvey('otokuni-tennozan');
+    const openingEastBackdrop = priorities.eastBackdrop === 'opening' ? ensureEastBackdrop() : Promise.resolve(null);
     eye.copy(eyeOf(VIEW));
     if(view!=='shogunzuka')shadow.setRegion(shadowRegion(VIEW,eye));
     campus.y = hf.height(campus.x, campus.z) + 14;
@@ -539,7 +553,7 @@ export function createHero(
       scene.add(lake);
       return true;
     }).catch(error=>{lakeReady=undefined;console.warn('Lake survey unavailable',error);return false;});
-    const openingLake = ensureLake();
+    const openingLake = priorities.biwa === 'opening' ? ensureLake() : Promise.resolve(false);
     loading.step();
     await yieldToBrowser();
     const [, buildings, lines, woodlandBytes] = await cityData;
@@ -811,6 +825,12 @@ export function createHero(
     const installOverview=(item:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void},parent:THREE.Object3D=scene)=>{
       const update=(region:CityRegion|null)=>item.setDetailBox(region?.box??null);
       update(detailRegion);overviews.push(update);parent.add(item.mesh);
+      return ()=>{
+        const i=overviews.indexOf(update);
+        if(i>=0)overviews.splice(i,1);
+        parent.remove(item.mesh);
+        disposeGroup(item.mesh);
+      };
     };
     const setOverviewDetail=(region:CityRegion|null)=>{
       detailRegion=region;
@@ -834,15 +854,16 @@ export function createHero(
     applyEastBackdrop=(photo,box)=>{
       if((!detailRegion && !districtBase) || detailRegion?.id==='yamashina')terrain.setPhoto(0,photo,box);
     };
-    const loadRegionalPhoto=(r:CityRegion)=>{
+    const loadRegionalPhoto=async(r:CityRegion)=>{
       const progressive=r.id!=='yamashina'&&!lite&&!heroOpened;
       const file=lite||progressive?r.photo.mobile.file:r.photo.file;
-      if(r.id!=='yamashina')return loadTexture(file,aniso).then(photo=>({photo,upgradeFile:progressive?r.photo.file:null}));
-      return (eastTexture??=loadTexture(file,aniso).then(photo=>{
-        eastBackdrop={photo,box:r.photo.box};
-        if(!detailRegion && !districtBase)terrain.setPhoto(0,photo,r.photo.box);
-        return photo;
-      }).catch(error=>{eastTexture=undefined;throw error;})).then(photo=>({photo,upgradeFile:null as string|null}));
+      if(r.id!=='yamashina')return {photo:await loadTexture(file,aniso),upgradeFile:progressive?r.photo.file:null};
+      const photo=await (eastTexture??=loadTexture(file,aniso).then(loaded=>{
+        eastBackdrop={photo:loaded,box:r.photo.box};
+        if(!detailRegion && !districtBase)terrain.setPhoto(0,loaded,r.photo.box);
+        return loaded;
+      }).catch(error=>{eastTexture=undefined;throw error;}));
+      return {photo,upgradeFile:null as string|null};
     };
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
       const lakeRemainder=r.id==='yamashina' && await ensureLake()?'kansai/yamashina-lake-remainder.json.gz':undefined;
@@ -981,7 +1002,7 @@ export function createHero(
     },error=>console.warn('Neighbouring Kyoto area unavailable; retaining terrain',error));
     const regionManifest=await cityRegions;
     const easternBasin=regionManifest.regions.find(r=>r.id==='yamashina');
-    const eastBackdropReady=earlyEastPhoto.then(photo=>{
+    const eastBackdropReady=openingEastBackdrop.then(photo=>{
       if(photo && easternBasin && !detailRegion && !districtBase)terrain.setPhoto(0,photo,easternBasin.photo.box);
     });
     let lastAreaRequest:{id:string|null;retry?:ReturnType<typeof setTimeout>}|undefined;
@@ -1024,16 +1045,41 @@ export function createHero(
       if(next)regionLoader.prefetch(next);
       if(next?.id==='osaka'||(meta.otokuni&&containsPhoto(meta.otokuni.box,center)))void closePhotos.prefetch(center);
     };
-    const residentSouth=southSurvey.then(async survey=>{
+    let southSampleRemove: (() => void) | undefined;
+    let southOuterRemove: (() => void) | undefined;
+    let southOuterBuildings: OverviewBuilding[] | undefined;
+    let southResidentInstalled = false;
+    let otokuniTennozanMask: ((x: number, z: number) => boolean) | null = null;
+    const clearSouthSample = () => {
+      southResidentInstalled = true;
+      southSampleRemove?.();
+      southSampleRemove = undefined;
+    };
+    const refineSouthOuter = async (mask: (x: number, z: number) => boolean) => {
+      otokuniTennozanMask = mask;
+      const source = southOuterBuildings;
+      if (!source) return;
+      southOuterBuildings = undefined;
+      const filtered = source.filter(([x, z]) => !mask(x, z));
+      const next = await buildSouthOverview(env, filtered, (x, z) => hf.height(x, z));
+      next.mesh.name = 'south-overview';
+      southOuterRemove?.();
+      southOuterRemove = installOverview(next);
+    };
+
+    let residentSouthJob: Promise<boolean> | undefined;
+    const ensureResidentSouth = (priority?: RequestPriority) => residentSouthJob ??= getSouthSurvey(priority).then(async survey=>{
       if(!survey)return false;
       const skyline=await buildResidentCity(env,hf,survey.buildings,survey.region.box);
       skyline.mesh.name='southern-basin-buildings';
       await prepare(skyline.mesh);
       basinLod.register(survey.buildings);
       installOverview(skyline,basinLod.detail);
+      clearSouthSample();
       return true;
     }).catch(error=>{console.warn('Southern survey unavailable; using sampled skyline',error);return false;});
-    const residentEast=eastSurvey.then(async survey=>{
+    let residentEastJob: Promise<void> | undefined;
+    const ensureResidentEast = (priority?: RequestPriority) => residentEastJob ??= getEastSurvey(priority).then(async survey=>{
       if(!survey)return;
       const skyline=await buildResidentCity(env,hf,survey.buildings);
       skyline.mesh.name='yamashina-survey';
@@ -1042,36 +1088,63 @@ export function createHero(
       basinLod.register(survey.buildings);
       update(detailRegion);overviews.push(update);basinLod.detail.add(skyline.mesh);
     }).catch(error=>console.warn('Yamashina survey unavailable',error));
-    const residentEastFill=eastFill.then(async data=>{
+    let residentEastFillJob: Promise<void> | undefined;
+    const ensureResidentEastFill = (priority?: RequestPriority) => residentEastFillJob ??= getEastFill(priority).then(async data=>{
       // These footprints have no detailed counterpart on either side of the ward edge.
       const skyline=await buildResidentCity(env,hf,data);
       skyline.mesh.name='yamashina-basin';
       await prepare(skyline.mesh);
       basinLod.register(data);basinLod.detail.add(skyline.mesh);
     }).catch(error=>console.warn('Yamashina basin outlines unavailable',error));
-    const residentWest=Promise.all(westSurveys.map(({name,buildings})=>buildings.then(async data=>{
-      if(!data)return null;
-      const sampledRoofMask=name==='otokuni-tennozan'?await createBuildingMaskAsync(data.boxes,data.polys,yieldToBrowser):null;
-      const skyline=await buildResidentCity(env,hf,data);
-      skyline.mesh.name=name;
-      await prepare(skyline.mesh);
-      if(name==='otokuni-tennozan'){
-        // Only these footprints have a counterpart in the detailed confluence survey.
-        // The southern ward rectangle also covers Muko but supplies no houses there.
-        const update=(region:CityRegion|null)=>{skyline.mesh.visible=region?.id!=='tennozan';};
-        update(detailRegion);overviews.push(update);
+    const residentWestJobs: Partial<Record<'otokuni' | 'otokuni-tennozan', Promise<((x: number, z: number) => boolean) | null>>> = {};
+    const ensureResidentWest = (name: 'otokuni' | 'otokuni-tennozan', priority?: RequestPriority) =>
+      residentWestJobs[name] ??= getWestSurvey(name, priority).then(async data=>{
+        if(!data)return null;
+        const sampledRoofMask=name==='otokuni-tennozan'?await createBuildingMaskAsync(data.boxes,data.polys,yieldToBrowser):null;
+        const skyline=await buildResidentCity(env,hf,data);
+        skyline.mesh.name=name;
+        await prepare(skyline.mesh);
+        if(name==='otokuni-tennozan'){
+          // Only these footprints have a counterpart in the detailed confluence survey.
+          // The southern ward rectangle also covers Muko but supplies no houses there.
+          const update=(region:CityRegion|null)=>{skyline.mesh.visible=region?.id!=='tennozan';};
+          update(detailRegion);overviews.push(update);
+        }
+        basinLod.register(data);basinLod.detail.add(skyline.mesh);
+        if(sampledRoofMask)await refineSouthOuter(sampledRoofMask);
+        return sampledRoofMask;
+      }).catch(error=>{
+        console.warn(`Western basin roofs unavailable: ${name}`,error);
+        return null;
+      });
+    const openingSurveys: Promise<unknown>[] = [];
+    if (priorities.south === 'opening') openingSurveys.push(ensureResidentSouth());
+    if (priorities.otokuni === 'opening') openingSurveys.push(ensureResidentWest('otokuni'));
+    if (priorities.otokuniTennozan === 'opening') openingSurveys.push(ensureResidentWest('otokuni-tennozan'));
+    if (priorities.yamashina === 'opening') openingSurveys.push(ensureResidentEast());
+    if (priorities.yamashinaBasin === 'opening') openingSurveys.push(ensureResidentEastFill());
+    const deferredSurveys: { tier: typeof priorities.south; run: () => Promise<unknown> }[] = [
+      { tier: priorities.south, run: () => ensureResidentSouth('low') },
+      { tier: priorities.otokuni, run: () => ensureResidentWest('otokuni', 'low') },
+      { tier: priorities.otokuniTennozan, run: () => ensureResidentWest('otokuni-tennozan', 'low') },
+      { tier: priorities.yamashina, run: () => ensureResidentEast('low') },
+      { tier: priorities.yamashinaBasin, run: () => ensureResidentEastFill('low') },
+      { tier: priorities.eastBackdrop, run: () => ensureEastBackdrop('low') },
+      { tier: priorities.biwa, run: () => ensureLake() },
+    ];
+    for (const item of deferredSurveys) {
+      if (item.tier === 'afterOpen') schedulePostOpenUpgrade(async () => { await item.run(); });
+    }
+    const warmDeferredSurveys = () => {
+      for (const item of deferredSurveys) {
+        if (item.tier !== 'opening') void item.run();
       }
-      basinLod.register(data);basinLod.detail.add(skyline.mesh);
-      return sampledRoofMask;
-    }).catch(error=>{
-      console.warn(`Western basin roofs unavailable: ${name}`,error);
-      return null;
-    })));
+    };
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
     const skylinesReady = Promise.all([
       openingRegion, openingRegionalPhoto, eastBackdropReady, openingLake, railwaysReady, initialRelief,
-      residentSouth, residentWest, residentEast, residentEastFill,
+      ...openingSurveys,
       loadOverview('south'), loadOverview('osaka'), loadOverview('north'), loadOverview('tamba'),
     ]).then(() => loading.step());
     const shadersReady = Promise.all([...earlyPrograms, scenePrograms, streetPrograms]).then(() => loading.step());
@@ -1110,10 +1183,11 @@ export function createHero(
           if(!insideCore)refreshForest();
         }).catch(error=>console.warn('Regional city index unavailable',error));
       }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
-    // Defer the 10 MB outer five-prefecture ground until the visitor interacts or travels,
-    // so opening the initial panorama triggers zero post-load downloads or forest rebuilds.
+    // Defer the 10 MB outer five-prefecture ground and off-frustum surveys until interaction or navigation,
+    // so opening the initial panorama only fetches and builds what lies ahead of the camera.
     warmRegionalOnInteract = () => {
       warmRegionalOnInteract = undefined;
+      warmDeferredSurveys();
       void ensureRegionalGround?.();
     };
     async function loadOverview(area:'south'|'osaka'|'north'|'tamba') {
@@ -1121,13 +1195,29 @@ export function createHero(
         const bytes=await overviewFiles[area];
         if(!bytes)return;
         const data=JSON.parse(new TextDecoder().decode(bytes)) as {buildings:OverviewBuilding[];towers?:OverviewBuilding[];residentCount?:number};
-        let buildings=data.buildings;
         if(area==='south'){
-          if(data.residentCount&&await residentSouth)buildings=buildings.slice(data.residentCount);
-          const masks=(await residentWest).filter(mask=>mask!==null);
-          buildings=buildings.filter(([x,z])=>!masks.some(mask=>mask(x,z)));
+          const southSample=data.residentCount?data.buildings.slice(0,data.residentCount):[];
+          const outerSample=data.residentCount?data.buildings.slice(data.residentCount):data.buildings;
+          if(priorities.south==='opening')await ensureResidentSouth();
+          if(!southResidentInstalled&&southSample.length){
+            const sample=await buildSouthOverview(env,southSample,(x,z)=>hf.height(x,z));
+            sample.mesh.name='south-resident-overview';
+            if(southResidentInstalled)disposeGroup(sample.mesh);
+            else southSampleRemove=installOverview(sample);
+          }
+          if(priorities.otokuniTennozan==='opening')await ensureResidentWest('otokuni-tennozan');
+          const mask=otokuniTennozanMask;
+          const outerBuildings=mask?outerSample.filter(([x,z])=>!mask(x,z)):outerSample;
+          const overview=await buildSouthOverview(env,outerBuildings,(x,z)=>hf.height(x,z));
+          overview.mesh.name='south-overview';
+          southOuterRemove=installOverview(overview);
+          if(!mask){
+            southOuterBuildings=outerSample;
+            if(otokuniTennozanMask)await refineSouthOuter(otokuniTennozanMask);
+          }
+          return;
         }
-        const overview=await buildSouthOverview(env,buildings,(x,z)=>hf.height(x,z));
+        const overview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
         overview.mesh.name=`${area}-overview`;
         installOverview(overview);
         if(data.towers){
