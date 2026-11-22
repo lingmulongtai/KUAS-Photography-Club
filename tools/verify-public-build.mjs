@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { SPOTS } from '../src/data/spots.ts';
-import { PANORAMA_VIEWS } from '../src/scripts/hero/views.ts';
+import { PANORAMA_VIEWS, REGIONAL_PLACES } from '../src/scripts/hero/views.ts';
 
 const output = resolve(process.argv[2] ?? 'dist/client');
 const html = [];
@@ -21,9 +21,14 @@ for (const spot of SPOTS) assert.ok(byPath.has(`trips/spots/${spot.id}/index.htm
 for (const path of ['index.html','en/index.html']) {
   const source=byPath.get(path);
   assert.deepEqual([...source.matchAll(/<button\b[^>]*data-view="([^"]+)"/g)].map(m=>m[1]),PANORAMA_VIEWS, `Scenic view menu: ${path}`);
+  assert.equal([...source.matchAll(/data-demo="hero"/g)].length,1,`Missing shared landscape: ${path}`);
+  assert.doesNotMatch(source,/href="(?:\/en)?\/kansai\/"|kansai-engine\//,`Separate map exposed on ${path}`);
+  const prefix=path.startsWith('en/')?'en/':'';
+  const redirect=byPath.get(prefix+'kansai/index.html');
+  assert.ok(redirect?.includes('content="0;url=/'+prefix+'"'),`Old map route must lead back to ${path}`);
   const select=source.match(/<select\b[^>]*id="hero-spot"[^>]*>([\s\S]*?)<\/select>/)?.[1];
   assert.ok(select, `Missing map spot selector: ${path}`);
-  assert.deepEqual([...select.matchAll(/<option\b[^>]*value="([^"]+)"/g)].map(m=>m[1]),SPOTS.map(s=>s.id), `Unreachable map spot: ${path}`);
+  assert.deepEqual([...select.matchAll(/<option\b[^>]*value="([^"]+)"/g)].map(m=>m[1]),[...SPOTS.map(s=>s.id),...REGIONAL_PLACES.map(p=>'region-'+p.id)], `Unreachable map spot: ${path}`);
 }
 for (const route of ['index.html', 'about/index.html', 'join/index.html', 'schedule/index.html', 'trips/index.html',
   'contact/index.html', 'guidelines/index.html', 'guidelines/en/index.html', 'learn/index.html',
