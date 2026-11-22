@@ -108,7 +108,7 @@ const fragmentShader = `
     gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
   }`;
 
-export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture)=>void) {
+export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture,needed:()=>boolean)=>Promise<void>) {
   const [{grid,patches},surveys]=await Promise.all([loadJSON<GroundSurvey>('kansai/ground.json'),loadJSON<District[]>('kansai/districts/index.json')]);
   const [heights,boundary,cover,fine]=await Promise.all([
     loadGrid(grid),boundaryUniforms(),loadBinary('kansai/canopy.bin').then(decodeTreeCover),
@@ -151,8 +151,8 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       if(!needed())return false;
       await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
       if(!needed())return false;
-      upload(photo);
-      return true;
+      await upload(photo,needed);
+      return needed();
     });
     uploads=next.then(()=>{},()=>{});
     return next;

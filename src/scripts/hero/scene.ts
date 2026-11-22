@@ -10,6 +10,7 @@ import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
 import { createFrameQueue } from './frame-queue';
 import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
+import {uploadPhoto} from './upload-photo';
 import {createGroundRelief} from './ground-relief';
 import { initialNormals } from './initial-normals';
 import { normalMapBytes } from './normal-map';
@@ -847,7 +848,7 @@ export function createHero(
             terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
           }
           regionalPhoto=detail??base;sharedSlot?.setOverride(localPhoto??regionalPhoto);
-        },prepare,photo=>renderer.initTexture(photo));
+        },prepare,(photo,needed)=>uploadPhoto(renderer,photo,needed));
       })
       .then(result=>{
         regional=result;
