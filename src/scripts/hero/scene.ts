@@ -39,7 +39,7 @@ import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio }
 import {createKamoChannel,kamoMask} from './kamo-channel';
 import {buildBridges} from './bridges';
 import {buildTransportSpans,type TransportSpan} from './transport-spans';
-import { createBuildingMask } from './vegetation-mask';
+import { createBuildingMaskAsync, type createBuildingMask } from './vegetation-mask';
 import type { Woodland } from './woodland';
 import { buildWoodlandTexture } from './woodland-texture';
 import { decodeTreeCover } from './tree-cover';
@@ -453,7 +453,7 @@ export function createHero(
     env.uBuiltBox.value.set(...BUILDINGS_BOX);
     env.uBuiltTexel.value = (BUILDINGS_BOX[2] - BUILDINGS_BOX[0]) / builtSize;
     env.uBuiltOn.value = 1;
-    const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
+    const buildingsMask = await createBuildingMaskAsync(buildings.boxes, buildings.polys,yieldToBrowser);
     let outerExcluded:(x:number,z:number)=>boolean=()=>false;
     const forestMaskBox=regions.reduce<Box>((a,{meta:{box:b}})=>[Math.min(a[0],b[0]),Math.min(a[1],b[1]),
       Math.max(a[2],b[2]),Math.max(a[3],b[3])],BUILDINGS_BOX);
@@ -484,8 +484,14 @@ export function createHero(
     (x,z) => !!cultivated?.(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
       replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
     [...campusTreeSpots(hf),...cherries], !cover);
+    let forestRefreshPending=false;
     const refreshForest = () => {
-      void forest.refreshExclusions().then(() => shadow.invalidate()).catch(error => console.warn('Forest update failed', error));
+      if(forestRefreshPending)return;
+      forestRefreshPending=true;
+      queueMicrotask(()=>{
+        forestRefreshPending=false;
+        void forest.refreshExclusions().then(() => shadow.invalidate()).catch(error => console.warn('Forest update failed', error));
+      });
     };
     orbitObstruction = (x,z) => {
       const center=landscapeCenter(VIEW);
@@ -683,7 +689,7 @@ export function createHero(
       await step();
       built=data.coverage?occlusionTexture(data.coverage,builtSize,coreBuilt):buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
       await step();
-      mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
+      mask=await createBuildingMaskAsync(data.buildings.boxes,data.buildings.polys,step);
       infrastructure=infrastructureMask(data.lines,r.box,data.forest);
       await step();
       } catch(error) {
@@ -801,7 +807,7 @@ export function createHero(
     }).catch(error=>console.warn('Yamashina basin outlines unavailable',error));
     const residentWest=Promise.all(westSurveys.map(({name,buildings})=>buildings.then(async data=>{
       if(!data)return null;
-      const sampledRoofMask=name==='otokuni-tennozan'?createBuildingMask(data.boxes,data.polys):null;
+      const sampledRoofMask=name==='otokuni-tennozan'?await createBuildingMaskAsync(data.boxes,data.polys,yieldToBrowser):null;
       const skyline=await buildResidentCity(env,hf,data);
       skyline.mesh.name=name;
       await prepare(skyline.mesh);
