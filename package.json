@@ -17,6 +17,7 @@
     "@vercel/analytics": "2.0.1",
     "@vercel/cli-config": "file:vendor/vercel-cli-config",
     "@vercel/speed-insights": "2.0.0",
+    "3d-tiles-renderer": "0.5.4",
     "astro": "7.3.4",
     "cesium": "1.133.0",
     "earcut": "3.0.2",

@@ -3,7 +3,8 @@ import type { Demo } from '../gl/stage';
 import { createEnv } from './env';
 import { KYOTO, directionFrom, jstMinutes, jstParts, localSiderealAngle, moonPosition, sunPosition } from './astro';
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
-import type { Box } from './geo';
+import {toLocal,type Box} from './geo';
+import {EXPO} from '../../data/kansai-outings';
 import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
 import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
 import { createFrameQueue } from './frame-queue';
@@ -183,6 +184,9 @@ export function createHero(
   let groundAt: ((x: number, z: number) => number) | null = null;
   let regional:Awaited<ReturnType<typeof import('./regional-ground').regionalGround>> | undefined;
   let regionalCity:Awaited<ReturnType<typeof import('./regional-city').regionalCity>>|undefined;
+  const expoAnchor=toLocal(EXPO.lat,EXPO.lon);
+  let expo:ReturnType<typeof import('./regional-expo').expoGrounds>|undefined;
+  let preparingExpo=false,retryExpoAt=0;
   let updateFireworks:ReturnType<typeof import('./regional-fireworks').regionalFireworks>|undefined;
   let ensureRegionalGround:(()=>Promise<void>)|undefined;
   let flightRequest=0;
@@ -1259,6 +1263,15 @@ export function createHero(
       regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime);
       const detailEye=flight?.p3??camera.position;
       regionalCity?.update(detailEye.x,detailEye.z,regionalTime);
+      const expoDistance=Math.hypot(camera.position.x-expoAnchor.x,camera.position.z-expoAnchor.z);
+      if(expoDistance<4800 && !expo && !preparingExpo && regionalTime>=retryExpoAt){
+        preparingExpo=true;
+        void import('./regional-expo').then(({expoGrounds})=>{expo=expoGrounds(scene,camera,renderer);})
+          .catch(error=>{retryExpoAt=performance.now()/1000+20;console.warn('Expo archive unavailable',error);})
+          .finally(()=>{preparingExpo=false;});
+      }
+      if(expo && expoDistance>7000){expo.dispose();expo=undefined;}
+      else if(expo){camera.updateMatrixWorld();expo.update();}
       clouds.prepareField(renderer,camera.position);
       if (dt > 0) driveCars?.(dt);
       if (dt > 0 && !opts.reducedMotion) aircraft.update(dt);
