@@ -36,12 +36,13 @@ test('distantBasin defers kyoto-horizon.bin.gz inside Kyoto and loads it when ap
   });
   const scene=new THREE.Scene();
   const basin=mod.distantBasin({},scene,()=>0,async()=>{});
-  // Inside Kyoto and nearby viewpoints should never fetch the 1.2 MB distant skyline.
+  // Inside Kyoto and nearby outer panoramas (including Kameoka Terrace at 9.4 km) must not fetch the 1.2 MB skyline.
   assert.equal(basin.update(2430,161,1000),false);
   assert.equal(basin.update(-7613,14397,1000),false);
+  assert.equal(basin.update(-18392,2300,1000),false);
   assert.equal(calls.length,0);
-  // Once well outside Kyoto (> 45% of cutoff), fetch the baked horizon once.
-  assert.equal(basin.update(14000,0,1000),false);
+  // Once well outside Kyoto (> 65% of cutoff = 12.35 km), fetch the baked horizon once.
+  assert.equal(basin.update(17400,0,1000),false);
   assert.equal(calls.length,1);
   assert.equal(calls[0],'/kyoto/kansai/kyoto-horizon.bin.gz');
   await new Promise(resolve=>setTimeout(resolve,20));

@@ -106,7 +106,7 @@ export function distantBasin(env:Env,scene:THREE.Scene,ground:(x:number,z:number
     const distance=Math.hypot(Math.max(w-x,0,x-e),Math.max(n-z,0,z-s));
     const cutoff=Math.max(19000,focal*18);
     lastFallback=distance>cutoff*.65;
-    if(distance>cutoff*.45 && !ready && !archiveTried)loadArchive();
+    if(lastFallback && !ready && !archiveTried)loadArchive();
     if(lastFallback && !ready && archiveTried)requestBuild();
     const far=ready && distance>cutoff*(horizon.visible ? .92 : 1);
     horizon.visible=far;
