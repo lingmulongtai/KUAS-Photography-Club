@@ -24,7 +24,11 @@ export function isSetaDeck(p:Point){
   });
 }
 
-export function drawSetaBridges(mesh:Mesh,[w,s,e,n]:Box,local:(p:Point)=>Point){
+export type VerticalDatum='orthometric'|'ellipsoid';
+
+export function drawSetaBridges(mesh:Mesh,[w,s,e,n]:Box,local:(p:Point)=>Point,datum:VerticalDatum='ellipsoid',
+  terrain?:(p:Point)=>number){
+  const offset=datum==='ellipsoid'?geoid:0;
   for(const bridge of crossings){
     const {west,east,spans,width,approaches,banks}=bridge;
     if(e<west[0]-.00012||w>east[0]+.00012||n<east[1]-.00015||s>west[1]+.00015)continue;
@@ -33,10 +37,17 @@ export function drawSetaBridges(mesh:Mesh,[w,s,e,n]:Box,local:(p:Point)=>Point){
     const leftX=(ay-by)/distance,leftY=(bx-ax)/distance;
     // Split longitudinal runs once at the z16 seam. A post is always owned by just one tile.
     const lo=(w-west[0])/(east[0]-west[0])*length,hi=(e-west[0])/(east[0]-west[0])*length;
+    function approachHeight(d:number){
+      const t=d/length;
+      return terrain?.([west[0]+(east[0]-west[0])*t,west[1]+(east[1]-west[1])*t]);
+    }
+    const westRoad=approachHeight(-approaches[0]),eastRoad=approachHeight(length+approaches[1]);
     function point(d:number,left:number,height:number):XYZ{
       const t=d/length;
-      return [ax+(bx-ax)*t+leftX*left,ay+(by-ay)*t+leftY*left,
-        geoid+banks[0]+t*(banks[1]-banks[0])+.18+height];
+      let deck=offset+banks[0]+t*(banks[1]-banks[0])+.18;
+      if(d<0 && westRoad!==undefined)deck+=(westRoad+.32-deck)*(-d/approaches[0]);
+      if(d>length && eastRoad!==undefined)deck+=(eastRoad+.32-deck)*((d-length)/approaches[1]);
+      return [ax+(bx-ax)*t+leftX*left,ay+(by-ay)*t+leftY*left,deck+height];
     }
     function beam(a:number,b:number,right:number,left:number,base:number,top:number,color:RGB){
       const start=Math.max(lo,a),end=Math.min(hi,b);
@@ -57,7 +68,7 @@ export function drawSetaBridges(mesh:Mesh,[w,s,e,n]:Box,local:(p:Point)=>Point){
     }
     const stations=[0];
     for(const span of spans)stations.push(stations.at(-1)!+span);
-    beam(-approaches[0],length+approaches[1],-half,half,-.28,0,asphalt);
+    for(const [start,end] of [[-approaches[0],0],[0,length],[length,length+approaches[1]]])beam(start,end,-half,half,-.28,0,asphalt);
     for(const d of stations.slice(1,-1)){
       beam(d-.52,d+.52,-half+.5,half-.5,-1.9,-1.05,concrete);
       for(const side of [-.72,0,.72])turned(d,side*half,[[-9,.52],[-1.85,.52]],concrete);

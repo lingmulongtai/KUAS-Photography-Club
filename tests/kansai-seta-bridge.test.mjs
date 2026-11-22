@@ -40,3 +40,14 @@ test('Karahashi retains both pile rows, the island road and one continuous deck 
   assert.ok(Math.abs(asphalt(left)+asphalt(right)-asphalt(whole))<.0001);
   assert.equal(region(135.95,135.96).positions.length,0);
 });
+
+test('homepage bridge decks meet their approaches in the terrain height datum',()=>{
+  const scale=tileMetresPerDegree(34.973);
+  const local=([lon,lat])=>[(lon-135.9049509)*scale[0],(lat-34.9733849)*scale[1]];
+  const mesh=new Mesh();
+  drawSetaBridges(mesh,[135.90,34.97,135.91,34.99],local,'orthometric',()=>86);
+  const levels=mesh.positions.filter((_,i)=>i%3===2);
+  assert.ok(levels.some(z=>Math.abs(z-86.32)<.001),'approach matches adjoining road');
+  assert.ok(levels.some(z=>Math.abs(z-88.37)<.001),'deck sits above the lake');
+  assert.ok(Math.min(...levels)<84.6 && Math.max(...levels)<96,'piers extend below the water and railings stay above the deck');
+});

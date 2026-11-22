@@ -6,7 +6,7 @@ import {drawGround,roadWidth} from './ground';
 import {hyogoHeights} from './lidar';
 import {regionalHeights} from './building-heights';
 import {railStructure} from './rail';
-import {drawSetaBridges,isSetaDeck} from './seta-bridge';
+import {drawSetaBridges,isSetaDeck,type VerticalDatum} from './seta-bridge';
 import {combineTileMeshes,type TileGeometry} from './tile-geometry';
 
 
@@ -38,12 +38,12 @@ function terrainSampler(elevations:Float64Array,west:number,south:number,east:nu
   };
 }
 
-export interface TileRequest {includeTrees?:boolean;id:number;x:number;y:number;elevations:Float64Array<ArrayBuffer>}
+export interface TileRequest {datum?:VerticalDatum;includeTrees?:boolean;id:number;x:number;y:number;elevations:Float64Array<ArrayBuffer>}
 export interface CompiledTile {center:Point;geometry?:TileGeometry;locations:Point[]}
 
 export function tileCompiler(){
   let data:Promise<[Awaited<ReturnType<typeof modelSources>>,Awaited<ReturnType<typeof regionalHeights>>]>|undefined;
-  return async({x,y,elevations,includeTrees=true}:TileRequest):Promise<CompiledTile>=>{
+  return async({x,y,elevations,includeTrees=true,datum='ellipsoid'}:TileRequest):Promise<CompiledTile>=>{
     data??=Promise.all([modelSources(),regionalHeights()]).catch(error=>{data=undefined;throw error;});
     const [sources,heightSources]=await data;
     const nw=lonLat(x,y,16),se=lonLat(x+1,y+1,16),[west,north]=nw,[east,south]=se;
@@ -117,7 +117,7 @@ export function tileCompiler(){
       appendBuilding(row.rings,row.point,row.tag,matched.has(row.tag.id)&&row.tag.levels!==undefined&&row.tag.levels>3);
     }
     const karahashi=y===25964&&(x===57508||x===57509);
-    if(karahashi)drawSetaBridges(groundMesh,[west,south,east,north],local);
+    if(karahashi)drawSetaBridges(groundMesh,[west,south,east,north],local,datum,ground);
     for(const name of ['RdCL','RailCL','RailTrCL']){
       const layer=tile?.layers[name];if(!layer)continue;
       for(let i=0;i<layer.length;i++){
