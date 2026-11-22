@@ -3,7 +3,7 @@ export const OUTINGS = [
   {id:'minoh', pref:'27', ja:'箕面公園', en:'Minoh Park', lon:135.472022, lat:34.853598, range:680, heading:15},
   {id:'aquarium', pref:'26', ja:'京都水族館', en:'Kyoto Aquarium', lon:135.74751, lat:34.98754, range:650, heading:14},
   {id:'tennoji', pref:'27', ja:'天王寺動物園', en:'Tennoji Zoo', lon:135.5084235, lat:34.648927, targetHeight:6, pitch:-23, range:185, heading:197},
-  {id:'botanical', pref:'26', ja:'京都府立植物園', en:'Kyoto Botanical Gardens', lon:135.7635, lat:35.0492, range:1250, heading:20},
+  {id:'botanical', pref:'26', ja:'京都府立植物園', en:'Kyoto Botanical Gardens', lon:135.7609759, lat:35.0482789, targetHeight:6, pitch:-20, range:220, heading:302},
   {id:'senrigawa', pref:'27', ja:'千里川土手', en:'Senrigawa River embankment', lon:135.453304, lat:34.771224, range:900, heading:322},
   {id:'miyagahama', pref:'25', ja:'休暇村近江八幡BBQ', en:'Kyukamura Ohmi-Hachiman BBQ', lon:136.080608, lat:35.187032, range:880, heading:345},
   {id:'setagawa', pref:'25', ja:'瀬田川花火大会（瀬田の唐橋周辺）', en:'Setagawa fireworks (Seta-no-Karahashi area)', lon:135.906341, lat:34.973043, targetHeight:61, pitch:-7, range:930, heading:350},

@@ -107,6 +107,9 @@ try{
   const biwa=JSON.parse(await fs.readFile(new URL('biwa-museum.geojson',output)));
   manifest.push({id:'biwa-museum',pref:'25',lon:135.9351978,lat:35.074304,file:'/kansai/landmarks/biwa-museum.glb',
     rings:biwa.features.map(feature=>feature.geometry.coordinates[0])});
+  const botanical=JSON.parse(await fs.readFile(new URL('kitayama-conservatory.geojson',output)));
+  manifest.push({id:'kitayama-conservatory',pref:'26',lon:135.7609759,lat:35.0482789,file:'/kansai/landmarks/kitayama-conservatory.glb',
+    rings:botanical.features.map(feature=>feature.geometry.coordinates[0])});
   const lotus=JSON.parse(await fs.readFile(new URL('lotus-pavilion.geojson',output)));
   manifest.push({id:'lotus-pavilion',pref:'25',lon:135.9404719,lat:35.0736969,file:'/kansai/landmarks/lotus-pavilion.glb',
     rings:lotus.features.map(feature=>feature.geometry.coordinates[0])});

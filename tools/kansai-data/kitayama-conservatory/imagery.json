@@ -1,0 +1,24 @@
+{
+  "tiles": [
+    {
+      "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229929/103791.jpg",
+      "sha256": "2ea93d87367be9d8f6a09cb54ed2de288ac8d43f838dc9c341f06fb410a75bfa"
+    },
+    {
+      "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229929/103792.jpg",
+      "sha256": "ecd9e762a053dee20c384cd37e7d9f35249e443b5127ee854b3052b0e6cc0cb5"
+    },
+    {
+      "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229930/103791.jpg",
+      "sha256": "1a91700578866a4fa699a0696f03d8eb4413b8caced97164eabe5aa023ec1b7b"
+    },
+    {
+      "url": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/18/229930/103792.jpg",
+      "sha256": "f60df753676a5b80bc8f85223a55981252e49473865a92ac6fb019eb0039de36"
+    }
+  ],
+  "epsg": 6674,
+  "west": -21875.08585475162,
+  "north": -105482.97857622565,
+  "pixelM": 0.2
+}

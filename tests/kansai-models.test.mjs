@@ -44,6 +44,23 @@ test('Lake Biwa Museum keeps the design height, roof materials and the mapped at
   assert.ok(doc.meshes.some(m=>m.name==='Mullions'));
 });
 
+test('the Kyoto conservatory preserves six survey sections and its published roof height',()=>{
+  const model=json('landmarks/index.json').find(b=>b.id==='kitayama-conservatory');
+  const sections=json('landmarks/kitayama-conservatory.geojson').features;
+  assert.equal(new Set(sections.map(f=>f.properties.gmlId)).size,6);
+  assert.deepEqual(model.rings,sections.map(f=>f.geometry.coordinates[0]));
+  const camera=OUTINGS.find(p=>p.id==='botanical');
+  assert.deepEqual([camera.lon,camera.lat],[model.lon,model.lat]);
+  const bytes=readFileSync(new URL('landmarks/kitayama-conservatory.glb',root));
+  const doc=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
+  const primitive=name=>doc.meshes.find(m=>m.name===name).primitives[0];
+  const roof=primitive('Roof'),frame=primitive('Frame');
+  assert.ok(roof.attributes.TEXCOORD_0!==undefined);
+  assert.ok(doc.materials[roof.material].pbrMetallicRoughness.baseColorTexture);
+  assert.equal(doc.materials[primitive('Vertical glass').material].alphaMode,'BLEND');
+  assert.ok(Math.abs(doc.accessors[frame.attributes.POSITION].max[1]-14.8)<.001);
+});
+
 test('Mizunomori preserves the six pavilion footprints and transparent planted atrium',()=>{
   const model=json('landmarks/index.json').find(b=>b.id==='lotus-pavilion');
   const outlines=json('landmarks/lotus-pavilion.geojson').features;
