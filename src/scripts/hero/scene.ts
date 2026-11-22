@@ -21,8 +21,9 @@ import { loadBuildings } from './buildings-data';
 import { buildingCutout } from './building-cutout';
 import { buildCity, buildCityAsync, buildResidentCity } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
-import { buildLamps } from './lights';
-import { buildCars } from './cars';
+import {prepareSteps} from './task-yield';
+import { buildLampsSteps,type buildLamps } from './lights';
+import { buildCarsSteps,type buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
@@ -576,8 +577,8 @@ export function createHero(
     idle(()=>void ensureLake());
     scene.add(buildIslands(env, hf, lines));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, labelLanguage);
-    const lamps = buildLamps(env, streetGround, lines, opts.quality);
-    const cars = buildCars(env, hf, lines, opts.quality,roadHeight);
+    const lamps = await prepareSteps(buildLampsSteps(env,streetGround,lines,opts.quality));
+    const cars = await prepareSteps(buildCarsSteps(env,hf,lines,opts.quality,roadHeight));
     pointLayers.push(lamps.uniforms, cars.uniforms);
     scene.add(lamps.points, cars.group);
     updatePointScale();
@@ -686,15 +687,17 @@ export function createHero(
         }
       }
       await step();
-      lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7,true);group.add(lamps.points);
-      traffic=buildCars(env,hf,data.lines,lite ? .25 : .45,roadHeight);group.add(traffic.group);
+      lamps=await prepareSteps(buildLampsSteps(env,hf,data.lines,lite ? .4 : .7,true),step);group.add(lamps.points);
+      traffic=await prepareSteps(buildCarsSteps(env,hf,data.lines,lite ? .25 : .45,roadHeight),step);group.add(traffic.group);
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
       await step();
+      const programs=prepare(group);
       built=data.coverage?occlusionTexture(data.coverage,builtSize,coreBuilt):buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
       await step();
       mask=await createBuildingMaskAsync(data.buildings.boxes,data.buildings.polys,step);
       infrastructure=infrastructureMask(data.lines,r.box,data.forest);
+      await programs;
       await step();
       } catch(error) {
         disposeGroup(group);road?.dispose();built?.dispose();campusNormal?.dispose();

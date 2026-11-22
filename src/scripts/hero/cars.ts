@@ -1,3 +1,4 @@
+import {finishSteps} from './task-yield';
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
@@ -63,12 +64,14 @@ function carShape() {
   return { pos, nrm, part };
 }
 
-export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quality: number,
+export function* buildCarsSteps(env: Env, hf: Heightfield, lines: LineFeature[], quality: number,
   roadHeight?: (x: number, z: number, dx: number, dz: number) => number) {
   const r = rng(131);
   const paths: Path[] = [];
   const weight: number[] = [];
+  let scanned=0;
   for (const f of lines) {
+    if(++scanned%128===0)yield;
     if (f.kind !== LINE.road) continue;
     const rank = f.attr & 15;
     if (rank < 2) continue;
@@ -82,7 +85,9 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
     }
   }
   const total = weight.reduce((a, b) => a + b, 0);
+  yield;
   const junctions=trafficJunctions(paths);
+  yield;
   const approaches = signalApproaches(paths, junctions, ROAD_WIDTH, (x,z,dx,dz) =>
     !!roadHeight && roadHeight(x,z,dx,dz) > hf.height(x,z) + 1, quality > .75 ? 520 : 260);
   const controlled = new Int32Array(paths.length * 2).fill(-1);
@@ -130,7 +135,7 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
     laneNumber[i] = Math.floor(r() * lanes.length);
     lane[i] = lanes[laneNumber[i]] * ROAD_WIDTH[path.rank];
   };
-  for (let i = 0; i < count; i++) place(i, true);
+  for (let i=0;i<count;i++){if(i && i%256===0)yield;place(i,true);}
 
   /* ---- bodies ---- */
   const shape = carShape();
@@ -376,4 +381,8 @@ export function buildCars(env: Env, hf: Heightfield, lines: LineFeature[], quali
   group.add(bodies, points);
   group.add(buildSignalHeads(approaches, ROAD_WIDTH, (x,z) => hf.height(x,z), lightMat.uniforms as typeof env & {uScale:{value:number};uDpr:{value:number}}));
   return { group, update, uniforms: lightMat.uniforms as typeof lightMat.uniforms & { uScale: { value: number }; uDpr: { value: number } }, count };
+}
+
+export function buildCars(...args: Parameters<typeof buildCarsSteps>){
+  return finishSteps(buildCarsSteps(...args));
 }
