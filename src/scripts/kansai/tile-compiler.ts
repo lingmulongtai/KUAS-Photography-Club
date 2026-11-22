@@ -8,6 +8,7 @@ import {roofSurvey,matchRoof,drawSurveyedRoof,surveyFits} from './surveyed-roofs
 import {hyogoHeights} from './lidar';
 import {regionalHeights} from './building-heights';
 import {railStructure} from './rail';
+import {bridgeClearance,drawBridgePolyline,drawRailPolyline} from './transport-mesh';
 import {drawSetaBridges,isSetaDeck,type VerticalDatum} from './seta-bridge';
 import {combineTileMeshes,type TileGeometry} from './tile-geometry';
 
@@ -145,39 +146,50 @@ export function tileCompiler(){
       appendBuilding(row.rings,row.point,row.tag,matched.has(row.tag.id)&&row.tag.levels!==undefined&&row.tag.levels>3);
     }
     const karahashi=y===25964&&(x===57508||x===57509);
-    if(karahashi)drawSetaBridges(groundMesh,[west,south,east,north],local,datum,ground);
-    for(const name of ['RdCL','RailCL','RailTrCL']){
-      const layer=tile?.layers[name];if(!layer)continue;
-      for(let i=0;i<layer.length;i++){
-        const f=layer.feature(i),props=f.properties;
-        const structure=railStructure(name,Number(props.vt_code),String(props.vt_railstate));
-        if(structure==='hidden')continue;
-        const road=name==='RdCL',raised=road||structure==='raised';
-        const width=road?roadWidth(props.vt_rnkwidth):name==='RailCL'?4.6:2.6;
-        for(const line of f.loadGeometry()){
-          let distance=0;
-          for(let j=1;j<line.length;j++){
-            const geo=[line[j-1],line[j]].map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
-            const p=midpoint(geo);if(!here(p))continue;
-            if(karahashi&&road&&Number(props.vt_code)===2703&&isSetaDeck(p))continue;
-            const lift=raised?6.8:name==='RailTrCL'?.8:.55;
-            const a=xyz(geo[0],ground(geo[0])+lift),b=xyz(geo[1],ground(geo[1])+lift);
-            strip(groundMesh,a,b,width,road?[99,100,98]:[55,52,47],raised?.9:.28);
-            if(!road){
-              const top=(v:XYZ):XYZ=>[v[0],v[1],v[2]+.11];
-              for(const offset of [-.55,.55])strip(groundMesh,top(a),top(b),.13,[158,157,150],0,offset);
-            }
-            const len=Math.hypot(b[0]-a[0],b[1]-a[1]);
-            if(raised&&len>0){
-              for(let t=32-distance;t<len;t+=32){
-                const u=t/len,px=a[0]+(b[0]-a[0])*u,py=a[1]+(b[1]-a[1])*u,h=a[2]+(b[2]-a[2])*u-1;
-                const w=Math.min(width*.32,2);
-                strip(groundMesh,[px-w,py,h],[px+w,py,h],1.4,[135,131,121],lift);
-              }
-            }
-            distance=(distance+len)%32;
-          }
-        }
+    const bounds:[number,number,number,number]=[west,south,east,north];
+    if(karahashi)drawSetaBridges(groundMesh,bounds,local,datum,ground);
+    const roadLayer=tile?.layers.RdCL;
+    if(roadLayer)for(let i=0;i<roadLayer.length;i++){
+      const f=roadLayer.feature(i),props=f.properties;
+      const code=Number(props.vt_code);
+      const clearance=bridgeClearance(Number(props.vt_lvorder??0),Number(props.vt_motorway??0)===1,String(props.vt_rdctg??''));
+      const width=roadWidth(props.vt_rnkwidth);
+      const skip=karahashi&&code===2703?isSetaDeck:undefined;
+      for(const line of f.loadGeometry()){
+        const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
+        drawBridgePolyline(groundMesh,pts,bounds,ground,xyz,{width,clearance,skip});
+      }
+    }
+    const trackPoints:Point[]=[];
+    const trackLayer=tile?.layers.RailTrCL;
+    if(trackLayer)for(let i=0;i<trackLayer.length;i++){
+      const f=trackLayer.feature(i),props=f.properties,code=Number(props.vt_code);
+      if(code>=2820&&code<2830)continue; // Aerial ropeways/cableways are not steel ballast tracks.
+      const structure=railStructure('RailTrCL',code,String(props.vt_railstate??''));
+      if(structure==='hidden')continue;
+      const shinkansen=code>=2840&&code<2850,monorail=code>=2830&&code<2840,tram=code>=2810&&code<2820;
+      const lvorder=Number(props.vt_lvorder??0);
+      for(const line of f.loadGeometry()){
+        const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
+        for(const p of pts)if(here(p))trackPoints.push(p);
+        drawRailPolyline(groundMesh,pts,bounds,ground,xyz,{raised:structure==='raised',doubleTrack:false,shinkansen,monorail,tram,lvorder});
+      }
+    }
+    const railLayer=tile?.layers.RailCL;
+    if(railLayer)for(let i=0;i<railLayer.length;i++){
+      const f=railLayer.feature(i),props=f.properties;
+      if(String(props.vt_rtcode??'')==='索道')continue;
+      const structure=railStructure('RailCL',Number(props.vt_code),String(props.vt_railstate??''));
+      if(structure==='hidden')continue;
+      const doubleTrack=String(props.vt_sngldbl??'').includes('複線');
+      const lvorder=Number(props.vt_lvorder??0);
+      for(const line of f.loadGeometry()){
+        const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
+        if(pts.length<2)continue;
+        // Skip routes already modelled track-by-track in RailTrCL to avoid double-stacking.
+        const mid=pts[Math.floor(pts.length/2)];
+        if(trackPoints.some(t=>Math.abs(t[0]-mid[0])<.00022&&Math.abs(t[1]-mid[1])<.00018))continue;
+        drawRailPolyline(groundMesh,pts,bounds,ground,xyz,{raised:structure==='raised',doubleTrack,shinkansen:false,monorail:false,tram:false,lvorder});
       }
     }
     for(const f of fields){
