@@ -471,14 +471,16 @@ function* instancedSteps(shape: THREE.InstancedBufferGeometry, list: PlacedHouse
     const {b,y,seed,roofSource}=list[i];
     const r = pitched ? roofFor(roofSource ?? b) : { type: 0, rh: 0 };
     const { lift, inset } = separation(seed);
-    pos.set([b.x, y, b.z], i * 3);
-    size.set([Math.max(1, b.w - 2 * inset), b.h + lift, Math.max(1, b.d - 2 * inset)], i * 3);
+    const o3 = i * 3, o4 = i * 4;
+    pos[o3] = b.x; pos[o3 + 1] = y; pos[o3 + 2] = b.z;
+    size[o3] = Math.max(1, b.w - 2 * inset); size[o3 + 1] = b.h + lift; size[o3 + 2] = Math.max(1, b.d - 2 * inset);
     rot[i] = b.angle;
     const campus = inCampus(b.x, b.z) ? 256 + (isDetailed(b.kind, b.h, b.x, b.z) ? 512 : 0) : 0;
-    meta.set([b.kind + campus, seed, r.type, r.rh], i * 4);
-    minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
-    minZ = Math.min(minZ, b.z); maxZ = Math.max(maxZ, b.z);
-    minY = Math.min(minY, y - FOOTING); maxY = Math.max(maxY, y + b.h + r.rh);
+    meta[o4] = b.kind + campus; meta[o4 + 1] = seed; meta[o4 + 2] = r.type; meta[o4 + 3] = r.rh;
+    if (b.x < minX) minX = b.x; if (b.x > maxX) maxX = b.x;
+    if (b.z < minZ) minZ = b.z; if (b.z > maxZ) maxZ = b.z;
+    const bottom = y - FOOTING, top = y + b.h + r.rh;
+    if (bottom < minY) minY = bottom; if (top > maxY) maxY = top;
   }
   geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(pos, 3));
   geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(size, 3));
@@ -515,22 +517,36 @@ function* extrudedSteps(list: { p: PolyBuilding; y: number; seed: number }[]) {
   const pos=new Float32Array(3*capacity),nrm=new Float32Array(3*capacity);
   const wall=new Float32Array(2*capacity),info=new Float32Array(4*capacity);
   let count=0,pointsSinceYield=0;
-  type V = [number, number, number, number, number];
-  /** One triangle of vertices [x, y, z, u, v], wound counter-clockwise around the outward normal n. */
-  const tri = (a: V, b: V, c: V, n: number[], inf: number[]) => {
-    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const dot = (ab[1] * ac[2] - ab[2] * ac[1]) * n[0] + (ab[2] * ac[0] - ab[0] * ac[2]) * n[1] + (ab[0] * ac[1] - ab[1] * ac[0]) * n[2];
-    for (const q of dot < 0 ? [a, c, b] : [a, b, c]) {
-      const xyz=count*3,uv=count*2;
-      pos[xyz]=q[0];pos[xyz+1]=q[1];pos[xyz+2]=q[2];
-      nrm[xyz]=n[0];nrm[xyz+1]=n[1];nrm[xyz+2]=n[2];
-      wall[uv]=q[3];wall[uv+1]=q[4];
-      info.set(inf,count*4);count++;
-    }
+  /** Write one triangle of vertices (x,y,z,u,v) wound counter-clockwise around outward normal (nx,ny,nz). */
+  const tri = (
+    ax: number, ay: number, az: number, au: number, av: number,
+    bx: number, by: number, bz: number, bu: number, bv: number,
+    cx: number, cy: number, cz: number, cu: number, cv: number,
+    nx: number, ny: number, nz: number,
+    i0: number, i1: number, i2: number, i3: number,
+  ) => {
+    const abx = bx - ax, aby = by - ay, abz = bz - az;
+    const acx = cx - ax, acy = cy - ay, acz = cz - az;
+    const dot = (aby * acz - abz * acy) * nx + (abz * acx - abx * acz) * ny + (abx * acy - aby * acx) * nz;
+    const flip = dot < 0;
+    const p1x = flip ? cx : bx, p1y = flip ? cy : by, p1z = flip ? cz : bz, p1u = flip ? cu : bu, p1v = flip ? cv : bv;
+    const p2x = flip ? bx : cx, p2y = flip ? by : cy, p2z = flip ? bz : cz, p2u = flip ? bu : cu, p2v = flip ? bv : cv;
+    let o3 = count * 3, o2 = count * 2, o4 = count * 4;
+    pos[o3] = ax; pos[o3 + 1] = ay; pos[o3 + 2] = az;
+    pos[o3 + 3] = p1x; pos[o3 + 4] = p1y; pos[o3 + 5] = p1z;
+    pos[o3 + 6] = p2x; pos[o3 + 7] = p2y; pos[o3 + 8] = p2z;
+    nrm[o3] = nx; nrm[o3 + 1] = ny; nrm[o3 + 2] = nz;
+    nrm[o3 + 3] = nx; nrm[o3 + 4] = ny; nrm[o3 + 5] = nz;
+    nrm[o3 + 6] = nx; nrm[o3 + 7] = ny; nrm[o3 + 8] = nz;
+    wall[o2] = au; wall[o2 + 1] = av;
+    wall[o2 + 2] = p1u; wall[o2 + 3] = p1v;
+    wall[o2 + 4] = p2u; wall[o2 + 5] = p2v;
+    info[o4] = i0; info[o4 + 1] = i1; info[o4 + 2] = i2; info[o4 + 3] = i3;
+    info[o4 + 4] = i0; info[o4 + 5] = i1; info[o4 + 6] = i2; info[o4 + 7] = i3;
+    info[o4 + 8] = i0; info[o4 + 9] = i1; info[o4 + 10] = i2; info[o4 + 11] = i3;
+    count += 3;
   };
-  const box = new THREE.Box3();
-  const corner = new THREE.Vector3();
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   for (const { p, y, seed } of list) {
     const r = p.ring;
     const m = r.length / 2;
@@ -549,32 +565,35 @@ function* extrudedSteps(list: { p: PolyBuilding; y: number; seed: number }[]) {
     let cx = 0;
     let cz = 0;
     for (let i = 0; i < m; i++) {
-      cx += r[i * 2] / m;
-      cz += r[i * 2 + 1] / m;
+      cx += r[i * 2];
+      cz += r[i * 2 + 1];
     }
+    cx /= m; cz /= m;
     const campus = inCampus(cx, cz) ? 256 + (isDetailed(p.kind, p.h, cx, cz) ? 512 : 0) : 0;
-    const inf = [p.kind + campus, seed, p.h, 0];
+    const i0 = p.kind + campus, i1 = seed, i2 = p.h;
+    if (bottom < minY) minY = bottom;
+    if (top > maxY) maxY = top;
     for (let i = 0; i < m; i++) {
       const j = (i + 1) % m;
       const ax = r[i * 2], az = r[i * 2 + 1], bx = r[j * 2], bz = r[j * 2 + 1];
       const len = Math.hypot(bx - ax, bz - az);
       if (len < 0.01) continue;
-      const n = [(out * (bz - az)) / len, 0, (-out * (bx - ax)) / len];
+      const nx = (out * (bz - az)) / len, nz = (-out * (bx - ax)) / len;
       const u0 = along, u1 = along + len;
-      tri([ax, bottom, az, u0, -FOOTING], [bx, bottom, bz, u1, -FOOTING], [bx, top, bz, u1, p.h], n, inf);
-      tri([ax, bottom, az, u0, -FOOTING], [bx, top, bz, u1, p.h], [ax, top, az, u0, p.h], n, inf);
+      tri(ax, bottom, az, u0, -FOOTING, bx, bottom, bz, u1, -FOOTING, bx, top, bz, u1, p.h, nx, 0, nz, i0, i1, i2, 0);
+      tri(ax, bottom, az, u0, -FOOTING, bx, top, bz, u1, p.h, ax, top, az, u0, p.h, nx, 0, nz, i0, i1, i2, 0);
       along = u1;
-      box.expandByPoint(corner.set(ax, bottom, az));
-      box.expandByPoint(corner.set(ax, top, az));
+      if (ax < minX) minX = ax; if (ax > maxX) maxX = ax;
+      if (az < minZ) minZ = az; if (az > maxZ) maxZ = az;
     }
-    const contour: THREE.Vector2[] = [];
-    for (let i = 0; i < m; i++) contour.push(new THREE.Vector2(r[i * 2], r[i * 2 + 1]));
-    const roofInf = [p.kind + campus, seed, p.h, 3];
+    const contour: THREE.Vector2[] = new Array(m);
+    for (let i = 0; i < m; i++) contour[i] = new THREE.Vector2(r[i * 2], r[i * 2 + 1]);
     for (const t of THREE.ShapeUtils.triangulateShape(contour, [])) {
-      const [a, b, c] = t.map((k) => contour[k]);
-      tri([a.x, top, a.y, a.x, a.y], [b.x, top, b.y, b.x, b.y], [c.x, top, c.y, c.x, c.y], [0, 1, 0], roofInf);
+      const a = contour[t[0]], b = contour[t[1]], c = contour[t[2]];
+      tri(a.x, top, a.y, a.x, a.y, b.x, top, b.y, b.x, b.y, c.x, top, c.y, c.x, c.y, 0, 1, 0, i0, i1, i2, 3);
     }
   }
+  const box = minX <= maxX ? new THREE.Box3(new THREE.Vector3(minX, minY, minZ), new THREE.Vector3(maxX, maxY, maxZ)) : new THREE.Box3();
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0,count*3), 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nrm.subarray(0,count*3), 3));
