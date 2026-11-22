@@ -403,7 +403,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       }
     `,
   });
-  const { mesh, position, setPositions } = terrainTiles(pos, segments, material);
+  const { mesh, position, setPositions,setDistant } = terrainTiles(pos, segments, material);
   // Shade the aerial imagery only where opaque roofs, trees and roads leave ground
   // visible. At equal depth the overlaid geometry keeps its original priority.
   mesh.renderOrder = 1;
@@ -445,5 +445,5 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
     cache.clear();recenter(activeCenter,activeAnchored);
   };
-  return { mesh, position, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
+  return { mesh, position, setDistant, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
 }

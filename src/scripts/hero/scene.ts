@@ -67,6 +67,7 @@ import {buildKameokaCampus,isKameokaBuilding,KAMEOKA_CENTER} from './kameoka-cam
 import {kameokaClearing} from './kameoka-grounds';
 import {buildRailways} from './railways';
 import {buildAircraft} from './aircraft';
+import {distantBasin} from './distant-basin';
 import {buildSouthOverview,type OverviewBuilding} from './south-overview';
 import type {RailwayRoute} from './railway-path';
 import {containsPhoto,createNearbyPhotos,type PhotoSheet} from './nearby-photos';
@@ -191,6 +192,7 @@ export function createHero(
   });
   let preparingExpo=false,retryExpoAt=0;
   let updateFireworks:ReturnType<typeof import('./regional-fireworks').regionalFireworks>|undefined;
+  let updateBasinLod:(()=>void)|undefined;
   let ensureRegionalGround:(()=>Promise<void>)|undefined;
   let flightRequest=0;
   let travelBounds:Box=[-34000,-19000,13000,20000];
@@ -372,10 +374,16 @@ export function createHero(
     shadow.invalidate();
     await yieldToBrowser();
     const [, buildings, lines, woodlandBytes] = await cityData;
+    const basinLod=distantBasin(env,scene,(x,z)=>hf.height(x,z),prepare);
+    basinLod.register(buildings);
+    updateBasinLod=()=>{
+      const far=basinLod.update(camera.position.x,camera.position.z,pxPerM);
+      terrain.setDistant(far && !inKyoto(camera.position));
+    };
     const channel=createKamoChannel(lines,(x,z)=>hf.height(x,z));
     terrain.setChannel(channel,kamoMask(channel));
     const bridges=buildBridges(env,hf,lines,channel);
-    scene.add(bridges.mesh);casts(bridges.mesh);shadow.invalidate();
+    basinLod.detail.add(bridges.mesh);casts(bridges.mesh);shadow.invalidate();
     await yieldToBrowser();
     const streetGround=Object.create(hf) as Heightfield;
     streetGround.height=bridges.heightAt;
@@ -383,7 +391,7 @@ export function createHero(
       const {paths}=JSON.parse(new TextDecoder().decode(bytes)) as {paths:TransportSpan[]};
       return buildTransportSpans(env,paths,(x,z)=>hf.height(x,z),bridges.bridges);
     }).catch(error=>{console.warn('Mapped elevated transport unavailable',error);return null;});
-    if(spans)scene.add(spans.group);
+    if(spans)basinLod.detail.add(spans.group);
     const roadHeight=(x:number,z:number,dx:number,dz:number)=>{
       const mapped=spans?.heightAt(x,z,dx,dz)??-Infinity;
       return Math.max(mapped,bridges.deckAt(x,z,dx,dz));
@@ -486,7 +494,8 @@ export function createHero(
     campusModel = buildCampus(env, hf).mesh;
     scene.add(campusModel);
     casts(campusModel);
-    scene.add(city.group, landmarks.mesh, landmarks.glazing);
+    basinLod.detail.add(city.group);
+    scene.add(landmarks.mesh,landmarks.glazing);
     const station = landmarks.positions.kyotoStation;
     let stationDetail: Awaited<ReturnType<typeof import('./station-detail').loadStationDetail>> | undefined;
     let stationLoading = false;
@@ -521,7 +530,7 @@ export function createHero(
         }).finally(() => { stationLoading = false; });
       }
     };
-    if (city.overview) scene.add(city.overview);
+    if (city.overview) basinLod.detail.add(city.overview);
     casts(city.group);
     cityLods.add(city);
     casts(landmarks.mesh);
@@ -572,9 +581,9 @@ export function createHero(
     };
     const overviews:((region:CityRegion|null)=>void)[]=[];
     let detailRegion:CityRegion|null=null;
-    const installOverview=(item:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void})=>{
+    const installOverview=(item:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void},parent:THREE.Object3D=scene)=>{
       const update=(region:CityRegion|null)=>item.setDetailBox(region?.box??null);
-      update(detailRegion);overviews.push(update);scene.add(item.mesh);
+      update(detailRegion);overviews.push(update);parent.add(item.mesh);
     };
     const setOverviewDetail=(region:CityRegion|null)=>{
       detailRegion=region;
@@ -748,7 +757,8 @@ export function createHero(
       const skyline=await buildResidentCity(env,hf,survey.buildings,survey.region.box);
       skyline.mesh.name='southern-basin-buildings';
       await prepare(skyline.mesh);
-      installOverview(skyline);
+      basinLod.register(survey.buildings);
+      installOverview(skyline,basinLod.detail);
       return true;
     }).catch(error=>{console.warn('Southern survey unavailable; using sampled skyline',error);return false;});
     const residentEast=eastSurvey.then(async survey=>{
@@ -757,14 +767,15 @@ export function createHero(
       skyline.mesh.name='yamashina-survey';
       await prepare(skyline.mesh);
       const update=(region:CityRegion|null)=>{skyline.mesh.visible=region?.id!=='yamashina';};
-      update(detailRegion);overviews.push(update);scene.add(skyline.mesh);
+      basinLod.register(survey.buildings);
+      update(detailRegion);overviews.push(update);basinLod.detail.add(skyline.mesh);
     }).catch(error=>console.warn('Yamashina survey unavailable',error));
     const residentEastFill=eastFill.then(async data=>{
       // These footprints have no detailed counterpart on either side of the ward edge.
       const skyline=await buildResidentCity(env,hf,data);
       skyline.mesh.name='yamashina-basin';
       await prepare(skyline.mesh);
-      scene.add(skyline.mesh);
+      basinLod.register(data);basinLod.detail.add(skyline.mesh);
     }).catch(error=>console.warn('Yamashina basin outlines unavailable',error));
     const residentWest=Promise.all(westSurveys.map(({name,buildings})=>buildings.then(async data=>{
       if(!data)return null;
@@ -778,7 +789,7 @@ export function createHero(
         const update=(region:CityRegion|null)=>{skyline.mesh.visible=region?.id!=='tennozan';};
         update(detailRegion);overviews.push(update);
       }
-      scene.add(skyline.mesh);
+      basinLod.register(data);basinLod.detail.add(skyline.mesh);
       return sampledRoofMask;
     }).catch(error=>{
       console.warn(`Western basin roofs unavailable: ${name}`,error);
@@ -1267,6 +1278,7 @@ export function createHero(
       const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
+      updateBasinLod?.();
       updateFireworks?.(camera,dt,pxPerM);
       const regionalTime=performance.now()/1000;
       regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime);
