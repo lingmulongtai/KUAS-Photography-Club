@@ -2,11 +2,52 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import {readFileSync} from 'node:fs';
+import {buildSync} from 'esbuild';
+import {runInNewContext} from 'node:vm';
+import {setImmediate as idle} from 'node:timers/promises';
 import {inRing,prefectureLookup} from '../src/scripts/kansai/coordinates.ts';
 import {MAP_PLACES} from '../src/data/kansai-outings.ts';
 
 const base=new URL('../public/kansai/',import.meta.url);
 const original=prefectureLookup(JSON.parse(readFileSync(new URL('prefectures.json',base))).features);
+test('standalone landmark anchors and footprint edges belong to their display prefecture',()=>{
+  for(const landmark of JSON.parse(readFileSync(new URL('landmarks/index.json',base)))){
+    const belongs=p=>assert.equal(original(p),landmark.pref,landmark.id);
+    belongs([landmark.lon,landmark.lat]);
+    for(const ring of landmark.rings)for(let i=0;i<ring.length;i++){
+      const a=ring[i],b=ring[(i+1)%ring.length];
+      belongs(a);belongs([(a[0]+b[0])/2,(a[1]+b[1])/2]);
+    }
+  }
+});
+
+test('switching prefectures hides resident glass, restores footprints and discards a late landmark',async()=>{
+  const script=buildSync({entryPoints:['src/scripts/kansai/architecture.ts'],platform:'node',format:'cjs',bundle:true,write:false}).outputFiles[0].text;
+  let selection='25',draw,resolveLoad,requests=0,discarded=0;
+  const engine={Cartesian3:{fromDegrees:()=>({}),distance:()=>50},Cartographic:{fromDegrees:()=>({})},
+    Transforms:{eastNorthUpToFixedFrame:()=>({})},Axis:{},Model:{fromGltfAsync(){
+      requests++;return new Promise(resolve=>{resolveLoad=()=>resolve({show:true,ready:true,destroy(){discarded++;}});});
+    }}};
+  const ring=[[135,35],[135.001,35],[135,35.001],[135,35]],point=[135.0001,35.0001];
+  const module={exports:{}},catalogue=[{id:'glass',pref:'26',lon:135,lat:35,file:'glass.glb',rings:[ring]}];
+  runInNewContext(script,{module,window:{Cesium:engine},fetch:async()=>({ok:true,json:async()=>catalogue})});
+  const residents=[];
+  const widget={camera:{},terrainProvider:{},isDestroyed:()=>false,scene:{requestRender(){},
+    preRender:{addEventListener(fn){draw=fn;return ()=>{};}},primitives:{add:model=>residents.push(model)}}};
+  const buildings=await module.exports.architecturalModels(widget,()=>selection);
+  draw();assert.equal(requests,0);
+  selection='26';draw();selection='25';resolveLoad();await idle();draw();
+  assert.equal(discarded,1);assert.equal(residents.length,0);assert.equal(buildings.contains(point),false);
+  selection='26';draw();resolveLoad();await idle();draw();
+  assert.equal(residents.length,1);assert.equal(buildings.contains(point),true);
+  const revision=buildings.revision;
+  selection='25';draw();
+  assert.equal(residents[0].show,false);assert.equal(buildings.contains(point),false);assert.ok(buildings.revision>revision);
+  selection='26';draw();
+  assert.equal(residents[0].show,true);assert.equal(buildings.contains(point),true);assert.equal(requests,2);
+  buildings.dispose();
+});
+
 async function readImage(name){
   const {data,info}=await sharp(readFileSync(new URL('borders/'+name+'.png',base))).raw().toBuffer({resolveWithObject:true});
   const pixel=(x,y)=>{const at=(y*info.width+x)*info.channels;return data.subarray(at,at+3);};

@@ -4,7 +4,7 @@ import {inBox,inPolygon,type Box,type Point,type Ring} from './coordinates';
 import {json} from './sources';
 
 type Building={id:string;pref:string;lon:number;lat:number;ellipsoidHeight?:number;file:string;rings:Ring[]};
-export async function architecturalModels(widget:CesiumWidget){
+export async function architecturalModels(widget:CesiumWidget,prefecture:()=>string){
   const catalogue=await json<Building[]>('landmarks/index.json');
   const records=catalogue.map(b=>({...b,centre:C.Cartesian3.fromDegrees(b.lon,b.lat),
     masks:b.rings.map(r=>{const xs=r.map(p=>p[0]),ys=r.map(p=>p[1]);
@@ -32,15 +32,18 @@ export async function architecturalModels(widget:CesiumWidget){
       const model=await C.Model.fromGltfAsync({url:b.file,
         modelMatrix:C.Transforms.eastNorthUpToFixedFrame(C.Cartesian3.fromDegrees(b.lon,b.lat,pt.height||0)),
         upAxis:C.Axis.Y,forwardAxis:C.Axis.X,allowPicking:false});
-      if(!alive||widget.isDestroyed()){model.destroy();return;}
+      if(!alive||widget.isDestroyed()||b.pref!==prefecture()){model.destroy();return;}
       widget.scene.primitives.add(model);models.set(b.id,model);
       widget.scene.requestRender();
     }catch(error){retry.set(b.id,Date.now()+30000);console.warn('Architectural model',b.id,error);}
     finally{loading.delete(b.id);}
   }
   const stop=widget.scene.preRender.addEventListener(()=>{
+    const selected=prefecture();
     for(const b of records){
-      const near=C.Cartesian3.distance(widget.camera.positionWC,b.centre)<(b.id==='station-district'?3200:6500);
+      // Translucent glass can contribute colour without writing a depth sample
+      // for the border pass. Each standalone landmark lies within one prefecture.
+      const near=b.pref===selected&&C.Cartesian3.distance(widget.camera.positionWC,b.centre)<(b.id==='station-district'?3200:6500);
       const model=models.get(b.id);
       if(model){
         model.show=near;

@@ -115,7 +115,7 @@ export async function startMap(root:HTMLElement){
   try{await Promise.all([terrain,boundary]);}
   catch(error){dispose();throw error;}
   if(widget.isDestroyed())return;
-  const architecture=await architecturalModels(widget);
+  const architecture=await architecturalModels(widget,()=>selected.pref);
   const surveys=await attachSurveys(widget,()=>{surveyFailed=true;},[selected.lon,selected.lat],architecture);
   if(widget.isDestroyed())return;
 
