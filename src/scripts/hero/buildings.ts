@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {yieldTask} from './task-yield';
+import {finishSteps,prepareSteps,yieldTask} from './task-yield';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
@@ -159,6 +159,11 @@ function steppedShape() {
 
 /** Instanced placement: decode the unit shape into metres and turn it to the building's angle. */
 const INSTANCE_VS = /* glsl */ `
+  #ifdef DISTRICT_HOUSES
+    attribute float iSlot;
+    uniform sampler2D uNearby;
+    uniform vec4 uDetail;
+  #endif
   attribute float aRole;
   attribute float aLevel;
   attribute vec3 iPos;    // x, ground, z
@@ -171,6 +176,12 @@ const INSTANCE_VS = /* glsl */ `
   flat varying vec4 vInfo;
 
   void main(){
+    #ifdef DISTRICT_HOUSES
+      vec2 uv=(vec2(mod(iSlot,16.),floor(iSlot/16.))+.5)/16.;
+      if(texture2D(uNearby,uv).r>.5 || (all(greaterThanEqual(iPos.xz,uDetail.xy)) && all(lessThan(iPos.xz,uDetail.zw)))){
+        gl_Position=vec4(2.,2.,2.,1.);return;
+      }
+    #endif
     vec3 p = position;
     vec3 face = normal;
     float c = cos(iRot), s = sin(iRot);
@@ -445,7 +456,7 @@ function roofFor(b: BoxBuilding) {
   return { type: 1, rh: Math.min(Math.max(b.d * 0.26, 1.2), b.h * 0.4) };
 }
 
-function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pitched: boolean) {
+function* instancedSteps(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pitched: boolean) {
   const n = list.length;
   const geo = new THREE.InstancedBufferGeometry();
   geo.setIndex(shape.index);
@@ -455,7 +466,9 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pi
   const rot = new Float32Array(n);
   const meta = new Float32Array(n * 4);
   let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity, maxY = -Infinity, minY = Infinity;
-  list.forEach(({ b, y, seed, roofSource }, i) => {
+  for(let i=0;i<n;i++){
+    if(i && i%512===0)yield;
+    const {b,y,seed,roofSource}=list[i];
     const r = pitched ? roofFor(roofSource ?? b) : { type: 0, rh: 0 };
     const { lift, inset } = separation(seed);
     pos.set([b.x, y, b.z], i * 3);
@@ -466,7 +479,7 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pi
     minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
     minZ = Math.min(minZ, b.z); maxZ = Math.max(maxZ, b.z);
     minY = Math.min(minY, y - FOOTING); maxY = Math.max(maxY, y + b.h + r.rh);
-  });
+  }
   geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(pos, 3));
   geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(size, 3));
   geo.setAttribute('iRot', new THREE.InstancedBufferAttribute(rot, 1));
@@ -476,6 +489,23 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pi
   geo.boundingBox = box;
   geo.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
   return geo;
+}
+
+function instanced(shape:THREE.InstancedBufferGeometry,list:PlacedHouse[],pitched:boolean){
+  return finishSteps(instancedSteps(shape,list,pitched));
+}
+
+/** Distant regional streets share Kyoto's panorama unit meshes, window shader and roof profiles. */
+export async function residentHouseBatch(env:Env,houses:PlacedHouse[],pitched:boolean,slots:number[],
+  nearby:THREE.DataTexture,detail:{value:THREE.Vector4}){
+  const sides=walls(1).filter(face=>face.n[0]>0 || face.n[2]>0);
+  const shape=pitched?pitchedShape(sides):flatShape(sides);
+  const geometry=await prepareSteps(instancedSteps(shape,houses,pitched));
+  shape.dispose();
+  geometry.setAttribute('iSlot',new THREE.InstancedBufferAttribute(new Uint8Array(slots),1));
+  const material=new THREE.ShaderMaterial({uniforms:{...env,uNearby:{value:nearby},uDetail:detail},
+    vertexShader:INSTANCE_VS,fragmentShader:BUILDING_FS,defines:{BLOCK_OVERVIEW:1,DISTRICT_HOUSES:1}});
+  return new THREE.Mesh(geometry,material);
 }
 
 /** Walls and a triangulated flat roof for each outline, merged into one geometry. */
