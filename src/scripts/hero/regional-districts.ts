@@ -1,8 +1,23 @@
+import type * as THREE from 'three';
 import {loadTexture,type GridMeta} from './data';
 import type {Box} from './geo';
 import type {RegionalPhoto} from './regional-photo';
 
 export interface District {id:string;box:Box;file:string;zoom:number;grid?:GridMeta}
+
+export interface DistrictUniforms {
+  uDistrict:{value:THREE.Texture|null};uDistrictBox:{value:THREE.Vector4};
+  uInset:{value:THREE.Texture|null};uInsetBox:{value:THREE.Vector4};
+}
+
+export const districtSampling=`
+  vec3 overlay(vec3 base,sampler2D map,vec4 box,vec2 p){
+    vec2 uv=(p-box.xy)/max(vec2(1.),box.zw-box.xy);
+    if(any(lessThanEqual(uv,vec2(0.))) || any(greaterThanEqual(uv,vec2(1.))))return base;
+    vec4 aerial=texture2D(map,vec2(uv.x,1.-uv.y));
+    vec2 edge=min(uv,1.-uv);
+    return mix(base,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
+  }`;
 
 export function districtImagery(districts:District[],aniso:number,onChange:(broad:RegionalPhoto|null,inset:RegionalPhoto|null)=>void){
   const entries=districts.map(record=>({...record,sheet:null as RegionalPhoto|null,pending:false,retry:0,distance:Infinity}));

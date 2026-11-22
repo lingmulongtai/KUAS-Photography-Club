@@ -1,3 +1,4 @@
+import {districtSampling,type DistrictUniforms} from './regional-districts';
 import {regionalNeighborhoods} from './regional-neighborhoods';
 import * as THREE from 'three';
 import {lonLat, tileMetresPerDegree, tileXY, type Point} from '../kansai/coordinates';
@@ -25,9 +26,9 @@ function sampleTile(x:number,y:number,ground:Ground){
   return grid;
 }
 
-function cityMaterial(env:Env,boundary:Awaited<ReturnType<typeof boundaryUniforms>>){
+function cityMaterial(env:Env,boundary:Awaited<ReturnType<typeof boundaryUniforms>>,imagery:DistrictUniforms){
   return new THREE.ShaderMaterial({
-    uniforms:{...env,...boundary},
+    uniforms:{...env,...boundary,...imagery},
     vertexShader:`
       attribute vec4 surface;
       varying vec4 vSurface; varying vec2 vUv; varying vec3 vWorld,vNormal;
@@ -40,11 +41,19 @@ function cityMaterial(env:Env,boundary:Awaited<ReturnType<typeof boundaryUniform
     fragmentShader:`
       ${ENV_GLSL}
       ${HOME_BOUNDARY}
+      uniform sampler2D uDistrict,uInset;
+      uniform vec4 uDistrictBox,uInsetBox;
+      ${districtSampling}
       varying vec4 vSurface; varying vec2 vUv; varying vec3 vWorld,vNormal;
       void main(){
         if(owner(vWorld.xz)==0)discard;
         vec3 n=normalize(vNormal),albedo=pow(vSurface.rgb,vec3(2.2));
         vec3 emit=vec3(0.);
+        if(vSurface.a>.9){
+          vec3 surveyed=overlay(albedo,uDistrict,uDistrictBox,vWorld.xz);
+          surveyed=overlay(surveyed,uInset,uInsetBox,vWorld.xz);
+          albedo=mix(albedo,surveyed,.70);
+        }
         if(vSurface.a>.4 && vSurface.a<.6){
           vec2 cell=vUv/vec2(4.,3.2);
           vec2 edge=abs(fract(cell)-.5),aa=max(fwidth(cell),vec2(.01));
@@ -53,7 +62,12 @@ function cityMaterial(env:Env,boundary:Awaited<ReturnType<typeof boundaryUniform
           float lit=step(hash12(floor(cell)+floor(vWorld.xz/30.)),uLit);
           emit=vec3(1.15,.77,.40)*uCity*mix(.16*uLit,pane.x*pane.y*lit,near);
           // Keep the dark window-to-wall ratio even when individual panes fall below one pixel.
-          albedo*=1.-.37*mix(.19,pane.x*pane.y,near);
+          float glass=mix(.19,pane.x*pane.y,near);
+          albedo*=1.-.47*glass;
+          vec3 incident=normalize(vWorld-cameraPosition);
+          float fresnel=.035+.17*pow(1.-max(dot(-incident,n),0.),4.);
+          vec3 reflection=reflect(incident,n);
+          emit+=glass*fresnel*mix(uHorizon*.36,skyColor(reflection),smoothstep(0.,.45,reflection.y));
         }
         gl_FragColor=vec4(applyHaze(shade(seasonalSurface(albedo,n,vWorld),n,vWorld,1.),emit,vWorld),1.);
       }`});
@@ -150,14 +164,14 @@ async function readSkyline(x:number,y:number,material:THREE.Material,ground:Grou
   return {mesh,mask};
 }
 
-export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legacy:Box[],lite:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>){
+export async function regionalCity(scene:THREE.Scene,env:Env,ground:Ground,legacy:Box[],lite:boolean,imagery:DistrictUniforms,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const [{tiles},{prefectures},architecture,boundary,neighborhoods]=await Promise.all([
     json<{tiles:string[]}>('skyline/index.json'),
     json<{prefectures:Record<string,string[]>}>('network/index.json'),
     regionalLandmarks(scene,env,ground,prepare),boundaryUniforms(),regionalNeighborhoods(scene,env,ground,lite,prepare),
   ]);
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
-  const queue=tileQueue(false,'orthometric'),material=cityMaterial(env,boundary);
+  const queue=tileQueue(false,'orthometric'),material=cityMaterial(env,boundary,imagery);
   let shaderReady:Promise<unknown>|undefined;
   type Entry={mesh:THREE.Mesh|null;mask?:(near:ReadonlySet<string>)=>void};
   const loaded=new Map<string,Entry>(),loading=new Set<string>(),retry=new Map<string,number>();

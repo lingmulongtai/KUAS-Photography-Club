@@ -6,7 +6,7 @@ import type {Box} from './geo';
 import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
 import {regionalPhoto,type RegionalPhoto} from './regional-photo';
 import {Grid,type Heightfield} from './heightfield';
-import {districtImagery,type District} from './regional-districts';
+import {districtImagery,districtSampling,type District} from './regional-districts';
 
 interface Patch {box: Box; file: string}
 interface GroundSurvey {grid: GridMeta; patches: Patch[]}
@@ -86,13 +86,7 @@ const fragmentShader = `
   varying vec3 vWorld,vNormal;
   ${ENV_GLSL}
   ${HOME_BOUNDARY}
-  vec3 overlay(vec3 base,sampler2D map,vec4 box){
-    vec2 uv=(vWorld.xz-box.xy)/max(vec2(1.),box.zw-box.xy);
-    if(any(lessThanEqual(uv,vec2(0.))) || any(greaterThanEqual(uv,vec2(1.))))return base;
-    vec4 aerial=texture2D(map,vec2(uv.x,1.-uv.y));
-    vec2 edge=min(uv,1.-uv);
-    return mix(base,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
-  }
+  ${districtSampling}
   void main(){
     vec4 photo=texture2D(uPhoto,vUv);
     if(photo.a<.18)discard;
@@ -105,9 +99,9 @@ const fragmentShader = `
       return;
     }
     if(prefectureCode==0)discard;
-    photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox);
-    photo.rgb=overlay(photo.rgb,uInset,uInsetBox);
-    photo.rgb=overlay(photo.rgb,uClose,uCloseBox);
+    photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox,vWorld.xz);
+    photo.rgb=overlay(photo.rgb,uInset,uInsetBox,vWorld.xz);
+    photo.rgb=overlay(photo.rgb,uClose,uCloseBox,vWorld.xz);
     vec3 n=normalize(vNormal);
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
     vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,1.);
@@ -196,5 +190,5 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       }).catch(()=>{state.retry=last+10;}).finally(()=>{state.pending=false;running--;});
     }
   }
-  return {bounds:grid.box,ground,canopy,update};
+  return {bounds:grid.box,ground,canopy,update,imagery:{uDistrict,uDistrictBox,uInset,uInsetBox}};
 }
