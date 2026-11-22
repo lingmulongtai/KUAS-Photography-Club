@@ -556,5 +556,17 @@
    2048
   ],
   "bytes": 913190
+ },
+ "naraElevation": {
+  "box": [
+   1600,
+   31560,
+   11600,
+   39560
+  ],
+  "step": 40,
+  "nx": 251,
+  "nz": 201,
+  "file": "kansai/districts/nara.bin"
  }
 }

@@ -1,0 +1,63 @@
+---
+import Base from '../layouts/Base.astro';
+import surveySources from '../../public/kansai/surveys/sources.json';
+interface Props {lang:'ja'|'en'}
+const {lang}=Astro.props;
+const en=lang==='en';
+const title=en?'Map data credits':'地図データの出典';
+---
+<Base {lang} {title}>
+  <article class="sources">
+    <h1>{title}</h1>
+    <p>データソース：Landsat8画像（GSI,TSIC,GEO Grid/AIST）, Landsat8画像（courtesy of the U.S. Geological Survey）, 海底地形（GEBCO）</p>
+      <p><a href="https://docs.plateauview.mlit.go.jp/datasets/3d-tiles/">PLATEAU</a> · <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院（標高タイル・全国最新写真・最適化ベクトルタイルを加工）</a> · <a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2026.html">国土数値情報（行政区域）</a> · <a href="https://www.maff.go.jp/j/tokei/census/shuraku_data/2025/mb/index.html">農林水産省統計部「筆ポリゴンデータ（2026年）」を加工して作成</a></p>
+      <p>{en?'Eight roofs at Daikaku-ji, Nanzen-ji, Kurama-dera and Eikan-do combine Kyoto Prefecture’s 0.5 m laser surveys with GSI aerial photography. Sheltered framing and the bell are reconstructed.':'大覚寺の御影堂・宸殿、南禅寺の三門・法堂、鞍馬寺の転法輪堂、永観堂の釈迦堂・古方丈・鐘楼は、京都府の0.5mレーザー測量と地理院の航空写真から屋根を作成しました。軒下の木組みと鐘は復元表現です。'}
+        <a href="https://www.geospatial.jp/ckan/dataset/dchm05_kyoto">{en?'Kyoto Prefecture survey':'京都府・レーザー測量データ'}</a> ·
+        <a href="https://www.geospatial.jp/ckan/dataset/b5858140-94db-40e1-b666-f4908e2d89c6/resource/f1c1613a-a8d5-4b7e-8022-23bb814be4ba/download/_.pdf">{en?'Reuse terms':'利用規約'}</a></p>
+      <p>{en?'Kasuga Taisha’s four sanctuaries use the published column spans and ridge height of one representative building. The five-by-three-bay dance hall, roof details and colours are reconstructed.':'春日大社の本殿四棟は、代表一棟の実測図に記載された柱間と棟の高さを使用しました。桁行五間・梁間三間の幣殿・舞殿の高さと、各棟の細部・色は復元表現です。'}
+        <a href="https://whc.unesco.org/uploads/nominations/870.pdf#page=238">{en?'Historic Monuments of Ancient Nara, measured drawing':'古都奈良の文化財・実測図'}</a> ·
+        <a href="https://www.kasugataisha.or.jp/guidance/index/modal-05/">{en?'Kasuga Taisha':'春日大社'}</a> ·
+        <a href="/kansai/landmarks/kasuga-footprints.geojson">{en?'Footprints (OSM, ODbL)':'建物輪郭（OSM・ODbL）'}</a></p>
+      <p><a href="https://www.nankinmachi.or.jp/about">{en?'Nankinmachi Shopping Street Promotion Association':'南京町商店街振興組合'}</a>{en?' · The three gates and square pavilion use published dimensions and mapped roof outlines. Tilework and brackets are reconstructed. ':'の公表寸法と各建物の輪郭から、3基の楼門と広場のあづまやを復元。屋根瓦と軒下の組物は資料写真を参考に作成。'} <a href="/kansai/landmarks/nankinmachi.json">{en?'Footprints (OSM, ODbL)':'建物輪郭（OSM・ODbL）'}</a></p>
+      <p><a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-W09-2005.html">{en?'Lake Biwa extent · MLIT National Land Numerical Information W09 (2005)':'琵琶湖の範囲判定：国土数値情報「湖沼データ」（2005年）'}</a>{en?' · Shorelines and islands follow GSI water-area polygons.':'。岸線と島は地理院の水域ポリゴンから作成。'}</p>
+      <details>
+        <summary>{en?'Municipal 3D model releases and attribution':'自治体別の3D都市モデル・出典'}</summary>
+        <p>{en?'Published PLATEAU datasets for municipalities in the five prefectures.':'対象5府県で公開されている自治体別のPLATEAUデータセットです。'} <a href="https://www.mlit.go.jp/plateau/site-policy/">{en?'Terms of use':'利用条件'}</a></p>
+        <ul>{surveySources.filter(s=>s.code!=='27999').map(s=><li><a href={s.url}>{s.title}</a></li>)}</ul>
+      </details>
+      <p><a href="https://data.city.kyoto.lg.jp/resource/?id=21224">{en?'Kyoto Station district · Adapted from Kyoto City open data':'京都駅ビル・駅前広場・周辺建物 © 京都市オープンデータを加工'}</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></p>
+      <p><a href="https://www.geospatial.jp/ckan/dataset/plateau-26100-kyoto-shi-2025">{en?'Kyoto Aquarium and the former Kyoto Prefectural Office · Adapted from Kyoto City’s 2025 PLATEAU building models':'京都水族館・京都府庁旧本館は「3D都市モデル 京都市（2025年度）」（京都市・Project PLATEAU）から建物と外壁写真を抽出して作成'}</a> · <a href="https://www.mlit.go.jp/plateau/site-policy/">{en?'PLATEAU terms':'PLATEAU利用条件'}</a></p>
+      <p><a href="https://www.city.kobe.lg.jp/documents/51309/04_kobecitymuseum.pdf">{en?'Kobe City Museum · City architectural record':'神戸市立博物館 · 神戸市の建築資料'}</a> · <a href="https://www.belca.or.jp/l130.htm">{en?'West extension and copper roof':'西側増築部と銅板屋根'}</a>{en?' · Model reconstructed from the building outline, airborne survey and published exterior photographs.':'。建物の輪郭、航空測量、外観写真から京町筋側の半円柱と西館の屋根を復元。'}</p>
+      <p><a href="https://kobe-maritime-museum.com/about/">{en?'Kobe Maritime Museum':'神戸海洋博物館'}</a> · <a href="https://www.jstage.jst.go.jp/article/jime/53/1/53_83/_pdf/-char/ja">{en?'Museum architecture':'博物館の建築資料'}</a>{en?' · Original model from the mapped footprint, airborne roof profiles and the published 45 m height.':'。建物外形・航空レーザー断面と公表高45mを基に白い大屋根を独自に作成。'}</p>
+      <p><a href="https://koberope.jp/maya/guide">{en?'Maya Viewline station guide':'まやビューライン 駅の構内図'}</a>・<a href="https://koberope.jp/maya/miryoku">{en?'Station architecture':'駅舎の外観'}</a>{en?' · Original meshes of the two cable stations use mapped footprints and the Hyogo elevation survey.':'。地図上の駅舎外形と兵庫県の標高資料を基に、摩耶ケーブル駅とケーブル虹の駅を独自に立体化。'}</p>
+      <p><a href="https://web.pref.hyogo.lg.jp/kk26/3dgeo.html">兵庫県「全域数値地形図」</a>・<a href="https://tiles.gsj.jp/tiles/elev/tiles.html">産総研地質調査総合センター「シームレス標高タイル」</a>{en?' · Building heights and Kobe roof setbacks derived from airborne surface and terrain elevations.':'を加工し、航空レーザーの地表面と地盤面の差から兵庫県内の建物高と神戸市内の屋上の段差・上層階の外形を推定。'}</p>
+      <p><a href="https://doi.org/10.6084/m9.figshare.28906499">Che et al., 3D-GloBFP (2020)</a> · <a href="https://doi.org/10.2905/85005901-3a49-48dd-9d19-6261354f56fe">Pesaresi &amp; Politis, GHS-BUILT-H R2023A (European Commission, JRC)</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. {en?'The source polygons and height grids were clipped to the five prefectures. Unsurveyed buildings use matched predictions or a neighbourhood estimate.':'5府県分を抽出・加工。建物の個別資料がない場合は、外形と一致する予測高、または街区の平均高と建物面積からの推定値を使っています。'}</p>
+      <p><a href="https://doi.org/10.5281/zenodo.7254221">© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors (ODbL)</a> · <a href="/kansai/building-attributes/index.json">{en?'Download building attributes':'建物属性データの配布索引'}</a></p>
+      <p><a href="https://www.todaiji.or.jp/information/daibutsuden/">東大寺大仏殿</a> · <a href="https://www.todaiji.or.jp/information/nandaimon/">東大寺南大門</a> · <a href="https://www.city.hikone.lg.jp/material/files/group/4/Hikonejo_Kenzobutsu_HozonKatsuyo_Keikaku.pdf">彦根城建造物保存活用計画</a> · <a href="https://www.kobe-orientalhotel.co.jp/about/">神戸メリケンパークオリエンタルホテル</a> · <a href="/kansai/landmarks/nakanoshima-beds.json">{en?'Mapped rose beds (OSM, ODbL)':'中之島の花壇輪郭（OSM・ODbL）'}</a></p>
+      <p>{en?'The Flight Aviary at Tennoji Zoo uses the zoo’s 40 m and 27 m dome diameters and 20 m overall height. The smaller dome height and intermediate steelwork are reconstructed.':'天王寺動物園「鳥の楽園」は、園の竣工資料にある大小ドームの直径40m・27mと施設の最高部20mを反映しました。小ドームの高さと中間部の鉄骨は復元表現です。'}
+        <a href="https://www.tennojizoo.jp/nakigoe/1987/198709out.pdf#page=6">{en?'Zoo opening record':'園の竣工記録'}</a> · <a href="https://www.daido-100th.com/topics/384/">{en?'Steelwork record':'施工記録'}</a> · <a href="/kansai/landmarks/tennoji-aviary.geojson">{en?'Mapped outline (OSM, ODbL)':'建物輪郭（OSM・ODbL）'}</a></p>
+      <p>{en?'The Lake Biwa Museum follows the mapped building outlines and the museum’s 15 m design height. The separate roof levels, glazing and aquarium roof are reconstructed from the construction section and GSI aerial photographs.':'琵琶湖博物館は建物の輪郭と設計高さ15mを反映しています。本館の屋根段差と採光面、水族展示室の金属屋根は、建設時の断面図と地理院の航空写真から復元しました。'}
+        <a href="https://www.biwahaku.jp/publication/uploads/ee67251feda993ac6cbea40c6512d5b12c8450fc.pdf#page=243">{en?'Museum construction record':'博物館の建設記録'}</a> · <a href="/kansai/landmarks/biwa-museum.geojson">{en?'Building outlines (OSM, ODbL)':'建物輪郭（OSM・ODbL）'}</a></p>
+      <p>{en?'The six connected wings of the Lotus Pavilion follow their mapped footprints. The glass roof folds follow GSI aerial imagery. Heights, glazing and the four planted pools are reconstructed.':'みずの森のロータス館は六棟の輪郭と地理院の航空写真から復元しました。温室の屋根の折れ方は写真で確認し、高さ・ガラスの分割・四つの池の形は推定しています。'}
+        <a href="https://www.seibu-la.co.jp/mizunomori/facility.html">{en?'Park floor guide':'園の施設案内'}</a> · <a href="https://www.mlit.go.jp/tagengo-db/R6-00374.html">{en?'Atrium exhibits':'温室の展示'}</a> · <a href="/kansai/landmarks/lotus-pavilion.geojson">{en?'Building outlines (OSM, ODbL)':'建物輪郭（OSM・ODbL）'}</a></p>
+      <p>{en?'The Kyoto Botanical Gardens conservatory follows six Kyoto City survey footprints, GSI aerial imagery and the prefecture’s published maximum height of 14.8 m. Roof profiles, glazing bars and planting are reconstructed.':'京都府立植物園の観覧温室は、京都市の実測モデル6区画の輪郭、地理院の航空写真、府が公表した最高高さ14.8mから復元しました。屋根の曲率、鉄骨の間隔、内部の植栽は推定です。'}
+        <a href="https://www.pref.kyoto.jp/bunshi-kan/news/documents/08_document6.pdf#page=17">{en?'Facility plan':'京都府の施設平面図'}</a> · <a href="/kansai/landmarks/kitayama-conservatory.geojson">{en?'Survey footprints and source IDs':'実測輪郭と原典ID'}</a></p>
+      <p>{en?'Katsura retains 646 surveyed 2024 buildings whose roof outlines and heights match the 2025 Kyoto survey. The detailed meshes and photographed materials are extracted from the original models.':'京都・桂周辺は、2025年度の建物と屋根の輪郭・高さが合う646棟について、2024年度の詳細形状と写真素材を抽出して使用しています。'}
+        <a href="https://www.geospatial.jp/ckan/dataset/plateau-26100-kyoto-shi-2024">京都市・PLATEAU 2024</a> · <a href="https://www.geospatial.jp/ckan/dataset/plateau-26100-kyoto-shi-2025">2025</a> · <a href="/kansai/surveys/katsura/matches.json">{en?'Building matches':'建物の照合結果'}</a></p>
+      <p><a href="https://www.geospatial.jp/ckan/dataset/plateau-27999-osaka-shi-2025">2025年大阪・関西万博会場 3D都市モデル（国土交通省都市局・Project PLATEAU）</a>
+        {en?' · Noncommercial exhibit using the 2025 site imagery, pavilions and Grand Ring. ':' · 2025年の会場航空写真・パビリオン・大屋根リングを使用した非営利展示。'}
+        <a href="https://gic-plateau.s3.ap-northeast-1.amazonaws.com/2025/expo-doc/3d-license/license.pdf">{en?'Expo dataset terms':'万博データの専用利用規約'}</a></p>
+      <p>{en?'The fireworks are original visual sequences set above Otsu Port and the Seta River.':'花火は大津港沖と瀬田の唐橋周辺を舞台に構成したオリジナルの演出です。'}
+        <a href="https://www.city.otsu.lg.jp/soshiki/001/1003/od/R8/75988.html">びわ湖大花火大会</a> ·
+        <a href="https://takebetaisha.jp/ceremony/">建部大社・船幸祭</a></p>
+      <p>{en?'Seta-no-Karahashi follows the published spans of the two bridges and the widened east footway. The finials use the construction drawing. Deck elevations are estimated from the approaches. Water obscured by the original decks in the GSI aerial photo is interpolated from either side.':'瀬田の唐橋は、大橋・小橋の支間割りと東詰の歩道拡幅を反映し、擬宝珠を施工図の寸法で復元しています。橋面の高さは両岸の地盤高から推定し、地理院の航空写真で橋に隠れた水面は、橋の両側の水面から補間しました。'}
+        <a href="https://www.kkr.mlit.go.jp/plan/happyou/thesises/2023/lbhrsn000000m74g-att/a1684913814372.pdf">{en?'Otsu Civil Engineering Office construction report':'大津土木事務所の施工報告'}</a> ·
+        <a href="https://www.jasbc.or.jp/technique/nijihashiback/files/nijihashi23.pdf">{en?'Bridge specifications':'日本橋梁建設協会・橋梁諸元'}</a></p>
+
+  </article>
+</Base>
+<style>
+  .sources{max-width:76ch;margin:auto;padding:6rem 1rem 3rem}
+  .sources p{margin:1em 0}
+  .sources a{text-decoration:underline}
+</style>

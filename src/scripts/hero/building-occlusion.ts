@@ -50,16 +50,26 @@ export function buildOcclusion(data: { boxes: BoxBuilding[]; polys: PolyBuilding
       return inside;
     });
   }
-  // A regional texture carries both maps so changing districts preserves the shadow
-  // beneath houses on the other side of the boundary, using a single terrain sampler.
+  for (let i = 0; i < hits.length; i++) hits[i] = Math.min(4, hits[i]) * 63.75;
+  return occlusionTexture(hits, size, core);
+}
+
+export function occlusionFile(file: string, size: number) {
+  return 'occlusion/' + file.replace(/\.bin$/, '-' + size + '.bin');
+}
+
+/** Regional green and city red share one mipmapped texture on the ground material. */
+export function occlusionTexture(coverage: Uint8Array<ArrayBuffer>, size: number, core?: THREE.DataTexture) {
+  if (coverage.length !== size * size) throw new Error('Unexpected building coverage dimensions');
   const corePixels = core?.image.data;
-  const pixels = new Uint8Array(hits.length * (corePixels ? 2 : 1));
-  for (let i = 0; i < hits.length; i++) {
-    const coverage = Math.min(4, hits[i]) * 63.75;
-    if (corePixels) {
+  let pixels = coverage;
+  if (corePixels) {
+    if (corePixels.length !== coverage.length) throw new Error('Incompatible city coverage dimensions');
+    pixels = new Uint8Array(coverage.length * 2);
+    for (let i = 0; i < coverage.length; i++) {
       pixels[2*i] = corePixels[i];
-      pixels[2*i+1] = coverage;
-    } else pixels[i] = coverage;
+      pixels[2*i+1] = coverage[i];
+    }
   }
   // rows run from north (minZ) to south, which is v = 0 → 1 in the shader: no flip
   const texture = new THREE.DataTexture(pixels, size, size, corePixels ? THREE.RGFormat : THREE.RedFormat, THREE.UnsignedByteType);

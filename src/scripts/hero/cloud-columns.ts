@@ -19,8 +19,10 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
    * it is cloud, z how tall the cloud there grows (0..1).
    */
   vec3 field(vec2 p){
-    // bend the weather map so the cells never line up in rows or repeat one size
-    p += (vec2(vnoise(p * 1.7 + 2.3), vnoise(p * 1.7 - 4.1)) - .5) * .4;
+    // Multi-scale domain warp breaks cell alignment and prevents smooth oval blobs.
+    vec2 w1 = vec2(vnoise(p * 1.6 + 2.3), vnoise(p * 1.6 - 4.1)) - .5;
+    vec2 w2 = vec2(vnoise(p * 4.7 - 7.1), vnoise(p * 4.7 + 5.9)) - .5;
+    p += w1 * .46 + w2 * .14;
     // a regional swell, so some parts of the sky are busier than others
     float region = vnoise(p * .8 + 7.3);
     // and wide clear stretches between groups of clouds: these take whole clouds away (the
@@ -33,6 +35,7 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
     const vec3 emptyField = vec3(0., 1., 0.);
     if (emptyBelow > 1.) return emptyField;
     float n;
+    float sizeScale = 1.;
     if (deck()){
       // long rolls broken into cells
       vec2 q = mat2(.87, -.5, .5, .87) * p * (isStyle(5.) ? .7 : 1.);
@@ -40,24 +43,28 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
       if (n + .2 < emptyBelow) return emptyField;
       n += vnoise(p * 31. - 1.7) * .2;
     } else {
-      float f = isStyle(1.) ? 1.7 : isStyle(3.) ? .7 : isStyle(4.) ? .26 : 1.;
-      // big clouds in some parts of the sky, small ones in others: two sizes of cell, blended
-      // (scaling the coordinates by a varying amount would smear the cells into streaks)
-      float big = vnoise(p * 4.2 * f + 5.5) * .6 + vnoise(p * 9. * f - 2.2) * .4;
+      // Keep towering clouds horizontally broad yet well-populated across the summer horizon.
+      float f = isStyle(1.) ? 1.55 : isStyle(3.) ? .52 : isStyle(4.) ? .36 : .92;
+      // Clustered multi-lobe cumulus footprints with smaller satellite puffs.
+      float big = vnoise(p * 3.6 * f + 5.5) * .52 + vnoise(p * 8.2 * f - 2.2) * .32 + vnoise(p * 18. * f + 6.7) * .16;
       n = big;
       if (!isStyle(4.)) {
-        float blend = smoothstep(.3, .7, vnoise(p * 1.3 - 9.7));
-        float small = vnoise(p * 9.5 * f) * .55;
-        if (mix(small + .45, big, blend) < emptyBelow) return emptyField;
-        small += vnoise(p * 21. * f + 3.1) * .3;
-        small += vnoise(p * 43. * f - 1.7) * .15;
+        float blend = smoothstep(.26, .74, vnoise(p * 1.35 - 9.7));
+        float small = vnoise(p * 7.8 * f) * .52;
+        if (mix(small + .48, big, blend) < emptyBelow) return emptyField;
+        small += vnoise(p * 17.5 * f + 3.1) * .30;
+        small += vnoise(p * 38. * f - 1.7) * .18;
         n = mix(small, big, blend);
+        // Smaller horizontal puffs stay proportionally shallower so they read as broad clouds, never cones.
+        sizeScale = mix(isStyle(3.) ? .58 : .42, 1.0, blend);
       }
     }
     if (n < emptyBelow) return emptyField;
-    // some heads stay flat while their neighbours tower; a thunderhead climbs in turrets
-    float tall = deck() ? 1. : isStyle(4.) ? mix(.5, 1., vnoise(p * 6. + 1.9)) : mix(.45, 1., vnoise(p * 3.3 + 1.9));
-    if (isStyle(3.) || isStyle(4.)) tall *= mix(.75, 1., vnoise(p * 15. - 6.1));
+    // Thunderheads rise in tiered cauliflower turrets from a broad base.
+    float tall = deck() ? 1. : isStyle(4.) ? mix(.62, 1., smoothstep(.18, .82, vnoise(p * 3.6 + 1.9)))
+      : isStyle(3.) ? mix(.58, 1., vnoise(p * 3.8 + 1.9)) * sizeScale
+      : mix(.48, 1., vnoise(p * 3.2 + 1.9)) * sizeScale;
+    if (isStyle(3.) || isStyle(4.)) tall *= mix(.78, 1., smoothstep(.15, .85, vnoise(p * 9.5 - 6.1)));
     return vec3(n, th, tall);
   }
 
@@ -66,11 +73,14 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
     return clamp((f.x - f.y + spread) / max(1. - f.y, .05), 0., 1.);
   }
 
-  /** How high a cloud with this coverage grows, as a share of the slab. */
+  /** How high a cloud with this coverage grows, as a share of the slab (broad-shouldered towers & domes). */
   float crown(float c){
-    // decks have flat tops; heaps grow domes over their thickest parts; thunderheads tower
-    // (a thunderhead is a broad dome of cloud, widest at the base, not a column or a spire)
-    return deck() ? .5 + .5 * sqrt(c) : isStyle(4.) ? sqrt(1. - (1. - c) * (1. - c)) : isStyle(3.) ? pow(c, .5) : pow(c, .6);
+    if (deck()) return .55 + .45 * sqrt(c);
+    // Smooth multi-tiered cumulus/thunderhead profile with soft margins so edges never form vertical walls.
+    float dome = smoothstep(0., .82, c);
+    if (isStyle(4.)) return mix(.18, 1.0, smoothstep(.06, .66, c)) * (.38 + .62 * pow(dome, .62));
+    if (isStyle(3.)) return mix(.20, 1.0, smoothstep(.06, .64, c)) * (.40 + .60 * pow(dome, .62));
+    return .22 + .78 * pow(dome, .65);
   }
 
 
@@ -78,8 +88,9 @@ export const CLOUD_COLUMN_GLSL = /* glsl */ `
     vec3 f = field(p);
     if (f.z == 0.) return vec3(0.);
     float c = cover(f, 0.);
-    return vec3(crown(c) * f.z, smoothstep(0., .25, c),
-      isStyle(4.) ? smoothstep(0., .3, cover(f, .07)) : 0.);
+    // Keep coverage gradient broad on towers so 3D Worley noise sculpts deep cauliflower sides all the way out.
+    return vec3(crown(c) * f.z, smoothstep(0., isStyle(4.) ? .56 : isStyle(3.) ? .52 : .42, c),
+      isStyle(4.) ? smoothstep(0., .42, cover(f, .07)) : 0.);
   }
 `;
 
@@ -126,8 +137,9 @@ export const CLOUD_COLUMN_LOOKUP = /* glsl */ `
 /** Store the cloud crown, edge coverage and anvil coverage in the moving weather field.
  * The volume still evaluates billows, lighting and erosion at their actual 3D positions. */
 export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover', THREE.IUniform<number>>) {
+  // Half-float precision prevents 8-bit elevation staircasing across cloud crowns and undersides.
   const target = new THREE.WebGLRenderTarget(2 * SIZE, SIZE, {
-    type: THREE.UnsignedByteType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+    type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
     depthBuffer: false, stencilBuffer: false, generateMipmaps: false,
   });
   const anchor = new THREE.Vector2();
@@ -190,25 +202,26 @@ export function createCloudColumns(shape: Record<'uStyle' | 'uClear' | 'uCover',
       uniforms.uColumnEye.value.set(cx - anchor.x, cz - anchor.y);
       if (failed || (lastWeather === weather &&
         Math.max(Math.abs(cx - anchor.x), Math.abs(cz - anchor.y)) < RECENTER)) return;
-      const previous = renderer.getRenderTarget(), onError = renderer.debug.onShaderError;
+      const previous = renderer.getRenderTarget(), onError = renderer.debug.onShaderError, diagnostics=renderer.debug.checkShaderErrors;
       anchor.set(Math.floor(cx), Math.floor(cz));
       uniforms.uColumnEye.value.set(cx - anchor.x, cz - anchor.y);
       try {
         renderer.setRenderTarget(target);
         const gl = renderer.getContext();
-        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
+        if (!uniforms.uColumnsReady.value && gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
+        if(!uniforms.uColumnsReady.value)renderer.debug.checkShaderErrors=true;
         renderer.debug.onShaderError = (...args) => { failed = true; onError?.(...args); };
         renderer.render(scene, camera);
         if (failed) return;
         renderer.setRenderTarget(ceilings);
-        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
+        if (!uniforms.uColumnsReady.value && gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { failed = true; return; }
         mesh.material = maxMaterial;
         renderer.render(scene, camera);
         lastWeather = weather;
       } catch { failed = true; }
       finally {
         mesh.material = material;
-        renderer.debug.onShaderError = onError;
+        renderer.debug.onShaderError = onError;renderer.debug.checkShaderErrors=diagnostics;
         renderer.setRenderTarget(previous);
         uniforms.uColumnsReady.value = !failed;
         uniforms.uCloudColumns.value = failed ? null : target.texture;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {yieldTask} from './task-yield';
+import {finishSteps,prepareSteps,yieldTask} from './task-yield';
 import { ENV_GLSL, SHADOW_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
 import { CLASS, type BoxBuilding, type PolyBuilding } from './buildings-data';
@@ -159,6 +159,11 @@ function steppedShape() {
 
 /** Instanced placement: decode the unit shape into metres and turn it to the building's angle. */
 const INSTANCE_VS = /* glsl */ `
+  #ifdef DISTRICT_HOUSES
+    attribute float iSlot;
+    uniform sampler2D uNearby;
+    uniform vec4 uDetail;
+  #endif
   attribute float aRole;
   attribute float aLevel;
   attribute vec3 iPos;    // x, ground, z
@@ -171,6 +176,12 @@ const INSTANCE_VS = /* glsl */ `
   flat varying vec4 vInfo;
 
   void main(){
+    #ifdef DISTRICT_HOUSES
+      vec2 uv=(vec2(mod(iSlot,16.),floor(iSlot/16.))+.5)/16.;
+      if(texture2D(uNearby,uv).r>.5 || (all(greaterThanEqual(iPos.xz,uDetail.xy)) && all(lessThan(iPos.xz,uDetail.zw)))){
+        gl_Position=vec4(2.,2.,2.,1.);return;
+      }
+    #endif
     vec3 p = position;
     vec3 face = normal;
     float c = cos(iRot), s = sin(iRot);
@@ -256,7 +267,7 @@ const POLY_VS = /* glsl */ `
   }
 `;
 
-const BUILDING_FS = /* glsl */ `
+export const BUILDING_FS = /* glsl */ `
   ${ENV_GLSL}
   ${SHADOW_GLSL}
   ${BUILT_GLSL}
@@ -435,6 +446,7 @@ const DEPTH_FS = /* glsl */ `
 /* ---------- building the meshes ---------- */
 
 function roofFor(b: BoxBuilding) {
+  if (b.roof) return b.roof;
   if ((b.kind & 3) !== CLASS.wooden || b.h > 16) return { type: 0, rh: 0 };
   const area = b.w * b.d;
   if (area > 260) {
@@ -444,7 +456,7 @@ function roofFor(b: BoxBuilding) {
   return { type: 1, rh: Math.min(Math.max(b.d * 0.26, 1.2), b.h * 0.4) };
 }
 
-function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pitched: boolean) {
+function* instancedSteps(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pitched: boolean) {
   const n = list.length;
   const geo = new THREE.InstancedBufferGeometry();
   geo.setIndex(shape.index);
@@ -454,7 +466,9 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pi
   const rot = new Float32Array(n);
   const meta = new Float32Array(n * 4);
   let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity, maxY = -Infinity, minY = Infinity;
-  list.forEach(({ b, y, seed, roofSource }, i) => {
+  for(let i=0;i<n;i++){
+    if(i && i%512===0)yield;
+    const {b,y,seed,roofSource}=list[i];
     const r = pitched ? roofFor(roofSource ?? b) : { type: 0, rh: 0 };
     const { lift, inset } = separation(seed);
     pos.set([b.x, y, b.z], i * 3);
@@ -465,7 +479,7 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pi
     minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
     minZ = Math.min(minZ, b.z); maxZ = Math.max(maxZ, b.z);
     minY = Math.min(minY, y - FOOTING); maxY = Math.max(maxY, y + b.h + r.rh);
-  });
+  }
   geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(pos, 3));
   geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(size, 3));
   geo.setAttribute('iRot', new THREE.InstancedBufferAttribute(rot, 1));
@@ -477,12 +491,30 @@ function instanced(shape: THREE.InstancedBufferGeometry, list: PlacedHouse[], pi
   return geo;
 }
 
+function instanced(shape:THREE.InstancedBufferGeometry,list:PlacedHouse[],pitched:boolean){
+  return finishSteps(instancedSteps(shape,list,pitched));
+}
+
+/** Distant regional streets share Kyoto's panorama unit meshes, window shader and roof profiles. */
+export async function residentHouseBatch(env:Env,houses:PlacedHouse[],pitched:boolean,slots:number[],
+  nearby:THREE.DataTexture,detail:{value:THREE.Vector4}){
+  const sides=walls(1).filter(face=>face.n[0]>0 || face.n[2]>0);
+  const shape=pitched?pitchedShape(sides):flatShape(sides);
+  const geometry=await prepareSteps(instancedSteps(shape,houses,pitched));
+  shape.dispose();
+  geometry.setAttribute('iSlot',new THREE.InstancedBufferAttribute(new Uint8Array(slots),1));
+  const material=new THREE.ShaderMaterial({uniforms:{...env,uNearby:{value:nearby},uDetail:detail},
+    vertexShader:INSTANCE_VS,fragmentShader:BUILDING_FS,defines:{BLOCK_OVERVIEW:1,DISTRICT_HOUSES:1}});
+  return new THREE.Mesh(geometry,material);
+}
+
 /** Walls and a triangulated flat roof for each outline, merged into one geometry. */
-function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
-  const pos: number[] = [];
-  const nrm: number[] = [];
-  const wall: number[] = [];
-  const info: number[] = [];
+function* extrudedSteps(list: { p: PolyBuilding; y: number; seed: number }[]) {
+  // Six wall vertices per edge and at most (m-2) roof triangles per simple ring.
+  const capacity=list.reduce((n,{p})=>n+6*p.ring.length/2+3*Math.max(0,p.ring.length/2-2),0);
+  const pos=new Float32Array(3*capacity),nrm=new Float32Array(3*capacity);
+  const wall=new Float32Array(2*capacity),info=new Float32Array(4*capacity);
+  let count=0,pointsSinceYield=0;
   type V = [number, number, number, number, number];
   /** One triangle of vertices [x, y, z, u, v], wound counter-clockwise around the outward normal n. */
   const tri = (a: V, b: V, c: V, n: number[], inf: number[]) => {
@@ -490,10 +522,11 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
     const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
     const dot = (ab[1] * ac[2] - ab[2] * ac[1]) * n[0] + (ab[2] * ac[0] - ab[0] * ac[2]) * n[1] + (ab[0] * ac[1] - ab[1] * ac[0]) * n[2];
     for (const q of dot < 0 ? [a, c, b] : [a, b, c]) {
-      pos.push(q[0], q[1], q[2]);
-      nrm.push(n[0], n[1], n[2]);
-      wall.push(q[3], q[4]);
-      info.push(...inf);
+      const xyz=count*3,uv=count*2;
+      pos[xyz]=q[0];pos[xyz+1]=q[1];pos[xyz+2]=q[2];
+      nrm[xyz]=n[0];nrm[xyz+1]=n[1];nrm[xyz+2]=n[2];
+      wall[uv]=q[3];wall[uv+1]=q[4];
+      info.set(inf,count*4);count++;
     }
   };
   const box = new THREE.Box3();
@@ -501,6 +534,8 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
   for (const { p, y, seed } of list) {
     const r = p.ring;
     const m = r.length / 2;
+    if(pointsSinceYield>=256){yield;pointsSinceYield=0;}
+    pointsSinceYield+=m;
     const top = y + p.h + separation(seed).lift;
     const bottom = y - FOOTING;
     // signed area decides which side of each edge is outside
@@ -541,10 +576,10 @@ function extruded(list: { p: PolyBuilding; y: number; seed: number }[]) {
     }
   }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-  geo.setAttribute('aWall', new THREE.Float32BufferAttribute(wall, 2));
-  geo.setAttribute('aInfo', new THREE.Float32BufferAttribute(info, 4));
+  geo.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0,count*3), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nrm.subarray(0,count*3), 3));
+  geo.setAttribute('aWall', new THREE.BufferAttribute(wall.subarray(0,count*2), 2));
+  geo.setAttribute('aInfo', new THREE.BufferAttribute(info.subarray(0,count*4), 4));
   geo.boundingBox = box;
   geo.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
   return geo;
@@ -568,7 +603,7 @@ function instanceShape(shape: THREE.InstancedBufferGeometry, source: THREE.Insta
   return geometry;
 }
 
-function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>) {
+export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate=()=>false, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>) {
   const group = new THREE.Group();
   const fallback = new THREE.Group();
   if (replaceable) group.add(fallback);
@@ -695,7 +730,7 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: Bo
         block.proxy.add(new THREE.Mesh(blockGeometry(proxyShapes.flat, full, c.flat, false), proxyMaterial));
       }
     }
-    if (c.polys.length) add(extruded(c.polys), polyMat, polyDepth);
+    if (c.polys.length) add(yield* extrudedSteps(c.polys), polyMat, polyDepth);
     if (c.pitched.length) {
       const far = instanced(pitched, c.pitched, true);
       // the stepped houses share the far set's per-house data
@@ -713,11 +748,20 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: Bo
   complete=true;
   return {
     group, overview, fallback,
+    // Streamed street tiles also own materials for details that are created later.
+    materials: [instMat, polyMat, stepMat, detailMat],
+    dispose(){
+      group.traverse(object=>{if(object instanceof THREE.Mesh)object.geometry.dispose();});
+      overview?.traverse(object=>{if(object instanceof THREE.Mesh)object.geometry.dispose();});
+      for(const material of [instMat,polyMat,stepMat,detailMat,instDepth,polyDepth,stepDepth,proxyMaterial])material?.dispose();
+      flat.dispose();pitched.dispose();stepped.dispose();
+    },
     /**
      * Swap stepped and plain roofs, and show facade details, by distance from the camera; call once
      * a frame. True when the roofs changed (the sun's shadow map needs redrawing).
      */
-    updateLod(eye: { x: number; y: number; z: number }, panoramaFocalPixels = 0) {
+    updateLod(eye: { x: number; y: number; z: number }, panoramaFocalPixels = 0,
+      scheduleDetail?:(distance:number,build:()=>void)=>void) {
       let changed = false;
       for (const block of blocks) {
         // Keep full geometry where a 1.5 m detail still spans a screen pixel.
@@ -747,9 +791,13 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: Bo
         if (t.near) t.near.visible = d < detailNear;
       }
       if (next) {
-        modelDetails(next);
-        if (next.mid) next.mid.visible = true;
-        if (next.near) next.near.visible = nextD < detailNear;
+        const tile=next;
+        const build=()=>{
+          modelDetails(tile);
+          if (tile.mid) tile.mid.visible = true;
+          if (tile.near) tile.near.visible = nextD < detailNear;
+        };
+        if(scheduleDetail)scheduleDetail(nextD,build);else build();
       }
       return changed;
     },
@@ -765,15 +813,24 @@ function* buildCitySteps(env: Env, hf: Heightfield, data: CityData, keep: (b: Bo
   }
 }
 
+/** Street furniture on facades is built on approach. Link its material with the roofs
+ * before rendering the first close-up, without allocating any of the detail geometry. */
+export function prepareCityMaterials(materials:THREE.Material[],prepare:(mesh:THREE.Object3D)=>Promise<unknown>){
+  const layout=new THREE.BufferGeometry();
+  layout.setAttribute('position',new THREE.Float32BufferAttribute([],3));
+  layout.setAttribute('normal',new THREE.Float32BufferAttribute([],3));
+  return prepare(new THREE.Mesh(layout,materials)).finally(()=>layout.dispose());
+}
+
 type CityData = { boxes: BoxBuilding[]; polys: PolyBuilding[] };
 type CityPredicate = (b: BoxBuilding | PolyBuilding) => boolean;
-export function buildCity(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean=()=>true,quality=1,dressed:CityPredicate=()=>false) {
+export function buildCity(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,keep:(b:BoxBuilding)=>boolean=()=>true,quality=1,dressed:CityPredicate=()=>false) {
   const steps=buildCitySteps(env,hf,data,keep,quality,dressed);
   for(;;){const step=steps.next();if(step.done)return step.value;}
 }
 
 /** Keep the renderer responsive while a neighbouring region builds its city. */
-export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye,replaceable?:ReadonlySet<BoxBuilding | PolyBuilding>) {
+export async function buildCityAsync(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye,replaceable?:ReadonlySet<BoxBuilding | PolyBuilding>) {
   const steps=buildCitySteps(env,hf,data,keep,quality,dressed,panoramaEye,replaceable);
   try {
     while(current()){
@@ -787,7 +844,7 @@ export async function buildCityAsync(env:Env,hf:Heightfield,data:CityData,keep:(
 
 /** Resident rooflines use the same outlines, roof shapes and night windows as the core.
  * Only nearby regional models need individual balconies, stepped tiles and shadow-map submissions. */
-export async function buildResidentCity(env:Env,hf:Heightfield,data:CityData,extent?:Box) {
+export async function buildResidentCity(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,extent?:Box) {
   const mesh=new THREE.Group();
   const uniforms={...env,uDetailBox:{value:new THREE.Vector4()}};
   const material=(vertexShader:string)=>new THREE.ShaderMaterial({
@@ -818,7 +875,14 @@ export async function buildResidentCity(env:Env,hf:Heightfield,data:CityData,ext
   for(const t of tiles.values()){
     if(t.flat.length)batches.push(new THREE.Mesh(instanced(flat,t.flat,false),houses));
     if(t.pitched.length)batches.push(new THREE.Mesh(instanced(pitched,t.pitched,true),houses));
-    if(t.polys.length)batches.push(new THREE.Mesh(extruded(t.polys),polygons));
+    if(t.polys.length){
+      const steps=extrudedSteps(t.polys);
+      for(;;){
+        const step=steps.next();
+        if(step.done){batches.push(new THREE.Mesh(step.value,polygons));break;}
+        if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
+      }
+    }
     if(performance.now()>deadline){await yieldTask();deadline=performance.now()+5;}
   }
   for(const batch of batches){

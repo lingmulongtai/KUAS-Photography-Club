@@ -13,8 +13,8 @@ export const LOWEST_CLOUD_BASE=850;
 /** How often each character turns up in each season (weights in CLOUD_STYLES order). */
 const SEASON_STYLES:Record<Climate,number[]>={
   spring:[3,4,2,1,0,0],
-  // thunderheads over the mountains are the summer sky in Kyoto
-  summer:[2,2,0,2,4,0],
+  // Towering thunderheads (nyudogumo) dominate the midsummer sky over Kyoto's mountains
+  summer:[1,0,0,4,7,0],
   // autumn is mostly clear, with mackerel skies (see `alto`)
   autumn:[2,5,2,0,0,0],
   winter:[0,3,3,0,0,4],
@@ -28,8 +28,8 @@ const SHAPES=[
   {cover:[.36,.46],clear:[.55,.8],base:[1350,1600],depth:[900,1500]},
   {cover:[.28,.36],clear:[.5,.8],base:[1450,1750],depth:[450,800]},
   {cover:[.46,.56],clear:[.3,.55],base:[1250,1500],depth:[450,700]},
-  {cover:[.32,.4],clear:[.65,.85],base:[1300,1550],depth:[2200,3400]},
-  {cover:[.38,.46],clear:[.75,.9],base:[1200,1450],depth:[5800,6800]},
+  {cover:[.38,.48],clear:[.50,.64],base:[1250,1500],depth:[2400,3600]},
+  {cover:[.44,.54],clear:[.52,.66],base:[1180,1420],depth:[5600,6800]},
   {cover:[.56,.64],clear:[.1,.25],base:[LOWEST_CLOUD_BASE,1050],depth:[550,850]},
 ];
 
@@ -60,8 +60,8 @@ export function cloudWeather(seed:number,climate:Climate='spring') {
   const shape=SHAPES[style],span=(r:number[])=>r[0]+random()*(r[1]-r[0]);
   const cover=span(shape.cover),clear=span(shape.clear),base=span(shape.base),top=base+span(shape.depth);
   // high layers: cirrus streaks ~8 km up and an altocumulus (mackerel) field ~4.5 km up
-  const cirrus=style===5?0:style===1&&random()<.6?.5+random()*.5:random()<.4?random()*.8:0;
-  const alto=style>=4?0:climate==='autumn'&&random()<.65?.5+random()*.5:random()<.25?.3+random()*.5:0;
+  const cirrus=style===5?0:style===1&&random()<.6?.5+random()*.5:style>=3&&random()<.35?.25+random()*.45:random()<.4?random()*.8:0;
+  const alto=style>=3?0:climate==='autumn'&&random()<.65?.5+random()*.5:random()<.25?.3+random()*.5:0;
   return {style,cover,clear,base,top,cirrus,alto,
     offset:[random()*256,random()*256] as const,
     wind:westerly(random,climate)};

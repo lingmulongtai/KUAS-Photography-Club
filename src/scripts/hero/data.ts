@@ -1,20 +1,57 @@
 import * as THREE from 'three';
+import {expandGzip} from './gzip.ts';
 import type { Box } from './geo';
 
 /** Everything the scene loads from public/kyoto/ (written by tools/kyoto-data). */
 export const BASE = '/kyoto/';
 
+type InflateReply={id:number;bytes?:Uint8Array<ArrayBuffer>;error?:string};
+const inflating=new Map<number,{resolve:(b:Uint8Array<ArrayBuffer>)=>void;reject:(e:Error)=>void}>();
+let decoder:Worker|null|undefined,nextId=0;
+
+function binaryWorker(){
+  if(decoder!==undefined)return decoder;
+  try{
+    decoder=new Worker(new URL('./gzip.worker.ts',import.meta.url),{type:'module'});
+    decoder.onmessage=({data}:{data:InflateReply})=>{
+      const job=inflating.get(data.id);
+      if(!job)return;
+      inflating.delete(data.id);
+      if(data.bytes)job.resolve(data.bytes);
+      else job.reject(new Error(data.error));
+    };
+    decoder.onerror=()=>{
+      decoder?.terminate();decoder=null;
+      for(const job of inflating.values())job.reject(new Error('Binary decoder stopped'));
+      inflating.clear();
+    };
+  }catch{decoder=null;}
+  return decoder;
+}
+
 /**
  * Fetch a gzip-compressed .bin file and return its bytes. Some servers send such files with
  * Content-Encoding: gzip and the browser has already unpacked them, so check the magic bytes.
  */
-export async function loadBinary(file: string) {
-  const res = await fetch(BASE + file);
+export async function loadBinary(file: string,priority?:RequestPriority) {
+  const res = await fetch(BASE + file,priority?{priority}:undefined);
   if (!res.ok) throw new Error(`${file}: ${res.status}`);
   const bytes = new Uint8Array(await res.arrayBuffer());
   if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return bytes;
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  if(bytes.byteLength>=256*1024 && typeof window!=='undefined' && typeof Worker==='function'){
+    const worker=binaryWorker();
+    if(worker){
+      const id=++nextId;
+      try{
+        return await new Promise<Uint8Array<ArrayBuffer>>((resolve,reject)=>{
+          inflating.set(id,{resolve,reject});
+          // Keep the compressed input for local recovery if the worker is interrupted.
+          worker.postMessage({id,bytes});
+        });
+      }catch{inflating.delete(id);}
+    }
+  }
+  return expandGzip(bytes);
 }
 
 /** Undo the byte-plane split: n little-endian int16 values stored as n low bytes then n high bytes. */
@@ -47,6 +84,7 @@ export interface TerrainMeta {
   /** Coarser outer mountains; the original basin grids retain priority. */
   outer?: GridMeta;
   sonobeElevation?: GridMeta;
+  naraElevation?: GridMeta;
   aerialOuter?: RegionalPhotoMeta;
   far: GridMeta;
   near: GridMeta;
@@ -83,21 +121,44 @@ export async function loadGrid(meta: GridMeta) {
   return h;
 }
 
-export function loadTexture(file: string, maxAniso: number) {
-  return new Promise<THREE.Texture>((resolve, reject) => {
-    new THREE.TextureLoader().load(
-      BASE + file,
-      (t) => {
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.anisotropy = maxAniso;
-        t.generateMipmaps = true;
-        t.minFilter = THREE.LinearMipmapLinearFilter;
-        resolve(t);
-      },
-      undefined,
-      reject,
-    );
-  });
+/** Decode before the first GPU upload. Data maps retain their original colour channels. */
+export async function decodedTexture(url:string){
+  const loadImage=async(source:string)=>{
+    const value=await new THREE.TextureLoader().loadAsync(source);
+    await (value.image as HTMLImageElement).decode?.();
+    return value;
+  };
+  let texture:THREE.Texture;
+  if(typeof createImageBitmap==='function'){
+    const res=await fetch(url);
+    if(!res.ok)throw new Error(url+' '+res.status);
+    const blob=await res.blob();
+    // WebGL unpack flags do not flip an ImageBitmap. Apply the same orientation as TextureLoader here.
+    const bitmap=await createImageBitmap(blob,{imageOrientation:'flipY',premultiplyAlpha:'none',colorSpaceConversion:'none'}).catch(()=>null);
+    if(bitmap){
+      texture=new THREE.Texture(bitmap);
+      texture.flipY=false;
+      texture.addEventListener('dispose',()=>bitmap.close());
+    }else{
+      const objectUrl=URL.createObjectURL(blob);
+      try{texture=await loadImage(objectUrl);}
+      finally{URL.revokeObjectURL(objectUrl);}
+    }
+  }else{
+    texture=await loadImage(url);
+  }
+  texture.needsUpdate=true;
+  return texture;
+}
+
+export async function loadTexture(file:string,maxAniso:number){
+  const texture=await decodedTexture(BASE+file);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.anisotropy=maxAniso;
+  texture.generateMipmaps=true;
+  texture.minFilter=THREE.LinearMipmapLinearFilter;
+  texture.needsUpdate=true;
+  return texture;
 }
 
 export async function loadJSON<T>(file: string): Promise<T> {

@@ -13,18 +13,24 @@
   },
   "dependencies": {
     "@astrojs/vercel": "11.0.14",
+    "@mapbox/vector-tile": "2.0.4",
     "@vercel/analytics": "2.0.1",
     "@vercel/cli-config": "file:vendor/vercel-cli-config",
     "@vercel/speed-insights": "2.0.0",
+    "3d-tiles-renderer": "0.5.4",
     "astro": "7.3.4",
+    "cesium": "1.133.0",
+    "earcut": "3.0.2",
     "node-ical": "0.27.3",
     "parse5": "7.3.0",
+    "pbf": "4.0.1",
     "three": "0.186.0",
     "yaml": "2.9.1"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
     "@astrojs/sitemap": "3.7.3",
+    "@types/earcut": "3.0.0",
     "@types/node": "22.20.5",
     "@types/three": "0.186.0",
     "typescript": "5.9.3"

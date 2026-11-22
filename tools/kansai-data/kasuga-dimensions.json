@@ -1,0 +1,49 @@
+{
+  "k-honden-C1": {
+    "site": "春日大社 本社本殿",
+    "buildingCount": 4,
+    "datedStructureYear": 1863,
+    "plan": "one-bay Kasuga-zukuri",
+    "roofCovering": "cypress bark",
+    "orientation": "Each gable entrance faces south. The buildings form an east–west row. The north–south ridge runs fore to aft.",
+    "measuredRepresentation": "One representative structure of four, as labeled in the measured drawing. Numeric callouts below appear on plan 3 and longitudinal section 7.",
+    "printedMeasurementsM": {
+      "eastWestMainPostSpacing": 1.924,
+      "northSouthMainPostSpacing": 2.515,
+      "forwardBayPostSpacing": 1.745,
+      "section7VerticalDimension": 5.712
+    },
+    "heightDatum": "Reference is the lower foundation/plinth line in longitudinal section 7; the upper extension meets the level of the horizontal ridge-top member. Excludes projecting chigi tips. No orthometric datum or DEM tie.",
+    "digitizedSurface": false,
+    "references": [
+      "https://www.city.nara.lg.jp/uploaded/attachment/208546.pdf#page=12",
+      "https://whc.unesco.org/uploads/nominations/870.pdf#page=238",
+      "https://www.pref.nara.lg.jp/ikasu-nara/bunkashigen/main04201.html"
+    ],
+    "rights": "Numerical facts and independently worded descriptions only. City and UNESCO graphics are not included."
+  },
+  "k-heiden": {
+    "site": "春日大社 幣殿・舞殿",
+    "buildingCount": 1,
+    "yearRange": [
+      1650,
+      1652
+    ],
+    "longitudinalBays": 5,
+    "transverseBays": 3,
+    "levels": 1,
+    "roofCovering": "cypress bark",
+    "use": "eastern two bays Heiden; western three Buden",
+    "archivedSurveys": [
+      "https://www.history.arch.t.u-tokyo.ac.jp/db/japanresearch/item.php?id=00212",
+      "https://www.history.arch.t.u-tokyo.ac.jp/db/japanresearch/item.php?id=00213"
+    ],
+    "references": [
+      "https://kunishitei.bunka.go.jp/heritage/detail/102/2541",
+      "https://www.kasugataisha.or.jp/guidance/index/modal-05/"
+    ],
+    "digitizedSurface": false,
+    "roofHeightsM": null,
+    "rights": "Archived measured elevations are available for inspection; the University of Tokyo requires a separate procedure for image use. No drawing, tracing, or heights are supplied."
+  }
+}

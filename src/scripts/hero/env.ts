@@ -7,7 +7,7 @@ import * as THREE from 'three';
 export function createEnv() {
   return {
     uTime: { value: 0 },
-    uSpring:{value:0},uAutumn:{value:0},uSnow:{value:0},
+    uSpring:{value:0},uSummer:{value:0},uAutumn:{value:0},uSnow:{value:0},
     uSunDir: { value: new THREE.Vector3(0, 1, 0) },
     uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
     uZenith: { value: new THREE.Color() },
@@ -79,6 +79,7 @@ float fbm(vec2 p){
 export const ENV_GLSL = /* glsl */ `
 uniform float uTime;
 uniform float uSpring;
+uniform float uSummer;
 uniform float uAutumn;
 uniform float uSnow;
 uniform vec3 uSunDir;
@@ -199,6 +200,14 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wp, float sh){
 }
 
 /* A light dusting on upward-facing surfaces, strongest in the higher hills. */
+vec3 surveyedGroundAlbedo(vec3 photo){
+  float green=smoothstep(.006,.035,photo.g-min(photo.r,photo.b));
+  float luma=dot(photo,vec3(.2126,.7152,.0722));
+  float neutral=1.-smoothstep(.04,.19,max(photo.r,max(photo.g,photo.b))-min(photo.r,min(photo.g,photo.b)));
+  float shoulder=1.-.30*neutral*smoothstep(.14,.68,luma);
+  vec3 tint=mix(vec3(1.),vec3(1.65,.72,.38),green*uAutumn*.6)*mix(vec3(1.),vec3(.82,1.18,.78),green*uSummer*.72);
+  return photo*.68*shoulder*tint;
+}
 vec3 seasonalSurface(vec3 albedo,vec3 n,vec3 wp){
   float cover=uSnow*smoothstep(.4,.85,n.y)*(.3+.7*smoothstep(100.,550.,wp.y));
   return mix(albedo,vec3(.67,.72,.76),cover*(.75+.25*vnoise(wp.xz*.025)));

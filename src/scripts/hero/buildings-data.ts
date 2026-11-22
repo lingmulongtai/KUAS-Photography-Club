@@ -1,5 +1,6 @@
 import { loadBinary, loadJSON } from './data.ts';
 import type { Box } from './geo';
+import {prepareSteps} from './task-yield.ts';
 
 /** Building classes and uses as stored in buildings.bin (see tools/kyoto-data/build_buildings.py). */
 export const CLASS = { wooden: 0, sturdy: 1, shed: 3 } as const;
@@ -12,6 +13,8 @@ export interface BoxBuilding {
   w: number;
   d: number;
   angle: number;
+  /** Surveyed roof family and ridge height above the eaves, in metres. */
+  roof?: {type:0|1|2; rh:number};
   h: number;
   ground: number;
   kind: number;
@@ -35,6 +38,10 @@ interface Meta {
 
 export async function loadBuildings(metaFile='buildings.json',binFile='buildings.bin') {
   const [meta, bytes] = await Promise.all([loadJSON<Meta>(metaFile), loadBinary(binFile)]);
+  return prepareSteps(decodeBuildings(meta,bytes));
+}
+
+function* decodeBuildings(meta:Meta,bytes:Uint8Array){
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const nb = dv.getUint32(0, true);
   const np = dv.getUint32(4, true);
@@ -79,6 +86,7 @@ export async function loadBuildings(metaFile='buildings.json',binFile='buildings
   for (let i = 0; i < nb; i++) {
     x = (x + dx[i]) & 0xffff;
     z = (z + dz[i]) & 0xffff;
+    if((i&511)===511)yield;
     boxes[i] = {
       x: minX + x * q,
       z: minZ + z * q,
@@ -95,6 +103,7 @@ export async function loadBuildings(metaFile='buildings.json',binFile='buildings
   z = 0;
   let k = 0;
   for (let i = 0; i < np; i++) {
+    if((i&255)===255)yield;
     const ring = new Float32Array(pn[i] * 2);
     for (let j = 0; j < pn[i]; j++, k++) {
       x = (x + pdx[k]) & 0xffff;

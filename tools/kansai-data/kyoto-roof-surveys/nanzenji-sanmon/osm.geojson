@@ -1,0 +1,97 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          135.7925035,
+          35.0114378
+        ],
+        [
+          135.7925575,
+          35.0114363
+        ],
+        [
+          135.7925608,
+          35.0115138
+        ],
+        [
+          135.7926584,
+          35.011511
+        ],
+        [
+          135.7926551,
+          35.0114336
+        ],
+        [
+          135.7927148,
+          35.0114319
+        ],
+        [
+          135.7927084,
+          35.0112816
+        ],
+        [
+          135.7927029,
+          35.0111525
+        ],
+        [
+          135.7926384,
+          35.0111544
+        ],
+        [
+          135.7926357,
+          35.0110904
+        ],
+        [
+          135.7926351,
+          35.0110749
+        ],
+        [
+          135.7925423,
+          35.0110775
+        ],
+        [
+          135.7925456,
+          35.0111552
+        ],
+        [
+          135.7924915,
+          35.0111567
+        ],
+        [
+          135.7924971,
+          35.0112877
+        ],
+        [
+          135.7925035,
+          35.0114378
+        ]
+      ]
+    ]
+  },
+  "properties": {
+    "source": "OpenStreetMap",
+    "id": "w190876301",
+    "version": 13,
+    "lastEdit": "2025-04-25 09:56:04+00:00",
+    "tags": {
+      "building": "gatehouse",
+      "building:wikidata": "Q2975604",
+      "contact:website": "https://nanzenji.or.jp/equipment/sanmon",
+      "fee": "yes",
+      "material": "wood",
+      "name": "三門",
+      "name:en": "Three Gate",
+      "name:fr": "Trois Portes",
+      "name:ja-Hira": "さんもん",
+      "name:ja-Latn": "San-mon",
+      "name:ko": "산몬",
+      "opening_hours": "Mo-Su 08:40-17:00",
+      "roof:orientation": "along",
+      "roof:shape": "hipped-and-gabled",
+      "start_date": "1628"
+    }
+  }
+}

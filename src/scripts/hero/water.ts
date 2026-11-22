@@ -5,6 +5,7 @@ import { LINE, type LineFeature } from './lines-data';
 import { ROAD_GLSL } from './roads';
 import {refineWaterSurfaceSteps} from './water-surface';
 import {toLocal} from './geo';
+import {loadBinary} from './data';
 import {yieldTask} from './task-yield';
 import type {KamoChannel} from './kamo-channel';
 
@@ -25,16 +26,17 @@ type WaterRoads = {
   uRegionRoadsOn:{value:number};
 };
 
-function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: WaterRoads,
+export function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: WaterRoads,
   regionalEdge=18,channel?:KamoChannel,regionalSurface=false) {
   const pos: number[] = [];
-  const stable:number[]=[];
+  const stable:number[]=[],profiles:number[]=[];
   let trianglesBuilt=0;
   for (let i = 0; i < lines.length; i++) {
     if(i && i%128===0)yield;
     const f = lines[i];
     if (f.kind !== LINE.water) continue;
     const ring = toVec(f.pts);
+    const profile=waterProfile(ring,f.attr);
     const holes: THREE.Vector2[][] = [];
     while (i + 1 < lines.length && lines[i + 1].kind === LINE.waterHole) holes.push(toVec(lines[++i].pts));
     if (ring.length < 3) continue;
@@ -63,6 +65,7 @@ function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: Wat
         const ground=hf.height(p.x,p.y),fixed=channel&&channel.owns(f.pts);
         pos.push(p.x,fixed?channel.surface(p.x,p.y,ground):ground+.4,p.y);
         stable.push(fixed?channel.stability(p.x,p.y):0);
+        profiles.push(...profile);
       }
     }
   }
@@ -73,17 +76,41 @@ function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: Wat
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position',position);
   geo.setAttribute('aStable',stability);
-  const material = new THREE.ShaderMaterial({
-    uniforms: { ...env, ...roads,uWaterBias:{value:regionalSurface?.35:30} },
+  geo.setAttribute('aWater',new THREE.Float32BufferAttribute(profiles,3));
+  const mesh = new THREE.Mesh(geo, waterMaterial(env,roads,regionalSurface?.35:30));
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+// The river's main axis follows the length-weighted orientation of its banks.
+export function waterProfile(ring:readonly {x:number;y:number}[],attr:number):[number,number,number]{
+  let xx=0,xy=0,yy=0,perimeter=0,area=0;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const a=ring[j],b=ring[i],x=b.x-a.x,y=b.y-a.y,length=Math.hypot(x,y);
+    if(length===0)continue;
+    perimeter+=length;area+=a.x*b.y-b.x*a.y;
+    xx+=x*x/length;xy+=x*y/length;yy+=y*y/length;
+  }
+  const angle=.5*Math.atan2(2*xy,xx-yy);
+  const compactness=2*Math.PI*Math.abs(area)/Math.max(1,perimeter*perimeter);
+  const river=attr===1 || attr===2 || compactness<.32;
+  return [river?1:0,Math.cos(angle),Math.sin(angle)];
+}
+
+export function waterMaterial(env:Env,roads:WaterRoads,bias:number){
+  return new THREE.ShaderMaterial({
+    uniforms: { ...env, ...roads,uWaterBias:{value:bias} },
     vertexShader: /* glsl */ `
       attribute float aStable;
+      attribute vec3 aWater;
       uniform float uWaterBias;
       varying float vStable;
+      varying vec3 vWater;
       varying vec3 vWorld;
       void main(){
         vec3 p = position;
         vWorld = p;
-        vStable=aStable;
+        vStable=aStable;vWater=aWater;
         vec3 toCam = cameraPosition - p;
         float dist = length(toCam);
         p += toCam / max(dist,.01) * min(dist * .004, uWaterBias) * (1.-aStable);
@@ -95,39 +122,64 @@ function* waterSteps(env: Env, hf: Heightfield, lines: LineFeature[], roads: Wat
       ${ROAD_GLSL}
       varying vec3 vWorld;
       varying float vStable;
+      varying vec3 vWater;
       void main(){
         vec2 q = vWorld.xz;
         float footprint=max(length(dFdx(q)),length(dFdy(q)));
-        float fine=1.-smoothstep(.2,.65,footprint);
-        float broad=1.-smoothstep(.8,2.,footprint);
-        // Sample before discarding so the road texture's mip level remains well defined.
-        // The road painted on the terrain and its cars must remain visible across rivers.
         Road road = roadAt(q);
         if (road.edge <= 0. && vStable<.001) discard;
-        float t = uTime;
-        vec2 w = vec2(vnoise(q * .35 + vec2(t * .3, 0.)) - .5, vnoise(q * .35 + vec2(0., t * .25) + 9.) - .5);
-        w *= broad;
-        w += fine * .25 * vec2(vnoise(q * 1.4 - t * .5) - .5, vnoise(q * 1.4 + 3. + t * .4) - .5);
-        vec3 n = normalize(vec3(w.x * .07, 1., w.y * .07));
-        vec3 v = normalize(vWorld - cameraPosition);
-        vec3 r = reflect(v, n);
-        r.y = abs(r.y);
-        float fres = .03 + .97 * pow(clamp(1. - dot(-v, n), 0., 1.), 5.);
-        vec3 deep = vec3(.006, .014, .014);
-        vec3 col = deep * (uSunLight * max(uSunDir.y, 0.) + skyLight(vec3(0., 1., 0.))) + skyColor(r) * fres;
-        // glints break up on the ripples instead of lighting a whole narrow moat or pond
-        col += uSunLight * pow(max(dot(r, uSunDir), 0.), 160.) * 1.4 * mix(1., .35 + 1.3 * vnoise(q * .6 + t * .4), broad);
-        col += uMoonLight * pow(max(dot(r, uMoonDir), 0.), 120.) * 30.;
-        // reflected bank lights: vertical streaks that break up with the ripples
-        float streak = vnoise(vec2(q.x * .25 + q.y * .25, t * .6) + w * 4.);
-        vec3 emit = vec3(1., .66, .34) * mix(.12,smoothstep(.55, .95, streak),broad) * .35 * uCity;
-        gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
+        bool lake=vWater.x>1.5,river=vWater.x>.5&&!lake;
+        vec2 axis=normalize(vWater.yz),crosswind=vec2(-axis.y,axis.x);
+        vec2 along=vec2(dot(q,axis),dot(q,crosswind));
+        float t=uTime*(lake?.42:river?.60:.15);
+        vec2 phase=along*(lake?vec2(.22,.43):river?vec2(.38,.92):vec2(.18,.22));
+        float broad=1.-smoothstep(.6,5.,footprint),fine=1.-smoothstep(.18,1.3,footprint);
+        float envelope=vnoise(q*.015);
+        float a=sin(phase.x+2.8*envelope-t)*broad;
+        float b=sin(phase.y+.65*phase.x+4.*envelope+t*.73)*fine;
+        float ripple=lake?.050:river?.038:.012;
+        vec2 slope=ripple*(axis*a+crosswind*b*.63);
+        vec3 n=normalize(vec3(slope.x,1.,slope.y));
+        vec3 view=normalize(vWorld-cameraPosition),r=reflect(view,n);
+        r.y=clamp(abs(r.y)+(lake?.05:river?.085:.018),.02,1.);
+        float facing=clamp(dot(-view,n),0.,1.);
+        float fres=.025+.83*pow(1.-facing,4.5);
+        vec3 deep=lake?vec3(.009,.033,.044):river?vec3(.023,.041,.034):vec3(.019,.034,.025);
+        vec3 ambient=skyLight(vec3(0.,1.,0.))+uSunLight*max(uSunDir.y,0.);
+        vec3 col=mix(deep*ambient,skyColor(normalize(r)),fres);
+        float gloss=lake?100.:river?68.:150.;
+        float glint=pow(max(dot(normalize(r),uSunDir),0.),gloss);
+        col+=uSunLight*glint*.35+uMoonLight*pow(max(dot(normalize(r),uMoonDir),0.),gloss)*2.5;
+        gl_FragColor=vec4(applyHaze(col,vec3(0.),vWorld),1.);
       }
     `,
   });
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.frustumCulled = false;
-  return mesh;
+}
+
+// The lake and the Seta reach above the weir share a surveyed 84.6 m surface.
+// Its small lift matches the detailed water in the basin, with no per-tile camera bias.
+export async function biwaSurface(env:Env,roads:WaterRoads){
+  const bytes=await loadBinary('kansai/biwa-water.bin'),view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const group=new THREE.Group();
+  group.name='lake-biwa-and-seta';
+  let offset=8;
+  for(const [i,profile] of [[0,[2,.83,.56]],[1,[1,-.16,.987]]] as const){
+    const count=view.getUint32(4*i,true);
+    const positions=new Float32Array(count*3);
+    for(let n=0;n<count;n++){
+      positions[n*3]=view.getFloat32(offset,true);
+      positions[n*3+1]=85;
+      positions[n*3+2]=view.getFloat32(offset+4,true);
+      offset+=8;
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+    geometry.computeBoundingSphere();
+    const material=waterMaterial(env,roads,.35);
+    Object.assign(material.defaultAttributeValues,{aStable:[0],aWater:[...profile]});
+    group.add(new THREE.Mesh(geometry,material));
+  }
+  return group;
 }
 
 export function buildWater(env:Env,hf:Heightfield,lines:LineFeature[],roads:WaterRoads,

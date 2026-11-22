@@ -59,6 +59,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
   const uniforms = {
     ...env,
     uTerrainBounds: { value: v4(hf.bounds) },
+    uSurveyOn: { value: 0 },
     uAerialWide: { value: tex.aerialWide },
     uAerialWideBox: { value: v4(tex.aerialWideBox) },
     uAerialCity: { value: tex.aerialCity ?? tex.aerialWide },
@@ -111,6 +112,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       ${ENV_GLSL}
       ${SHADOW_GLSL}
       uniform vec4 uTerrainBounds;
+      uniform float uSurveyOn;
       uniform sampler2D uAerialWide;
       uniform vec4 uAerialWideBox;
       uniform sampler2D uAerialCity;
@@ -186,6 +188,12 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 nr=texture2D(uRegionalNormal,boxUv(uRegionalBox,p)).xyz*2.-1.;
         n=normalize(mix(n,nr,regional));
 
+        float outerDistrict=uSurveyOn*(1.-basin);
+        if(outerDistrict>.5){
+          vec3 face=normalize(cross(dFdx(vWorld),dFdy(vWorld)));
+          n=normalize(mix(n,face*sign(face.y),.65));
+        }
+
         // aerial photo: the sharper city sheet where we have it
         // Composite front to back. An opaque local sheet completely covers the coarser samples.
         vec3 photo=vec3(0.);
@@ -207,7 +215,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           float outer=uOuterOn*(1.-inside(uAerialWideBox,p,300.));
           if(outer<1.)photo+=remaining*(1.-outer)*blockPhoto(uAerialWide,uAerialWideBox,p,fp,dx,dy);
           if(outer>0.){
-            float mapped=inside(uOuterBox,p,1000.);
+            float mapped=max(uSurveyOn,inside(uOuterBox,p,1000.));
             vec3 background=vec3(.22,.25,.22);
             if(mapped>0.)background=mix(background,blockPhoto(uOuterPhoto,uOuterBox,p,fp,dx,dy),mapped);
             photo+=remaining*outer*background;
@@ -224,6 +232,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           detail = max(detail, k);
         }`).join('')}
 
+        vec3 surveyPhoto=photo;
         // forest: green and dark in the photo. Up close add canopy texture the photo can't resolve.
         float photoGreen = smoothstep(.0, .05, photo.g - max(photo.r, photo.b * .9)) * (1. - smoothstep(.05, .2, dot(photo, vec3(.33))));
         float green = max(photoGreen, mappedForest);
@@ -344,6 +353,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         albedo *= 1. - .5 * smoothstep(.05, .6, contact) - .22 * urban;
 
         albedo=mix(albedo,albedo*vec3(1.65,.72,.38),green*uAutumn*.6);
+        albedo=mix(albedo,albedo*vec3(.82,1.18,.78),green*uSummer*.72);
         albedo=seasonalSurface(albedo,n,vWorld);
         float sh = sunShadow(vWorld, n);
         vec3 col = shade(albedo, n, vWorld, sh);
@@ -391,6 +401,11 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         // Discard after screen derivatives and shadows, so shoreline pixels keep
         // valid derivatives. Physical bridge decks cover the river independently.
         if(river.r>.5)discard;
+        float basinEdge=boxInset(uOuterBox,p);
+        if(uSurveyOn*uOuterOn>.5 && basinEdge<1400.){
+          vec3 albedoAtEdge=seasonalSurface(surveyedGroundAlbedo(surveyPhoto),n,vWorld);
+          col=mix(shade(albedoAtEdge,n,vWorld,1.),col,smoothstep(0.,1400.,basinEdge));
+        }
         vec3 ground = applyHaze(col, emit, vWorld);
         float inset = boxInset(uTerrainBounds, p);
         // Soften the map boundary in the distance. Keep the ground under a
@@ -403,7 +418,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       }
     `,
   });
-  const { mesh, position, setPositions } = terrainTiles(pos, segments, material);
+  const { mesh, position, setPositions,setDistant } = terrainTiles(pos, segments, material);
   // Shade the aerial imagery only where opaque roofs, trees and roads leave ground
   // visible. At equal depth the overlaid geometry keeps its original priority.
   mesh.renderOrder = 1;
@@ -424,12 +439,12 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     // Keep one GPU attribute while switching equal-sized terrain grids.
     setPositions(prepare(c,anchored));
   };
-  const recenterAsync = async (c: { x: number; z: number }, onReady: () => void) => {
-    const request = ++generation, target = { x: c.x, z: c.z }, key = `travel:${target.x},${target.z}`;
+  const recenterAsync = async (c: { x: number; z: number }, onReady: () => void,anchored=true) => {
+    const request = ++generation, target = { x: c.x, z: c.z }, key = `${anchored?'travel:':''}${target.x},${target.z}`;
     const prepared = cache.get(key) ?? await terrainPositionsAsync(hf, target, segments, channel,
-      () => request === generation, () => new Promise<void>(resolve => setTimeout(resolve, 0)));
+      () => request === generation, () => new Promise<void>(resolve => setTimeout(resolve, 0)),anchored);
     if (!prepared || request !== generation) return;
-    activeCenter = target;activeAnchored=true;
+    activeCenter = target;activeAnchored=anchored;
     cache.delete(key);cache.set(key,prepared);
     if(cache.size>4)cache.delete(cache.keys().next().value!);
     setPositions(prepared);onReady();
@@ -445,5 +460,5 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
     cache.clear();recenter(activeCenter,activeAnchored);
   };
-  return { mesh, position, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
+  return { mesh, position, setDistant, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
 }

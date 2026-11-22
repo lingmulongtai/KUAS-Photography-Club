@@ -38,20 +38,24 @@ export const HIGH_CLOUD_GLSL = /* glsl */ `
     vec2 p = pos.xz * K * .6 - uWind * 1.6 + uOffset * 1.7;
     float a;
     if (cirrus){
-      // streaks combed by the jet stream, with hooked ends
-      vec2 w = vec2(vnoise(p * 2.1 + 3.), vnoise(p * 2.1 - 5.));
+      // Feathery curved cirrus wisps: delicate fibrous filaments without heavy painted ribbons.
       vec2 s = mat2(.92, -.39, .39, .92) * p;
-      float streak = fbm(s * vec2(.9, 9.) + w * .9);
-      float patchy = vnoise(p * 1.3 + 11.);
-      a = smoothstep(.52, .85, streak) * smoothstep(.25, .7, patchy) * uCirrus * .62;
+      vec2 w0 = vec2(vnoise(p * 1.45 + 3.1), vnoise(p * 1.45 - 5.2)) - .5;
+      vec2 w1 = vec2(vnoise(s * 4.2 + w0 * 1.4 + 7.4), vnoise(s * 4.2 - w0 * 1.2 - 2.9)) - .5;
+      vec2 q = s + w0 * .48 + w1 * .24;
+      float wisps = fbm(q * vec2(1.6, 5.2));
+      float fibers = fbm(q * vec2(4.8, 15.5) + w1 * .75);
+      float patchy = smoothstep(.30, .78, vnoise(p * 1.25 + w0 * .45 + 11.));
+      float veil = smoothstep(.48, .86, wisps * .55 + fibers * .45);
+      a = veil * patchy * uCirrus * .38;
     } else {
-      // mackerel sky: rows of small puffs, thinning out at the edges of the field
+      // mackerel sky: rows of small delicate puffs, thinning out at the edges of the field
       vec2 s = mat2(.8, -.6, .6, .8) * p;
-      float field = smoothstep(.35, .75, vnoise(p * 1.7 + 4.));
+      float field = smoothstep(.38, .78, vnoise(p * 1.7 + 4.));
       // Rotate the finer detail so its cell edges do not align with the larger puffs.
       vec2 detail = mat2(.8, .6, -.6, .8) * s;
-      float puffs = puffNoise(s * vec2(48., 30.)) * .7 + puffNoise(detail * 110.) * .3;
-      a = smoothstep(.62 - .25 * field, .9 - .2 * field, puffs) * field * uAlto * .8;
+      float puffs = puffNoise(s * vec2(52., 34.)) * .62 + puffNoise(detail * 125.) * .38;
+      a = smoothstep(.64 - .24 * field, .92 - .18 * field, puffs) * field * uAlto * .56;
     }
     // seen edge-on far away, a sheet thins to nothing in the haze
     a *= 1. - smoothstep(30000., 70000., dist);

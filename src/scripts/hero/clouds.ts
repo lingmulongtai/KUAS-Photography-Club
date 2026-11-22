@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
-import {cloudWeather,LOWEST_CLOUD_BASE} from './cloud-weather';
+import { cloudWeather, LOWEST_CLOUD_BASE } from './cloud-weather';
 import { CLOUD_COLUMN_GLSL, CLOUD_COLUMN_LOOKUP, createCloudColumns, WEATHER_SCALE } from './cloud-columns.ts';
-import type {Climate} from './seasons';
-
+import { cloudNoiseTexture } from './cloud-noise.ts';
+import type { Climate } from './seasons';
 import { CIRRUS_Y, HIGH_CLOUD_GLSL } from './high-clouds.ts';
 
 /** Clouds fade out into the haze before this distance. */
@@ -12,26 +12,19 @@ const FAR = 44000;
 const DRUM = 52000;
 
 /**
- * Clouds with volume. The low layer (cumulus heads, a stratocumulus deck or towering congestus,
- * depending on the day) is ray-marched through a slab of 3D noise: flat grey bases, sunlit domes,
- * silver edges toward the sun, and the orange glow of the city on their undersides at night.
- * Above it, a mackerel-sky altocumulus field and high cirrus streaks are drawn as thin sheets that
- * keep the sunset colour after the low clouds have gone grey. The character and amount of each
- * layer change from visit to visit (cloud-weather.ts).
- *
- * The mesh is the inside of a box around the camera that reaches from the cloud base to above the
- * cirrus, so every ray that could meet a cloud covers a pixel; the shader works out where.
+ * Volumetric 3D clouds sculpted with tileable Perlin-Worley + multi-octave Worley FBM noise,
+ * jittered adaptive raymarching (free of slice banding), and multi-scattering sun/sky lighting.
+ * Above the low convective slab, high altocumulus and feathered cirrus sheets retain twilight glow.
  */
-export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),quality=1,climate:Climate='spring') {
-  let weather=cloudWeather(seed,climate);
+export function buildClouds(env: Env, seed = Math.floor(Math.random() * 4294967296), quality = 1, climate: Climate = 'spring') {
+  let weather = cloudWeather(seed, climate);
 
-  // Runtime loop bounds keep GPU drivers from duplicating the large noise function at compile time.
   const detail = quality > .75 ? 2 : 1;
   const uniforms = {
     ...env,
-
+    uCloudNoise: { value: cloudNoiseTexture() },
     uVolumeOnly: { value: false },
-    uMarchSteps: { value: detail === 2 ? 40 : 22 },
+    uMarchSteps: { value: detail === 2 ? 44 : 26 },
     uCover: { value: weather.cover },
     uClear: { value: weather.clear },
     uStyle: { value: weather.style },
@@ -58,6 +51,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
       ${ENV_GLSL}
       ${CLOUD_COLUMN_GLSL}
       ${CLOUD_COLUMN_LOOKUP}
+      uniform mediump sampler3D uCloudNoise;
       uniform float uBase;
       uniform float uTop;
       uniform bool uVolumeOnly;
@@ -68,97 +62,123 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
       const float K = ${WEATHER_SCALE};
       ${HIGH_CLOUD_GLSL}
 
-      float vnoise3(vec3 p){
-        vec3 i = floor(p), f = fract(p);
-        f = f * f * (3. - 2. * f);
-        return mix(
-          mix(mix(hash13(i), hash13(i + vec3(1,0,0)), f.x), mix(hash13(i + vec3(0,1,0)), hash13(i + vec3(1,1,0)), f.x), f.y),
-          mix(mix(hash13(i + vec3(0,0,1)), hash13(i + vec3(1,0,1)), f.x), mix(hash13(i + vec3(0,1,1)), hash13(i + vec3(1,1,1)), f.x), f.y),
-          f.z);
+      float remap(float v, float lo0, float hi0, float lo1, float hi1){
+        return lo1 + (v - lo0) * (hi1 - lo1) / max(hi0 - lo0, 1e-5);
       }
 
-      /** Cloud shape without the fine detail: for the light that reaches a point. */
+      /** Static screen-space Interleaved Gradient Noise to break raymarch layering without temporal flicker. */
+      float ign(vec2 p){
+        return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+      }
+
+      vec3 cloudCoord(vec3 pos){
+        // Tileable 3D Perlin-Worley scale: bold buoyant cauliflower billows on towering nyudogumo.
+        bool tower = isStyle(3.) || isStyle(4.);
+        float invCell = isStyle(4.) ? .00062 : isStyle(3.) ? .00076 : isStyle(2.) || isStyle(5.) ? .00084 : .00096;
+        vec3 p = pos - vec3(uWind.x, 0., uWind.y) / K;
+        float yScale = tower ? .88 : 1.24;
+        return vec3(p.x, p.y * yScale, p.z) * invCell;
+      }
+
+      /** Macro cloud envelope from the 2D weather column map and vertical profile (0..1). */
       float coarse(vec3 pos){
         float h = (pos.y - uBase) / (uTop - uBase);
-        if (h < 0. || h > 1.) return 0.;
+        if (h <= 0. || h >= 1.) return 0.;
+        bool tower = isStyle(3.) || isStyle(4.);
         vec2 xz = pos.xz;
-        if (isStyle(3.) || isStyle(4.)){
-          // towers lean and bulge as they climb, so their sides break into heaped lobes instead
-          // of running straight up from the outline at the base
-          vec3 w = pos * .00045;
-          xz += (vec2(vnoise3(w), vnoise3(w + 17.3)) - .5) * (uTop - uBase) * .22;
+        if (tower){
+          // Towering summer thunderheads lean and bulge into stacked overhanging cauliflower lobes.
+          vec3 pShift = pos - vec3(uWind.x, 0., uWind.y) / K;
+          vec3 w0 = texture(uCloudNoise, pShift * .00018).rgb - .5;
+          vec3 w1 = texture(uCloudNoise, pShift * .00048 + vec3(.31, .17, .73)).rgb - .5;
+          xz += (w0.xz * .18 + w1.xz * .07) * (uTop - uBase) * smoothstep(.05, .85, h);
         }
         vec3 column = lookupColumn(xz * K - uWind + uOffset);
-        float d = smoothstep(0., .1, column.r - h) * smoothstep(0., .04, h) * column.g;
+        float topH = column.r;
+        float cov = column.g;
+        if (topH <= .001 || cov <= .001) return 0.;
+        // Flat convective base and soft rounded cauliflower crown; strictly zero at h = 0 and h = topH
+        // so emptyColumnRun acceleration remains conservative.
+        float baseSoft = tower ? .065 : mix(.16, .07, cov);
+        float baseGrad = smoothstep(0., baseSoft, h);
+        float topGrad = 1. - smoothstep(topH * (tower ? .54 : .64), topH, h);
+        // Gentle mid-upper tapering keeps towers stacked in rounded tiers instead of sheer vertical slabs.
+        float tierShape = tower ? mix(1.0, .86, smoothstep(.22, .85, h)) : 1.0;
+        float env = baseGrad * topGrad * cov * tierShape;
         if (isStyle(4.)){
-          float band = smoothstep(.8, .88, h) * (1. - smoothstep(.95, 1., h));
-          d = max(d, band * column.b * .7);
+          // Spreading fibrous anvil shelf crowning the tallest midsummer thunderheads.
+          float anvil = smoothstep(.76, .86, h) * (1. - smoothstep(.93, 1., h)) * column.b * .74;
+          env = max(env, anvil);
         }
-        return d;
+        return env;
       }
 
-      /** Where the billows are: tall clouds churn in bigger ones. */
-      vec3 billowAt(vec3 pos){
-        return (pos - vec3(uWind.x, 0., uWind.y) / K) * (isStyle(4.) ? .0011 : isStyle(3.) ? .0015 : .0021);
-      }
-
-      /** 3D noise n eats into the edges more than the core. */
-      float erode(float base, float n){
-        // a steep ramp keeps the edges crisp instead of fading out like fog
-        // (towering clouds are lumpier: their heads bulge out of the tower)
-        float bite = isStyle(4.) ? 1.25 : isStyle(3.) ? 1.05 : .9;
-        return clamp((base - (1. - base * .5) * smoothstep(.2, .85, n) * bite) * 2.4, 0., 1.);
-      }
-
-      /** The cloud with its big billows only: for the shadows the billows cast on each other. */
+      /** Macro 3D Perlin-Worley billows for volumetric self-shadowing probes. */
       float lumps(vec3 pos){
-        float base = coarse(pos);
-        return base < .001 ? 0. : erode(base, vnoise3(billowAt(pos)));
+        float env = coarse(pos);
+        if (env <= .001) return 0.;
+        vec4 n = texture(uCloudNoise, cloudCoord(pos));
+        float fbmLow = n.g * .625 + n.b * .25 + n.a * .125;
+        float shape = clamp(remap(n.r, -(1. - fbmLow) * .72, 1., 0., 1.), 0., 1.);
+        float boost = (isStyle(3.) || isStyle(4.)) ? 1.04 : 1.18;
+        float sculpted = clamp(remap(shape, 1. - min(1., env * boost), 1., 0., 1.), 0., 1.);
+        return sculpted * mix(.62, 1.0, env);
       }
 
+      /** Full 3D volumetric cloud density with multi-scale cauliflower billows & frothy wisps. */
       float density(vec3 pos, float dist){
-        float base = coarse(pos);
-        if (base < .001) return 0.;
-        // billows: the outline turns into the rounded cauliflower heads of real cumulus
-        vec3 q = billowAt(pos);
-        float n = vnoise3(q);
-        // finer octaves only where they are bigger than a pixel; far away they would only alias.
-        // Folded noise (1 - |2n - 1|) makes rounded lobes with sharp creases between them.
-        // Fade detail continuously: hard distance cut-offs slice low winter clouds into bands.
-        if (dist < 16000.) n = mix(n, 1. - abs(vnoise3(q * 3.1 + 5.) * 2. - 1.), .38 * (1. - smoothstep(10000., 16000., dist)));
-        #if DETAIL > 1
-        if (dist < 8000.) n = mix(n, 1. - abs(vnoise3(q * 8.3 - 3.) * 2. - 1.), .2 * (1. - smoothstep(4000., 8000., dist)));
-        #endif
-        return erode(base, n);
-      }
+        float env = coarse(pos);
+        if (env <= .001) return 0.;
+        bool tower = isStyle(3.) || isStyle(4.);
+        float h = clamp((pos.y - uBase) / (uTop - uBase), 0., 1.);
+        vec3 q = cloudCoord(pos);
+        vec4 baseN = texture(uCloudNoise, q);
+        float fbmLow = baseN.g * .625 + baseN.b * .25 + baseN.a * .125;
+        // Perlin-Worley base shape forms bold cauliflower heads and deep sculptural crevices.
+        float shape = clamp(remap(baseN.r, -(1. - fbmLow) * (tower ? .78 : .65), 1., 0., 1.), 0., 1.);
+        float boost = tower ? 1.04 : 1.18;
+        float d = clamp(remap(shape, 1. - min(1., env * boost), 1., 0., 1.), 0., 1.) * mix(.62, 1.0, env);
+        if (d <= .0005) return 0.;
 
-      // The quadratic near spacing joins a uniform far grid with the same slope at the knee.
-      float rayStation(float distanceAlongRay, vec4 grid){
-        return distanceAlongRay < grid.w
-          ? 2.*distanceAlongRay / (grid.x + sqrt(grid.x*grid.x + 2.*distanceAlongRay))
-          : grid.z + (distanceAlongRay - grid.w) / grid.y;
-      }
-      float stationDistance(float station, vec4 grid){
-        float n = min(station, grid.z);
-        return n*(grid.x + .5*n) + max(station-grid.z, 0.)*grid.y;
+        // Keep cauliflower sub-lobes crisp even on distant 15-30 km summer thunderheads over the mountains.
+        float detailFade = 1. - smoothstep(tower ? 18000. : 9000., tower ? 38000. : 24000., dist);
+        if (detailFade > .001){
+          vec3 curl = (baseN.gbr - .5) * (tower ? .32 : .26);
+          vec4 hiN = texture(uCloudNoise, q * (tower ? 2.45 : 2.75) + curl + vec3(0., h * .18, 0.));
+          float hiFbm = hiN.g * .625 + hiN.b * .25 + hiN.a * .125;
+          float hiMod = mix(hiFbm, 1. - hiFbm, smoothstep(.04, .24, h));
+          float edgeMask = 1. - d * (tower ? .36 : .48);
+          float erodeStrength = (isStyle(4.) ? .66 : isStyle(3.) ? .62 : isStyle(5.) ? .36 : .52) * detailFade * edgeMask;
+          d = clamp(remap(d, hiMod * erodeStrength, 1., 0., 1.), 0., 1.);
+
+          // Close-up frothy turbulence (~20-50 m wisps) prevents smooth clay-like surfaces.
+          #if DETAIL > 1
+          float closeFade = 1. - smoothstep(tower ? 8000. : 3800., tower ? 20000. : 10500., dist);
+          if (closeFade > .001 && d > .001){
+            vec4 fineN = texture(uCloudNoise, q * 6.8 + curl * 2.0 + hiN.rgb * .16);
+            float fineFbm = fineN.g * .55 + fineN.b * .30 + fineN.a * .15;
+            float wispErode = (1. - fineFbm) * .44 * closeFade * (1. - d * .50);
+            d = clamp(remap(d, wispErode, 1., 0., 1.), 0., 1.);
+          }
+          #endif
+        }
+        // Soft frothy edge feathering with dense sunlit upper interiors.
+        float densityProfile = mix(.70, 1.24, smoothstep(.05, .42, h));
+        return clamp(pow(d, 1.15) * densityProfile, 0., 1.);
       }
 
       void main(){
         vec3 ro = cameraPosition;
         vec3 rd = normalize(vWorld - ro);
         float mu = dot(rd, uSunDir);
-        // forward scattering makes silver linings toward the sun, a little back-scatter keeps the
-        // side away from it from going flat
-        float phase = min(mix(hg(mu, -.2), hg(mu, .62), .45), 3.2);
-        vec3 amb = mix(uHorizon, uZenith, .55);
-        vec3 cityGlow = vec3(.05, .026, .011) * uCity;
-        vec3 moon = uMoonLight * .35;
+        vec3 cityGlow = vec3(.052, .027, .011) * uCity;
+        vec3 moon = uMoonLight * .36;
 
         vec3 L = vec3(0.);
         float T = 1.;
         float distSum = 0., wSum = 0.;
 
-        // the stretch of this ray inside the low-cloud slab
+        // Ray interval inside the low-cloud slab.
         float t0 = 0., t1 = ${FAR.toFixed(1)};
         if (abs(rd.y) > 1e-7) {
           float baseHit = (uBase - ro.y) / rd.y, topHit = (uTop - ro.y) / rd.y;
@@ -167,85 +187,153 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
         } else if (ro.y < uBase || ro.y > uTop) {
           t1 = 0.;
         }
+
         if (t1 > t0) {
-          // Place samples in metres from the eye. Extending the ray towards the
-          // horizon must not move the samples already inside a nearby cloud.
-          float verticalLimit = (uTop - uBase) / (float(uMarchSteps) * max(abs(rd.y), .001));
-          #if DETAIL > 1
-          float maxStep = min(56., verticalLimit), startStep = min(16., maxStep);
-          #else
-          float maxStep = min(72., verticalLimit), startStep = min(18., maxStep);
-          #endif
-          float knee = maxStep - startStep;
-          vec4 grid = vec4(startStep, maxStep, knee, knee*(startStep + .5*knee));
-          float station = floor(rayStation(t0, grid)) + 1.;
-          float t = t0, d0 = density(ro + rd*t, t);
+          float layerDepth = uTop - uBase;
+          bool tower = isStyle(3.) || isStyle(4.);
+          float qualityScale = ${detail > 1 ? '1.0' : '1.45'};
+          float nearStep = isStyle(4.) ? 16. : isStyle(3.) ? 13. : 9.5;
+          float farStep = isStyle(4.) ? 68. : isStyle(3.) ? 62. : 58.;
+          // Keep empty-air skipping fast enough to span 44 km without ever coarsening in-cloud fine steps.
+          float minEmptyStep = (t1 - t0) / (tower ? 78. : 96.);
+          float verticalCap = layerDepth / (float(uMarchSteps) * max(abs(rd.y), .14));
+          float jitter = ign(gl_FragCoord.xy);
+          float firstStep = min(mix(nearStep, farStep, smoothstep(600., 32000., t0)) * qualityScale, verticalCap);
+          float t = t0 + jitter * firstStep;
           float nextBlock = t0;
-          float layerDepth = uTop-uBase;
-          bool useCeilings = uColumnsReady && !isStyle(3.) && !isStyle(4.);
-          for (int i = 0; i < uMarchSteps * 32; ++i) {
-            if (T < .002 || t >= t1) break;
-            if (useCeilings && t >= nextBlock) {
+          bool useCeilings = uColumnsReady && !tower;
+          bool fineMode = false;
+          float fineUntil = 0.;
+          int emptyFine = 0;
+          int fineCount = 0;
+          float extinction = isStyle(5.) ? .024 : isStyle(4.) ? .026 : isStyle(3.) ? .030 : .036;
+          float ls = isStyle(4.) ? 2.4 : isStyle(3.) ? 1.55 : 1.0;
+
+          float emptyStride = useCeilings ? 2.6 : 3.2;
+          #if DETAIL > 1
+          const int MAX_ITERS = 240;
+          #else
+          const int MAX_ITERS = 160;
+          #endif
+
+          for (int i = 0; i < MAX_ITERS; ++i) {
+            if (T < .004 || t >= t1) break;
+            if (useCeilings && !fineMode && t >= nextBlock) {
               float run;
-              bool empty = emptyColumnRun(uColumnEye + rd.xz*t/outerColumnMetres, rd.xz,
-                (ro.y + rd.y*t-uBase)/layerDepth, rd.y/layerDepth, t1-t, run);
-              nextBlock = t + run + .01;
-              if (empty && d0 <= .002) {
-                if (run >= t1-t) break;
-                float lastEmpty = floor(rayStation(t+run, grid));
-                if (lastEmpty >= station) {
-                  t = stationDistance(lastEmpty, grid);
-                  station = lastEmpty + 1.;
-                  d0 = 0.;
-                }
+              bool empty = emptyColumnRun(uColumnEye + rd.xz * t / outerColumnMetres, rd.xz,
+                (ro.y + rd.y * t - uBase) / layerDepth, rd.y / layerDepth, t1 - t, run);
+              nextBlock = t + run + .05;
+              if (empty) {
+                if (run >= t1 - t) break;
+                float skipStep = min(mix(nearStep, farStep, smoothstep(600., 32000., t + run)) * qualityScale, verticalCap);
+                t += run + jitter * skipStep * .65;
+                continue;
               }
             }
-            float nextT = min(t1, stationDistance(station, grid));
-            station += 1.;
-            float d1 = density(ro + rd*nextT, nextT);
-            float lo = t, hi = nextT, left = d0, right = d1;
-            t = nextT; d0 = d1;
-            // Simpson integration is continuous as a billow enters or leaves the interval.
-            // Its midpoint also sees thin wisps between two empty endpoints.
-            float midT = .5*(lo+hi);
-            float middle = density(ro+rd*midT, midT);
-            if (max(max(left, right), middle) < .00001) continue;
-            float mass = left + 4.*middle + right;
-            float segmentDensity = mass / 6., dt = hi-lo;
-            float shadeT = mix(lo, hi, (2.*middle + right) / mass);
-            vec3 lightPos = ro + rd*shadeT;
-            float h = clamp((lightPos.y - uBase) / (uTop - uBase), 0., 1.);
-            // light from the sun, dimmed by the cloud above and toward it
-            // (bigger clouds shade themselves over a bigger distance)
-            float ls = isStyle(4.) ? 3. : isStyle(3.) ? 1.8 : 1.;
+
+            float baseFine = min(mix(nearStep, farStep, smoothstep(600., 32000., t)) * qualityScale, verticalCap);
+            // Only relax fine step size on unusually long grazing rays so normal edges stay silky-smooth.
+            float relax = 1. + max(0., float(fineCount - 75)) * .055;
+            float fineStep = baseFine * relax;
+            // Cap coarse empty steps by distance so thin near/mid anvil rims are never jumped over.
+            float maxEmpty = mix(95., 340., smoothstep(2500., 24000., t)) * qualityScale;
+            float dt = fineMode ? fineStep : min(maxEmpty, max(minEmptyStep, baseFine * emptyStride));
+            dt = min(dt, t1 - t);
+            if (dt <= .01) break;
+
+            vec3 pos = ro + rd * (t + dt * .5);
+            float envVal = coarse(pos);
+
+            if (!fineMode) {
+              if (envVal > .001) {
+                // Bisect the hit bracket cheaply on coarse() so fine marching starts right on the cloud surface
+                // and cannot drop back to coarse before crossing the confirmed hit.
+                float tLo = max(t0, t - dt * .5);
+                float tHi = t + dt * .5;
+                float m1 = .5 * (tLo + tHi);
+                if (coarse(ro + rd * m1) > .001) tHi = m1; else tLo = m1;
+                float m2 = .5 * (tLo + tHi);
+                if (coarse(ro + rd * m2) > .001) tHi = m2; else tLo = m2;
+                t = tLo;
+                fineUntil = tHi + fineStep;
+                fineMode = true;
+                emptyFine = 0;
+                continue;
+              }
+              t += dt;
+              continue;
+            }
+            fineCount++;
+
+            if (envVal <= .001) {
+              if (t >= fineUntil) {
+                emptyFine++;
+                if (emptyFine >= 2) fineMode = false;
+              }
+              t += dt;
+              continue;
+            }
+            emptyFine = 0;
+            float d = density(pos, t + dt * .5);
+            if (d <= .0008) {
+              t += dt;
+              continue;
+            }
+
+            float h = clamp((pos.y - uBase) / layerDepth, 0., 1.);
+            // Exponential sun-ray optical depth: 3D billow probes carve sculptural shadows between cumulus heads.
             #if DETAIL > 1
-            // near the surface the billows shade each other, which models the heads
-            float od = (lumps(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
+            float od = (
+              lumps(pos + uSunDir * (22. * ls)) * 28. +
+              lumps(pos + uSunDir * (64. * ls)) * 58. +
+              lumps(pos + uSunDir * (145. * ls)) * 96. +
+              coarse(pos + uSunDir * (310. * ls)) * 180.
+            ) * ls * extinction * .95;
             #else
-            float od = (coarse(lightPos + uSunDir * 90. * ls) * 90. + coarse(lightPos + uSunDir * 320. * ls) * 230.) * ls;
+            float od = (
+              lumps(pos + uSunDir * (34. * ls)) * 45. +
+              lumps(pos + uSunDir * (110. * ls)) * 95. +
+              coarse(pos + uSunDir * (280. * ls)) * 175.
+            ) * ls * extinction * .95;
             #endif
-            // beer's law plus a softer second term for light scattered many times inside
-            float toSun = exp(-od * .006) * .65 + exp(-od * .0014) * .35;
-            // dark edges where light can't scatter back out ("powder"), mostly away from the sun
-            float powder = mix(1. - exp(-segmentDensity * 6.), 1., .35 + .4 * max(mu, 0.));
-            // a snow deck is thick and grey all through
-            vec3 sun = uCloudLight * phase * toSun * powder * (isStyle(5.) ? .45 : .85);
-            // the sky lights the tops more than the bases; the city lights the bases at night
-            // (at night the sky's own glow is faint: the clouds are lit from below by the city)
-            vec3 sky = amb * (.55 + .75 * h) * (.85 + .15 * segmentDensity) * (1. - .5 * uCity) * (isStyle(5.) ? .75 : 1.);
-            vec3 below = cityGlow * (1. - h) * (1. - h) * 1.6 + moon * toSun;
-            // snow clouds are thick and grey all the way through
-            vec3 col = (sun + sky + below) * (isStyle(5.) ? .62 : 1.);
-            float a = 1. - exp(-segmentDensity * .007 * dt);
+
+            // 3-octave multiple scattering: bright sunlit tops, silver rims, and soft blue-grey shadowed bellies.
+            float atten = 1., contrib = 1., ecc = 1.;
+            float sunScatter = 0.;
+            for (int oct = 0; oct < 3; ++oct) {
+              float ph = min(mix(hg(mu, -.25 * ecc), hg(mu, .72 * ecc), .66), 3.2);
+              sunScatter += contrib * ph * exp(-od * atten);
+              atten *= .40;
+              contrib *= .46;
+              ecc *= .50;
+            }
+            // Subtle powder dark-edge relief on shadowed sides facing away from the sun.
+            float powder = mix(.64 + .36 * (1. - exp(-d * 5.0)), 1., .40 + .50 * max(mu, 0.));
+            float towerBoost = isStyle(4.) ? 1.04 : isStyle(3.) ? .96 : isStyle(5.) ? .44 : .84;
+            vec3 sun = uCloudLight * sunScatter * powder * towerBoost;
+
+            // Ambient sky illumination: clean summer sky-blue shadow bellies vs dazzling sunlit white tops.
+            float bellyFloor = (isStyle(3.) || isStyle(4.)) ? .40 : .36;
+            float skyVis = mix(bellyFloor, 1.08, smoothstep(0., .70, h)) * mix(1.0, .78, clamp(d * 1.05, 0., 1.));
+            vec3 skyTint = mix(mix(uHorizon, uZenith, .54), mix(uHorizon, uZenith, .74), h);
+            vec3 sky = skyTint * skyVis * (1.06 - .54 * uCity) * (isStyle(5.) ? .74 : 1.0);
+            vec3 below = cityGlow * (1. - h) * (1. - h) * 1.65 + moon * exp(-od * .55);
+            vec3 col = (sun + sky + below) * (isStyle(5.) ? .66 : 1.);
+
+            float sigma = d * extinction;
+            float stepT = exp(-sigma * dt);
+            float a = 1. - stepT;
             L += T * a * col;
-            distSum += T * a * shadeT;
+            distSum += T * a * (t + dt * .5);
             wSum += T * a;
-            T *= 1. - a;
+            T *= stepT;
+            t += dt;
           }
         }
+
         float lowA = 1. - T;
         if (wSum > 0.){
-          // the distant clouds fade into the haze toward the horizon
+          // Distant clouds blend smoothly into aerial perspective haze toward the horizon.
           float dist = distSum / wSum;
           float haze = smoothstep(7000., 36000., dist) * .85;
           vec3 hc = hazeColor(rd);
@@ -254,7 +342,7 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
           L *= fade;
           lowA *= fade;
         }
-        // behind the low clouds: altocumulus, then cirrus
+        // Behind the low clouds: altocumulus, then feathered cirrus.
         vec4 high = uVolumeOnly ? vec4(0.) : highClouds(ro, rd);
         vec3 C = L + high.rgb * (1. - lowA);
         float A = lowA + high.a * (1. - lowA);
@@ -265,10 +353,6 @@ export function buildClouds(env: Env,seed=Math.floor(Math.random()*4294967296),q
     depthWrite: false,
     side: THREE.BackSide,
   });
-  // The rays are marched from the inside of a drum around the camera, which starts below the lowest
-  // cloud base any character uses. Every point of it stays inside the camera's far plane (60 km):
-  // the corners of a box that reached as far along the axes were beyond it, and the clouds toward
-  // north-east, south-east and so on were cut off there.
   const bottom = LOWEST_CLOUD_BASE;
   const geometry = new THREE.CylinderGeometry(DRUM, DRUM, CIRRUS_Y + 400 - bottom, 96, 1).translate(0, (CIRRUS_Y + 400 + bottom) / 2, 0);
   const mesh = new THREE.Mesh(geometry, material);

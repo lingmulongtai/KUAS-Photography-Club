@@ -5,7 +5,7 @@ import type {Box} from './geo';
 export type OverviewBuilding = [number,number,number,number,number,number,number];
 
 /** A compact sample of buildings, visible until detailed regional data replaces it. */
-export async function buildSouthOverview(env:Env,buildings:OverviewBuilding[],ground:(x:number,z:number)=>number) {
+export function overviewBatch(env:Env,count:number) {
   const geometry=new THREE.BoxGeometry(1,1,1);
   const uniforms={...env,uDetailBox:{value:new THREE.Vector4()},uDetailOn:{value:0}};
   const material=new THREE.ShaderMaterial({uniforms,
@@ -20,7 +20,16 @@ export async function buildSouthOverview(env:Env,buildings:OverviewBuilding[],gr
         float window=step(.35,fract(vWorld.y/3.))*step(.4,fract((vWorld.x+vWorld.z)/5.))*wall;
         vec3 emit=vec3(.23,.15,.075)*window*uCity*uLit*cityLightShimmer(vWorld);
         gl_FragColor=vec4(applyHaze(col,emit,vWorld),1.);}`});
-  const mesh=new THREE.InstancedMesh(geometry,material,buildings.length);mesh.name='south-overview';
+  const mesh=new THREE.InstancedMesh(geometry,material,count);mesh.name='south-overview';
+  return {mesh,setDetailBox(box:Box|null){
+    uniforms.uDetailOn.value=box?1:0;if(box)uniforms.uDetailBox.value.set(...box);
+    // The overview spans several regions; a partial detail box only hides overlapping blocks.
+    mesh.visible=true;
+  }};
+}
+
+export async function buildSouthOverview(env:Env,buildings:OverviewBuilding[],ground:(x:number,z:number)=>number) {
+  const batch=overviewBatch(env,buildings.length),mesh=batch.mesh;
   const dummy=new THREE.Object3D();
   for(let i=0;i<buildings.length;i++){
     const [x,z,w,d,h,angle,offset]=buildings[i];dummy.position.set(x,ground(x,z)+offset+h/2,z);
@@ -29,9 +38,5 @@ export async function buildSouthOverview(env:Env,buildings:OverviewBuilding[],gr
   }
   mesh.instanceMatrix.needsUpdate=true;
   mesh.computeBoundingSphere();
-  return {mesh,setDetailBox(box:Box|null){
-    uniforms.uDetailOn.value=box?1:0;if(box)uniforms.uDetailBox.value.set(...box);
-    // The overview spans several regions; a partial detail box only hides overlapping blocks.
-    mesh.visible=true;
-  }};
+  return batch;
 }

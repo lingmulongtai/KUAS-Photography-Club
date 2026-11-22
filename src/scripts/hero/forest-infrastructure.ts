@@ -2,7 +2,7 @@ import type { LineFeature } from './lines-data';
 import type { Box } from './geo';
 
 /** A one-time CPU mask prevents historical woodland from planting across today's rivers/roads. */
-export function infrastructureMask(lines: LineFeature[], box: Box) {
+export function infrastructureBits(lines: LineFeature[], box: Box) {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 2048;
   const ctx = canvas.getContext('2d', {willReadFrequently:true})!;
   const sx = 2048 / (box[2] - box[0]), sz = 2048 / (box[3] - box[1]);
@@ -26,8 +26,18 @@ export function infrastructureMask(lines: LineFeature[], box: Box) {
     else {ctx.lineWidth = (f.kind === 1 ? 6 : [6,8,12,18,26][Math.min(4,f.attr&15)]) + 8;ctx.stroke();}
   }
   const pixels=ctx.getImageData(0,0,2048,2048).data;
+  const bits=new Uint8Array(2048*2048/8);
+  for(let i=0;i<2048*2048;i++)if(pixels[i*4+3]>80)bits[i>>>3]|=1<<(i&7);
+  return bits;
+}
+
+export function infrastructureMask(lines: LineFeature[],box: Box,baked?:Uint8Array|null) {
+  // Four little-endian bytes bind this mask to the decoded road/water variant.
+  const valid=baked?.length===4+2048*2048/8 && new DataView(baked.buffer,baked.byteOffset,4).getUint32(0,true)===lines.length;
+  const bits=valid?baked!.subarray(4):infrastructureBits(lines,box);
+  const sx=2048/(box[2]-box[0]),sz=2048/(box[3]-box[1]);
   return (x:number,z:number) => {
     const ix=Math.floor((x-box[0])*sx),iz=Math.floor((z-box[1])*sz);
-    return ix>=0&&iz>=0&&ix<2048&&iz<2048&&pixels[(iz*2048+ix)*4+3]>80;
+    return ix>=0&&iz>=0&&ix<2048&&iz<2048&&Boolean(bits[(iz*2048+ix)>>>3]&(1<<(ix&7)));
   };
 }

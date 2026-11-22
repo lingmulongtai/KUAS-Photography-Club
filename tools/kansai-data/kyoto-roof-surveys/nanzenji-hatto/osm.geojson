@@ -1,0 +1,71 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          135.793649,
+          35.0113992
+        ],
+        [
+          135.7937501,
+          35.0113963
+        ],
+        [
+          135.7939509,
+          35.0113905
+        ],
+        [
+          135.7939457,
+          35.0112693
+        ],
+        [
+          135.7939438,
+          35.0112231
+        ],
+        [
+          135.7939382,
+          35.0110917
+        ],
+        [
+          135.7937255,
+          35.0110978
+        ],
+        [
+          135.7936363,
+          35.0111003
+        ],
+        [
+          135.7936429,
+          35.0112549
+        ],
+        [
+          135.793649,
+          35.0113992
+        ]
+      ]
+    ]
+  },
+  "properties": {
+    "source": "OpenStreetMap",
+    "id": "w190876449",
+    "version": 9,
+    "lastEdit": "2025-04-25 09:56:04+00:00",
+    "tags": {
+      "building": "shrine",
+      "building:levels": "2",
+      "building:wikidata": "Q28224125",
+      "contact:website": "https://nanzenji.or.jp/equipment/hatto",
+      "name": "法堂",
+      "name:en": "Dharma Hall",
+      "name:fr": "Pavillon du Dharma",
+      "name:ja-Hira": "ほうどう",
+      "name:ja-Latn": "Hattō",
+      "religion": "buddhist",
+      "roof:orientation": "along",
+      "roof:shape": "hipped-and-gabled",
+      "start_date": "1909"
+    }
+  }
+}

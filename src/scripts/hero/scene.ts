@@ -3,12 +3,15 @@ import type { Demo } from '../gl/stage';
 import { createEnv } from './env';
 import { KYOTO, directionFrom, jstMinutes, jstParts, localSiderealAngle, moonPosition, sunPosition } from './astro';
 import { createLook, kelvin, lookAt, phaseName, windowsLit } from './palette';
-import type { Box } from './geo';
+import {toLocal,type Box} from './geo';
+import {EXPO} from '../../data/kansai-outings';
 import { loadBinary, loadJSON, loadTexture, type TerrainMeta } from './data';
 import { createHeroLoading, type HeroLoadingCallbacks } from './loading';
 import { createFrameQueue } from './frame-queue';
 import { loadHeightfield, type Heightfield } from './heightfield';
 import { buildTerrain, normalTexture } from './terrain';
+import {prepareRegionBuffers} from './region-upload';
+import {uploadPhoto} from './upload-photo';
 import {createGroundRelief} from './ground-relief';
 import { initialNormals } from './initial-normals';
 import { normalMapBytes } from './normal-map';
@@ -18,14 +21,15 @@ import { createPost } from './post';
 import { createPanoramaCity } from './panorama-city';
 import { loadBuildings } from './buildings-data';
 import { buildingCutout } from './building-cutout';
-import { buildCity, buildCityAsync, buildResidentCity } from './buildings';
+import { buildCity, buildCityAsync, buildCitySteps, buildResidentCity, prepareCityMaterials } from './buildings';
 import { SHADOW_LAYER, createSunShadow } from './shadow';
-import { buildLamps } from './lights';
-import { buildCars } from './cars';
+import {prepareSteps} from './task-yield';
+import { buildLampsSteps,type buildLamps } from './lights';
+import { buildCarsSteps,type buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
-import { buildWaterAsync } from './water';
+import { biwaSurface, buildWaterAsync, waterSteps } from './water';
 import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
@@ -38,7 +42,7 @@ import { createLookRotation, createViewZoom, mountLookControls, wheelZoomRatio }
 import {createKamoChannel,kamoMask} from './kamo-channel';
 import {buildBridges} from './bridges';
 import {buildTransportSpans,type TransportSpan} from './transport-spans';
-import { createBuildingMask } from './vegetation-mask';
+import { createBuildingMaskAsync, type createBuildingMask } from './vegetation-mask';
 import type { Woodland } from './woodland';
 import { buildWoodlandTexture } from './woodland-texture';
 import { decodeTreeCover } from './tree-cover';
@@ -50,10 +54,11 @@ import { createSharedPhotoSlot } from './shared-photo';
 import { VIEWS, flightLift, openingPanorama, viewBelowClouds, type ViewDef, type HeroView } from './views';
 import type { SpotId } from '../../data/spots';
 export type { HeroView } from './views';
-import { buildOcclusion } from './building-occlusion';
+import { buildOcclusion, occlusionFile, occlusionTexture } from './building-occlusion';
 import { buildIslands } from './islands';
 import { islandMask } from './island-mask';
 import { LINE, loadLines } from './lines-data';
+import {todaijiClearing} from './todaiji-grounds';
 import { withoutTunnels } from './tunnels';
 import {createRegionalLoader,regionAt,regionInView,type CityRegion} from './regional-loader';
 import {replacesHeianFootprint} from './heian-shrine';
@@ -66,6 +71,7 @@ import {buildKameokaCampus,isKameokaBuilding,KAMEOKA_CENTER} from './kameoka-cam
 import {kameokaClearing} from './kameoka-grounds';
 import {buildRailways} from './railways';
 import {buildAircraft} from './aircraft';
+import {distantBasin} from './distant-basin';
 import {buildSouthOverview,type OverviewBuilding} from './south-overview';
 import type {RailwayRoute} from './railway-path';
 import {containsPhoto,createNearbyPhotos,type PhotoSheet} from './nearby-photos';
@@ -78,6 +84,10 @@ import {replacesInari,inariClearing} from './fushimi-inari';
 import {createTrafficView} from './traffic-view';
 import {katsuraStation} from './katsura-station';
 import {replacesByodoin,BYODOIN_CENTER} from './byodoin';
+import {inRing,type Ring} from '../kansai/coordinates';
+import {json as kansaiJson} from '../kansai/sources';
+import {buildSacredGeometry,sacredMaterial} from '../kansai/sacred-models';
+import {sacredForBox,sacredMatcher,type SacredSite} from '../kansai/sacred-sites';
 
 export interface HeroStatus {
   minutes: number;
@@ -131,8 +141,13 @@ export function createHero(
   el: HTMLElement,
   opts: HeroOptions,
 ): Demo & { burst(n: number): void; flyTo(to: 'campus' | HeroView): void;setSeason(season:Season):void; setLanguage(lang: 'ja' | 'en'): void; setExploring(enabled:boolean):void; setTouchMove(forward:number,side:number,up:number,fast:boolean):void; readonly exploring:boolean; readonly mode: HeroMode; readonly view: HeroView; readonly orbiting:boolean } {
+  // Reading shader diagnostic logs synchronously can drain the GPU queue on the first district draw.
+  if(import.meta.env.PROD)renderer.debug.checkShaderErrors=false;
   const env = createEnv();
   const scene = new THREE.Scene();
+  // Light counts are part of Three's program cache key, including custom terrain shaders.
+  const landmarkLights={sun:new THREE.DirectionalLight(0),sky:new THREE.HemisphereLight(0,0)};
+  scene.add(landmarkLights.sun,landmarkLights.sky);
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
   // away depends on it, and too little of it makes neighbouring rooftops flicker
   const camera = new THREE.PerspectiveCamera(40, 1, 20, 60000);
@@ -181,10 +196,23 @@ export function createHero(
   let VIEW: ViewDef = VIEWS.shogunzuka;
   const eye = new THREE.Vector3(VIEW.eye.x, 260, VIEW.eye.z);
   let groundAt: ((x: number, z: number) => number) | null = null;
+  let regional:Awaited<ReturnType<typeof import('./regional-ground').regionalGround>> | undefined;
+  const regionalDirection=new THREE.Vector3();
+  let activeRegionBox:Box|null=null;
+  let regionalCity:Awaited<ReturnType<typeof import('./regional-city').regionalCity>>|undefined;
+  const expoAnchor=toLocal(EXPO.lat,EXPO.lon);
+  let expo:ReturnType<typeof import('./regional-expo').expoGrounds>|undefined;
+  const prepare = (object: THREE.Object3D) => post.prepare(object).catch(error => {
+    console.warn('Scene shaders will compile on first draw', error);
+  });
+  let preparingExpo=false,retryExpoAt=0;
+  let updateFireworks:ReturnType<typeof import('./regional-fireworks').regionalFireworks>|undefined;
+  let updateBasinLod:(()=>void)|undefined;
+  let ensureRegionalGround:(()=>Promise<void>)|undefined;
+  let flightRequest=0;
   let travelBounds:Box=[-34000,-19000,13000,20000];
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number },anchored?:boolean) => void) | null = null;
-  let terrainRecenterAsync: ((c: { x: number; z: number }) => void) | null = null;
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let ensureCityRegion:((center:{x:number;z:number},bearing?:number)=>Promise<void>|undefined)|null=null;
@@ -214,10 +242,7 @@ export function createHero(
     const metadata = loading.track(loadJSON<TerrainMeta>('terrain.json'));
     const cityRegions=loading.track(loadJSON<{regions:CityRegion[]}>('regions.json')
       .catch(error=>{console.warn('Neighbouring Kyoto index unavailable',error);return {regions:[]};}));
-    const prepare = (object: THREE.Object3D) => post.prepare(object).catch(error => {
-      console.warn('Panorama shaders will compile on first draw', error);
-    });
-    const cloudProgram = Promise.all([prepare(clouds.mesh), prepare(clouds.columnMesh)]);
+    const cloudProgram = Promise.all([clouds.mesh,clouds.columnMesh,cloudBlur.compositeMesh,cloudHistory.compositeMesh].map(prepare));
     const meta = await metadata;
     const wideFile = opts.quality >= .75 && meta.aerialWide.high ? meta.aerialWide.high.file : meta.aerialWide.file;
     const elevation = loading.track(loadHeightfield(meta));
@@ -236,7 +261,7 @@ export function createHero(
     // The base imagery can fail before normal generation is joined below.
     void normals.catch(() => {});
     const [hf, wide, outer] = await Promise.all([elevation, loading.track(loadTexture(wideFile, aniso)),
-      loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?meta.aerialOuter.mobile.file:meta.aerialOuter.file,aniso)
+      loading.track(meta.aerialOuter ? loadTexture(opts.quality<.75?'kansai/basin-mobile.webp':'kansai/basin.webp',aniso)
         .catch(error=>{console.warn('Outer imagery unavailable; retaining Kyoto imagery',error);return null;}) : Promise.resolve(null))]);
     // Download the city while normals and terrain are prepared, rather than
     // starting a second network waterfall after that CPU work.
@@ -277,6 +302,12 @@ export function createHero(
     const basinTransport=meta.basinTransport?loadLines(undefined,meta.basinTransport.file,meta.basinTransport.box,meta.basinTransport.q)
       .catch(error=>{console.warn('Basin street network unavailable',error);return [];}):Promise.resolve([]);
     void elevatedData.catch(()=>{});
+    const builtSize = opts.quality < .75 ? 1024 : 2048;
+    const coverageFor=(file:string)=>loadBinary(occlusionFile(file,builtSize)).then(
+      bytes=>bytes.length===builtSize*builtSize?bytes:null,()=>null);
+    const cityCoverage=coverageFor('buildings.bin');
+    const forestBits=(file:string,lake=false)=>loadBinary('forest-masks/'+file.replace(/\.bin$/,lake?'-lake.bin':'.bin')).catch(()=>null);
+    const coreForestBits=forestBits('lines.bin');
     const cityData=Promise.all([basinPhoto, loading.track(loadBuildings()), loading.track(withoutTunnels(loadLines(waterFiles))), loading.track(loadBinary('woodland.json.gz'))]);
     // Join the original promise below; attach a handler now for an early failure.
     void cityData.catch(()=>{});
@@ -336,10 +367,12 @@ export function createHero(
         else terrain.setPhoto(i+1,photo,r.meta.box);
       }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
     });
+    type Sheet={photo:THREE.Texture;box:Box};
+    let localPhoto:Sheet|null=null,regionalPhoto:Sheet|null=null;
     const closePhotos=createNearbyPhotos(
       async()=> (await loadJSON<{photos:PhotoSheet[]}>('photos-osaka.json')).photos,
       async sheet=>({photo:await loadTexture(opts.quality<.75?sheet.mobile.file:sheet.file,aniso),box:sheet.box}),
-      photo=>sharedSlot?.setOverride(photo),value=>value.photo.dispose(),
+      photo=>{localPhoto=photo;sharedSlot?.setOverride(localPhoto??regionalPhoto);},value=>value.photo.dispose(),
       error=>console.warn('Close transport imagery unavailable; retaining regional photo',error),
       meta.otokuni?[meta.otokuni]:[],
     );
@@ -349,8 +382,11 @@ export function createHero(
       sharedSlot?.select(v==='tennozan');
     };
     ensureRegionalPhoto(view);
-    terrainRecenter = terrain.recenter;
-    terrainRecenterAsync = center => { void terrain.recenterAsync(center, () => shadow.invalidate()); };
+    const inKyoto=(p:{x:number;z:number})=>p.x>=hf.bounds[0] && p.z>=hf.bounds[1] && p.x<=hf.bounds[2] && p.z<=hf.bounds[3];
+    terrainRecenter = (center,anchored=false)=>{
+      if(inKyoto(center))void terrain.recenterAsync(center,()=>shadow.invalidate(),anchored);
+      else terrain.cancelRecenter();
+    };
     cancelTerrainRecenter = terrain.cancelRecenter;
     // Prepare other viewpoints only when visited. Warming all six after startup
     // blocks scrolling and evicts earlier meshes from the four-entry terrain cache.
@@ -360,10 +396,16 @@ export function createHero(
     shadow.invalidate();
     await yieldToBrowser();
     const [, buildings, lines, woodlandBytes] = await cityData;
+    const basinLod=distantBasin(env,scene,(x,z)=>hf.height(x,z),prepare);
+    basinLod.register(buildings);
+    updateBasinLod=()=>{
+      const far=basinLod.update(camera.position.x,camera.position.z,pxPerM);
+      terrain.setDistant(far && !inKyoto(camera.position));
+    };
     const channel=createKamoChannel(lines,(x,z)=>hf.height(x,z));
     terrain.setChannel(channel,kamoMask(channel));
     const bridges=buildBridges(env,hf,lines,channel);
-    scene.add(bridges.mesh);casts(bridges.mesh);shadow.invalidate();
+    basinLod.detail.add(bridges.mesh);casts(bridges.mesh);shadow.invalidate();
     await yieldToBrowser();
     const streetGround=Object.create(hf) as Heightfield;
     streetGround.height=bridges.heightAt;
@@ -371,7 +413,7 @@ export function createHero(
       const {paths}=JSON.parse(new TextDecoder().decode(bytes)) as {paths:TransportSpan[]};
       return buildTransportSpans(env,paths,(x,z)=>hf.height(x,z),bridges.bridges);
     }).catch(error=>{console.warn('Mapped elevated transport unavailable',error);return null;});
-    if(spans)scene.add(spans.group);
+    if(spans)basinLod.detail.add(spans.group);
     const roadHeight=(x:number,z:number,dx:number,dz:number)=>{
       const mapped=spans?.heightAt(x,z,dx,dz)??-Infinity;
       return Math.max(mapped,bridges.deckAt(x,z,dx,dz));
@@ -385,23 +427,43 @@ export function createHero(
     terrain.uniforms.uWoodlandOn.value = 1;
     const lite = opts.quality < 0.75;
     scene.add(buildKiyomizuBeam(env,(x,z)=>hf.height(x,z)));
-    const eyes = Object.values(VIEWS).map((v) => v.eye);
+    const eyes = Object.values(VIEWS).map(v=>v.eye).filter(p=>p.x>=BUILDINGS_BOX[0]-3000 && p.z>=BUILDINGS_BOX[1]-3000 && p.x<=BUILDINGS_BOX[2]+3000 && p.z<=BUILDINGS_BOX[3]+3000);
     const kawaramachi = kawaramachiFacades(buildings,hf), gion = gionStreetscape(buildings,hf);
     const katsura=katsuraStation(buildings.polys,(x,z)=>hf.height(x,z));
     const landmarks = buildLandmarks(env, hf,[...kawaramachi.parts,...gion.parts,...katsura.parts]);
+    const landmarkCatalog = await kansaiJson<{id:string;lon:number;lat:number;rings:Ring[]}[]>('landmarks/index.json').catch(() => []);
+    const isCatalogLandmark = (s: SacredSite) => landmarkCatalog.some(r =>
+      Math.abs(r.lon - s.lon) < 0.008 && Math.abs(r.lat - s.lat) < 0.007 && r.rings.some(ring => inRing([s.lon, s.lat], ring)),
+    );
+    const kyotoSacredMat = sacredMaterial(env);
     const replacements = [{p:landmarks.positions.kyotoTower,w:52,d:40},{p:landmarks.positions.goldenPavilion,w:25,d:25},{p:landmarks.positions.kiyomizuHall,w:40,d:48},{p:landmarks.positions.ryoanji,w:29,d:30},
       {p:landmarks.positions.tojiKondo,w:47,d:32},{p:landmarks.positions.tojiKodo,w:48,d:29},{p:landmarks.positions.tojiJikido,w:42,d:33},
       {p:{x:2095.62,z:-1314.07},w:28,d:17}];
     const replaced = (x:number,z:number) => replacesInari(x,z)||replacesNijoBox(x,z)||replacements.some(({p,w,d})=>Math.abs(x-p.x)<w/2 && Math.abs(z-p.z)<d/2);
+    const sacredExcludedCore = (s: SacredSite) => {
+      if (replaced(s.x, s.z) || isCatalogLandmark(s) || replacesByodoin(s.x, s.z)) return true;
+      // Keep hand-modeled Kyoto compounds (Heian, Imperial Palace, Nijo, Toji/Yasaka/Kiyomizu pagodas) intact.
+      if (s.x >= 2015 && s.x <= 2210 && s.z >= -1495 && s.z <= -1275) return true;
+      if (s.x >= 125 && s.x <= 395 && s.z >= -2638 && s.z <= -2175) return true;
+      if (s.x >= -1160 && s.x <= -510 && s.z >= -1460 && s.z <= -870) return true;
+      for (const id of ['toji', 'yasaka', 'kiyomizu', 'heianTorii'] as const) {
+        const p = landmarks.positions[id];
+        if (p && Math.hypot(s.x - p.x, s.z - p.z) < 28) return true;
+      }
+      return false;
+    };
+    const coreSacred = (await sacredForBox(BUILDINGS_BOX)).filter(s => !sacredExcludedCore(s));
+    const replacesCoreSacred = sacredMatcher(coreSacred);
     const hojo=landmarks.positions.ryoanji;
     const hojoBox:Box=[hojo.x-14.5,hojo.z-15.5,hojo.x+14.5,hojo.z+10.5];
     const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>!katsura.replaced.has(p)&&!replacesHeianFootprint(p.ring)&&!replacesNijoFootprint(p.ring)&&!replacesKyotoStation(p.ring)).flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
       let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}
-      return !replaced(x/(p.ring.length/2),z/(p.ring.length/2));
+      const cx=x/(p.ring.length/2),cz=z/(p.ring.length/2);
+      return !replaced(cx,cz)&&!replacesCoreSacred(cx,cz);
     })};
     await yieldToBrowser();
     const city = await buildCityAsync(env, hf, modeledBuildings, (b) =>
-      !replaced(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
+      !replaced(b.x,b.z) && !replacesCoreSacred(b.x,b.z) && (!lite || b.w * b.d > 90 || b.h > 12 || eyes.some((e) => Math.hypot(b.x - e.x, b.z - e.z) < 3000) || Math.hypot(b.x - campus.x, b.z - campus.z) < 1200),
       opts.quality,
       () => true,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
@@ -409,6 +471,14 @@ export function createHero(
       new Set([...stationMatches.boxes.map(([i]) => buildings.boxes[i]), ...stationMatches.polys.map(([i]) => buildings.polys[i])]),
     );
     if (!city) throw new Error('Initial city preparation cancelled');
+    const coreSacredGeo = buildSacredGeometry(coreSacred, (x, z) => hf.height(x, z));
+    if (coreSacredGeo) {
+      const sacredMesh = new THREE.Mesh(coreSacredGeo, kyotoSacredMat);
+      sacredMesh.name = 'kyoto-sacred-buildings';
+      basinLod.detail.add(sacredMesh);
+      casts(sacredMesh);
+    }
+    const streetPrograms=prepareCityMaterials(city.materials,prepare);
     city.fallback.name = 'Station district fallback';
     panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
       eyeOf(VIEWS.shogunzuka), { position: terrain.position, river: channel.box });
@@ -418,17 +488,17 @@ export function createHero(
       panoramaCity.prepare();
     }
     await yieldToBrowser();
-    const builtSize = lite ? 1024 : 2048;
-    const coreBuilt = buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
+    const coverage = await cityCoverage;
+    const coreBuilt = coverage ? occlusionTexture(coverage, builtSize) : buildOcclusion(buildings, BUILDINGS_BOX, builtSize);
     env.uBuilt.value = coreBuilt;
     env.uBuiltBox.value.set(...BUILDINGS_BOX);
     env.uBuiltTexel.value = (BUILDINGS_BOX[2] - BUILDINGS_BOX[0]) / builtSize;
     env.uBuiltOn.value = 1;
-    const buildingsMask = createBuildingMask(buildings.boxes, buildings.polys);
+    const buildingsMask = await createBuildingMaskAsync(buildings.boxes, buildings.polys,yieldToBrowser);
     let outerExcluded:(x:number,z:number)=>boolean=()=>false;
     const forestMaskBox=regions.reduce<Box>((a,{meta:{box:b}})=>[Math.min(a[0],b[0]),Math.min(a[1],b[1]),
       Math.max(a[2],b[2]),Math.max(a[3],b[3])],BUILDINGS_BOX);
-    const roadsAndWater = infrastructureMask(lines, forestMaskBox);
+    const roadsAndWater = infrastructureMask(lines, forestMaskBox,await coreForestBits);
     await yieldToBrowser();
     scene.add(buildDaimonji(env,hf));
     // the water mask is too coarse for garden islands, so they are tested on their outlines
@@ -438,16 +508,31 @@ export function createHero(
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
     const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
     let cultivated:((x:number,z:number)=>boolean)|undefined;
-    const forest = createForest(env, hf, opts.quality, [
+    const forestTerrain={
+      get bounds(){return regional?.bounds??hf.bounds;},
+      height:(x:number,z:number)=>regional?regional.ground(x,z):hf.height(x,z),
+      normal:hf.normal.bind(hf),
+    };
+    const forest = createForest(env, forestTerrain, opts.quality, [
       { photo: basin.texture.image as HTMLImageElement, box: meta.aerialCity.box, uv:basin.sheets[0].uv },
       { photo: wide.image as HTMLImageElement, box: meta.aerialWide.box },
       ...(outer && meta.aerialOuter ? [{ photo: outer.image as HTMLImageElement, box: meta.aerialOuter.box }] : []),
-    ], (x,z) => woodlandRaster.sample(x,z) || (island(x,z) ? 1 : 0),
-    (x,z) => !!cultivated?.(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
+    ], (x,z) => {
+      const b=woodlandRaster.box;
+      if(x>=b[0] && x<b[2] && z>=b[1] && z<b[3])return woodlandRaster.sample(x,z) || (island(x,z)?1:0);
+      return regional?.canopy(x,z)??0;
+    },
+    (x,z) => !!cultivated?.(x,z) || regionalCity?.excludesTree(x,z)===true || todaijiClearing(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
       replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
     [...campusTreeSpots(hf),...cherries], !cover);
+    let forestRefreshPending=false;
     const refreshForest = () => {
-      void forest.refreshExclusions().then(() => shadow.invalidate()).catch(error => console.warn('Forest update failed', error));
+      if(forestRefreshPending)return;
+      forestRefreshPending=true;
+      queueMicrotask(()=>{
+        forestRefreshPending=false;
+        void forest.refreshExclusions().then(() => shadow.invalidate()).catch(error => console.warn('Forest update failed', error));
+      });
     };
     orbitObstruction = (x,z) => {
       const center=landscapeCenter(VIEW);
@@ -458,14 +543,15 @@ export function createHero(
     const planted = (work: Promise<void> | undefined) => {
       void work?.then(() => shadow.invalidate()).catch(error => console.warn('Forest planting failed',error));
     };
-    plantTreesAsync = (eye,bearing) => planted(forest.plantAsync(eye,bearing));
-    followForest = (eye,bearing) => planted(forest.follow(eye,bearing));
+    plantTreesAsync = (eye,bearing) => {if(regional || inKyoto(eye))planted(forest.plantAsync(eye,bearing));};
+    followForest = (eye,bearing) => {if(regional || inKyoto(eye))planted(forest.follow(eye,bearing));};
     cancelTreePlanting = forest.cancelPlant;
     scene.add(forest.group);
     campusModel = buildCampus(env, hf).mesh;
     scene.add(campusModel);
     casts(campusModel);
-    scene.add(city.group, landmarks.mesh, landmarks.glazing);
+    basinLod.detail.add(city.group);
+    scene.add(landmarks.mesh,landmarks.glazing);
     const station = landmarks.positions.kyotoStation;
     let stationDetail: Awaited<ReturnType<typeof import('./station-detail').loadStationDetail>> | undefined;
     let stationLoading = false;
@@ -500,7 +586,7 @@ export function createHero(
         }).finally(() => { stationLoading = false; });
       }
     };
-    if (city.overview) scene.add(city.overview);
+    if (city.overview) basinLod.detail.add(city.overview);
     casts(city.group);
     cityLods.add(city);
     casts(landmarks.mesh);
@@ -518,10 +604,17 @@ export function createHero(
     terrain.uniforms.uRoadsOn.value = 1;
     const water = await buildWaterAsync(env, hf, lines, terrain.uniforms,lite?28:18,channel,false,()=>true);
     if (water) scene.add(water);
+    let lakeReady:Promise<boolean>|undefined;
+    const ensureLake=()=>lakeReady??=biwaSurface(env,terrain.uniforms).then(async lake=>{
+      await prepare(lake);
+      scene.add(lake);
+      return true;
+    }).catch(error=>{lakeReady=undefined;console.warn('Lake survey unavailable',error);return false;});
+    idle(()=>void ensureLake());
     scene.add(buildIslands(env, hf, lines));
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, labelLanguage);
-    const lamps = buildLamps(env, streetGround, lines, opts.quality);
-    const cars = buildCars(env, hf, lines, opts.quality,roadHeight);
+    const lamps = await prepareSteps(buildLampsSteps(env,streetGround,lines,opts.quality));
+    const cars = await prepareSteps(buildCarsSteps(env,hf,lines,opts.quality,roadHeight));
     pointLayers.push(lamps.uniforms, cars.uniforms);
     scene.add(lamps.points, cars.group);
     updatePointScale();
@@ -551,12 +644,15 @@ export function createHero(
     };
     const overviews:((region:CityRegion|null)=>void)[]=[];
     let detailRegion:CityRegion|null=null;
-    const installOverview=(item:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void})=>{
+    const installOverview=(item:{mesh:THREE.Object3D;setDetailBox(box:Box|null):void},parent:THREE.Object3D=scene)=>{
       const update=(region:CityRegion|null)=>item.setDetailBox(region?.box??null);
-      update(detailRegion);overviews.push(update);scene.add(item.mesh);
+      update(detailRegion);overviews.push(update);parent.add(item.mesh);
     };
     const setOverviewDetail=(region:CityRegion|null)=>{
       detailRegion=region;
+      // These two resident surveys are removed footprint by footprint at bake time.
+      // Their bounding boxes also contain streets outside the survey.
+      activeRegionBox=region && region.id!=='south' && region.id!=='yamashina'?region.box:null;
       for(const update of overviews)update(region);
     };
     const disposeGroup=(group:THREE.Object3D)=>{
@@ -570,6 +666,7 @@ export function createHero(
     };
     // Reuse the regional photo slot for the eastern basin between detailed regions.
     // Keep its texture alive while a different region temporarily owns that slot.
+    let districtBase:Sheet|null=null;
     let eastTexture:Promise<THREE.Texture>|undefined;
     let eastBackdrop:{photo:THREE.Texture;box:Box}|null=null;
     const loadRegionalPhoto=(r:CityRegion)=>{
@@ -577,43 +674,54 @@ export function createHero(
       if(r.id!=='yamashina')return loadTexture(file,aniso);
       return eastTexture??=loadTexture(file,aniso).then(photo=>{
         eastBackdrop={photo,box:r.photo.box};
-        if(!detailRegion)terrain.setPhoto(0,photo,r.photo.box);
+        if(!detailRegion && !districtBase)terrain.setPhoto(0,photo,r.photo.box);
         return photo;
       }).catch(error=>{eastTexture=undefined;throw error;});
     };
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
+      const lakeRemainder=r.id==='yamashina' && await ensureLake()?'kansai/yamashina-lake-remainder.json.gz':undefined;
       const results=await Promise.allSettled([loadRegionalBuildings(r),
-        withoutTunnels(loadLines(undefined,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r)] as const);
-      const [b,l,p]=results;
+        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file),forestBits(r.lines.file,Boolean(lakeRemainder))] as const);
+      const [b,l,p,coverage,forest]=results;
       const disposePhoto=()=>{if(p.status==='fulfilled'&&r.id!=='yamashina')p.value.dispose();};
       if(b.status==='rejected'||l.status==='rejected'||p.status==='rejected'){
         disposePhoto();
         throw results.find(result=>result.status==='rejected')!.reason;
       }
-      return {buildings:b.value,lines:l.value,photo:p.value,dispose:disposePhoto};
+      return {buildings:b.value,lines:l.value,photo:p.value,forest:forest.status==='fulfilled'?forest.value:null,coverage:coverage.status==='fulfilled'?coverage.value:null,dispose:disposePhoto};
     },async(r,data,current,releasePrevious)=>{
       const group=new THREE.Group();group.name=`region-${r.id}`;
-      const step=async()=>{await yieldToBrowser();if(!current())throw new Error('Region superseded');};
+      const step=async()=>{
+        if(loading.canDraw)await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+        else await yieldToBrowser();
+        if(!current())throw new Error('Region superseded');
+      };
       let campusNormal:THREE.Texture|null=null;
       let road!:ReturnType<typeof buildRoadField>,built!:THREE.Texture;
       let city:ReturnType<typeof buildCity>,lamps:ReturnType<typeof buildLamps>,traffic:ReturnType<typeof buildCars>;
       let mask:ReturnType<typeof createBuildingMask>,infrastructure:ReturnType<typeof infrastructureMask>;
       try {
       const detailedCampus=r.id==='kameoka-campus';
+      const regionSacred=(await sacredForBox(r.box)).filter(s=>!replacesByodoin(s.x,s.z)&&!isCatalogLandmark(s)&&(!detailedCampus||!isKameokaBuilding(s.x,s.z)));
+      const replacesRegionSacred=sacredMatcher(regionSacred);
       const polys=detailedCampus?data.buildings.polys.filter(p=>{
         let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !isKameokaBuilding(x/(p.ring.length/2),z/(p.ring.length/2));
       }):data.buildings.polys;
-      const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}return !replacesByodoin(x/(p.ring.length/2),z/(p.ring.length/2));});
+      const filteredPolys=polys.filter(p=>{let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}const cx=x/(p.ring.length/2),cz=z/(p.ring.length/2);return !replacesByodoin(cx,cz)&&!replacesRegionSacred(cx,cz);});
       await step();
-      const preparedCity=await buildCityAsync(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||r.id==='tennozan'||r.id==='yamashina'||b.w*b.d>65||b.h>10),opts.quality,current);
-      if(!preparedCity)throw new Error('Region superseded');
-      city=preparedCity;
+      city=await prepareSteps(buildCitySteps(env,hf,{...data.buildings,polys:filteredPolys},b=>!replacesByodoin(b.x,b.z)&&!replacesRegionSacred(b.x,b.z)&&(!detailedCampus||!isKameokaBuilding(b.x,b.z))&&(!lite||r.id==='tennozan'||r.id==='yamashina'||b.w*b.d>65||b.h>10),opts.quality),step);
       group.add(city.group);
+      const regionSacredGeo=buildSacredGeometry(regionSacred,(x,z)=>hf.height(x,z));
+      if(regionSacredGeo){
+        const sacredMesh=new THREE.Mesh(regionSacredGeo,sacredMaterial(env));
+        sacredMesh.name=`region-${r.id}-sacred`;
+        group.add(sacredMesh);
+        casts(sacredMesh);
+      }
       await step();
       const wideWater=r.id==='tennozan'||r.id==='osaka';
       const waterEdge=wideWater?(lite?80:60):(lite?36:24);
-      const water=await buildWaterAsync(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||wideWater,current);
-      if(!water)throw new Error('Region superseded');
+      const water=await prepareSteps(waterSteps(env,hf,data.lines,terrain.uniforms,waterEdge,undefined,r.id==='yamashina'||wideWater),step);
       group.add(water);
       group.add(buildIslands(env,hf,data.lines));
       await step();
@@ -625,15 +733,18 @@ export function createHero(
         }
       }
       await step();
-      lamps=buildLamps(env,hf,data.lines,lite ? .4 : .7,true);group.add(lamps.points);
-      traffic=buildCars(env,hf,data.lines,lite ? .25 : .45,roadHeight);group.add(traffic.group);
+      lamps=await prepareSteps(buildLampsSteps(env,hf,data.lines,lite ? .4 : .7,true),step);group.add(lamps.points);
+      traffic=await prepareSteps(buildCarsSteps(env,hf,data.lines,lite ? .25 : .45,roadHeight),step);group.add(traffic.group);
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
       await step();
-      built=buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
+      const programs=prepare(group);
+      built=data.coverage?occlusionTexture(data.coverage,builtSize,coreBuilt):buildOcclusion(data.buildings,r.box,builtSize,coreBuilt);
       await step();
-      mask=createBuildingMask(data.buildings.boxes,data.buildings.polys);
-      infrastructure=infrastructureMask(data.lines,r.box);
+      mask=await createBuildingMaskAsync(data.buildings.boxes,data.buildings.polys,step);
+      infrastructure=infrastructureMask(data.lines,r.box,data.forest);
+      await programs;
+      await prepareRegionBuffers(renderer,camera,group,current);
       await step();
       } catch(error) {
         disposeGroup(group);road?.dispose();built?.dispose();campusNormal?.dispose();
@@ -651,7 +762,8 @@ export function createHero(
         terrain.uniforms.uRegionRoadsOn.value=0;
         terrain.uniforms.uRegionRoads.value=wide;
         terrain.uniforms.uRegionClose.value=0;
-        terrain.setPhoto(0,eastBackdrop?.photo??null,eastBackdrop?.box);
+        const backdrop=districtBase??eastBackdrop;
+        terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
         env.uBuilt.value=coreBuilt;env.uRegionBuiltTexel.value=0;
         outerExcluded=()=>false;
         if(forestMaskChanged)refreshForest();
@@ -727,7 +839,8 @@ export function createHero(
       const skyline=await buildResidentCity(env,hf,survey.buildings,survey.region.box);
       skyline.mesh.name='southern-basin-buildings';
       await prepare(skyline.mesh);
-      installOverview(skyline);
+      basinLod.register(survey.buildings);
+      installOverview(skyline,basinLod.detail);
       return true;
     }).catch(error=>{console.warn('Southern survey unavailable; using sampled skyline',error);return false;});
     const residentEast=eastSurvey.then(async survey=>{
@@ -736,18 +849,19 @@ export function createHero(
       skyline.mesh.name='yamashina-survey';
       await prepare(skyline.mesh);
       const update=(region:CityRegion|null)=>{skyline.mesh.visible=region?.id!=='yamashina';};
-      update(detailRegion);overviews.push(update);scene.add(skyline.mesh);
+      basinLod.register(survey.buildings);
+      update(detailRegion);overviews.push(update);basinLod.detail.add(skyline.mesh);
     }).catch(error=>console.warn('Yamashina survey unavailable',error));
     const residentEastFill=eastFill.then(async data=>{
       // These footprints have no detailed counterpart on either side of the ward edge.
       const skyline=await buildResidentCity(env,hf,data);
       skyline.mesh.name='yamashina-basin';
       await prepare(skyline.mesh);
-      scene.add(skyline.mesh);
+      basinLod.register(data);basinLod.detail.add(skyline.mesh);
     }).catch(error=>console.warn('Yamashina basin outlines unavailable',error));
     const residentWest=Promise.all(westSurveys.map(({name,buildings})=>buildings.then(async data=>{
       if(!data)return null;
-      const sampledRoofMask=name==='otokuni-tennozan'?createBuildingMask(data.boxes,data.polys):null;
+      const sampledRoofMask=name==='otokuni-tennozan'?await createBuildingMaskAsync(data.boxes,data.polys,yieldToBrowser):null;
       const skyline=await buildResidentCity(env,hf,data);
       skyline.mesh.name=name;
       await prepare(skyline.mesh);
@@ -757,7 +871,7 @@ export function createHero(
         const update=(region:CityRegion|null)=>{skyline.mesh.visible=region?.id!=='tennozan';};
         update(detailRegion);overviews.push(update);
       }
-      scene.add(skyline.mesh);
+      basinLod.register(data);basinLod.detail.add(skyline.mesh);
       return sampledRoofMask;
     }).catch(error=>{
       console.warn(`Western basin roofs unavailable: ${name}`,error);
@@ -766,12 +880,41 @@ export function createHero(
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
     const openingTamba=view==='kameokaTerrace';
-    await Promise.all([cloudProgram,scenePrograms,openingRegion,residentSouth,residentWest,residentEast,residentEastFill,loadOverview('south'),
+    await Promise.all([cloudProgram,scenePrograms,streetPrograms,openingRegion,residentSouth,residentWest,residentEast,residentEastFill,loadOverview('south'),
       openingTamba?loadOverview('tamba'):undefined]);
     loading.built();
+    let regionalLoad:Promise<void>|undefined;
+    ensureRegionalGround=()=>regionalLoad??=import('./regional-ground')
+      .then(async({regionalGround})=>{
+        const legacy=[BUILDINGS_BOX,...(await cityRegions).regions.map(r=>r.box)];
+        return regionalGround(scene,env,hf,aniso,legacy,(base,detail)=>{
+          districtBase=base;
+          if(!detailRegion){
+            const backdrop=base??eastBackdrop;
+            terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
+          }
+          regionalPhoto=detail??base;sharedSlot?.setOverride(localPhoto??regionalPhoto);
+        },prepare,(photo,needed)=>uploadPhoto(renderer,photo,needed));
+      })
+      .then(result=>{
+        regional=result;
+        void import('./regional-fireworks').then(({regionalFireworks})=>{
+          updateFireworks=regionalFireworks(scene,env,result.ground,!!opts.reducedMotion,prepare);
+        }).catch(error=>console.warn('Regional fireworks unavailable',error));
+        // moveExplorer keeps a 500 m safety margin inside its camera bounds.
+        const [w,n,e,s]=result.bounds;
+        travelBounds=[w-500,n-500,e+500,s+500];
+        groundAt=result.ground;
+        terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
+        terrain.uniforms.uSurveyOn.value=1;
+        void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
+          module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,prepare,shadow.invalidate)
+        ).then(city=>{regionalCity=city;refreshForest();}).catch(error=>console.warn('Regional city index unavailable',error));
+      }).catch(error=>{regionalLoad=undefined;console.warn('Regional terrain unavailable',error);});
+    idle(()=>void ensureRegionalGround?.());
     startGroundRelief=() => idle(() => {
-      const ground=(x:number,z:number)=>hf.height(x,z);
-      const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,ground(x,z)),refreshForest);
+      const ground=(x:number,z:number)=>groundAt?groundAt(x,z):hf.height(x,z);
+      const relief=createGroundRelief(env,terrain.uniforms,ground,(x,z)=>channel.bed(x,z,hf.height(x,z)),refreshForest,prepare,()=>Boolean(regional));
       scene.add(relief.group);
       cultivated=relief.containsField;
       updateGroundRelief=relief.update;
@@ -804,6 +947,10 @@ export function createHero(
   let lastStatus = '';
 
   let season:Season='auto';
+  const SUMMER_ZENITH=new THREE.Color('#0a44b8');
+  const SUMMER_MID=new THREE.Color('#3288e0');
+  const SUMMER_HORIZON=new THREE.Color('#c8e8fa');
+  const SUMMER_DUSK_HORIZON=new THREE.Color('#ff8446');
   function applyTime(date: Date, t: number) {
     const sun = sunPosition(date);
     const alt = sun.altitude / RAD;
@@ -828,17 +975,27 @@ export function createHero(
         shadow.setRegion(shadowRegion(VIEW,eye));
       }
     }
-    env.uSpring.value=weights.spring;env.uAutumn.value=weights.autumn;env.uSnow.value=weights.snow;
+    env.uSpring.value=weights.spring;env.uSummer.value=weights.summer;env.uAutumn.value=weights.autumn;env.uSnow.value=weights.snow;
     snow.points.visible=weights.snow>0;
+    const summerDay=weights.summer*THREE.MathUtils.smoothstep(alt,4,20);
+    const summerDusk=weights.summer*THREE.MathUtils.smoothstep(alt,-4,3)*(1-THREE.MathUtils.smoothstep(alt,6,18));
     env.uSunDir.value.set(...directionFrom(sun));
     env.uZenith.value.copy(look.zenith);
     env.uMid.value.copy(look.mid);
     env.uHorizon.value.copy(look.horizon);
+    if(summerDay>0){
+      env.uZenith.value.lerp(SUMMER_ZENITH,.64*summerDay);
+      env.uMid.value.lerp(SUMMER_MID,.52*summerDay);
+      env.uHorizon.value.lerp(SUMMER_HORIZON,.40*summerDay);
+    }
+    if(summerDusk>0){
+      env.uHorizon.value.lerp(SUMMER_DUSK_HORIZON,.28*summerDusk);
+    }
     env.uGlow.value.copy(look.glow).multiplyScalar(look.glowAmt);
-    const directSun = look.sunAmt * THREE.MathUtils.smoothstep(alt, -1.2, 1.2);
+    const directSun = look.sunAmt * THREE.MathUtils.smoothstep(alt, -1.2, 1.2) * (1 + .18 * summerDay);
     env.uSunLight.value.copy(look.sun).multiplyScalar(directSun);
     shadow.update(env.uSunDir.value, directSun);
-    env.uCloudLight.value.copy(look.cloud).multiplyScalar(look.cloudAmt);
+    env.uCloudLight.value.copy(look.cloud).multiplyScalar(look.cloudAmt * (1 + .24 * summerDay));
     env.uCity.value = look.city;
     env.uLit.value = windowsLit(minutes);
     env.uVenus.value = THREE.MathUtils.smoothstep(alt, -8, -2) * (1 - THREE.MathUtils.smoothstep(alt, 1, 5));
@@ -857,7 +1014,7 @@ export function createHero(
     env.uStars.value = dark * (1.3 - 0.65 * moonlight);
     celestial.setSidereal(localSiderealAngle(date, KYOTO.lon));
 
-    renderer.toneMappingExposure = look.exposure;
+    renderer.toneMappingExposure = look.exposure * (1 + .05 * summerDay);
     // after dusk the threshold drops below the lamps and windows, so every light (the far towns
     // included) glows by its own brightness; by day and at sunset only the brightest highlights pass
     const night = THREE.MathUtils.smoothstep(look.city, .55, 1);
@@ -991,6 +1148,15 @@ export function createHero(
 
   /** Fly to the campus, or to one of the viewpoints over the city. */
   function flyTo(target: 'campus' | HeroView, t: number) {
+    const request=++flightRequest;
+    if(target.startsWith('region-') && !regional && ensureRegionalGround){
+      opts.onAreaLoading?.(true);
+      void ensureRegionalGround().then(()=>{
+        opts.onAreaLoading?.(false);
+        if(regional && request===flightRequest)flyTo(target,clock);
+      });
+      return;
+    }
     stopIntroCamera();
     const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
     if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
@@ -1084,7 +1250,7 @@ export function createHero(
         nextAreaCheck=now+250;
       }
       if(freeCenter.distanceTo(freePosition)>600){
-        freeCenter.copy(freePosition);terrainRecenterAsync?.(freePosition);
+        freeCenter.copy(freePosition);terrainRecenter?.(freePosition,true);
         prefetchCityRegion?.({x:freePosition.x+Math.sin(yaw)*1200,z:freePosition.z-Math.cos(yaw)*1200});
         shadow.setRegion(shadowRegion(VIEW,freePosition));
       }
@@ -1214,6 +1380,25 @@ export function createHero(
       const cloudFrame=cloudMotion.step(cloudSeconds,dt,clouds.weather.wind,opts.reducedMotion);
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
+      updateBasinLod?.();
+      updateFireworks?.(camera,dt,pxPerM);
+      const regionalTime=performance.now()/1000;
+      regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime,flight?.p3);
+      const detailEye=flight?.p3??camera.position;
+      if(regionalCity){
+        camera.getWorldDirection(regionalDirection);
+        const horizontal=Math.hypot(regionalDirection.x,regionalDirection.z)||1;
+        regionalCity.update(detailEye.x,detailEye.z,regionalDirection.x/horizontal,regionalDirection.z/horizontal,regionalTime,activeRegionBox,camera.position);
+      }
+      const expoDistance=Math.hypot(camera.position.x-expoAnchor.x,camera.position.z-expoAnchor.z);
+      if(expoDistance<4800 && !expo && !preparingExpo && regionalTime>=retryExpoAt){
+        preparingExpo=true;
+        void import('./regional-expo').then(({expoGrounds})=>{expo=expoGrounds(scene,camera,renderer,prepare);})
+          .catch(error=>{retryExpoAt=performance.now()/1000+20;console.warn('Expo archive unavailable',error);})
+          .finally(()=>{preparingExpo=false;});
+      }
+      if(expo && expoDistance>7000){expo.dispose();expo=undefined;}
+      else if(expo){camera.updateMatrixWorld();expo.update();}
       clouds.prepareField(renderer,camera.position);
       if (dt > 0) driveCars?.(dt);
       if (dt > 0 && !opts.reducedMotion) aircraft.update(dt);

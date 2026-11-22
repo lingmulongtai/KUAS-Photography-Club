@@ -1,7 +1,7 @@
 import type { BoxBuilding, PolyBuilding } from './buildings-data';
 
 /** Spatial footprint lookup, built once; tree roots never sit inside measured buildings. */
-export function createBuildingMask(boxes: BoxBuilding[], polys: PolyBuilding[]) {
+function* buildMask(boxes: BoxBuilding[], polys: PolyBuilding[]) {
   const cells = new Map<string, ((x: number, z: number) => boolean)[]>();
   const add = (x0: number, z0: number, x1: number, z1: number, hit: (x: number, z: number) => boolean) => {
     for (let x = Math.floor(x0 / 128); x <= Math.floor(x1 / 128); x++) {
@@ -12,7 +12,9 @@ export function createBuildingMask(boxes: BoxBuilding[], polys: PolyBuilding[]) 
       }
     }
   };
+  let count=0;
   for (const b of boxes) {
+    if(++count%128===0)yield;
     const radius = Math.hypot(b.w, b.d) / 2 + 6;
     const c = Math.cos(b.angle), s = Math.sin(b.angle);
     add(b.x - radius, b.z - radius, b.x + radius, b.z + radius, (x, z) => {
@@ -21,6 +23,7 @@ export function createBuildingMask(boxes: BoxBuilding[], polys: PolyBuilding[]) 
     });
   }
   for (const { ring } of polys) {
+    if(++count%128===0)yield;
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
     for (let i = 0; i < ring.length; i += 2) {
       x0 = Math.min(x0, ring[i]); x1 = Math.max(x1, ring[i]);
@@ -39,4 +42,19 @@ export function createBuildingMask(boxes: BoxBuilding[], polys: PolyBuilding[]) 
     });
   }
   return (x: number, z: number) => cells.get(`${Math.floor(x / 128)},${Math.floor(z / 128)}`)?.some(hit => hit(x, z)) ?? false;
+}
+
+
+export function createBuildingMask(boxes: BoxBuilding[], polys: PolyBuilding[]) {
+  const work=buildMask(boxes,polys);
+  for(;;){const step=work.next();if(step.done)return step.value;}
+}
+
+export async function createBuildingMaskAsync(boxes:BoxBuilding[],polys:PolyBuilding[],pause:()=>Promise<void>){
+  const work=buildMask(boxes,polys);
+  for(;;){
+    const deadline=performance.now()+3;
+    do{const step=work.next();if(step.done)return step.value;}while(performance.now()<deadline);
+    await pause();
+  }
 }

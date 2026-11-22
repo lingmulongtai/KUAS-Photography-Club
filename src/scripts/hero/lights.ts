@@ -1,3 +1,4 @@
+import {finishSteps} from './task-yield';
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import type { Heightfield } from './heightfield';
@@ -9,12 +10,14 @@ import { lightSpriteGeometry, LIGHT_SPRITE_VERTEX, LIGHT_SPRITE_FRAGMENT } from 
 /* Street lamps along the real road network. */
 
 /** Points spaced along every road: street lamps, brighter and closer together on the avenues. */
-export function buildLamps(env: Env, hf: Heightfield, lines: LineFeature[], quality: number, regional = false) {
+export function* buildLampsSteps(env: Env, hf: Heightfield, lines: LineFeature[], quality: number, regional = false) {
   const r = rng(77);
   const pos: number[] = [];
   const tint: number[] = [];
   const spacing = [60, 46, 30, 24, 20].map((s) => s / quality);
+  let scanned=0;
   for (const f of lines) {
+    if(++scanned%128===0)yield;
     if (f.kind !== LINE.road) continue;
     const rank = f.attr & 15;
     if (rank < 1) continue;
@@ -80,4 +83,8 @@ export function buildLamps(env: Env, hf: Heightfield, lines: LineFeature[], qual
   const points = new THREE.Mesh(geo, material);
   points.frustumCulled = false;
   return { points, uniforms: material.uniforms as typeof material.uniforms & { uScale: { value: number }; uDpr: { value: number } }, count: pos.length / 3 };
+}
+
+export function buildLamps(...args: Parameters<typeof buildLampsSteps>){
+  return finishSteps(buildLampsSteps(...args));
 }

@@ -12,3 +12,18 @@ export function yieldTask(): Promise<void> {
     channel.port2.postMessage(null);
   });
 }
+
+/** Consume unchanged geometry/traffic recipes either for synchronous callers or in short live-scene slices. */
+export function finishSteps<T>(steps:Generator<void,T>){
+  for(;;){const step=steps.next();if(step.done)return step.value;}
+}
+
+export async function prepareSteps<T>(steps:Generator<void,T>,pause:()=>Promise<void> = yieldTask){
+  try{
+    for(;;){
+      const deadline=performance.now()+3;
+      do{const step=steps.next();if(step.done)return step.value;}while(performance.now()<deadline);
+      await pause();
+    }
+  }finally{steps.return(undefined as T);}
+}

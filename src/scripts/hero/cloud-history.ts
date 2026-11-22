@@ -153,6 +153,7 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
   }
 
   return {
+    compositeMesh:new THREE.Mesh(mesh.geometry,composite),
     invalidate,
     restored() { reset(); weather = undefined; failed = verified = false; for (const image of images) image.checked = false; },
     render(w: number, h: number, currentWeather: object, travel: number, date: number, draw: () => void, elapsed = .05) {
@@ -179,7 +180,8 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
       if (cut || (present && coverage(present) > .995)) { reset(); return false; }
 
       let shaderFailed = false;
-      const oldHandler = renderer.debug.onShaderError;
+      const oldHandler = renderer.debug.onShaderError,diagnostics=renderer.debug.checkShaderErrors;
+      if(!verified)renderer.debug.checkShaderErrors=true;
       if (!verified) renderer.debug.onShaderError = (...args) => { shaderFailed = true; oldHandler?.(...args); };
       try {
         try {
@@ -213,7 +215,7 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
         return true;
       } finally {
         mesh.material = original;
-        renderer.debug.onShaderError = oldHandler;
+        renderer.debug.onShaderError = oldHandler;renderer.debug.checkShaderErrors=diagnostics;
       }
     },
   };

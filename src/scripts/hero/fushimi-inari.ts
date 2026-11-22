@@ -18,13 +18,29 @@ export const INARI_PATHS=[
   [[1392.11,4062.74],[1399.90,4073.66],[1415.70,4097.08],[1421.70,4103.99],[1427.28,4109.12],[1439.74,4114.08],[1452.65,4114.40]],
   [[1392.11,4062.74],[1423.37,4089.55],[1429.91,4101.71],[1437.83,4111.11],[1444.05,4112.50],[1452.71,4112.17],[1452.65,4114.40]],
 ] as const;
+// The outer box includes the one-metre hall margins at every rotation and the two-metre footways.
+const shrineBounds = new THREE.Box2();
+for (const {x, z, w, d} of INARI_BUILDINGS) {
+  const radius = Math.hypot(w / 2 + 1, d / 2 + 1);
+  shrineBounds.expandByPoint(new THREE.Vector2(x - radius, z - radius));
+  shrineBounds.expandByPoint(new THREE.Vector2(x + radius, z + radius));
+}
+for (const path of INARI_PATHS) for (const [x, z] of path) {
+  shrineBounds.expandByPoint(new THREE.Vector2(x - 2, z - 2));
+  shrineBounds.expandByPoint(new THREE.Vector2(x + 2, z + 2));
+}
+function outsideShrine(x: number, z: number) {
+  return x < shrineBounds.min.x || x > shrineBounds.max.x || z < shrineBounds.min.y || z > shrineBounds.max.y;
+}
 export function replacesInari(x:number,z:number) {
+  if (outsideShrine(x, z)) return false;
   return INARI_BUILDINGS.some(b=>{
     const a=b.angle*Math.PI/180,dx=x-b.x,dz=z-b.z;
     return Math.abs(dx*Math.cos(a)+dz*Math.sin(a))<b.w/2+1&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<b.d/2+1;
   });
 }
 export function inariClearing(x:number,z:number) {
+  if (outsideShrine(x, z)) return false;
   if(replacesInari(x,z))return true;
   return INARI_PATHS.some(path=>path.slice(1).some((b,i)=>{
     const a=path[i],dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));

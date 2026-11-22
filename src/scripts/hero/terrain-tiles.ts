@@ -43,6 +43,26 @@ export function terrainTiles(positions: Float32Array, segments: number, material
       bounds.getBoundingSphere(geometry.boundingSphere!);
     }
   }
+  // Distant views share the same heights and aerial shader. A coarser index draws the
+  // whole basin in one pass once neighbouring grid samples fall below a screen pixel.
+  const farGeometry=new THREE.BufferGeometry(),farIndices:number[]=[];
+  const stride=4;
+  for(let z=0;z<segments;z+=stride)for(let x=0;x<segments;x+=stride){
+    const east=Math.min(x+stride,segments),south=Math.min(z+stride,segments);
+    const a=z*n+x,b=z*n+east,c=south*n+x,d=south*n+east;
+    farIndices.push(a,c,b,b,c,d);
+  }
+  farGeometry.setAttribute('position',position);
+  farGeometry.setIndex(farIndices);
+  const distant=new THREE.Mesh(farGeometry,material);
+  distant.frustumCulled=false;
+  const near=mesh.children.slice();
+  distant.visible=false;
+  mesh.add(distant);
   setPositions(positions);
-  return { mesh, position, setPositions };
+  return { mesh, position, setPositions,setDistant(value:boolean){
+    if(value===distant.visible)return;
+    distant.visible=value;
+    for(const tile of near)tile.visible=!value;
+  }};
 }

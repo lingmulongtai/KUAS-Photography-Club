@@ -37,18 +37,18 @@
     ],
     "file": "aerial-uji.webp",
     "size": [
-     2048,
-     1676
+     1536,
+     1257
     ],
-    "bytes": 299852,
-    "zoom": 13,
+    "bytes": 531230,
+    "zoom": 15,
     "mobile": {
      "file": "aerial-uji-mobile.webp",
      "size": [
-      1024,
-      838
+      768,
+      628
      ],
-     "bytes": 142356
+     "bytes": 128188
     }
    }
   },
@@ -89,18 +89,18 @@
     ],
     "file": "aerial-osaka.webp",
     "size": [
-     2048,
-     2048
+     1536,
+     1536
     ],
-    "bytes": 594838,
-    "zoom": 13,
+    "bytes": 589740,
+    "zoom": 14,
     "mobile": {
      "file": "aerial-osaka-mobile.webp",
      "size": [
-      1024,
-      1024
+      768,
+      768
      ],
-     "bytes": 218056
+     "bytes": 200294
     }
    }
   },
@@ -141,18 +141,18 @@
     ],
     "file": "aerial-tennozan.webp",
     "size": [
-     2048,
-     2048
+     1536,
+     1536
     ],
-    "bytes": 547974,
-    "zoom": 13,
+    "bytes": 594666,
+    "zoom": 15,
     "mobile": {
      "file": "aerial-tennozan-mobile.webp",
      "size": [
-      1024,
-      1024
+      768,
+      768
      ],
-     "bytes": 213318
+     "bytes": 183962
     }
    }
   },
@@ -193,18 +193,18 @@
     ],
     "file": "aerial-kameoka.webp",
     "size": [
-     2048,
-     1638
+     1536,
+     1229
     ],
-    "bytes": 302934,
-    "zoom": 13,
+    "bytes": 488266,
+    "zoom": 15,
     "mobile": {
      "file": "aerial-kameoka-mobile.webp",
      "size": [
-      1024,
-      819
+      768,
+      614
      ],
-     "bytes": 132696
+     "bytes": 125436
     }
    }
   },
@@ -245,18 +245,18 @@
     ],
     "file": "aerial-sonobe.webp",
     "size": [
-     2048,
-     1707
+     1536,
+     1280
     ],
-    "bytes": 274760,
-    "zoom": 13,
+    "bytes": 434970,
+    "zoom": 15,
     "mobile": {
      "file": "aerial-sonobe-mobile.webp",
      "size": [
-      1024,
-      854
+      768,
+      640
      ],
-     "bytes": 126958
+     "bytes": 105404
     }
    }
   },
@@ -349,18 +349,18 @@
     ],
     "file": "aerial-south.webp",
     "size": [
-     2048,
-     1928
+     1536,
+     1446
     ],
-    "bytes": 514816,
-    "zoom": 13,
+    "bytes": 565632,
+    "zoom": 15,
     "mobile": {
      "file": "aerial-south-mobile.webp",
      "size": [
-      1024,
-      964
+      768,
+      723
      ],
-     "bytes": 206890
+     "bytes": 158728
     }
    }
   },
