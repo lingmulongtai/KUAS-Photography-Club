@@ -954,7 +954,7 @@ export function createHero(
         }
       }
       await step();
-      lamps=await prepareSteps(buildLampsSteps(env,hf,data.lines,lite ? .4 : .7,true),step);group.add(lamps.points);
+      lamps=await prepareSteps(buildLampsSteps(env,hf,data.lines,lite ? .4 : .7),step);group.add(lamps.points);
       traffic=await prepareSteps(buildCarsSteps(env,hf,data.lines,lite ? .25 : .45,roadHeight),step);group.add(traffic.group);
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
