@@ -169,10 +169,16 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
   });
 }
 
-export async function loadStationDetail(env: Env, hf: Heightfield, center: THREE.Vector3, compact: boolean) {
+/** `far` is derived from the full survey by tools/kyoto-data/build-station-far.mjs. */
+export type StationProfile = 'full' | 'compact' | 'far';
+const stationFile = (profile: StationProfile) =>
+  `kyoto-station-district${profile === 'full' ? '' : '-' + profile}.glb`;
+
+export async function loadStationDetail(env: Env, hf: Heightfield, center: THREE.Vector3, profile: StationProfile, bytes?: Uint8Array) {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const file = compact ? 'kyoto-station-district-compact.glb' : 'kyoto-station-district.glb';
-  const {scene: group} = await loader.loadAsync('/kyoto/' + file);
+  const {scene: group} = bytes
+    ? await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, '')
+    : await loader.loadAsync('/kyoto/' + stationFile(profile));
   const materials = new Map<THREE.MeshStandardMaterial, THREE.ShaderMaterial>();
   const geometries = new Set<THREE.BufferGeometry>();
   const textures = new Set<THREE.Texture>();
@@ -207,7 +213,7 @@ export async function loadStationDetail(env: Env, hf: Heightfield, center: THREE
     obj.material = material;
     if (!material.transparent) obj.layers.enable(SHADOW_LAYER);
   });
-  group.name = 'Kyoto station detail';
+  group.name = profile === 'far' ? 'Kyoto station distant' : 'Kyoto station detail';
   group.position.copy(center);
   return { group, dispose() {
     geometries.forEach(g => g.dispose());
