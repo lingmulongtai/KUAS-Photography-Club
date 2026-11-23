@@ -1,8 +1,17 @@
 import * as THREE from 'three';
 import type { Heightfield } from './heightfield';
-import { toLocal } from './geo';
+import { toLocal, type Box } from './geo';
 import { SPOTS, type SpotId } from '../../data/spots';
-import { pinBounds, overlaps, type ScreenRect } from './pin-layout';
+import { REGIONAL_PLACES, EXTRA_LANDMARKS, spotDestination, type HeroDestination } from './views';
+import {
+  ACTION_SLOTS,
+  DEFAULT_SLOTS,
+  choosePinSlot,
+  effectivePinPriority,
+  maxPinDistance,
+  type PinSlot,
+  type ScreenRect,
+} from './pin-layout';
 
 export interface LabelDef {
   id: SpotId;
@@ -18,8 +27,117 @@ export interface LabelDef {
   action?: boolean;
 }
 
+export interface MapPinDef {
+  id: string;
+  destination: HeroDestination;
+  /** Lower numbers win when pins compete at similar distances. */
+  rank: number;
+  ja: string;
+  en: string;
+  lat: number;
+  lon: number;
+  /** Metres above ground where the pin points. */
+  above: number;
+  /** Optional spot ID for club outing records and badges. */
+  spotId?: SpotId;
+  /** Highlight the campus destination. */
+  action?: boolean;
+}
+
 /** Places worth naming in the view west from Shogunzuka. Coordinates from OpenStreetMap. */
 export const LABELS: readonly LabelDef[] = SPOTS;
+
+interface RegionalPinStyle {
+  rank: number;
+  above: number;
+  ja?: string;
+  en?: string;
+}
+
+/** Concise map labels, hierarchy ranks and elevations for regional outings and 3D landmarks. */
+const REGIONAL_PIN_STYLE: Record<string, RegionalPinStyle> = {
+  // Shiga / Lake Biwa
+  'biwako-fireworks': { rank: 1, above: 45, ja: '大津港・びわ湖', en: 'Otsu Port · Lake Biwa' },
+  setagawa: { rank: 2, above: 24, ja: '瀬田の唐橋', en: 'Seta-no-Karahashi' },
+  'biwa-museum': { rank: 2, above: 26 },
+  mizunomori: { rank: 3, above: 18, ja: 'みずの森', en: 'Mizunomori Garden' },
+  miyagahama: { rank: 2, above: 24, ja: '近江八幡', en: 'Ohmi-Hachiman' },
+  // Osaka
+  'osaka-castle': { rank: 1, above: 65 },
+  'expo-2025': { rank: 1, above: 45, ja: '大阪・関西万博', en: 'Expo 2025 · Yumeshima' },
+  nakanoshima: { rank: 2, above: 24 },
+  tennoji: { rank: 2, above: 28 },
+  senrigawa: { rank: 2, above: 20 },
+  minoh: { rank: 2, above: 30 },
+  // Nara
+  'nara-park': { rank: 1, above: 34, ja: '奈良公園', en: 'Nara Park' },
+  wakakusa: { rank: 2, above: 24 },
+  ikoma: { rank: 2, above: 55 },
+  // Hyogo / Kobe
+  meriken: { rank: 1, above: 95, ja: 'メリケンパーク', en: 'Kobe · Meriken Park' },
+  nankinmachi: { rank: 2, above: 24, ja: '南京町', en: 'Nankinmachi' },
+  maya: { rank: 2, above: 45, ja: '摩耶山', en: 'Mt. Maya' },
+  // Additional Kyoto outings & 3D landmarks
+  aquarium: { rank: 2, above: 24 },
+  botanical: { rank: 2, above: 24 },
+  nanzenji: { rank: 2, above: 28, ja: '南禅寺', en: 'Nanzen-ji' },
+  eikando: { rank: 3, above: 26, ja: '永観堂', en: 'Eikan-do' },
+  shimogamo: { rank: 2, above: 26 },
+  delta: { rank: 3, above: 16 },
+  'old-office': { rank: 3, above: 24, en: 'Old Kyoto Pref. Office' },
+  daikakuji: { rank: 2, above: 26 },
+  hirosawa: { rank: 3, above: 14 },
+  hozukyo: { rank: 2, above: 35 },
+  sagano: { rank: 3, above: 24, ja: 'トロッコ保津峡', en: 'Torokko Hozukyo' },
+  kifune: { rank: 2, above: 30, ja: '貴船', en: 'Kifune' },
+  kurama: { rank: 2, above: 34, ja: '鞍馬寺', en: 'Kurama-dera' },
+  daikichiyama: { rank: 3, above: 28, ja: '大吉山展望台', en: 'Daikichiyama' },
+};
+
+const EXTRA_PIN_STYLE: Record<(typeof EXTRA_LANDMARKS)[number]['id'], { rank: number; above: number }> = {
+  hikone: { rank: 1, above: 42 },
+  hiei: { rank: 2, above: 45 },
+  todaiji: { rank: 2, above: 54 },
+  kasuga: { rank: 3, above: 24 },
+};
+
+export const ALL_PINS: readonly MapPinDef[] = [
+  ...SPOTS.map((s): MapPinDef => ({
+    id: s.id,
+    destination: spotDestination(s.id),
+    rank: s.rank,
+    ja: s.ja,
+    en: s.en,
+    lat: s.lat,
+    lon: s.lon,
+    above: s.above,
+    spotId: s.id,
+    action: 'action' in s ? s.action : undefined,
+  })),
+  ...REGIONAL_PLACES.map((p): MapPinDef => {
+    const style = REGIONAL_PIN_STYLE[p.id] ?? { rank: 2, above: 28 };
+    return {
+      id: `region-${p.id}`,
+      destination: `region-${p.id}` as HeroDestination,
+      rank: style.rank,
+      ja: style.ja ?? p.ja,
+      en: style.en ?? p.en,
+      lat: p.lat,
+      lon: p.lon,
+      above: style.above,
+    };
+  }),
+  ...EXTRA_LANDMARKS.map((m): MapPinDef => ({
+    id: m.id,
+    destination: m.id,
+    rank: EXTRA_PIN_STYLE[m.id].rank,
+    ja: m.ja,
+    en: m.en,
+    lat: m.lat,
+    lon: m.lon,
+    above: EXTRA_PIN_STYLE[m.id].above,
+  })),
+];
 
 export interface HeroTrip {
   spot: string;
@@ -31,20 +149,72 @@ export interface HeroTrip {
   sample: boolean;
 }
 
+/** Check whether the terrain blocks the sightline from the camera to a visible upper landmark point. */
+export function isSightlineBlocked(
+  cam: { x: number; y: number; z: number },
+  ground: { x: number; y: number; z: number },
+  above: number,
+  heightAt: (x: number, z: number) => number,
+): boolean {
+  const targetY = ground.y + Math.max(14, Math.min(above, 48));
+  const dx = ground.x - cam.x;
+  const dz = ground.z - cam.z;
+  const dy = targetY - cam.y;
+  const dist = Math.hypot(dx, dy, dz);
+  if (dist < 160) return false;
+  // Skip ~60 m around the camera and around the landmark's own sloped terrace/hillside base.
+  const endSkip = Math.min(0.25, 60 / dist);
+  const span = 1 - endSkip * 2;
+  if (span <= 0.05) return false;
+  const steps = Math.min(48, Math.max(14, Math.ceil(dist / 350)));
+  const clearance = 6 + Math.min(18, dist * 0.0012);
+  for (let s = 1; s < steps; s++) {
+    const t = endSkip + (span * s) / steps;
+    const x = cam.x + dx * t;
+    const z = cam.z + dz * t;
+    const y = cam.y + dy * t;
+    if (heightAt(x, z) > y + clearance) return true;
+  }
+  return false;
+}
+
+function insideBox(x: number, z: number, box: Box) {
+  return x >= box[0] && x <= box[2] && z >= box[1] && z <= box[3];
+}
+
+const SLOT_CLASSES: Record<PinSlot, string> = {
+  top: '',
+  right: 'pin-slot-right',
+  left: 'pin-slot-left',
+  bottom: 'pin-slot-bottom',
+};
+
 /**
- * Pins that follow their places on screen. They hide when off screen or behind a ridge
- * (checked by stepping along the line of sight over the terrain).
+ * Pins that follow their places on screen. They adaptively place labels without overlapping
+ * each other or UI controls, prioritize nearby landmarks over distant ones, and update ground
+ * elevations once the five-prefecture Kansai survey loads.
  */
-export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: SpotId) => void, avoid?: () => { x: number; y: number; w: number; h: number }[], trips: HeroTrip[] = [], lang: 'ja' | 'en' = 'ja') {
+export function createLabels(
+  el: HTMLElement,
+  hf: Heightfield,
+  onAction: (destination: HeroDestination) => void,
+  avoid?: () => ScreenRect[],
+  trips: HeroTrip[] = [],
+  lang: 'ja' | 'en' = 'ja',
+) {
   const layer = document.createElement('div');
   layer.className = 'hero-labels';
   el.appendChild(layer);
-  const items = LABELS.map((d, i) => {
+
+  let groundFn = (x: number, z: number) => hf.height(x, z);
+  let activeBounds: Box = hf.bounds;
+
+  const items = ALL_PINS.map((d, i) => {
     const p = toLocal(d.lat, d.lon);
-    const ground = hf.height(p.x, p.z);
-    const related = trips.filter((t) => t.spot === d.id).slice(0, 3);
-    // the club has a published outing here (not just the neutral spot page)
-    const outings = trips.filter((t) => t.spot === d.id && !t.sample).length;
+    const inBounds = insideBox(p.x, p.z, activeBounds);
+    const groundY = inBounds ? groundFn(p.x, p.z) : 0;
+    const related = d.spotId ? trips.filter((t) => t.spot === d.spotId).slice(0, 3) : [];
+    const outings = d.spotId ? trips.filter((t) => t.spot === d.spotId && !t.sample).length : 0;
     const node = document.createElement('div');
     node.className = `hero-pin is-linked${d.action ? ' is-action' : ''}${outings ? ' is-visited' : ''}`;
     node.dataset.spot = d.id;
@@ -85,8 +255,8 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
       popup.hidden = false;
       node.classList.add('is-open');
     };
-    trigger.addEventListener('click', () => { close(); onAction(d.id); });
-    const records = related.map(trip => {
+    trigger.addEventListener('click', () => { close(); onAction(d.destination); });
+    const records = related.map((trip) => {
       const link = document.createElement('a');
       if (trip.src) {
         const img = document.createElement('img');
@@ -126,72 +296,184 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
       node.addEventListener('close-pin', close);
     }
     layer.appendChild(node);
-    return { def: d, node, trigger, close, text, translate, labelWidth: 0, labelHeight: 0, anchor: new THREE.Vector3(p.x, ground + d.above, p.z), ground: new THREE.Vector3(p.x, ground, p.z), shown: false, x: 0, y: 0 };
+    return {
+      def: d,
+      node,
+      trigger,
+      close,
+      text,
+      translate,
+      inBounds,
+      labelWidth: 0,
+      labelHeight: 0,
+      anchor: new THREE.Vector3(p.x, groundY + d.above, p.z),
+      ground: new THREE.Vector3(p.x, groundY, p.z),
+      shown: false,
+      slot: 'top' as PinSlot,
+      far: false,
+      x: 0,
+      y: 0,
+      dist: 0,
+      priority: d.rank,
+    };
   });
-  el.addEventListener('pointerdown', (e) => { if (!(e.target as Element).closest('.hero-pin')) items.forEach((it) => it.close()); });
-  const byRank = [...items].sort((a, b) => a.def.rank - b.def.rank);
+
+  el.addEventListener('pointerdown', (e) => {
+    if (!(e.target as Element).closest('.hero-pin')) items.forEach((it) => it.close());
+  });
+
+  const order = [...items];
   const placed: ScreenRect[] = [];
-  let blocks: { x: number; y: number; w: number; h: number }[] = [];
+  let blocks: ScreenRect[] = [];
   let frame = 0;
+  let forceAvoid = true;
+  let forceMeasure = true;
   const v = new THREE.Vector3();
   const lastCam = new THREE.Vector3(Infinity, 0, 0);
   const occluded = new Map<string, boolean>();
 
-  /** Is the line from the camera to the place blocked by the terrain? */
-  function blocked(cam: THREE.Vector3, target: THREE.Vector3) {
-    const steps = 24;
-    for (let s = 1; s < steps; s++) {
-      const t = s / steps;
-      const x = cam.x + (target.x - cam.x) * t;
-      const z = cam.z + (target.z - cam.z) * t;
-      const y = cam.y + (target.y - cam.y) * t;
-      if (hf.height(x, z) > y + 4) return true;
-    }
-    return false;
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    void document.fonts.ready.then(() => { forceMeasure = true; });
+  }
+
+  function applySlot(it: (typeof items)[number], slot: PinSlot) {
+    if (it.slot === slot) return;
+    const prev = SLOT_CLASSES[it.slot];
+    if (prev) it.node.classList.remove(prev);
+    const next = SLOT_CLASSES[slot];
+    if (next) it.node.classList.add(next);
+    it.slot = slot;
   }
 
   return {
     layer,
     setLanguage(language: 'ja' | 'en') {
-      items.forEach(item => item.translate(language));
-      frame = 0; // Re-measure translated labels before placing them.
+      items.forEach((item) => item.translate(language));
+      forceMeasure = true;
+    },
+    /** Upgrade ground elevations and occlusion sampling once the Kansai survey finishes loading. */
+    setGround(nextGround: (x: number, z: number) => number, bounds: Box) {
+      groundFn = nextGround;
+      activeBounds = bounds;
+      for (const it of items) {
+        it.inBounds = insideBox(it.ground.x, it.ground.z, activeBounds);
+        if (!it.inBounds) continue;
+        const h = groundFn(it.ground.x, it.ground.z);
+        it.ground.y = h;
+        it.anchor.y = h + it.def.above;
+      }
+      occluded.clear();
+      lastCam.set(Infinity, 0, 0);
+    },
+    invalidateLayout() {
+      forceAvoid = true;
     },
     /** Show only some pins (for the campus view). */
     filter(ids: string[] | null) {
       for (const it of items) it.node.classList.toggle('is-muted', !!ids && !ids.includes(it.def.id));
+      forceAvoid = true;
     },
     update(camera: THREE.PerspectiveCamera, width: number, height: number) {
       const moved = lastCam.distanceToSquared(camera.position) > 1;
       if (moved) lastCam.copy(camera.position);
       placed.length = 0;
-      // re-measure the areas to keep clear now and then (they only move on resize and scroll-in)
-      const measure=frame++ % 30===0;
-      if (avoid && (measure || moved)) blocks = avoid();
-      if (measure) for (const it of items) {
-        it.labelWidth=it.text.offsetWidth;
-        it.labelHeight=it.text.offsetHeight;
+      const periodic = frame++ % 20 === 0;
+      if (avoid && (forceAvoid || periodic || moved)) {
+        blocks = avoid();
+        forceAvoid = false;
       }
-      for (const it of byRank) {
-        if (moved) occluded.set(it.def.id, blocked(camera.position, it.ground.clone().setY(it.ground.y + 6)));
-        // a place you are standing on (Kyoto Tower from its own deck) needs no pin
-        const here = Math.hypot(it.ground.x - camera.position.x, it.ground.z - camera.position.z) < 350;
-        v.copy(it.anchor).project(camera);
-        const onScreen = !here && v.z < 1 && Math.abs(v.x) < 0.95 && v.y < 0.9 && v.y > -0.98;
-        let show = onScreen && !occluded.get(it.def.id) && !it.node.classList.contains('is-muted');
-        if (show) {
-          // keep pins from piling up: a lower-ranked pin gives way
-          const px = ((v.x + 1) / 2) * width;
-          const py = ((1 - v.y) / 2) * height;
-          const box=pinBounds(px,py,it.labelWidth,it.labelHeight);
-          const clash =
-            box.x < 8 || box.x+box.w > width-8 || box.y < 8 || box.y+box.h > height-8 ||
-            placed.some((p) => overlaps(box,p)) ||
-            blocks.some((b) => overlaps(box,{x:b.x-8,y:b.y-8,w:b.w+16,h:b.h+16}));
-          if (clash) show = false;
-          else placed.push(box);
+      if (forceMeasure || frame % 30 === 1) {
+        forceMeasure = false;
+        for (const it of items) {
+          it.labelWidth = it.text.offsetWidth;
+          it.labelHeight = it.text.offsetHeight;
         }
-        // Move focus before inert can remove the disappearing pin from navigation.
-        if (!show && it.node.contains(document.activeElement)) el.querySelector<HTMLElement>('.spot-select, .views [aria-pressed="true"]')?.focus({ preventScroll: true });
+      }
+
+      const cam = camera.position;
+      for (const it of order) {
+        it.dist = it.anchor.distanceTo(cam);
+        it.priority = effectivePinPriority(it.def.rank, it.dist, it.shown);
+      }
+      order.sort((a, b) => a.priority - b.priority);
+
+      const maxVisible = width < 900 ? 7 : 12;
+      let visibleCount = 0;
+
+      for (const it of order) {
+        const muted = it.node.classList.contains('is-muted');
+        const horiz = Math.hypot(it.ground.x - cam.x, it.ground.z - cam.z);
+        // Only suppress when practically standing inside the anchor itself, not when orbiting or approaching nearby.
+        const here = horiz < 65 || it.dist < 95;
+        const inRange = it.inBounds && !here && it.dist <= maxPinDistance(it.def.rank);
+
+        let show = false;
+        let px = 0;
+        let py = 0;
+        let chosenSlot: PinSlot = it.slot;
+
+        if (inRange && !muted && visibleCount < maxVisible) {
+          v.copy(it.anchor).project(camera);
+          const onScreen = v.z > -1 && v.z < 1 && Math.abs(v.x) < 0.96 && v.y < 0.92 && v.y > -0.96;
+          if (onScreen) {
+            let blocked = occluded.get(it.def.id);
+            if (moved || blocked === undefined) {
+              blocked = isSightlineBlocked(cam, it.ground, it.def.above, groundFn);
+              occluded.set(it.def.id, blocked);
+            }
+            if (!blocked) {
+              if (!it.labelWidth) {
+                it.labelWidth = it.text.offsetWidth;
+                it.labelHeight = it.text.offsetHeight;
+              }
+              px = ((v.x + 1) / 2) * width;
+              py = ((1 - v.y) / 2) * height;
+              const choice = choosePinSlot(
+                px,
+                py,
+                it.labelWidth,
+                it.labelHeight,
+                width,
+                height,
+                placed,
+                blocks,
+                it.shown ? it.slot : null,
+                it.def.action ? ACTION_SLOTS : DEFAULT_SLOTS,
+              );
+              if (choice) {
+                show = true;
+                chosenSlot = choice.slot;
+                placed.push(choice.rects[0], choice.rects[1]);
+                visibleCount++;
+              }
+            }
+          }
+        }
+
+        if (!show && it.node.contains(document.activeElement)) {
+          el.querySelector<HTMLElement>('.spot-select, .views [aria-pressed="true"]')?.focus({ preventScroll: true });
+        }
+
+        if (show) {
+          const x = Math.round(px);
+          const y = Math.round(py);
+          applySlot(it, chosenSlot);
+          const isFar = it.dist > 9500 && !it.def.action;
+          if (isFar !== it.far) {
+            it.far = isFar;
+            it.node.classList.toggle('is-far', isFar);
+          }
+          // Position before toggling .is-shown so newly revealed pins fade in cleanly in place.
+          if (x !== it.x || y !== it.y || !it.shown) {
+            it.x = x;
+            it.y = y;
+            it.node.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+            it.node.style.setProperty('--pin-x', `${x}px`);
+            it.node.style.setProperty('--stage-w', `${width}px`);
+            it.node.classList.toggle('opens-below', y < 240);
+          }
+        }
+
         if (show !== it.shown) {
           it.shown = show;
           it.node.classList.toggle('is-shown', show);
@@ -199,17 +481,7 @@ export function createLabels(el: HTMLElement, hf: Heightfield, onAction: (id: Sp
           it.trigger.tabIndex = show ? 0 : -1;
           it.node.setAttribute('aria-hidden', String(!show));
         }
-        if (!show) { it.close(); continue; }
-        const x = Math.round(((v.x + 1) / 2) * width);
-        const y = Math.round(((1 - v.y) / 2) * height);
-        if (x !== it.x || y !== it.y) {
-          it.x = x;
-          it.y = y;
-          it.node.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-          it.node.style.setProperty('--pin-x', `${x}px`);
-          it.node.style.setProperty('--stage-w', `${width}px`);
-          it.node.classList.toggle('opens-below', y < 240);
-        }
+        if (!show) it.close();
       }
     },
   };
