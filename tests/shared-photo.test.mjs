@@ -51,3 +51,20 @@ test('a nearby Osaka sheet survives late fallback loads and releases the slot wh
   slot.select(false);assert.equal(applied.at(-1),'osaka-close');
   slot.setOverride(null);assert.equal(applied.at(-1),'arashiyama');
 });
+
+test('setChosen upgrades the selected area seamlessly without disturbing other areas',async()=>{
+  const applied=[];
+  const slot=createSharedPhotoSlot(()=>Promise.resolve('tennozan-mobile'),p=>applied.push(p),()=>assert.fail('unexpected error'));
+  slot.setFallback('arashiyama');
+  slot.select(true);
+  await Promise.resolve();
+  assert.equal(applied.at(-1),'tennozan-mobile');
+  slot.setChosen('tennozan-full');
+  assert.equal(applied.at(-1),'tennozan-full');
+  slot.select(false);
+  assert.equal(applied.at(-1),'arashiyama');
+  slot.setChosen('tennozan-ultra');
+  assert.equal(applied.at(-1),'arashiyama');
+  slot.select(true);
+  assert.equal(applied.at(-1),'tennozan-ultra');
+});

@@ -21,7 +21,8 @@ export function createForest(
 ) {
   const samplers = photos.map(({photo, box: photoBox, uv=[0,0,1,1]}) => {
     const sw=Math.round((uv[2]-uv[0])*photo.width), sh=Math.round((uv[3]-uv[1])*photo.height);
-    const W = Math.min(quality > .75 ? 2048 : 1024, sw);
+    // Ground colour only blends 20% into tree crown tint when tree-cover.bin supplies the mask.
+    const W = Math.min(photoFallback ? (quality > .75 ? 1024 : 512) : 512, sw);
     const H = Math.round(sh * W / sw);
     const canvas = document.createElement('canvas');
     canvas.width = W;

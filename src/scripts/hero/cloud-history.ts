@@ -25,7 +25,8 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
   const scene = new THREE.Scene();
   const proxy = new THREE.Mesh(mesh.geometry, frozen);
   proxy.frustumCulled = false;
-  scene.add(proxy);
+  // Match main scene light counts so Three's program cache reuses the precompiled CLOUDS program.
+  scene.add(proxy, new THREE.DirectionalLight(0), new THREE.HemisphereLight(0, 0));
   const images = [skyImage(), skyImage(), skyImage()];
   const uniforms = {
     ...original.uniforms,

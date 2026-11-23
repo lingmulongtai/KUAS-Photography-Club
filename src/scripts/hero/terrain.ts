@@ -450,9 +450,46 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     setPositions(prepared);onReady();
   };
   const cancelRecenter = () => { generation++; };
+  let currentAerialWide = tex.aerialWide;
+  /** Upgrade the wide mountain photo and retarget every placeholder uniform before disposing the previous texture. */
+  const setAerialWide = (next: THREE.Texture) => {
+    const prev = currentAerialWide;
+    if (prev === next) return;
+    currentAerialWide = next;
+    uniforms.uAerialWide.value = next;
+    if (uniforms.uAerialCity.value === prev) uniforms.uAerialCity.value = next;
+    if (uniforms.uWoodland.value === prev) uniforms.uWoodland.value = next;
+    if (uniforms.uOuterPhoto.value === prev) uniforms.uOuterPhoto.value = next;
+    if (uniforms.uKamoMask.value === prev) uniforms.uKamoMask.value = next;
+    if (uniforms.uRegionRoads.value === prev) uniforms.uRegionRoads.value = next;
+    for (const p of photos) if (p.map.value === prev) p.map.value = next;
+    prev.dispose();
+  };
+  /** Upgrade the basin aerial atlas in place while keeping the compiled sheet count intact. */
+  const setAerialCity = (next: THREE.Texture, nextSheets?: BasinSheet[]) => {
+    const prev = uniforms.uAerialCity.value;
+    if (prev === next) return;
+    if (nextSheets && nextSheets.length === sheets.length) {
+      for (let i = 0; i < nextSheets.length; i++) {
+        uniforms.uSheetBoxes.value[i].set(...nextSheets[i].box);
+        uniforms.uSheetUVs.value[i].set(...nextSheets[i].uv);
+      }
+    }
+    uniforms.uAerialCity.value = next;
+    uniforms.uCityOn.value = 1;
+    if (prev && prev !== currentAerialWide) prev.dispose();
+  };
+  /** Upgrade the outer Kansai basin photo and dispose the replaced texture. */
+  const setOuterPhoto = (next: THREE.Texture) => {
+    const prev = uniforms.uOuterPhoto.value;
+    if (prev === next) return;
+    uniforms.uOuterPhoto.value = next;
+    uniforms.uOuterOn.value = 1;
+    if (prev && prev !== currentAerialWide) prev.dispose();
+  };
   /** Show the sharper photo for tex.photos[i]. */
   const setPhoto = (i: number, photo: THREE.Texture|null,box?:Box) => {
-    photos[i].map.value = photo??tex.aerialWide;
+    photos[i].map.value = photo??currentAerialWide;
     photos[i].on.value = photo?1:0;
     if(box)photos[i].box.value.set(...box);
   };
@@ -460,5 +497,5 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     channel=next;uniforms.uKamoMask.value=mask;uniforms.uKamoBox.value.set(...next.box);uniforms.uKamoOn.value=1;
     cache.clear();recenter(activeCenter,activeAnchored);
   };
-  return { mesh, position, setDistant, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setChannel };
+  return { mesh, position, setDistant, uniforms, recenter, recenterAsync, cancelRecenter, prepare, setPhoto, setAerialWide, setAerialCity, setOuterPhoto, setChannel };
 }

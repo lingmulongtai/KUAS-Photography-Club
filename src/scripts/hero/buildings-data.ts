@@ -36,8 +36,8 @@ interface Meta {
   points: number;
 }
 
-export async function loadBuildings(metaFile='buildings.json',binFile='buildings.bin') {
-  const [meta, bytes] = await Promise.all([loadJSON<Meta>(metaFile), loadBinary(binFile)]);
+export async function loadBuildings(metaFile='buildings.json',binFile='buildings.bin',priority?:RequestPriority) {
+  const [meta, bytes] = await Promise.all([loadJSON<Meta>(metaFile), loadBinary(binFile,priority)]);
   return prepareSteps(decodeBuildings(meta,bytes));
 }
 

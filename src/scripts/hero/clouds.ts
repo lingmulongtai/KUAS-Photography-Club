@@ -112,18 +112,6 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
         return env;
       }
 
-      /** Macro 3D Perlin-Worley billows for volumetric self-shadowing probes. */
-      float lumps(vec3 pos){
-        float env = coarse(pos);
-        if (env <= .001) return 0.;
-        vec4 n = textureLod(uCloudNoise, cloudCoord(pos), 0.);
-        float fbmLow = n.g * .625 + n.b * .25 + n.a * .125;
-        float shape = clamp(remap(n.r, -(1. - fbmLow) * .72, 1., 0., 1.), 0., 1.);
-        float boost = (isStyle(3.) || isStyle(4.)) ? 1.04 : 1.18;
-        float sculpted = clamp(remap(shape, 1. - min(1., env * boost), 1., 0., 1.), 0., 1.);
-        return sculpted * mix(.62, 1.0, env);
-      }
-
       /** Full 3D volumetric cloud density with multi-scale cauliflower billows & frothy wisps. */
       float density(vec3 pos, float dist, float env){
         if (env <= .001) return 0.;
@@ -214,6 +202,10 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
           const int MAX_ITERS = 160;
           #endif
 
+          // Dynamic-bound copies of fixed iteration counts prevent D3D11 FXC from unrolling
+          // 6+ full copies of coarse() inside the raymarch loop while executing identical steps.
+          int bisectSteps = min(uMarchSteps, 2);
+          int sunSteps = min(uMarchSteps, ${detail > 1 ? 4 : 3});
           for (int i = 0; i < MAX_ITERS; ++i) {
             if (T < .004 || t >= t1) break;
             if (useCeilings && !fineMode && t >= nextBlock) {
@@ -248,7 +240,7 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
                 // and cannot drop back to coarse before crossing the confirmed hit.
                 float tLo = max(t0, t - dt * .5);
                 float tHi = t + dt * .5;
-                for (int b = 0; b < 2; ++b) {
+                for (int b = 0; b < bisectSteps; ++b) {
                   float mid = .5 * (tLo + tHi);
                   if (coarse(ro + rd * mid) > .001) tHi = mid; else tLo = mid;
                 }
@@ -279,23 +271,30 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
             }
 
             float h = clamp((pos.y - uBase) / layerDepth, 0., 1.);
-            // Exponential sun-ray optical depth: looped probes keep HLSL compact for fast D3D11 compilation.
+            // Exponential sun-ray optical depth: dynamic loop bound keeps HLSL compact for fast D3D11 compilation.
             float od = 0.;
             #if DETAIL > 1
             const float sunDist[4] = float[4](22., 64., 145., 310.);
             const float sunW[4] = float[4](28., 58., 96., 180.);
-            for (int s = 0; s < 4; ++s) {
-              vec3 sp = pos + uSunDir * (sunDist[s] * ls);
-              od += (s < 3 ? lumps(sp) : coarse(sp)) * sunW[s];
-            }
             #else
             const float sunDist[3] = float[3](34., 110., 280.);
             const float sunW[3] = float[3](45., 95., 175.);
-            for (int s = 0; s < 3; ++s) {
-              vec3 sp = pos + uSunDir * (sunDist[s] * ls);
-              od += (s < 2 ? lumps(sp) : coarse(sp)) * sunW[s];
-            }
             #endif
+            float sunBoost = tower ? 1.04 : 1.18;
+            for (int s = 0; s < sunSteps; ++s) {
+              vec3 sp = pos + uSunDir * (sunDist[s] * ls);
+              float se = coarse(sp);
+              if (se > .001) {
+                float sd = se;
+                if (s < sunSteps - 1) {
+                  vec4 sn = textureLod(uCloudNoise, cloudCoord(sp), 0.);
+                  float sfbm = sn.g * .625 + sn.b * .25 + sn.a * .125;
+                  float ssh = clamp(remap(sn.r, -(1. - sfbm) * .72, 1., 0., 1.), 0., 1.);
+                  sd = clamp(remap(ssh, 1. - min(1., se * sunBoost), 1., 0., 1.), 0., 1.) * mix(.62, 1.0, se);
+                }
+                od += sd * sunW[s];
+              }
+            }
             od *= ls * extinction * .95;
 
             // 3-octave multiple scattering: bright sunlit tops, silver rims, and soft blue-grey shadowed bellies.
