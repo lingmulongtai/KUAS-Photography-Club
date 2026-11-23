@@ -79,6 +79,7 @@ import {moveExplorer} from './free-explore';
 import {climateOf,seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
+import {kamoCherries} from './cherry-groves';
 import {buildKiyomizuBeam} from './kiyomizu-beam';
 import {replacesInari,inariClearing} from './fushimi-inari';
 import {createTrafficView} from './traffic-view';
@@ -683,7 +684,9 @@ export function createHero(
     const garden=landmarks.positions.ryoanji;
     const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
-    const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
+    const cherries=[...philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z)),
+      ...kamoCherries(channel,(x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z),
+        (x,z)=>roadsAndWater(x,z)&&!waterArea(x,z))];
     let cultivated:((x:number,z:number)=>boolean)|undefined;
     const forestTerrain={
       get bounds(){return regional?.bounds??hf.bounds;},

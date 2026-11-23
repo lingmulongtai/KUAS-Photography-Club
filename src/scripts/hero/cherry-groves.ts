@@ -1,4 +1,5 @@
 import {toLocal} from './geo.ts';
+import type {KamoChannel} from './kamo-channel.ts';
 
 /** Seasonal scenery, not a flowering forecast or a tree inventory: well-known cherry
  * viewing grounds take a large share of their broadleaf trees, and wild yamazakura
@@ -44,3 +45,21 @@ export function cherryPick(x:number,z:number){
   return s-Math.floor(s);
 }
 
+/** Rows along both banks of the Kamo River's promenade, a few metres back from the water. */
+export function kamoCherries(channel:Pick<KamoChannel,'box'|'contains'>,ground:(x:number,z:number)=>number,
+  blocked:(x:number,z:number)=>boolean,paved:(x:number,z:number)=>boolean,spacing=11,setback=9){
+  const trees:{x:number;y:number;z:number;cherry:true}[]=[];
+  const [x0,z0,x1,z1]=channel.box;
+  for(let z=z0+spacing/2;z<z1;z+=spacing){
+    let west=Infinity,east=-Infinity;
+    for(let x=x0;x<=x1;x+=2)if(channel.contains(x,z)){west=Math.min(west,x);east=Math.max(east,x);}
+    if(east<west)continue;
+    for(const x of [west-setback,east+setback]){
+      // The promenade paths are mapped as roads too: only the trunk itself must miss a
+      // road, which keeps the rows continuous but off the bridges and the bank streets.
+      if(paved(x,z)||[[0,0],[-3,0],[3,0],[0,-3],[0,3]].some(([dx,dz])=>blocked(x+dx,z+dz)))continue;
+      trees.push({x,z,y:ground(x,z),cherry:true});
+    }
+  }
+  return trees;
+}
