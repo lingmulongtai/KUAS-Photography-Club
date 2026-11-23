@@ -113,7 +113,9 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number){
         vStable=aStable;vWater=aWater;
         vec3 toCam = cameraPosition - p;
         float dist = length(toCam);
-        p += toCam / max(dist,.01) * min(dist * .004, uWaterBias) * (1.-aStable);
+        float farLake = aWater.x > 1.5 ? smoothstep(2500., 14000., dist) : 0.;
+        float pull = mix(min(dist * .004, uWaterBias), max(uWaterBias, min(dist * .0035, 110.)), farLake);
+        p += toCam / max(dist,.01) * pull * (1.-aStable);
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
       }
     `,
@@ -176,6 +178,11 @@ export async function biwaSurface(env:Env,roads:WaterRoads){
     geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
     geometry.computeBoundingSphere();
     const material=waterMaterial(env,roads,.35);
+    if(i===0){
+      material.polygonOffset=true;
+      material.polygonOffsetFactor=-2;
+      material.polygonOffsetUnits=-8;
+    }
     Object.assign(material.defaultAttributeValues,{aStable:[0],aWater:[...profile]});
     group.add(new THREE.Mesh(geometry,material));
   }
