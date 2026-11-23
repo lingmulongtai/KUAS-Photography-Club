@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
-import {kyotoStation,stationGlazing,replacesKyotoStation} from '../src/scripts/hero/kyoto-station.ts';
+import {kyotoStation,plazaSurface,stationGlazing,replacesKyotoStation} from '../src/scripts/hero/kyoto-station.ts';
 import {loadBuildings} from '../src/scripts/hero/buildings-data.ts';
 
 test('Kyoto Station has an open atrium and a grand stair rising west',()=>{
@@ -72,6 +72,17 @@ test('both station detail profiles retain the surveyed geometry, embedded photos
   const full = await verifyDistrictAsset('kyoto-station-district.glb');
   const compact = await verifyDistrictAsset('kyoto-station-district-compact.glb');
   assert.ok(compact < full * .85, 'the compact detail profile reduces the download');
+});
+
+test('plaza layers take street surfaces instead of their survey display colours', async () => {
+  const file = await readFile(new URL('../public/kyoto/kyoto-station-district.glb', import.meta.url));
+  const model = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
+  const surface = material => plazaSurface({name: material.name,
+    color: new THREE.Color().fromArray(material.pbrMetallicRoughness.baseColorFactor ?? [1, 1, 1])});
+  const kinds = Object.fromEntries(model.materials.filter(m => m.name.startsWith('Plaza-'))
+    .map(m => [m.pbrMetallicRoughness.baseColorFactor.slice(0, 3).map(v => v.toFixed(2)).join(','), surface(m)]));
+  assert.deepEqual(kinds, {'0.92,0.92,0.92': 2, '0.19,0.30,0.00': 3, '0.32,0.32,0.32': 1, '0.50,0.50,0.50': 1});
+  assert.equal(surface(model.materials.find(m => m.name.startsWith('District facade'))), 0);
 });
 
 test('the station replacement indices match the shipped city footprints', async () => {

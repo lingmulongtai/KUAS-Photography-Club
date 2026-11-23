@@ -93,3 +93,13 @@ export function stationGlazing(){
   geometry.computeVertexNormals();
   return geometry;
 }
+
+/** The survey draws its plaza layers in flat display colours: white kerbs and
+ * paving, mid-grey carriageway and a bright planting green. Classify them so
+ * they can take the same asphalt and paving as the terrain's street field. */
+export function plazaSurface(source:{name:string;color:{r:number;g:number;b:number}}){
+  if(!source.name.startsWith('Plaza-'))return 0;
+  const {r,g,b}=source.color;
+  if(g>r*1.3&&g>b*1.3)return 3;
+  return r+g+b>2.1?2:1;
+}
