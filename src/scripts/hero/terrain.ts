@@ -382,11 +382,17 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // so the two neighbouring areas cannot expose a strip of coarse light between them.
           float detailed = max(uRoadsOn*smoothstep(-30.,0.,coreInset),
             uRegionRoadsOn*smoothstep(-30.,0.,boxInset(uRegionRoadBox,p)));
-          float closeDetail = detailed*(1.-smoothstep(2400.,4000.,dist));
+          // Wherever a street field exists it is drawn as in the core, by pixel footprint
+          // rather than distance, so loaded regions and the city do not meet at a box edge.
+          // Once a pixel spans several blocks the resolved lanes and their haloes pile up
+          // into a white sheet, so every area hands over to the same overview average there.
+          float resolved = 1. - smoothstep(30., 110., fp);
+          float closeDetail = detailed * resolved;
+          emit *= mix(1., resolved, max(core, detailed));
           // Keep light on the horizon. A single enlarged overview texel must not
           // light an entire block below the camera while its real streets are loading.
           float overviewGain = mix(.08,1.,smoothstep(1200.,4000.,dist));
-          emit = max(emit, vec3(.65,.47,.29)*distantLight*overviewGain*(1.-max(core,closeDetail)));
+          emit = max(emit, vec3(.65,.47,.29)*distantLight*overviewGain*(1.-max(core*resolved,closeDetail)));
           emit *= uCity * cityLightShimmer(vWorld);
         }
         // a teal ring that pulses around the campus when it is in focus
