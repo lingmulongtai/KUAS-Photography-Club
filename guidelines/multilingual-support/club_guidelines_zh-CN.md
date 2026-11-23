@@ -6,7 +6,7 @@
 - **适用范围：** 这些规则适用于俱乐部组织、协办或批准的所有活动，包括会议、摄影旅行和在线交流。
 - **联系方式：**
   - Instagram: @kuas_photographyclub
-  - 邮箱: photography.club.in.kuas@gmail.com
+  - 邮箱: kuas.photography.club@gmail.com
 - **例会：** 每周五 18:00 起，于太秦校区S306室。
 
 ---

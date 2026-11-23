@@ -18,7 +18,7 @@
 フォームは未ログイン時にサインインを要求します。質問内容、使用言語、許可されるアカウントの範囲は今回確認できていません。回答できない場合は、次の窓口へご相談ください。いただく情報は、見学・参加の案内とお問い合わせへの対応に使用します。
 
 - Instagram：[@kuas_photographyclub](https://www.instagram.com/kuas_photographyclub)
-- メール：[photography.club.in.kuas@gmail.com](mailto:photography.club.in.kuas@gmail.com)
+- メール：[kuas.photography.club@gmail.com](mailto:kuas.photography.club@gmail.com)
 - [問い合わせ](https://kuas-photography-club.vercel.app/contact/)：撮影依頼・協賛・取材は対応可否・費用・納期・写真の利用条件等を個別に相談します
 
 部員への通常連絡はLINE等、運営が案内する連絡用チャットで行います。部員用参加リンク、名簿、学籍番号、個人連絡先、口座情報、個人別支払状況、未公開作品、提出用フォルダ等を一般公開しません。

@@ -28,7 +28,7 @@ export const club = {
     url: 'https://www.instagram.com/kuas_photographyclub',
   },
   /** Public contact address. */
-  email: 'photography.club.in.kuas@gmail.com',
+  email: 'kuas.photography.club@gmail.com',
   github: 'https://github.com/lingmulongtai/KUAS-Photography-Club',
 } as const;
 

@@ -6,7 +6,7 @@ Ces directives sont nos règles importantes pour garantir que les activités du 
 - **Champ d'application :** Ces règles s'appliquent à toutes les activités organisées, co-organisées ou approuvées par le club, y compris les réunions, les sorties photo et les communications en ligne.
 - **Contact :**
   - Instagram : @kuas_photographyclub
-  - E-mail : photography.club.in.kuas@gmail.com
+  - E-mail : kuas.photography.club@gmail.com
 - **Réunions régulières :** Le vendredi à partir de 18h00 dans la salle S306, Campus d'Uzumasa.
 
 ---
