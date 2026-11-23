@@ -6,7 +6,7 @@ Estas diretrizes são as nossas regras importantes para garantir que as atividad
 - **Âmbito de aplicação:** Estas regras aplicam-se a todas as atividades organizadas, coorganizadas ou aprovadas pelo clube, incluindo reuniões, passeios fotográficos e comunicações online.
 - **Contato:**
   - Instagram: @kuas_photographyclub
-  - E-mail: photography.club.in.kuas@gmail.com
+  - E-mail: kuas.photography.club@gmail.com
 - **Reuniões regulares:** Sextas-feiras a partir das 18:00 na sala S306, Campus de Uzumasa.
 
 ---

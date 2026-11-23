@@ -6,7 +6,7 @@
 - 対象となる活動: サークルが主催・共催・承認するすべての活動（ミーティング、撮影会、オンラインでのやり取りなど）
 - 連絡先:
   - Instagram: @kuas_photographyclub
-  - メール: photography.club.in.kuas@gmail.com
+  - メール: kuas.photography.club@gmail.com
 - 定例ミーティング: 毎週 金曜 18:00〜（太秦キャンパス S306 教室）
 
 ---
