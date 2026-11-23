@@ -9,6 +9,7 @@ import region as R
 from build_basin_atlas import balance, neutral_ground, photo
 from build_kansai_ground import source_tiles
 from common import OUT, bilinear, decode_dem_png, encode_heights, global_pixels, grid, mosaic, write_gz
+from harmonize import harmonize_image, load_canopy, sample_kansai_ground_anchor
 
 DEST = Path(OUT, 'kansai', 'districts')
 # Centre (lat, lon), width and depth in local metres, source zoom and output pixels.
@@ -27,13 +28,22 @@ def main():
     terrain = json.loads(Path(OUT, 'terrain.json').read_text())
     with Image.open(Path(OUT, terrain['aerialCity']['file'])) as city:
         reference = neutral_ground(city)
+    canopy_data = load_canopy()
     sheets = []
     for name, lat, lon, width, depth, zoom, pixels in DISTRICTS:
         x, z = [round(v / 40) * 40 for v in R.to_local(lat, lon)]
         box = [x-width//2, z-depth//2, x+width//2, z+depth//2]
         file = 'kansai/districts/' + name
         size = (pixels, round(pixels * depth / width))
-        image = balance(photo(box, zoom, size), reference)
+        raw = photo(box, zoom, size)
+        if zoom <= 15:
+            anchor = sample_kansai_ground_anchor(box)
+            image = harmonize_image(
+                raw, box, work_step_m=25.0, anchor_img=anchor,
+                use_z11_drift_guard=anchor is None, fill_biwa=True, canopy_data=canopy_data,
+            )
+        else:
+            image = balance(raw, reference)
         image.save(Path(OUT, file + '.webp'), quality=84, method=5)
         sheet = dict(id=name, box=box, file=file+'.webp', zoom=zoom)
         if name in ('kobe', 'nara'):

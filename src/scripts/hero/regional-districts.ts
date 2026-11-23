@@ -11,12 +11,28 @@ export interface DistrictUniforms {
 }
 
 export const districtSampling=`
-  vec3 overlay(vec3 base,sampler2D map,vec4 box,vec2 p){
-    vec2 uv=(p-box.xy)/max(vec2(1.),box.zw-box.xy);
+  vec3 overlay(vec3 base,sampler2D map,vec4 box,vec2 p,float feather){
+    if(box.z<=box.x || box.w<=box.y)return base;
+    vec2 uv=(p-box.xy)/(box.zw-box.xy);
     if(any(lessThanEqual(uv,vec2(0.))) || any(greaterThanEqual(uv,vec2(1.))))return base;
     vec4 aerial=texture2D(map,vec2(uv.x,1.-uv.y));
     vec2 edge=min(uv,1.-uv);
-    return mix(base,aerial.rgb,aerial.a*smoothstep(0.,.03,min(edge.x,edge.y)));
+    return mix(base,aerial.rgb,aerial.a*smoothstep(0.,feather,min(edge.x,edge.y)));
+  }
+  vec3 overlayMatched(vec3 base,sampler2D map,vec4 box,vec2 p,float feather,vec3 baseLow,float matchTone){
+    if(box.z<=box.x || box.w<=box.y)return base;
+    vec2 uv=(p-box.xy)/(box.zw-box.xy);
+    if(any(lessThanEqual(uv,vec2(0.))) || any(greaterThanEqual(uv,vec2(1.))))return base;
+    vec2 texUv=vec2(uv.x,1.-uv.y);
+    vec4 aerial=texture2D(map,texUv);
+    vec3 rgb=aerial.rgb;
+    if(matchTone>.5){
+      vec3 mapLow=textureGrad(map,texUv,vec2(.045,0.),vec2(0.,.045)).rgb;
+      vec3 gain=clamp((baseLow+.04)/(mapLow+.04),vec3(.68),vec3(1.48));
+      rgb=clamp(rgb*gain,0.,1.);
+    }
+    vec2 edge=min(uv,1.-uv);
+    return mix(base,rgb,aerial.a*smoothstep(0.,feather,min(edge.x,edge.y)));
   }`;
 
 export function districtImagery(districts:District[],aniso:number,prepare:(photo:THREE.Texture,needed:()=>boolean)=>Promise<boolean>,onChange:(broad:RegionalPhoto|null,inset:RegionalPhoto|null)=>void){
@@ -47,6 +63,6 @@ export function districtImagery(districts:District[],aniso:number,prepare:(photo
     for(const e of entries)if(e.sheet && e.distance>(e.zoom>15?6500:19000)){
       e.sheet.photo.dispose();e.sheet=null;
     }
-    return !!close && close.distance<150;
+    return close && close.distance<150 ? close.zoom : (wide && wide.distance===0 ? wide.zoom : 0);
   };
 }

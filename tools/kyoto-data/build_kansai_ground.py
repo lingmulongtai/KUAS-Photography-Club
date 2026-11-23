@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw
 import region as R
 from common import CACHE, OUT, bilinear, decode_dem_png, decode_rgb, encode_heights, global_pixels, grid, mosaic
 from fetch import GSI, get
+from harmonize import harmonize_image
 
 STEP = 200
 PHOTO_STEP = 50
@@ -104,6 +105,7 @@ def main():
         sea = bilinear(coastline, ax - ox, az - oy) < .5
         land[(land == 0) & sea] = 96
         mask.paste(Image.fromarray(land), (0, y))
+    photo = harmonize_image(photo, box, alpha_mask=mask, work_step_m=float(PHOTO_STEP), use_z11_drift_guard=True, fill_biwa=True)
     photo.putalpha(mask)
     # Independent patches avoid oversized GPU textures on mobile and allow frustum culling.
     patches = []

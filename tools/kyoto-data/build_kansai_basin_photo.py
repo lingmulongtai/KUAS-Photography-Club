@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 
 from common import OUT, bilinear, global_pixels, mosaic
+from harmonize import harmonize_image, sample_kansai_ground_anchor
 
 
 def main():
@@ -32,6 +33,8 @@ def main():
     if sampled < width * height * .95:
         raise ValueError('Generate the Kansai ground survey first to populate the GSI aerial cache')
     photo = Image.fromarray(result)
+    anchor = sample_kansai_ground_anchor(outer['box'])
+    photo = harmonize_image(photo, outer['box'], work_step_m=50.0, anchor_img=anchor, use_z11_drift_guard=anchor is None, fill_biwa=True)
     photo.save(root / 'kansai/basin.webp', quality=84, method=6)
     photo.resize(tuple(outer['mobile']['size']), Image.Resampling.LANCZOS).save(
         root / 'kansai/basin-mobile.webp', quality=82, method=6)
