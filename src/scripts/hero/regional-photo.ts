@@ -3,7 +3,7 @@ import {lonLat,tileXY} from '../kansai/coordinates';
 import expo from '../../../public/kansai/expo-imagery/index.json';
 import {M_PER_DEG_LAT,M_PER_DEG_LON,ORIGIN,toLocal,type Box} from './geo';
 
-export interface RegionalPhoto {photo:THREE.Texture;box:Box}
+export interface RegionalPhoto {photo:THREE.Texture;box:Box;raw?:boolean}
 const radius=1,size=(radius*2+1)*256;
 
 /** One orthophoto sampler follows the camera, including when crossing an internal prefecture line. */
@@ -42,7 +42,7 @@ export function regionalPhoto(aniso:number,onChange:(sheet:RegionalPhoto|null)=>
     photo.anisotropy=aniso;
     const a=lonLat(west,north,zoom),b=lonLat(west+2*radius+1,north+2*radius+1,zoom);
     const nw=toLocal(a[1],a[0]),se=toLocal(b[1],b[0]);
-    install({photo,box:[nw.x,nw.z,se.x,se.z]});
+    install({photo,box:[nw.x,nw.z,se.x,se.z],raw:true});
   }
   return (x:number,z:number,height:number,now:number,enabled:boolean)=>{
     if(!enabled){

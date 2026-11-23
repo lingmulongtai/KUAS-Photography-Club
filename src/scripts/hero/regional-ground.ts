@@ -82,6 +82,7 @@ const vertexShader = `
 const fragmentShader = `
   uniform sampler2D uPhoto,uClose,uDistrict,uInset;
   uniform vec4 uCloseBox,uDistrictBox,uInsetBox;
+  uniform float uCloseMatch;
   varying vec2 vUv;
   varying vec3 vWorld,vNormal;
   ${ENV_GLSL}
@@ -100,9 +101,10 @@ const fragmentShader = `
       return;
     }
     if(prefectureCode==0)discard;
-    photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox,vWorld.xz);
-    photo.rgb=overlay(photo.rgb,uInset,uInsetBox,vWorld.xz);
-    photo.rgb=overlay(photo.rgb,uClose,uCloseBox,vWorld.xz);
+    vec3 baseLow=textureGrad(uPhoto,vUv,vec2(.008,0.),vec2(0.,.008)).rgb;
+    photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox,vWorld.xz,.08);
+    photo.rgb=overlay(photo.rgb,uInset,uInsetBox,vWorld.xz,.08);
+    photo.rgb=overlayMatched(photo.rgb,uClose,uCloseBox,vWorld.xz,mix(.08,.16,uCloseMatch),baseLow,uCloseMatch);
     vec3 n=normalize(vNormal);
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
     vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sunShadow(vWorld,n));
@@ -147,7 +149,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   };
 
   const states=patches.map(p=>({patch:p,distance:Infinity,pending:false,retry:0,mesh:null as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>|null}));
-  const uClose={value:null as THREE.Texture|null},uCloseBox={value:new THREE.Vector4()};
+  const uClose={value:null as THREE.Texture|null},uCloseBox={value:new THREE.Vector4()},uCloseMatch={value:0};
   const uDistrict={value:null as THREE.Texture|null},uDistrictBox={value:new THREE.Vector4()};
   const uInset={value:null as THREE.Texture|null},uInsetBox={value:new THREE.Vector4()};
   let broad:RegionalPhoto|null=null,inset:RegionalPhoto|null=null,live:RegionalPhoto|null=null;
@@ -174,6 +176,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   const photos=regionalPhoto(aniso,sheet=>{
     live=sheet;uClose.value=sheet?.photo??null;
     uCloseBox.value.fromArray(sheet?.box??[0,0,0,0]);
+    uCloseMatch.value=sheet?.raw?1:0;
     onPhoto(broad,inset??live);
   });
   let shaderReady:Promise<unknown>|undefined;
@@ -183,8 +186,11 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
     last=now;
     // Preserve continuous base terrain under the moving camera. Stage the detailed
     // survey at the landing point instead of uploading cities crossed for a fraction of a second.
-    const surveyed=districts(destination?.x??x,destination?.z??z,now);
-    photos(x,z,y-ground(x,z),now,!destination && !surveyed && !legacy.some(b=>boxDistance(x,z,b)===0));
+    const coveredZoom=districts(destination?.x??x,destination?.z??z,now);
+    const altitude=y-ground(x,z);
+    // Avoid fetching raw zoom-15 live GSI tiles over an already-harmonized zoom-15 district sheet.
+    const surveyed=coveredZoom>15 || (coveredZoom>=15 && altitude>450);
+    photos(x,z,altitude,now,!destination && !surveyed && !legacy.some(b=>boxDistance(x,z,b)===0));
     for(const state of states){
       state.distance=boxDistance(x,z,state.patch.box);
       if(state.mesh && state.distance>65000){
@@ -204,7 +210,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
         if(!await preparePhoto(photo,()=>state.distance<=65000)){photo.dispose();return;}
         const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=65000);
         if(!geometry){photo.dispose();return;}
-        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});
+        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uCloseMatch,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});
         const mesh=new THREE.Mesh(geometry,material);
         await (shaderReady??=prepare(mesh));
         if(state.distance>65000){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
