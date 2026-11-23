@@ -392,7 +392,18 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // Keep light on the horizon. A single enlarged overview texel must not
           // light an entire block below the camera while its real streets are loading.
           float overviewGain = mix(.08,1.,smoothstep(1200.,4000.,dist));
-          emit = max(emit, vec3(.65,.47,.29)*distantLight*overviewGain*(1.-max(core*resolved,closeDetail)));
+          // The overview averages street light over whole blocks, which reads as a milky
+          // wash beside resolved streets. Gather it into lamp-sized points with the same
+          // mean, and roll off dense centres instead of clipping them to white.
+          vec2 lampCell = p / 18.;
+          float lampSeed = hash12(floor(lampCell));
+          vec2 lampAt = fract(lampCell) - .5 - (vec2(lampSeed, fract(lampSeed * 7.13)) - .5) * .5;
+          float lampAA = max(fp / 18., .02);
+          float lampDot = 1. - smoothstep(.22 - lampAA, .22 + lampAA, length(lampAt));
+          float lamps = mix(lampDot * step(lampSeed, .7) / (.7 * 3.1416 * .22 * .22), 1., smoothstep(.35, 1., lampAA * 2.));
+          float overview = distantLight * overviewGain * (1. - max(core * resolved, closeDetail));
+          overview = (1. - exp(-overview * 1.6)) / 1.6 * .62;
+          emit = max(emit, vec3(.65,.47,.29) * overview * lamps);
           emit *= uCity * cityLightShimmer(vWorld);
         }
         // a teal ring that pulses around the campus when it is in focus
