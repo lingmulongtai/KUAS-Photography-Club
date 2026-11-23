@@ -16,7 +16,7 @@ const local = (href: string) => languagePath(href, lang);
 import { credit, getTrips } from '../lib/trips';
 import { completeSpotPreviews } from '../data/spot-samples';
 import { SPOTS } from '../data/spots';
-import { REGIONAL_PLACES, PANORAMA_VIEWS, VIEWS } from '../scripts/hero/views';
+import { REGIONAL_PLACES, EXTRA_LANDMARKS, PANORAMA_VIEWS, VIEWS } from '../scripts/hero/views';
 const pinTrips = completeSpotPreviews((await getTrips())
   .filter((t) => t.data.spot)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
@@ -45,6 +45,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
         <option value="" selected disabled>{en ? 'Explore a place' : 'スポットへ移動'}</option>
         {SPOTS.map(spot => <option value={spot.id}>{spot[lang]}</option>)}
         {REGIONAL_PLACES.map(p => <option value={'region-'+p.id}>{p[lang]}</option>)}
+        {EXTRA_LANDMARKS.map(m => <option value={m.id}>{m[lang]}</option>)}
       </select>
       <button type="button" class="spot-return" hidden>{en ? 'Back to view' : '展望へ戻る'}</button>
       <a class="spot-records" hidden>{en ? 'Outing records' : '活動記録'}</a>
@@ -175,7 +176,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   import { mountGlassRefraction } from '../scripts/hero/glisse-refraction';
   import { createExploreButtons } from '../scripts/hero/explore-touch';
   import { SPOTS, type SpotId } from '../data/spots';
-  import { REGIONAL_PLACES, PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
+  import { REGIONAL_PLACES, EXTRA_LANDMARKS, PANORAMA_VIEWS, VIEWS, spotDestination } from '../scripts/hero/views';
   import type {Season} from '../scripts/hero/seasons';
 
   const stage = document.querySelector<HTMLElement>('.stage[data-demo="hero"]');
@@ -390,7 +391,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
       if (atPanorama && demo) panorama=demo.view;
       viewArrived = arrived;
       const selected = describeView(mode, arrived);
-      spotSelect.value=atPanorama?'':selected?.id??(demo?.view.startsWith('region-')?demo.view:'');
+      spotSelect.value=atPanorama?'':selected?.id??(demo?.view.startsWith('region-')||EXTRA_LANDMARKS.some(m=>m.id===demo?.view)?demo?.view??'':'');
       spotReturn.hidden=mode==='campus'||atPanorama;
       spotRecords.hidden=spotReturn.hidden||!selected;
       viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(mode==='city' && b.dataset.view===demo?.view)));
@@ -498,17 +499,50 @@ const pinTrips = completeSpotPreviews((await getTrips())
             else if (mobileExplore.matches) hero.scrollIntoView({block:'start',behavior:'instant'});
             card.hidden=enabled||demo?.mode!=='campus';
           },
-          onAction: (id) => demo?.flyTo(spotDestination(id)),
+          onAction: (target) => demo?.flyTo(target),
           onMode: setView,
           avoid: () => {
             const base = stage.getBoundingClientRect();
-            // the header and the view bar float over the top of the stage: no pin under them either
-            return [hero.querySelector('.copy'), hero.querySelector('.copy h1'), hero.querySelector('.sky-chip'), card.hidden ? null : card, document.querySelector('.site-header'), hero.querySelector('.views'), hero.querySelector('.spot-nav'), exploreTouch.hidden ? null : exploreTouch]
-              .filter((n): n is Element => !!n)
-              .map((n) => {
-                const r = n.getBoundingClientRect();
-                return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
-              });
+            const isExploring = hero.classList.contains('is-exploring');
+            const isCampus = hero.dataset.view === 'campus';
+            const copyVisible = !isExploring && !isCampus;
+            const skyVisible = !isCampus || isExploring;
+            const rectOf = (el: Element | null, tightText = false) => {
+              if (!el) return null;
+              const cs = getComputedStyle(el);
+              if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.05) return null;
+              let r = el.getBoundingClientRect();
+              if (r.width <= 0 || r.height <= 0) return null;
+              if (tightText) {
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                const tr = range.getBoundingClientRect();
+                if (tr.width > 0 && tr.height > 0) r = tr;
+              }
+              return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+            };
+            // Only avoid visible HUD elements, hugging copy text tightly so empty grid track space never hides centre landmarks.
+            const boxes = [
+              ...(copyVisible
+                ? [
+                    rectOf(hero.querySelector('.copy .next-chip')),
+                    rectOf(hero.querySelector('.copy .eyebrow'), true),
+                    rectOf(hero.querySelector('.copy h1'), true),
+                    rectOf(hero.querySelector('.copy .lead-full'), true),
+                    rectOf(hero.querySelector('.copy .lead-short'), true),
+                    rectOf(hero.querySelector('.copy .traits')),
+                    ...Array.from(hero.querySelectorAll('.copy .ctas > *')).map((n) => rectOf(n)),
+                  ]
+                : []),
+              skyVisible ? rectOf(hero.querySelector('.sky-chip')) : null,
+              exploreGuide.hidden ? null : rectOf(exploreGuide),
+              card.hidden ? null : rectOf(card),
+              rectOf(document.querySelector('.site-header')),
+              rectOf(hero.querySelector('.views')),
+              rectOf(hero.querySelector('.spot-nav')),
+              ...(exploreTouch.hidden ? [] : Array.from(exploreTouch.children).map((n) => rectOf(n))),
+            ];
+            return boxes.filter((r): r is { x: number; y: number; w: number; h: number } => !!r);
           },
         })),
       // The scene already uses a multisampled HDR target. Its final full-screen quad
@@ -530,7 +564,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
     back.addEventListener('click', returnToPanorama);
     spotReturn.addEventListener('click', returnToPanorama);
     spotSelect.addEventListener('change',()=>{
-      if (REGIONAL_PLACES.some(p=>'region-'+p.id===spotSelect.value)) demo?.flyTo(spotSelect.value as HeroView);
+      if (REGIONAL_PLACES.some(p=>'region-'+p.id===spotSelect.value) || EXTRA_LANDMARKS.some(m=>m.id===spotSelect.value)) demo?.flyTo(spotSelect.value as HeroView);
       else if (SPOTS.some(spot=>spot.id===spotSelect.value)) demo?.flyTo(spotDestination(spotSelect.value as SpotId));
     });
     hero.addEventListener('keydown', (e) => {
@@ -1200,11 +1234,35 @@ const pinTrips = completeSpotPreviews((await getTrips())
     opacity: 1;
   }
 
+  .hero :global(.hero-pin.is-far.is-shown) {
+    opacity: 0.78;
+  }
+
+  .hero :global(.hero-pin.is-far:hover),
+  .hero :global(.hero-pin.is-far:focus-within) {
+    opacity: 1;
+  }
+
+  .hero :global(.hero-pin.is-far .pin-dot) {
+    width: 6px;
+    height: 6px;
+    margin: -3px 0 0 -3px;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.75), 0 0 8px rgba(100, 190, 198, 0.75);
+  }
+
   .hero :global(.hero-pin:not(.is-shown)) { pointer-events: none; }
   .hero :global(.pin-trigger) { color: inherit; font: inherit; background: none; border: 0; padding: 0; }
   .hero :global(button.pin-trigger) { position: absolute; width: 44px; height: 44px; left: -22px; top: -22px; cursor: pointer; }
   .hero :global(button.pin-trigger .pin-dot) { left: 22px; top: 22px; }
   .hero :global(button.pin-trigger .pin-text) { left: 22px; bottom: 34px; }
+  .hero :global(.hero-pin.pin-slot-bottom button.pin-trigger .pin-text) { left: 22px; bottom: auto; top: 34px; transform: translateX(-50%); text-align: center; }
+  .hero :global(.hero-pin.pin-slot-bottom .pin-text)::after { left: 50%; top: auto; bottom: 100%; width: 1px; height: 8px; transform: none; }
+  .hero :global(.hero-pin.pin-slot-right button.pin-trigger .pin-text) { left: 36px; right: auto; bottom: auto; top: 22px; transform: translateY(-50%); text-align: left; }
+  .hero :global(.hero-pin.pin-slot-right .pin-text)::after { left: -10px; right: auto; top: 50%; bottom: auto; width: 8px; height: 1px; transform: translateY(-50%); }
+  .hero :global(.hero-pin.pin-slot-right .pin-visited) { margin-left: 0; margin-right: auto; }
+  .hero :global(.hero-pin.pin-slot-left button.pin-trigger .pin-text) { left: auto; right: 36px; bottom: auto; top: 22px; transform: translateY(-50%); text-align: right; }
+  .hero :global(.hero-pin.pin-slot-left .pin-text)::after { left: auto; right: -10px; top: 50%; bottom: auto; width: 8px; height: 1px; transform: translateY(-50%); }
+  .hero :global(.hero-pin.pin-slot-left .pin-visited) { margin-left: auto; margin-right: 0; }
   .hero :global(.hero-pin.is-linked) { pointer-events: auto; }
   .hero :global(.hero-pin.is-open) { z-index: 5; }
   .hero :global(.pin-trips) {
