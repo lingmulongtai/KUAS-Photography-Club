@@ -51,10 +51,9 @@ import { buildDaimonji, fireClearing } from './daimonji';
 import { landmarkOrbit } from './landmark-orbit';
 import { createIntroCameraMotion } from './intro-camera';
 import { createSharedPhotoSlot } from './shared-photo';
-import { VIEWS, flightLift, openingPanorama, viewBelowClouds, type ViewDef, type HeroView } from './views';
+import { VIEWS, flightLift, openingPanorama, viewBelowClouds, type ViewDef, type HeroView, type HeroDestination } from './views';
 import { openingPriorities } from './opening-priority';
-import type { SpotId } from '../../data/spots';
-export type { HeroView } from './views';
+export type { HeroView, HeroDestination } from './views';
 import { buildOcclusion, occlusionFile, occlusionTexture } from './building-occlusion';
 import { buildIslands } from './islands';
 import { islandMask } from './island-mask';
@@ -115,7 +114,7 @@ export interface HeroOptions extends HeroLoadingCallbacks {
   onAreaLoading?:(loading:boolean)=>void;
   onExplore?:(exploring:boolean)=>void;
   /** A map destination was selected. */
-  onAction?: (id: SpotId) => void;
+  onAction?: (destination: HeroDestination) => void;
   /** The camera started moving to (or arrived at) a view. */
   onMode?: (mode: HeroMode, arrived: boolean) => void;
   reducedMotion?: boolean;
@@ -1179,6 +1178,7 @@ export function createHero(
         const [w,n,e,s]=result.bounds;
         travelBounds=[w-500,n-500,e+500,s+500];
         groundAt=result.ground;
+        labels?.setGround(result.ground,result.bounds);
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
         terrain.uniforms.uSurveyOn.value=1;
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
@@ -1445,7 +1445,8 @@ export function createHero(
   function flyTo(target: 'campus' | HeroView, t: number) {
     warmRegionalOnInteract?.();
     const request=++flightRequest;
-    if(target.startsWith('region-') && !regional && ensureRegionalGround){
+    const needsRegional = target.startsWith('region-') || target === 'hikone' || target === 'todaiji' || target === 'kasuga';
+    if(needsRegional && !regional && ensureRegionalGround){
       opts.onAreaLoading?.(true);
       void ensureRegionalGround().then(()=>{
         opts.onAreaLoading?.(false);
@@ -1455,7 +1456,7 @@ export function createHero(
     }
     stopIntroCamera();
     const fromExplorer=exploring?{pos:camera.position.clone(),target:lastTarget.clone()}:null;
-    if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);}
+    if(exploring){exploring=false;clearKeys();el.removeAttribute('tabindex');env.uHighlight.value=mode==='campus'?1:0;opts.onExplore?.(false);labels?.invalidateLayout();}
     zoom.reset();
     updateZoom();
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
@@ -1467,6 +1468,7 @@ export function createHero(
       resetLook();
       opts.onMode?.(to,false);
       opts.onMode?.(to,true);
+      labels?.invalidateLayout();
       return;
     }
     cancelTerrainRecenter?.();
@@ -1505,6 +1507,7 @@ export function createHero(
       env.uHighlight.value = to === 'campus' ? 1 : 0;
       opts.onMode?.(to, false);
       opts.onMode?.(to, true);
+      labels?.invalidateLayout();
       return;
     }
 
@@ -1524,6 +1527,7 @@ export function createHero(
     };
     shapeFlightArc(flight);
     opts.onMode?.(to, false);
+    labels?.invalidateLayout();
   }
 
   const lastTarget = new THREE.Vector3();
@@ -1577,6 +1581,7 @@ export function createHero(
         flight = null;
         modeSince = t;
         opts.onMode?.(mode, true);
+        labels?.invalidateLayout();
       }
     } else {
       const p = mode === 'city' ? cityPose(t) : campusPose(t);
@@ -1642,7 +1647,8 @@ export function createHero(
         const d=lastTarget.clone().sub(camera.position).normalize();freeBearing=Math.atan2(d.x,-d.z)/RAD;freePitch=Math.asin(d.y)/RAD;
         ensureCityRegion?.(freePosition,freeBearing);nextAreaCheck=performance.now()+250;
         exploring=true;env.uHighlight.value=1;el.tabIndex=0;el.focus({preventScroll:true});opts.onExplore?.(true);
-      }else flyTo(mode==='campus'?'campus':view,clock);
+        labels?.invalidateLayout();
+      }else {flyTo(mode==='campus'?'campus':view,clock);labels?.invalidateLayout();}
     },
     get exploring(){return exploring;},
     get mode() {
