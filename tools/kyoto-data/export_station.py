@@ -5,6 +5,7 @@ Requires host Python with Pillow for the neighboring buildings' photo atlases.
 Then run gltfpack -i station.glb -o kyoto-station-district.glb -cc -ce ext -mm -km
     -si 0.36 -se 0.0015 -sp -tw -tl 2048 -tq 8 (native gltfpack 1.3)
 Repeat with --compact after the three paths for kyoto-station-district-compact.glb.
+Then derive kyoto-station-district-far.glb with node tools/kyoto-data/build-station-far.mjs.
 """
 import sys
 import tempfile

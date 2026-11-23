@@ -45,6 +45,8 @@ async function verifyDistrictAsset(filename) {
   assert.ok(model.extensionsRequired.includes('EXT_meshopt_compression'));
   assert.ok(model.images.every(image => image.mimeType === 'image/webp' && Number.isInteger(image.bufferView)));
   assert.equal(model.images.length, 10);
+  let triangles = 0;
+  for (const mesh of model.meshes) for (const primitive of mesh.primitives) triangles += model.accessors[primitive.indices].count / 3;
   const bounds = new THREE.Box3();
   for (const node of model.nodes.filter(node => node.mesh !== undefined)) {
     for (const primitive of model.meshes[node.mesh].primitives) {
@@ -65,13 +67,16 @@ async function verifyDistrictAsset(filename) {
   assert.ok(model.meshes.some(mesh => mesh.primitives.some(primitive =>
     model.materials[primitive.material].name === 'KYcb0061_org.001'
   )), 'the opaque station envelope can be selected for planar wall lighting');
-  return file.length;
+  return {bytes: file.length, triangles};
 }
 
-test('both station detail profiles retain the surveyed geometry, embedded photos and plaza', async () => {
+test('every station profile retains the surveyed district, embedded photos and plaza', async () => {
   const full = await verifyDistrictAsset('kyoto-station-district.glb');
   const compact = await verifyDistrictAsset('kyoto-station-district-compact.glb');
-  assert.ok(compact < full * .85, 'the compact detail profile reduces the download');
+  const far = await verifyDistrictAsset('kyoto-station-district-far.glb');
+  assert.ok(compact.bytes < full.bytes * .85, 'the compact detail profile reduces the download');
+  assert.ok(far.bytes < full.bytes * .3, 'the distant profile is a fraction of the detail download');
+  assert.ok(far.triangles < full.triangles * .35, 'the distant profile is simplified from the detail model');
 });
 
 test('plaza layers take street surfaces instead of their survey display colours', async () => {
