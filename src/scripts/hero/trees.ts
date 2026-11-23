@@ -7,6 +7,7 @@ import { rng } from './util';
 import { forestCells, woodland, seasonalWoodland } from './forest-layout';
 import { treeProfile, standDensity } from './tree-profile';
 import { SHADOW_LAYER } from './shadow';
+import { cherryPick, cherryShare } from './cherry-groves';
 
 /** Ground photographs tint the crowns. The planting map is independent of the visited views. */
 export function createForest(
@@ -85,7 +86,9 @@ export function createForest(
         const c = sample(x,z) ?? profile.tint;
         tint.push(...profile.tint.map((v,i)=>v*.8+Math.min(c[i],.45)*.2));
         kind.push(cedar ? 1 : 0);
-        season.push(cedar?0:1,0);
+        // A representative stand crown blends its share of blossom; a single tree flowers or not.
+        const blossom = cedar ? 0 : cherryShare(x,z);
+        season.push(cedar?0:1, lod >= 2 ? blossom : cherryPick(x,z) < blossom ? 1 : 0);
         lods.push(lod);
         shapes.push(profile.aspect,profile.lean,profile.crown);
     }
