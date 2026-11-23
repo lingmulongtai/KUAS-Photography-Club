@@ -10,7 +10,6 @@ import {templeHall} from './compound-models';
 import {heianShrine,HEIAN_CENTER} from './heian-shrine';
 import {imperialPalace} from './imperial-palace';
 import {nijoCastle} from './nijo-castle';
-import {kyotoStation,stationGlazing,STATION_CENTER} from './kyoto-station';
 import {fushimiInari} from './fushimi-inari';
 import {byodoinParts} from './byodoin';
 
@@ -95,7 +94,6 @@ interface Placed {
 
 export const LANDMARKS: Record<string, Placed> = {
   kyotoTower: { parts: kyotoTower(), ...KYOTO_TOWER_LOCATION },
-  kyotoStation:{parts:kyotoStation(),...STATION_CENTER},
   toji: { parts: pagoda(5, 9.5, 6.6, 54.8, 12, WOOD, ROOF), x: -984, z: 2632 },
   tojiKondo:{parts:templeHall(44.56,29.11,24.9,true),x:-1077.32,z:2578.44},
   tojiKodo:{parts:templeHall(45.72,26.12,17.7),x:-1076.97,z:2534.76},
@@ -115,7 +113,6 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
   const geos: THREE.BufferGeometry[] = [...extraParts,...fushimiInari((x,z)=>hf.height(x,z)),...byodoinParts((x,z)=>hf.height(x,z))].map(paint);
   const positions: Record<string, THREE.Vector3> = {};
   const sites:Record<string,Placed>={...LANDMARKS,...imperialPalace(),...nijoCastle()};
-  const stationGeos: THREE.BufferGeometry[] = [];
   for (const [name, l] of Object.entries(sites)) {
     const p = l.lat !== undefined ? toLocal(l.lat, l.lon!) : { x: l.x!, z: l.z! };
     const y = hf.height(p.x, p.z);
@@ -124,11 +121,10 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
       const g = paint(part);
       if (l.rotY) g.rotateY(l.rotY);
       g.translate(p.x, y, p.z);
-      (name === 'kyotoStation' ? stationGeos : geos).push(g);
+      geos.push(g);
     }
   }
-  const stationStart = geos.reduce((n,g) => n + g.getAttribute('position').count, 0);
-  const geo = mergeGeometries(geos.concat(stationGeos));
+  const geo = mergeGeometries(geos);
   const material = new THREE.ShaderMaterial({
     uniforms: env,
     vertexShader: /* glsl */ `
@@ -172,28 +168,7 @@ export function buildLandmarks(env: Env, hf: Heightfield,extraParts:Part[]=[]) {
     `,
   });
   const mesh = new THREE.Mesh(geo, material);
-  // Keep the city and stairs visible through the glazing in a single sorted draw.
-  const glazing=new THREE.Mesh(stationGlazing(),new THREE.ShaderMaterial({
-    uniforms:env,transparent:true,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true,
-    vertexShader:`varying vec3 vWorld; varying vec3 vNormal;
-      void main(){vWorld=(modelMatrix*vec4(position,1.)).xyz; vNormal=mat3(modelMatrix)*normal;
-        gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`,
-    fragmentShader:`${ENV_GLSL}
-      varying vec3 vWorld; varying vec3 vNormal;
-      void main(){vec3 view=normalize(cameraPosition-vWorld);
-        vec3 n=faceforward(normalize(vNormal),-view,normalize(vNormal));
-        float grazing=pow(1.-clamp(dot(n,view),0.,1.),3.);
-        vec3 reflection=skyColor(reflect(-view,n));
-        vec3 color=vec3(.035,.078,.107)+reflection*(.30+.45*grazing);
-        gl_FragColor=vec4(applyHaze(color,vec3(.075,.049,.023)*uCity,vWorld),.38+.42*grazing);}`,
-  }));
-  glazing.name='kyoto-station-glazing';
-  glazing.position.copy(positions.kyotoStation);
-  function showStationFallback(show: boolean) {
-    geo.setDrawRange(0, show ? Infinity : stationStart);
-    glazing.visible = show;
-  }
-  return { mesh, glazing, positions, showStationFallback };
+  return { mesh, positions };
 }
 
 /** Red aviation lights blinking on the tallest structures. */

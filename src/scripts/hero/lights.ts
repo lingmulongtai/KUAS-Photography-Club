@@ -10,7 +10,7 @@ import { lightSpriteGeometry, LIGHT_SPRITE_VERTEX, LIGHT_SPRITE_FRAGMENT } from 
 /* Street lamps along the real road network. */
 
 /** Points spaced along every road: street lamps, brighter and closer together on the avenues. */
-export function* buildLampsSteps(env: Env, hf: Heightfield, lines: LineFeature[], quality: number, regional = false) {
+export function* buildLampsSteps(env: Env, hf: Heightfield, lines: LineFeature[], quality: number) {
   const r = rng(77);
   const pos: number[] = [];
   const tint: number[] = [];
@@ -46,12 +46,11 @@ export function* buildLampsSteps(env: Env, hf: Heightfield, lines: LineFeature[]
   const geo = lightSpriteGeometry(new THREE.InstancedBufferAttribute(new Float32Array(pos),3));
   geo.setAttribute('aTint', new THREE.InstancedBufferAttribute(new Float32Array(tint), 3));
   const material = new THREE.ShaderMaterial({
-    uniforms: { ...env, uScale: { value: 1 }, uDpr: { value: 1 }, uRegionalLamps: { value: regional } },
+    uniforms: { ...env, uScale: { value: 1 }, uDpr: { value: 1 } },
     vertexShader: /* glsl */ `
       ${ENV_GLSL}
       ${LIGHT_SPRITE_VERTEX}
       attribute vec3 aTint;
-      uniform bool uRegionalLamps;
       varying vec3 vColor;
       void main(){
         vec4 mv = viewMatrix * vec4(aLightPosition, 1.);
@@ -67,10 +66,10 @@ export function* buildLampsSteps(env: Env, hf: Heightfield, lines: LineFeature[]
         // then has the same glow per pixel on a narrow phone, where its lamps crowd together,
         // as on a wide screen. The gain keeps it bright enough to bloom.
         float fade = clamp(s / 1.2, .05, 1.);
-        float far = min(1., pow(fade, 1.5) * 7.);
-        // The regional road field already supplies the distant glow. Let each
-        // unresolved lamp contribute only the screen area of its bright core.
-        if (uRegionalLamps) far = min(1., s*s);
+        // Beyond ~15 km tens of thousands of boosted lamps stack into a white band on the
+        // horizon; there each lamp tapers to the screen area of its bright core. Kyoto and
+        // the loaded regions share this curve so neither reads brighter at the same range.
+        float far = min(1., pow(fade, 1.5) * 7. * smoothstep(.04, .25, s) + s * s);
         vColor = aTint * uCity * mix(tr, 1., .4) * cityLightShimmer(aLightPosition) * 2.2 * near * far * (core*core/(px*px));
         gl_Position = lightSprite(mv,px);
       }

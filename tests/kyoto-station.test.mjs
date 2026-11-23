@@ -3,38 +3,14 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
-import {kyotoStation,stationGlazing,replacesKyotoStation} from '../src/scripts/hero/kyoto-station.ts';
+import {plazaSurface,replacesKyotoStation} from '../src/scripts/hero/kyoto-station.ts';
 import {loadBuildings} from '../src/scripts/hero/buildings-data.ts';
-
-test('Kyoto Station has an open atrium and a grand stair rising west',()=>{
-  const p=kyotoStation(),material=new THREE.MeshBasicMaterial(),meshes=p.map(part=>new THREE.Mesh(part.geo,material));
-  const ray=(x,z)=>new THREE.Raycaster(new THREE.Vector3(x,70,z),new THREE.Vector3(0,-1,0)).intersectObjects(meshes)[0];
-  assert.ok(ray(14,2).point.y<1,'atrium is not a full-height solid block');
-  assert.ok(ray(-121,2).point.y>ray(-51,2).point.y+20,'stairs rise to the west');
-  assert.ok(ray(-200,2).point.y>59,'western wing keeps its skyline');
-  let triangles=0;const bounds=new THREE.Box3();
-  for(const {geo} of p){geo.computeBoundingBox();bounds.union(geo.boundingBox);triangles+=(geo.index?.count??geo.getAttribute('position').count)/3;
-    assert.ok([...geo.getAttribute('position').array].every(Number.isFinite));geo.dispose();}
-  assert.ok(bounds.max.y<61&&bounds.max.x-bounds.min.x<481);assert.ok(triangles<22000);material.dispose();
-});
 
 test('only the station main block is replaced; platform roofs are retained',async(t)=>{
   const original=globalThis.fetch;globalThis.fetch=async(url)=>new Response(await readFile(new URL('../public'+url,import.meta.url)));
   t.after(()=>{globalThis.fetch=original;});const data=await loadBuildings();
   assert.equal(data.polys.filter(p=>replacesKyotoStation(p.ring)).length,1);
   assert.ok(data.polys.some(p=>p.ring[0]>-250&&p.ring[0]<180&&p.ring[1]>2080&&p.ring[1]<2140&&!replacesKyotoStation(p.ring)));
-});
-
-test('glass encloses the north facade and roof above an open concourse',()=>{
-  const geometry=stationGlazing(), material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
-  const mesh=new THREE.Mesh(geometry,material);
-  const ray=(x,y,z,dx,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(x,y,z),new THREE.Vector3(dx,dy,dz)).intersectObject(mesh);
-  for(const x of [-73,-17,23,58]){
-    assert.ok(ray(x,24,-90,0,0,1)[0].point.z < -42);
-    assert.ok(ray(x,70,1,0,-1,0)[0].point.y > 49);
-    assert.equal(ray(x,4,-90,0,0,1).length,0);
-  }
-  geometry.dispose(); material.dispose();
 });
 
 async function verifyDistrictAsset(filename) {
@@ -45,6 +21,8 @@ async function verifyDistrictAsset(filename) {
   assert.ok(model.extensionsRequired.includes('EXT_meshopt_compression'));
   assert.ok(model.images.every(image => image.mimeType === 'image/webp' && Number.isInteger(image.bufferView)));
   assert.equal(model.images.length, 10);
+  let triangles = 0;
+  for (const mesh of model.meshes) for (const primitive of mesh.primitives) triangles += model.accessors[primitive.indices].count / 3;
   const bounds = new THREE.Box3();
   for (const node of model.nodes.filter(node => node.mesh !== undefined)) {
     for (const primitive of model.meshes[node.mesh].primitives) {
@@ -65,13 +43,27 @@ async function verifyDistrictAsset(filename) {
   assert.ok(model.meshes.some(mesh => mesh.primitives.some(primitive =>
     model.materials[primitive.material].name === 'KYcb0061_org.001'
   )), 'the opaque station envelope can be selected for planar wall lighting');
-  return file.length;
+  return {bytes: file.length, triangles};
 }
 
-test('both station detail profiles retain the surveyed geometry, embedded photos and plaza', async () => {
+test('every station profile retains the surveyed district, embedded photos and plaza', async () => {
   const full = await verifyDistrictAsset('kyoto-station-district.glb');
   const compact = await verifyDistrictAsset('kyoto-station-district-compact.glb');
-  assert.ok(compact < full * .85, 'the compact detail profile reduces the download');
+  const far = await verifyDistrictAsset('kyoto-station-district-far.glb');
+  assert.ok(compact.bytes < full.bytes * .85, 'the compact detail profile reduces the download');
+  assert.ok(far.bytes < full.bytes * .3, 'the distant profile is a fraction of the detail download');
+  assert.ok(far.triangles < full.triangles * .35, 'the distant profile is simplified from the detail model');
+});
+
+test('plaza layers take street surfaces instead of their survey display colours', async () => {
+  const file = await readFile(new URL('../public/kyoto/kyoto-station-district.glb', import.meta.url));
+  const model = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
+  const surface = material => plazaSurface({name: material.name,
+    color: new THREE.Color().fromArray(material.pbrMetallicRoughness.baseColorFactor ?? [1, 1, 1])});
+  const kinds = Object.fromEntries(model.materials.filter(m => m.name.startsWith('Plaza-'))
+    .map(m => [m.pbrMetallicRoughness.baseColorFactor.slice(0, 3).map(v => v.toFixed(2)).join(','), surface(m)]));
+  assert.deepEqual(kinds, {'0.92,0.92,0.92': 2, '0.19,0.30,0.00': 3, '0.32,0.32,0.32': 1, '0.50,0.50,0.50': 1});
+  assert.equal(surface(model.materials.find(m => m.name.startsWith('District facade'))), 0);
 });
 
 test('the station replacement indices match the shipped city footprints', async () => {

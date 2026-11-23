@@ -77,7 +77,6 @@ try{
     manifest.push({id,pref,lon,lat,file:'/kansai/landmarks/'+id+'.glb',rings,approaches});
   }
   for(const [name,l] of Object.entries(LANDMARKS)){
-    if(name==='kyotoStation')continue;
     const [lon,lat]=l.lat===undefined?geo(l.x,l.z):[l.lon,l.lat];
     await save(name,l.parts,lon,lat);
   }
@@ -144,7 +143,7 @@ try{
   const garden=JSON.parse(await fs.readFile(new URL('nakanoshima-beds.json',output)));
   const roseLon=135.50788,roseLat=34.69240;
   await save('nakanoshima-roses',roseGarden(garden.beds,roseLon,roseLat),roseLon,roseLat,[],'27');
-  const station=LANDMARKS.kyotoStation;
+  const {STATION_CENTER:station}=await load('kyoto-station');
   const matches=JSON.parse(await fs.readFile(new URL('../../src/data/kyoto-station-replacements.json',import.meta.url)));
   const buildings=await loadBuildings(),rings=[rect(-335.2,1911.35,142.74,2004.04).map(([x,z])=>geo(x,z))];
   for(const [i] of matches.boxes){

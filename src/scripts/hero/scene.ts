@@ -63,7 +63,7 @@ import { withoutTunnels } from './tunnels';
 import {createRegionalLoader,regionAt,regionInView,type CityRegion} from './regional-loader';
 import {replacesHeianFootprint} from './heian-shrine';
 import {replacesNijoFootprint,replacesNijoBox} from './nijo-castle';
-import {replacesKyotoStation} from './kyoto-station';
+import {replacesKyotoStation,STATION_CENTER} from './kyoto-station';
 import stationMatches from '../../data/kyoto-station-replacements.json';
 import {kawaramachiFacades} from './kawaramachi-facades';
 import {gionStreetscape} from './gion-streetscape';
@@ -79,6 +79,7 @@ import {moveExplorer} from './free-explore';
 import {climateOf,seasonWeights,type Season} from './seasons';
 import {buildSnow} from './season-effects';
 import {philosopherCherries} from './philosopher-cherries';
+import {kamoCherries} from './cherry-groves';
 import {buildKiyomizuBeam} from './kiyomizu-beam';
 import {replacesInari,inariClearing} from './fushimi-inari';
 import {createTrafficView} from './traffic-view';
@@ -300,6 +301,12 @@ export function createHero(
     const coreForestBits = forestBits('lines.bin');
     const landmarkCatalogPromise = kansaiJson<{id:string;lon:number;lat:number;rings:Ring[]}[]>('landmarks/index.json').catch(() => []);
     const coreSacredPromise = sacredForBox(BUILDINGS_BOX);
+    // Kyoto Station at every distance beyond its detail model, derived from the same survey.
+    const stationDetailModule = import('./station-detail');
+    const stationFarBytes = loadBinary('kyoto-station-district-far.glb').catch(error => {
+      console.warn('Distant Kyoto Station unavailable; using the mapped footprints', error);
+      return null;
+    });
     // A resident skyline and the corresponding detailed streets share one survey decode.
     const buildingCache=new Map<string,ReturnType<typeof loadBuildings>>();
     const loadRegionalBuildings=(region:CityRegion,priority?:RequestPriority)=>{
@@ -621,7 +628,7 @@ export function createHero(
     const replacesCoreSacred = sacredMatcher(coreSacred);
     const hojo=landmarks.positions.ryoanji;
     const hojoBox:Box=[hojo.x-14.5,hojo.z-15.5,hojo.x+14.5,hojo.z+10.5];
-    const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>!katsura.replaced.has(p)&&!replacesHeianFootprint(p.ring)&&!replacesNijoFootprint(p.ring)&&!replacesKyotoStation(p.ring)).flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
+    const modeledBuildings = {...buildings,polys:buildings.polys.filter(p=>!katsura.replaced.has(p)&&!replacesHeianFootprint(p.ring)&&!replacesNijoFootprint(p.ring)).flatMap(p=>buildingCutout(p,hojoBox,(x,z)=>hf.height(x,z))).filter(p=>{
       let x=0,z=0;for(let i=0;i<p.ring.length;i+=2){x+=p.ring[i];z+=p.ring[i+1];}
       const cx=x/(p.ring.length/2),cz=z/(p.ring.length/2);
       return !replaced(cx,cz)&&!replacesCoreSacred(cx,cz);
@@ -633,7 +640,8 @@ export function createHero(
       () => true,
       (b) => kawaramachi.dressed.has(b) || gion.dressed.has(b),
       VIEWS.shogunzuka.eye,
-      new Set([...stationMatches.boxes.map(([i]) => buildings.boxes[i]), ...stationMatches.polys.map(([i]) => buildings.polys[i])]),
+      new Set([...stationMatches.boxes.map(([i]) => buildings.boxes[i]), ...stationMatches.polys.map(([i]) => buildings.polys[i]),
+        ...buildings.polys.filter(p => replacesKyotoStation(p.ring))]),
     );
     if (!city) throw new Error('Initial city preparation cancelled');
     const coreSacredGeo = buildSacredGeometry(coreSacred, (x, z) => hf.height(x, z));
@@ -647,7 +655,6 @@ export function createHero(
     warmProgram(city.group);
     if (city.overview) warmProgram(city.overview);
     warmProgram(landmarks.mesh);
-    warmProgram(landmarks.glazing);
     const streetPrograms=prepareCityMaterials(city.materials,prepare);
     city.fallback.name = 'Station district fallback';
     panoramaCity = createPanoramaCity(city.overview ? [city.group, city.overview] : [city.group],
@@ -677,7 +684,9 @@ export function createHero(
     const garden=landmarks.positions.ryoanji;
     const rockGarden=(x:number,z:number)=>Math.abs(x-garden.x)<14 && z-garden.z>10 && z-garden.z<22;
     const waterArea=islandMask(lines.filter(f=>f.kind===LINE.water).map(f=>f.pts));
-    const cherries=philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z));
+    const cherries=[...philosopherCherries((x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z)),
+      ...kamoCherries(channel,(x,z)=>hf.height(x,z),(x,z)=>buildingsMask(x,z)||waterArea(x,z),
+        (x,z)=>roadsAndWater(x,z)&&!waterArea(x,z))];
     let cultivated:((x:number,z:number)=>boolean)|undefined;
     const forestTerrain={
       get bounds(){return regional?.bounds??hf.bounds;},
@@ -736,9 +745,25 @@ export function createHero(
     casts(campusModel);
     warmProgram(campusModel);
     basinLod.detail.add(city.group);
-    scene.add(landmarks.mesh,landmarks.glazing);
-    const station = landmarks.positions.kyotoStation;
+    scene.add(landmarks.mesh);
+    const station = new THREE.Vector3(STATION_CENTER.x, hf.height(STATION_CENTER.x, STATION_CENTER.z), STATION_CENTER.z);
     let stationDetail: Awaited<ReturnType<typeof import('./station-detail').loadStationDetail>> | undefined;
+    let stationFar: typeof stationDetail;
+    // The mapped footprints stay as a fallback only if the distant survey model is missing.
+    const showDistantStation = (show: boolean) => {
+      if (stationFar) stationFar.group.visible = show;
+      else city.fallback.visible = show;
+    };
+    const stationFarReady = stationFarBytes.then(async bytes => {
+      if (!bytes) return;
+      const model = await (await stationDetailModule).loadStationDetail(env, hf, station, 'far', bytes);
+      await prepare(model.group);
+      stationFar = model;
+      model.group.visible = city.fallback.visible;
+      city.fallback.visible = false;
+      scene.add(model.group);
+      shadow.invalidate();
+    }).catch(error => console.warn('Distant Kyoto Station failed to load', error));
     let stationLoading = false;
     let retryStationAt = 0;
     updateStation = () => {
@@ -749,8 +774,7 @@ export function createHero(
         const visible = distanceSq <= range * range;
         if (visible !== group.visible) {
           group.visible = visible;
-          landmarks.showStationFallback(!visible);
-          city.fallback.visible = !visible;
+          showDistantStation(!visible);
           shadow.invalidate();
         }
         if (distanceSq > 2600 * 2600) {
@@ -760,7 +784,7 @@ export function createHero(
         }
       } else if (distanceSq < 1250 * 1250 && !stationLoading && performance.now() >= retryStationAt) {
         stationLoading = true;
-        void import('./station-detail').then(m => m.loadStationDetail(env, hf, station, lite)).then(detail => {
+        void stationDetailModule.then(m => m.loadStationDetail(env, hf, station, lite ? 'compact' : 'full')).then(detail => {
           stationDetail = detail;
           detail.group.visible = false;
           scene.add(detail.group);
@@ -933,7 +957,7 @@ export function createHero(
         }
       }
       await step();
-      lamps=await prepareSteps(buildLampsSteps(env,hf,data.lines,lite ? .4 : .7,true),step);group.add(lamps.points);
+      lamps=await prepareSteps(buildLampsSteps(env,hf,data.lines,lite ? .4 : .7),step);group.add(lamps.points);
       traffic=await prepareSteps(buildCarsSteps(env,hf,data.lines,lite ? .25 : .45,roadHeight),step);group.add(traffic.group);
       await step();
       road=buildRoadField(renderer,data.lines,lite?2048:4096,r.box);
@@ -1149,7 +1173,7 @@ export function createHero(
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
     prefetchCityRegion(landscapeCenter(VIEW),view);
     const skylinesReady = Promise.all([
-      openingRegion, openingRegionalPhoto, eastBackdropReady, openingLake, railwaysReady, initialRelief,
+      openingRegion, openingRegionalPhoto, eastBackdropReady, openingLake, railwaysReady, initialRelief, stationFarReady,
       ...openingSurveys,
       loadOverview('south'), loadOverview('osaka'), loadOverview('north'), loadOverview('tamba'),
     ]).then(() => loading.step());

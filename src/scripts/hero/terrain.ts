@@ -382,11 +382,28 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // so the two neighbouring areas cannot expose a strip of coarse light between them.
           float detailed = max(uRoadsOn*smoothstep(-30.,0.,coreInset),
             uRegionRoadsOn*smoothstep(-30.,0.,boxInset(uRegionRoadBox,p)));
-          float closeDetail = detailed*(1.-smoothstep(2400.,4000.,dist));
+          // Wherever a street field exists it is drawn as in the core, by pixel footprint
+          // rather than distance, so loaded regions and the city do not meet at a box edge.
+          // Once a pixel spans several blocks the resolved lanes and their haloes pile up
+          // into a white sheet, so every area hands over to the same overview average there.
+          float resolved = 1. - smoothstep(30., 110., fp);
+          float closeDetail = detailed * resolved;
+          emit *= mix(1., resolved, max(core, detailed));
           // Keep light on the horizon. A single enlarged overview texel must not
           // light an entire block below the camera while its real streets are loading.
           float overviewGain = mix(.08,1.,smoothstep(1200.,4000.,dist));
-          emit = max(emit, vec3(.65,.47,.29)*distantLight*overviewGain*(1.-max(core,closeDetail)));
+          // The overview averages street light over whole blocks, which reads as a milky
+          // wash beside resolved streets. Gather it into lamp-sized points with the same
+          // mean, and roll off dense centres instead of clipping them to white.
+          vec2 lampCell = p / 18.;
+          float lampSeed = hash12(floor(lampCell));
+          vec2 lampAt = fract(lampCell) - .5 - (vec2(lampSeed, fract(lampSeed * 7.13)) - .5) * .5;
+          float lampAA = max(fp / 18., .02);
+          float lampDot = 1. - smoothstep(.22 - lampAA, .22 + lampAA, length(lampAt));
+          float lamps = mix(lampDot * step(lampSeed, .7) / (.7 * 3.1416 * .22 * .22), 1., smoothstep(.35, 1., lampAA * 2.));
+          float overview = distantLight * overviewGain * (1. - max(core * resolved, closeDetail));
+          overview = (1. - exp(-overview * 1.6)) / 1.6 * .62;
+          emit = max(emit, vec3(.65,.47,.29) * overview * lamps);
           emit *= uCity * cityLightShimmer(vWorld);
         }
         // a teal ring that pulses around the campus when it is in focus
