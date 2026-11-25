@@ -130,8 +130,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
         </select>
       </label>
       <button type="button" class="explore-sky-back">{en ? 'Back to scenery ↑' : '景色へ戻る ↑'}</button>
-      <p class="hint">{en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。'}<span class="hint-more">{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Aircraft, seasonal snow, bonfires and the blue night beam are illustrative, rather than live flight, weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。飛行機や季節の雪、夜景の送り火・青い光は演出で、実際の運航・天気・催事を示すものではありません。'}</span></p>
-      <details class="hint-note"><summary>{en ? 'About the effects' : '演出について'}</summary><p>{en ? 'Tap a map label or choose a place to move closer. Swipe vertically to scroll the page. Tap the sky for a shooting star. Aircraft, seasonal snow, bonfires and the blue night beam are illustrative, rather than live flight, weather or event information.' : '地図の地点をタップするか、スポットを選ぶと近づけます。縦スワイプはページのスクロール。空をタップすると流れ星。飛行機や季節の雪、夜景の送り火・青い光は演出で、実際の運航・天気・催事を示すものではありません。'}</p></details>
     </aside>
   </div>
 
@@ -238,7 +236,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
     const card = hero.querySelector<HTMLElement>('.campus-card')!;
     const back = card.querySelector<HTMLButtonElement>('.back')!;
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
-    const cameraHint=hero.querySelector('.hint')!.firstChild!;
     const exploreGuide=hero.querySelector<HTMLElement>('.explore-guide')!;
     const exploreHelp=hero.querySelector<HTMLButtonElement>('.explore-help')!;
     const mobileExplore=matchMedia('(max-width: 900px)');
@@ -380,9 +377,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
       placeStatus.textContent=arrived
         ? (en ? `Now viewing ${placeName}.` : `${placeName}を表示しています。`)
         : (en ? 'Moving to the selected place.' : '選んだ地点へ移動しています。');
-      cameraHint.textContent = demo?.orbiting && mode==='city'
-        ? (en ? 'Drag or swipe to orbit this place.' : 'ドラッグでスポットを中心に360°回れます。スマホは横スワイプ。')
-        : (en ? 'Drag or swipe sideways to look around.' : 'ドラッグで360°見回せます。スマホは横スワイプ。');
       return selected;
     };
     const setView = (mode: HeroMode, arrived: boolean, opening=false) => {
@@ -658,6 +652,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
     background: #0b1424;
     isolation: isolate;
     color: var(--on-dark);
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .hero-stage {
@@ -852,18 +848,24 @@ const pinTrips = completeSpotPreviews((await getTrips())
     align-items: end;
     gap: 28px 48px;
     pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
     transition: opacity 0.6s, transform 0.6s;
   }
 
-  .copy,
+  .copy {
+    pointer-events: none;
+    min-width: 0;
+    display: grid;
+    gap: 16px;
+  }
+
+  .copy .next-chip,
+  .copy .ctas a,
+  .copy .ctas button,
   .sky-chip {
     pointer-events: auto;
     min-width: 0;
-  }
-
-  .copy {
-    display: grid;
-    gap: 16px;
   }
 
   .eyebrow {
@@ -914,7 +916,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
   .next-chip[data-state='cancelled'] .next-dot { background: #ffb27a; box-shadow: 0 0 0 3px rgba(255, 178, 122, 0.25); }
 
   /* the phone versions of the introduction */
-  .lead-short, .traits, .hint-note { display: none; }
+  .lead-short, .traits { display: none; }
   .traits { flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
   .traits li {
     padding: 5px 11px;
@@ -946,11 +948,11 @@ const pinTrips = completeSpotPreviews((await getTrips())
     gap: 6px;
     padding: 14px 18px;
     border-radius: 18px;
-    background: linear-gradient(150deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.015) 45%, rgba(100, 190, 198, 0.06)), rgba(8, 17, 26, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.23);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 12px 32px rgba(0, 0, 0, 0.2);
-    -webkit-backdrop-filter: blur(10px) saturate(1.2);
-    backdrop-filter: blur(10px) saturate(1.2);
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.02) 45%, rgba(100, 190, 198, 0.07)), rgba(8, 17, 26, 0.44);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), inset 0 -1px 0 rgba(255, 255, 255, 0.06), 0 12px 32px rgba(0, 0, 0, 0.18);
+    -webkit-backdrop-filter: blur(12px) saturate(1.25);
+    backdrop-filter: blur(12px) saturate(1.25);
     max-width: 360px;
   }
 
@@ -1003,18 +1005,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
     opacity: 0.75;
   }
 
-  .hint {
-    font-size: 12px;
-    line-height: 1.6;
-    /* the global .hint grey is for light pages; on the dark glass it sank below legibility */
-    color: var(--hud);
-    opacity: 0.78;
-  }
-
-  .hint span {
-    display: block;
-  }
-
   /* campus view */
   .campus-card {
     position: absolute;
@@ -1028,6 +1018,8 @@ const pinTrips = completeSpotPreviews((await getTrips())
     border-radius: var(--radius);
     background: var(--header-bg);
     color: var(--ink);
+    user-select: text;
+    -webkit-user-select: text;
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
     animation: card-in 0.7s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
@@ -1484,10 +1476,6 @@ const pinTrips = completeSpotPreviews((await getTrips())
     .lead-full { display: none; }
     .lead-short { display: block; font-size: 15px; }
     .traits { display: flex; }
-    .hint .hint-more { display: none; }
-    .hint-note { display: block; font-size: 12px; color: var(--hud); opacity: 0.85; }
-    .hint-note summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
-    .hint-note p { margin-top: 4px; line-height: 1.6; }
 
     .sky-chip {
       order: 1;
