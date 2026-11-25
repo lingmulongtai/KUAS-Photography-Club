@@ -7,6 +7,7 @@ import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
 import {regionalPhoto,type RegionalPhoto} from './regional-photo';
 import {Grid,type Heightfield} from './heightfield';
 import {districtImagery,districtSampling,type District} from './regional-districts';
+import {regionalBudgetForTier,type RegionalQualityBudget} from './adaptive-quality';
 
 interface Patch {box: Box; file: string}
 interface GroundSurvey {grid: GridMeta; patches: Patch[]}
@@ -188,19 +189,31 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   });
   let shaderReady:Promise<unknown>|undefined;
   let running=0,last= -Infinity;
-  function update(x:number,z:number,y:number,now:number,destination?:{x:number;z:number}) {
+  const fallbackBudget=regionalBudgetForTier(2);
+  let activeUnload=fallbackBudget.groundUnload;
+  function update(x:number,z:number,y:number,now:number,destination?:{x:number;z:number},dirX=0,dirZ=0,budget:RegionalQualityBudget=fallbackBudget) {
     if(now-last<.15)return;
     last=now;
-    // Preserve continuous base terrain under the moving camera. Stage the detailed
-    // survey at the landing point instead of uploading cities crossed for a fraction of a second.
-    const coveredZoom=districts(destination?.x??x,destination?.z??z,now);
-    const altitude=y-ground(x,z);
-    // Avoid fetching raw zoom-15 live GSI tiles over an already-harmonized zoom-15 district sheet.
-    const surveyed=coveredZoom>15 || (coveredZoom>=15 && altitude>450);
-    photos(x,z,altitude,now,!destination && !surveyed && !legacy.some(b=>boxDistance(x,z,b)===0));
+    // Smoothly approach the adaptive spherical horizon radius so tier changes never pop.
+    uGroundFar.value=THREE.MathUtils.lerp(uGroundFar.value,budget.groundFar,.25);
+    activeUnload=budget.groundUnload;
+    const altitude=Math.max(0,y-ground(x,z));
+    // Target the ground ahead along the camera's sightline (or the flight landing point) so
+    // close-up orthophotos sharpen what the viewer is actually looking at rather than behind them.
+    const ahead=destination?0:Math.min(altitude*.85,650);
+    const targetX=destination?.x??(x+dirX*ahead);
+    const targetZ=destination?.z??(z+dirZ*ahead);
+    const coveredZoom=districts(targetX,targetZ,now);
+    const insideLegacy=legacy.some(b=>boxDistance(targetX,targetZ,b)===0);
+    photos(targetX,targetZ,altitude,now,!insideLegacy,{
+      radius:budget.photoRadius,
+      maxZoom:budget.photoMaxZoom,
+      coveredZoom,
+      prefetch:!!destination,
+    });
     for(const state of states){
       state.distance=boxDistance(x,z,state.patch.box);
-      if(state.mesh && state.distance>114000){
+      if(state.mesh && state.distance>activeUnload){
         scene.remove(state.mesh);
         state.mesh.geometry.dispose();
         state.mesh.material.uniforms.uPhoto.value.dispose();
@@ -209,18 +222,18 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       }
     }
     for(const state of states.sort((a,b)=>a.distance-b.distance)){
-      if(running>=3 || state.distance>106000)break;
+      if(running>=budget.groundConcurrency || state.distance>budget.groundLoad)break;
       if(state.mesh || state.pending || state.retry>now)continue;
       state.pending=true;
       running++;
       void loadTexture(state.patch.file,aniso).then(async photo=>{
-        if(!await preparePhoto(photo,()=>state.distance<=114000)){photo.dispose();return;}
-        const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=114000);
+        if(!await preparePhoto(photo,()=>state.distance<=activeUnload)){photo.dispose();return;}
+        const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=activeUnload);
         if(!geometry){photo.dispose();return;}
         const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});
         const mesh=new THREE.Mesh(geometry,material);
         await (shaderReady??=prepare(mesh));
-        if(state.distance>114000){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
+        if(state.distance>activeUnload){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
         mesh.name='regional-ground';
         state.mesh=mesh;
         scene.add(mesh);
