@@ -8,8 +8,8 @@ import { CIRRUS_Y, HIGH_CLOUD_GLSL } from './high-clouds.ts';
 
 /** Clouds fade out into the haze before this distance. */
 const FAR = 44000;
-/** Radius of the drum the clouds are drawn on: beyond FAR, inside the camera's far plane. */
-const DRUM = 52000;
+/** Radius of the drum the clouds are drawn on: beyond FAR and distant mountains, inside the camera's far plane. */
+const DRUM = 115000;
 
 /**
  * Volumetric 3D clouds sculpted with tileable Perlin-Worley + multi-octave Worley FBM noise,

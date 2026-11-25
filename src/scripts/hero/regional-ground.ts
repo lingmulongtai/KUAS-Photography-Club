@@ -82,13 +82,19 @@ const vertexShader = `
 const fragmentShader = `
   uniform sampler2D uPhoto,uClose,uDistrict,uInset;
   uniform vec4 uCloseBox,uDistrictBox,uInsetBox;
-  uniform float uCloseMatch;
+  uniform float uCloseMatch,uGroundFar;
   varying vec2 vUv;
   varying vec3 vWorld,vNormal;
   ${ENV_GLSL}
   ${SHADOW_GLSL}
   ${HOME_BOUNDARY}
   ${districtSampling}
+  vec3 fadeHorizon(vec3 color,vec3 world){
+    vec3 delta=world-cameraPosition;
+    float radialDist=length(delta);
+    float fade=smoothstep(uGroundFar*.84,uGroundFar,radialDist);
+    return fade>0.?mix(color,skyBackground(delta/max(radialDist,1e-4)),fade):color;
+  }
   void main(){
     vec4 photo=texture2D(uPhoto,vUv);
     if(photo.a<.18)discard;
@@ -97,7 +103,7 @@ const fragmentShader = `
       vec3 direction=normalize(vWorld-cameraPosition);
       float fresnel=pow(1.-clamp(-direction.y,0.,1.),3.);
       vec3 water=mix(shade(vec3(.024,.086,.105),vec3(0.,1.,0.),vWorld,1.),skyColor(reflect(direction,vec3(0.,1.,0.))),.09+.45*fresnel);
-      gl_FragColor=vec4(applyHaze(water,vec3(0.),vWorld),1.);
+      gl_FragColor=vec4(fadeHorizon(applyHaze(water,vec3(0.),vWorld),vWorld),1.);
       return;
     }
     if(prefectureCode==0)discard;
@@ -108,7 +114,7 @@ const fragmentShader = `
     vec3 n=normalize(vNormal);
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
     vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sunShadow(vWorld,n));
-    gl_FragColor=vec4(applyHaze(lit,vec3(0.),vWorld),1.);
+    gl_FragColor=vec4(fadeHorizon(applyHaze(lit,vec3(0.),vWorld),vWorld),1.);
   }`;
 
 export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture,needed:()=>boolean)=>Promise<void>) {
@@ -152,6 +158,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   const uClose={value:null as THREE.Texture|null},uCloseBox={value:new THREE.Vector4()},uCloseMatch={value:0};
   const uDistrict={value:null as THREE.Texture|null},uDistrictBox={value:new THREE.Vector4()};
   const uInset={value:null as THREE.Texture|null},uInsetBox={value:new THREE.Vector4()};
+  const uGroundFar={value:92000};
   let broad:RegionalPhoto|null=null,inset:RegionalPhoto|null=null,live:RegionalPhoto|null=null;
   // A first draw would upload every newly finished orthophoto at once. Keep the old
   // coverage visible and prepare at most one full-resolution sheet per animation frame.
@@ -193,7 +200,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
     photos(x,z,altitude,now,!destination && !surveyed && !legacy.some(b=>boxDistance(x,z,b)===0));
     for(const state of states){
       state.distance=boxDistance(x,z,state.patch.box);
-      if(state.mesh && state.distance>65000){
+      if(state.mesh && state.distance>114000){
         scene.remove(state.mesh);
         state.mesh.geometry.dispose();
         state.mesh.material.uniforms.uPhoto.value.dispose();
@@ -202,18 +209,18 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       }
     }
     for(const state of states.sort((a,b)=>a.distance-b.distance)){
-      if(running>=2 || state.distance>60000)break;
+      if(running>=3 || state.distance>106000)break;
       if(state.mesh || state.pending || state.retry>now)continue;
       state.pending=true;
       running++;
       void loadTexture(state.patch.file,aniso).then(async photo=>{
-        if(!await preparePhoto(photo,()=>state.distance<=65000)){photo.dispose();return;}
-        const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=65000);
+        if(!await preparePhoto(photo,()=>state.distance<=114000)){photo.dispose();return;}
+        const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=114000);
         if(!geometry){photo.dispose();return;}
-        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uCloseMatch,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});
+        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});
         const mesh=new THREE.Mesh(geometry,material);
         await (shaderReady??=prepare(mesh));
-        if(state.distance>65000){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
+        if(state.distance>114000){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
         mesh.name='regional-ground';
         state.mesh=mesh;
         scene.add(mesh);

@@ -151,7 +151,9 @@ export function createHero(
   scene.add(landmarkLights.sun,landmarkLights.sky);
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
   // away depends on it, and too little of it makes neighbouring rooftops flicker
-  const camera = new THREE.PerspectiveCamera(40, 1, 20, 60000);
+  // Keep near as far out as close views allow for depth precision, and far well beyond
+  // the radial horizon fade so panning never clips the screen center sooner than the edges.
+  const camera = new THREE.PerspectiveCamera(40, 1, 20, 150000);
   const aircraft=buildAircraft(env);scene.add(aircraft.mesh);
   const sky = buildSkyDome(env);
   const celestial = buildCelestial(env, opts.quality);

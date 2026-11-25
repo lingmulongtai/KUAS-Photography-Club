@@ -4,7 +4,7 @@ import { KYOTO } from './astro';
 import { rng } from './util';
 
 /** Radius of the sky dome in metres: inside the camera's far plane, beyond the farthest mountains. */
-export const RADIUS = 45000;
+export const RADIUS = 125000;
 
 /**
  * The sky dome: analytic sky, sun disc and a moon lit in 3D by the real sun direction
