@@ -105,6 +105,25 @@ export function drawBridgePolyline(
   const startFree=!onTileEdge(first,bounds),endFree=!onTileEdge(last,bounds);
   const startG=ground(first),endG=ground(last);
   const rampLen=Math.min(elevated?Math.max(20,clearance*4.2):10,total*.38);
+  // Subdivide segments at ramp crests so even 2-point spans reach full elevated clearance across the middle.
+  const splitMarks:number[]=[];
+  if(rampLen>0){
+    if(startFree)splitMarks.push(rampLen);
+    if(endFree&&total-rampLen>rampLen+.5)splitMarks.push(total-rampLen);
+  }
+  const subdivided:{a:Point;b:Point;len:number;start:number}[]=[];
+  for(const seg of segments){
+    const cuts=splitMarks.filter(m=>m>seg.start+.25&&m<seg.start+seg.len-.25);
+    if(!cuts.length){subdivided.push(seg);continue;}
+    let curA=seg.a,curStart=seg.start;
+    for(const m of cuts){
+      const t=(m-seg.start)/seg.len;
+      const mid:Point=[seg.a[0]+(seg.b[0]-seg.a[0])*t,seg.a[1]+(seg.b[1]-seg.a[1])*t];
+      subdivided.push({a:curA,b:mid,len:m-curStart,start:curStart});
+      curA=mid;curStart=m;
+    }
+    subdivided.push({a:curA,b:seg.b,len:seg.start+seg.len-curStart,start:curStart});
+  }
   const smooth=(t:number)=>t*t*(3-2*t);
   const deckZ=(p:Point,dist:number)=>{
     const g=ground(p);
@@ -121,7 +140,7 @@ export function drawBridgePolyline(
   const walkW=width>=8?Math.min(1.6,width*.14):0;
   const pierStep=elevated?30:24;
   let nextPier=pierStep*.5;
-  for(const seg of segments){
+  for(const seg of subdivided){
     const za=deckZ(seg.a,seg.start),zb=deckZ(seg.b,seg.start+seg.len);
     const a=xyz(seg.a,za),b=xyz(seg.b,zb);
     const ux=(b[0]-a[0])/seg.len,uy=(b[1]-a[1])/seg.len;
@@ -190,6 +209,24 @@ export function drawRailPolyline(
   if(!segments.length)return;
   const startFree=!onTileEdge(segments[0].p0,bounds),endFree=!onTileEdge(segments[segments.length-1].p1,bounds);
   const rampLen=(raised&&!monorail)?Math.min(26,total*.35):0;
+  const splitMarks:number[]=[];
+  if(rampLen>0){
+    if(startFree)splitMarks.push(rampLen);
+    if(endFree&&total-rampLen>rampLen+.5)splitMarks.push(total-rampLen);
+  }
+  const subdivided:{p0:Point;p1:Point;len:number;start:number}[]=[];
+  for(const seg of segments){
+    const cuts=splitMarks.filter(m=>m>seg.start+.25&&m<seg.start+seg.len-.25);
+    if(!cuts.length){subdivided.push(seg);continue;}
+    let curA=seg.p0,curStart=seg.start;
+    for(const m of cuts){
+      const t=(m-seg.start)/seg.len;
+      const mid:Point=[seg.p0[0]+(seg.p1[0]-seg.p0[0])*t,seg.p0[1]+(seg.p1[1]-seg.p0[1])*t];
+      subdivided.push({p0:curA,p1:mid,len:m-curStart,start:curStart});
+      curA=mid;curStart=m;
+    }
+    subdivided.push({p0:curA,p1:seg.p1,len:seg.start+seg.len-curStart,start:curStart});
+  }
   const smooth=(t:number)=>t*t*(3-2*t);
   const railLift=(dist:number)=>{
     if(rampLen<=0)return lift;
@@ -200,7 +237,7 @@ export function drawRailPolyline(
     return h;
   };
   let distance=0;
-  for(const seg of segments){
+  for(const seg of subdivided){
     const {p0,p1,len,start}=seg;
     const g0=ground(p0),g1=ground(p1);
     const a=xyz(p0,g0+railLift(start)),b=xyz(p1,g1+railLift(start+len));
