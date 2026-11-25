@@ -29,7 +29,11 @@ import { buildCarsSteps,type buildCars } from './cars';
 import { buildRoadField } from './roads';
 import { BUILDINGS_BOX, CAMPUS_CENTER } from './geo';
 import { buildBeacons, buildLandmarks } from './landmarks';
-import { biwaSurface, buildWaterAsync, waterSteps } from './water';
+import { biwaSurface, buildWaterAsync, osakaWaterSurface, waterSteps, type BiwaSurface } from './water';
+import { buildBiwaBridges } from './biwa-bridges';
+import { buildKansaiAirports } from './airports';
+import { inAirportClearing } from './airports-data';
+import { createAdaptiveQuality } from './adaptive-quality';
 import { createLabels, type HeroTrip } from './labels';
 import { createForest } from './trees';
 import { buildMeteors } from './meteors';
@@ -149,6 +153,17 @@ export function createHero(
   // Light counts are part of Three's program cache key, including custom terrain shaders.
   const landmarkLights={sun:new THREE.DirectionalLight(0,2.6),sky:new THREE.HemisphereLight(0,0,1.65)};
   scene.add(landmarkLights.sun,landmarkLights.sky);
+  const gl=renderer.getContext();
+  const debugInfo=gl.getExtension('WEBGL_debug_renderer_info');
+  const gpuRenderer=String((debugInfo?gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER))??'');
+  const adaptiveQuality=createAdaptiveQuality({
+    cores:typeof navigator!=='undefined'?(navigator.hardwareConcurrency||4):4,
+    memoryGb:typeof navigator!=='undefined'?(navigator as {deviceMemory?:number}).deviceMemory:undefined,
+    coarse:typeof matchMedia==='function'?matchMedia('(pointer: coarse)').matches:false,
+    width:typeof window!=='undefined'?window.innerWidth:1440,
+    quality:opts.quality,
+    renderer:gpuRenderer,
+  },opts.quality<1?1.5:2);
   // the near plane sits as far out as the closest views allow: depth precision in the city 5 km
   // away depends on it, and too little of it makes neighbouring rooftops flicker
   // Keep near as far out as close views allow for depth precision, and far well beyond
@@ -211,6 +226,9 @@ export function createHero(
   let preparingExpo=false,retryExpoAt=0;
   let updateFireworks:ReturnType<typeof import('./regional-fireworks').regionalFireworks>|undefined;
   let updateBasinLod:(()=>void)|undefined;
+  let kyotoDetailVisible=true;
+  let kyotoCity:ReturnType<typeof buildCity>|undefined;
+  let kyotoLamps:THREE.Object3D|undefined;
   let ensureRegionalGround:(()=>Promise<void>)|undefined;
   let flightRequest=0;
   let travelBounds:Box=[-34000,-19000,13000,20000];
@@ -562,9 +580,12 @@ export function createHero(
     // Compile the heavy terrain shader immediately in the background while JS builds city and forest.
     warmProgram(terrain.mesh);
     let lakeReady:Promise<boolean>|undefined;
-    const ensureLake=()=>lakeReady??=biwaSurface(env,terrain.uniforms).then(async lake=>{
-      await prepare(lake);
-      scene.add(lake);
+    let biwaMesh:BiwaSurface|undefined;
+    const ensureLake=()=>lakeReady??=biwaSurface(env,terrain.uniforms,(x,z)=>regional?regional.ground(x,z):hf.height(x,z)).then(async lake=>{
+      biwaMesh=lake;
+      const biwaBridges=buildBiwaBridges(env);
+      await Promise.all([prepare(lake),prepare(biwaBridges)]);
+      scene.add(lake,biwaBridges);
       return true;
     }).catch(error=>{lakeReady=undefined;console.warn('Lake survey unavailable',error);return false;});
     const openingLake = priorities.biwa === 'opening' ? ensureLake() : Promise.resolve(false);
@@ -575,6 +596,7 @@ export function createHero(
     basinLod.register(buildings);
     updateBasinLod=()=>{
       const far=basinLod.update(camera.position.x,camera.position.z,pxPerM);
+      kyotoDetailVisible=basinLod.detail.visible;
       terrain.setDistant(far && !inKyoto(camera.position));
     };
     const channel=createKamoChannel(lines,(x,z)=>hf.height(x,z));
@@ -704,7 +726,7 @@ export function createHero(
       if(x>=b[0] && x<b[2] && z>=b[1] && z<b[3])return woodlandRaster.sample(x,z) || (island(x,z)?1:0);
       return regional?.canopy(x,z)??0;
     },
-    (x,z) => !!cultivated?.(x,z) || regionalCity?.excludesTree(x,z)===true || todaijiClearing(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
+    (x,z) => !!cultivated?.(x,z) || regionalCity?.excludesTree(x,z)===true || inAirportClearing(x,z) || todaijiClearing(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
       replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
     [...campusTreeSpots(hf),...cherries], !cover);
     let forestRefreshPending=false;
@@ -763,7 +785,7 @@ export function createHero(
       stationFar = model;
       model.group.visible = city.fallback.visible;
       city.fallback.visible = false;
-      scene.add(model.group);
+      basinLod.detail.add(model.group);
       shadow.invalidate();
     }).catch(error => console.warn('Distant Kyoto Station failed to load', error));
     let stationLoading = false;
@@ -799,6 +821,7 @@ export function createHero(
     };
     if (city.overview) basinLod.detail.add(city.overview);
     casts(city.group);
+    kyotoCity = city;
     cityLods.add(city);
     casts(landmarks.mesh);
     shadow.invalidate();
@@ -814,15 +837,17 @@ export function createHero(
     terrain.uniforms.uRoadBox.value.set(...roadBox);
     terrain.uniforms.uRoadsOn.value = 1;
     const water = await buildWaterAsync(env, hf, lines, terrain.uniforms,lite?28:18,channel,false,()=>true);
-    if (water) { scene.add(water); warmProgram(water); }
+    if (water) { basinLod.detail.add(water); warmProgram(water); }
     const islands = buildIslands(env, hf, lines);
-    scene.add(islands);
+    basinLod.detail.add(islands);
     warmProgram(islands);
     labels = createLabels(el, hf, (id) => opts.onAction?.(id), opts.avoid, opts.trips, labelLanguage);
     const lamps = await prepareSteps(buildLampsSteps(env,streetGround,lines,opts.quality));
     const cars = await prepareSteps(buildCarsSteps(env,hf,lines,opts.quality,roadHeight));
     pointLayers.push(lamps.uniforms, cars.uniforms);
-    scene.add(lamps.points, cars.group);
+    kyotoLamps = lamps.points;
+    scene.add(lamps.points);
+    basinLod.detail.add(cars.group);
     warmProgram(lamps.points);
     warmProgram(cars.group);
     updatePointScale();
@@ -837,11 +862,12 @@ export function createHero(
       const routes=(JSON.parse(new TextDecoder().decode(bytes)) as {routes:RailwayRoute[]}).routes;
       const railways=buildRailways(env,(x,z)=>hf.height(x,z),routes,katsura.complete,transportLines,
         transportLines.length?meta.basinTransport?.trackBox:undefined);
-      scene.add(railways.group);railDrive=railways.update;shadow.invalidate();
+      basinLod.detail.add(railways.group);railDrive=railways.update;shadow.invalidate();
       return prepare(railways.group);
     }).catch(error=>{console.warn('Railway scenery unavailable',error);});
     const trafficView=new THREE.Frustum(),trafficProjection=new THREE.Matrix4(),streetView=createTrafficView();
     driveCars=(dt)=>{
+      if(!kyotoDetailVisible && !regionalDrive)return;
       camera.updateMatrixWorld();
       trafficProjection.copy(camera.projectionMatrix);
       // Include the glow of headlights centred just outside the viewport.
@@ -849,7 +875,8 @@ export function createHero(
       trafficProjection.elements[5]/=1+24/Math.max(1,height);
       streetView.update(camera,trafficProjection);
       trafficView.setFromProjectionMatrix(trafficProjection.multiply(camera.matrixWorldInverse));
-      cars.update(dt,trafficView,streetView.contains);regionalDrive?.(dt,trafficView,streetView.contains);railDrive?.(dt);
+      if(kyotoDetailVisible){cars.update(dt,trafficView,streetView.contains);railDrive?.(dt);}
+      regionalDrive?.(dt,trafficView,streetView.contains);
     };
     const overviews:((region:CityRegion|null)=>void)[]=[];
     let detailRegion:CityRegion|null=null;
@@ -1155,21 +1182,25 @@ export function createHero(
     if (priorities.otokuniTennozan === 'opening') openingSurveys.push(ensureResidentWest('otokuni-tennozan'));
     if (priorities.yamashina === 'opening') openingSurveys.push(ensureResidentEast());
     if (priorities.yamashinaBasin === 'opening') openingSurveys.push(ensureResidentEastFill());
-    const deferredSurveys: { tier: typeof priorities.south; run: () => Promise<unknown> }[] = [
-      { tier: priorities.south, run: () => ensureResidentSouth('low') },
-      { tier: priorities.otokuni, run: () => ensureResidentWest('otokuni', 'low') },
-      { tier: priorities.otokuniTennozan, run: () => ensureResidentWest('otokuni-tennozan', 'low') },
-      { tier: priorities.yamashina, run: () => ensureResidentEast('low') },
-      { tier: priorities.yamashinaBasin, run: () => ensureResidentEastFill('low') },
-      { tier: priorities.eastBackdrop, run: () => ensureEastBackdrop('low') },
+    const deferredSurveys: { tier: typeof priorities.south; kyotoOnly?: boolean; run: () => Promise<unknown> }[] = [
+      { tier: priorities.south, kyotoOnly: true, run: () => ensureResidentSouth('low') },
+      { tier: priorities.otokuni, kyotoOnly: true, run: () => ensureResidentWest('otokuni', 'low') },
+      { tier: priorities.otokuniTennozan, kyotoOnly: true, run: () => ensureResidentWest('otokuni-tennozan', 'low') },
+      { tier: priorities.yamashina, kyotoOnly: true, run: () => ensureResidentEast('low') },
+      { tier: priorities.yamashinaBasin, kyotoOnly: true, run: () => ensureResidentEastFill('low') },
+      { tier: priorities.eastBackdrop, kyotoOnly: true, run: () => ensureEastBackdrop('low') },
       { tier: priorities.biwa, run: () => ensureLake() },
     ];
     for (const item of deferredSurveys) {
-      if (item.tier === 'afterOpen') schedulePostOpenUpgrade(async () => { await item.run(); }, 4);
+      if (item.tier === 'afterOpen') schedulePostOpenUpgrade(async () => {
+        if (item.kyotoOnly && Math.hypot(camera.position.x, camera.position.z) > 24000) return;
+        await item.run();
+      }, 4);
     }
     const warmDeferredSurveys = () => {
+      const farFromKyoto = Math.hypot(camera.position.x, camera.position.z) > 24000;
       for (const item of deferredSurveys) {
-        if (item.tier !== 'opening') void item.run();
+        if (item.tier !== 'opening' && (!item.kyotoOnly || !farFromKyoto)) void item.run();
       }
     };
     const openingRegion=ensureCityRegion(landscapeCenter(VIEW));
@@ -1197,6 +1228,14 @@ export function createHero(
       })
       .then(result=>{
         regional=result;
+        biwaMesh?.refit(result.ground);
+        aircraft.setGround(result.ground);
+        void osakaWaterSurface(env,terrain.uniforms,result.ground).then(async osakaWater=>{
+          await prepare(osakaWater);
+          scene.add(osakaWater);
+        }).catch(error=>console.warn('Osaka river & bay water unavailable',error));
+        const airports=buildKansaiAirports(env,result.ground);
+        void prepare(airports).then(()=>{scene.add(airports);});
         void import('./regional-fireworks').then(({regionalFireworks})=>{
           updateFireworks=regionalFireworks(scene,env,result.ground,!!opts.reducedMotion,prepare);
         }).catch(error=>console.warn('Regional fireworks unavailable',error));
@@ -1420,6 +1459,8 @@ export function createHero(
     p1: THREE.Vector3;
     p2: THREE.Vector3;
     p3: THREE.Vector3;
+    /** Destination ground centre for mid-arc region & terrain handoff so departure stays crisp. */
+    destCenter: { x: number; z: number };
     /** re-centre the terrain and re-plant the trees for the new view at the top of the arc */
     regrow: boolean;
   } | null = null;
@@ -1476,7 +1517,8 @@ export function createHero(
   function flyTo(target: 'campus' | HeroView, t: number) {
     warmRegionalOnInteract?.();
     const request=++flightRequest;
-    const needsRegional = target.startsWith('region-') || target === 'hikone' || target === 'todaiji' || target === 'kasuga';
+    const needsRegional = target.startsWith('region-') || target === 'hikone' || target === 'todaiji' || target === 'kasuga'
+      || target === 'kix' || target === 'itami' || target === 'kobeAirport';
     if(needsRegional && !regional && ensureRegionalGround){
       opts.onAreaLoading?.(true);
       void ensureRegionalGround().then(()=>{
@@ -1493,8 +1535,12 @@ export function createHero(
     const to: HeroMode = target === 'campus' ? 'campus' : 'city';
     const nextView = target === 'campus' ? view : target;
     const destination=currentView(nextView);
-    ensureCityRegion?.(target==='campus'?CAMPUS_CENTER:landscapeCenter(destination));
-    if(target!=='campus')prefetchCityRegion?.(landscapeCenter(destination),nextView);
+    const destCenter=target==='campus'?CAMPUS_CENTER:landscapeCenter(destination);
+    const farJump=Math.hypot(destCenter.x-camera.position.x,destCenter.z-camera.position.z)>=4000;
+    // Prefetch the destination silently immediately, but wait until the mid-flight arc to unload
+    // the departure region on long jumps so the nearby view stays crisp as the camera lifts off.
+    if(target!=='campus')prefetchCityRegion?.(destCenter,nextView);
+    if(opts.reducedMotion || !farJump)ensureCityRegion?.(destCenter);
     if (!fromExplorer && !flight && mode === to && (to === 'campus' || nextView === view)) {
       resetLook();
       opts.onMode?.(to,false);
@@ -1554,6 +1600,7 @@ export function createHero(
       p1: new THREE.Vector3(),
       p2: new THREE.Vector3(),
       p3,
+      destCenter,
       regrow: locationChanged,
     };
     shapeFlightArc(flight);
@@ -1601,6 +1648,7 @@ export function createHero(
       if (flight.regrow && flight.t >= 0.5) {
         flight.regrow = false;
         const center = flight.to === 'campus' ? CAMPUS_CENTER : landscapeCenter(VIEW);
+        ensureCityRegion?.(flight.destCenter);
         terrainRecenter?.(center);
         plantTreesAsync?.(center, VIEW.bearing);
         shadow.invalidate();
@@ -1634,16 +1682,15 @@ export function createHero(
     clouds.mesh.position.z = camera.position.z;
     let roofsChanged = false;
     const panorama = mode === 'city' && view === 'shogunzuka' && !flight && !exploring && camera.fov >= baseFov * .82;
-    for (const c of cityLods) roofsChanged = c.updateLod(camera.position, panorama ? pxPerM : 0) || roofsChanged;
+    for (const c of cityLods) {
+      if (c === kyotoCity && !kyotoDetailVisible) continue;
+      roofsChanged = c.updateLod(camera.position, panorama ? pxPerM : 0) || roofsChanged;
+    }
     if (roofsChanged) shadow.invalidate();
   }
 
   const forward = new THREE.Vector3();
   let clock = 0;
-  let maxDpr = 1;
-  let lowered = false;
-  let slow = 0;
-  let firstDrawAt: number | undefined;
   function setResolution(d: number) {
     pixelRatio = d;
     renderer.setPixelRatio(d);
@@ -1691,14 +1738,14 @@ export function createHero(
     get orbiting() { return !!VIEW.orbit; },
     t0: 0,
     resize(w, h, d) {
-      maxDpr = d;
       width = w;
       height = h;
       camera.aspect = w / h;
       // about 68° across on a wide screen: Kyoto Tower and Toji on the left to Nijo Castle and Atago on the right
       baseFov = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(34 * RAD) / camera.aspect)) / RAD, 36, 66);
       updateZoom();
-      setResolution(Math.min(d, pixelRatio < maxDpr && pixelRatio > 0 && lowered ? pixelRatio : d));
+      adaptiveQuality.setMaxDpr(d);
+      setResolution(adaptiveQuality.pixelRatio);
     },
     render(t) {
       // The poster covers startup. Avoid rendering an invisible, incomplete scene
@@ -1715,14 +1762,20 @@ export function createHero(
       clouds.uniforms.uWind.value.set(cloudFrame.seconds*clouds.weather.wind[0],cloudFrame.seconds*clouds.weather.wind[1]);
       placeCamera(t, dt);
       updateBasinLod?.();
+      if(kyotoLamps)kyotoLamps.visible=env.uCity.value>0.01 && camera.position.lengthSq()<65000*65000;
       updateFireworks?.(camera,dt,pxPerM);
       const regionalTime=performance.now()/1000;
-      regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime,flight?.p3);
-      const detailEye=flight?.p3??camera.position;
+      camera.getWorldDirection(regionalDirection);
+      const horizontal=Math.hypot(regionalDirection.x,regionalDirection.z)||1;
+      const dirX=regionalDirection.x/horizontal,dirZ=regionalDirection.z/horizontal;
+      const budget=adaptiveQuality.budget;
+      // Hold departure high-res aerial imagery & nearby buildings during the first half of a flight
+      // so the foreground stays crisp while lifting off, then hand off cleanly to the destination.
+      const photoTarget=flight&&flight.t>=0.52?flight.p3:undefined;
+      regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime,photoTarget,dirX,dirZ,budget);
+      const detailEye=flight&&flight.t>=0.48?flight.p3:camera.position;
       if(regionalCity){
-        camera.getWorldDirection(regionalDirection);
-        const horizontal=Math.hypot(regionalDirection.x,regionalDirection.z)||1;
-        regionalCity.update(detailEye.x,detailEye.z,regionalDirection.x/horizontal,regionalDirection.z/horizontal,regionalTime,activeRegionBox,camera.position);
+        regionalCity.update(detailEye.x,detailEye.z,dirX,dirZ,regionalTime,activeRegionBox,camera.position,budget);
       }
       const expoDistance=Math.hypot(camera.position.x-expoAnchor.x,camera.position.z-expoAnchor.z);
       if(expoDistance<8500 && !expo && !preparingExpo && regionalTime>=retryExpoAt){
@@ -1762,17 +1815,11 @@ export function createHero(
       opts.onFrameSubmitted?.();
       labels?.update(camera, width, height);
       loading.frame();
-      // keep the frame rate up on slower devices by rendering fewer pixels
-      if (dt > 0 && pixelRatio > .75) {
-        const now = performance.now();
-        firstDrawAt ??= now;
-        slow = dt > 0.034 ? slow + 1 : Math.max(0, slow - 1);
-        // Faster submissions reach 45 samples earlier. Let the opening panorama settle at its requested density.
-        const openingPanorama = fullPanorama && now - firstDrawAt < 8000;
-        if (slow > 45 && !openingPanorama) {
-          slow = 0;
-          lowered = true;
-          setResolution(Math.max(.75, pixelRatio - 0.25));
+      // Dynamically adjust pixel ratio and regional draw-distance tier bidirectionally with live FPS.
+      if (dt > 0) {
+        const qualityState = adaptiveQuality.step(dt, regionalTime, fullPanorama && clock < 8);
+        if (qualityState.dprChanged && Math.abs(qualityState.pixelRatio - pixelRatio) > 0.01) {
+          setResolution(qualityState.pixelRatio);
         }
       }
     },

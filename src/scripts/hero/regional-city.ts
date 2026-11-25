@@ -306,7 +306,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
     if(shadowDirty && now>=nextShadow){invalidateShadow();shadowDirty=false;nextShadow=now+.25;}
     if(now<next)return;
     next=now+.09;
-    architecture.update(x,z,now);
+    architecture.update(eye.x,eye.z,now);
     neighborhoods.update(x,z,dirX,dirZ,now,detail,eye,budget);
     if(landmarkRevision!==architecture.revision){
       landmarkRevision=architecture.revision;shadowDirty=true;
