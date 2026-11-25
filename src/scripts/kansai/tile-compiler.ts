@@ -157,19 +157,44 @@ export function tileCompiler(){
     const karahashi=y===25964&&(x===57508||x===57509);
     const bounds:[number,number,number,number]=[west,south,east,north];
     if(karahashi)drawSetaBridges(groundMesh,bounds,local,datum,ground);
+    const pointToSegDeg=(p:Point,a:Point,b:Point)=>{
+      const dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy;
+      const t=l2>1e-14?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2)):0;
+      return Math.hypot((p[0]-(a[0]+dx*t))*0.82,p[1]-(a[1]+dy*t));
+    };
     const roadLayer=tile?.layers.RdCL;
-    if(roadLayer)for(let i=0;i<roadLayer.length;i++){
-      const f=roadLayer.feature(i),props=f.properties;
-      const code=Number(props.vt_code);
-      const clearance=bridgeClearance(Number(props.vt_lvorder??0),Number(props.vt_motorway??0)===1,String(props.vt_rdctg??''));
-      const width=roadWidth(props.vt_rnkwidth);
-      const skip=karahashi&&code===2703?isSetaDeck:undefined;
-      for(const line of f.loadGeometry()){
-        const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
-        drawBridgePolyline(groundMesh,pts,bounds,ground,xyz,{width,clearance,skip});
+    if(roadLayer){
+      const roadEntries:{pts:Point[];width:number;clearance:number;skip?:(p:Point)=>boolean;dir:Point;mid:Point}[]=[];
+      for(let i=0;i<roadLayer.length;i++){
+        const f=roadLayer.feature(i),props=f.properties;
+        const code=Number(props.vt_code);
+        const clearance=bridgeClearance(Number(props.vt_lvorder??0),Number(props.vt_motorway??0)===1,String(props.vt_rdctg??''));
+        const width=roadWidth(props.vt_rnkwidth);
+        const skip=karahashi&&code===2703?isSetaDeck:undefined;
+        for(const line of f.loadGeometry()){
+          const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
+          if(pts.length<2)continue;
+          const a=pts[0],b=pts[pts.length-1],dl=Math.hypot(b[0]-a[0],b[1]-a[1])||1;
+          const mid=pts[Math.floor(pts.length/2)];
+          roadEntries.push({pts,width,clearance,skip,dir:[(b[0]-a[0])/dl,(b[1]-a[1])/dl],mid});
+        }
+      }
+      // Prefer higher-clearance / wider spans first and suppress duplicate stacked bridge centrelines on the same corridor.
+      roadEntries.sort((a,b)=>b.clearance-a.clearance||b.width-a.width);
+      const drawnRoads:{pts:Point[];dir:Point}[]=[];
+      for(const r of roadEntries){
+        const duplicate=drawnRoads.some(d=>{
+          const align=Math.abs(d.dir[0]*r.dir[0]+d.dir[1]*r.dir[1]);
+          if(align<0.88)return false;
+          for(let k=1;k<d.pts.length;k++)if(pointToSegDeg(r.mid,d.pts[k-1],d.pts[k])<0.00009)return true;
+          return false;
+        });
+        if(duplicate)continue;
+        drawnRoads.push({pts:r.pts,dir:r.dir});
+        drawBridgePolyline(groundMesh,r.pts,bounds,ground,xyz,{width:r.width,clearance:r.clearance,skip:r.skip});
       }
     }
-    const trackPoints:Point[]=[];
+    const trackSegs:[Point,Point][]=[];
     const trackLayer=tile?.layers.RailTrCL;
     if(trackLayer)for(let i=0;i<trackLayer.length;i++){
       const f=trackLayer.feature(i),props=f.properties,code=Number(props.vt_code);
@@ -180,7 +205,7 @@ export function tileCompiler(){
       const lvorder=Number(props.vt_lvorder??0);
       for(const line of f.loadGeometry()){
         const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
-        for(const p of pts)if(here(p))trackPoints.push(p);
+        for(let k=1;k<pts.length;k++)trackSegs.push([pts[k-1],pts[k]]);
         drawRailPolyline(groundMesh,pts,bounds,ground,xyz,{raised:structure==='raised',doubleTrack:false,shinkansen,monorail,tram,lvorder});
       }
     }
@@ -195,9 +220,9 @@ export function tileCompiler(){
       for(const line of f.loadGeometry()){
         const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
         if(pts.length<2)continue;
-        // Skip routes already modelled track-by-track in RailTrCL to avoid double-stacking.
-        const mid=pts[Math.floor(pts.length/2)];
-        if(trackPoints.some(t=>Math.abs(t[0]-mid[0])<.00022&&Math.abs(t[1]-mid[1])<.00018))continue;
+        // Skip routes already modelled track-by-track in RailTrCL (distance to segment avoids gaps on long straights).
+        const samples=[pts[Math.floor(pts.length/2)],pts[Math.floor(pts.length/4)],pts[Math.floor((pts.length*3)/4)]];
+        if(samples.some(s=>trackSegs.some(([a,b])=>pointToSegDeg(s,a,b)<0.00024)))continue;
         drawRailPolyline(groundMesh,pts,bounds,ground,xyz,{raised:structure==='raised',doubleTrack,shinkansen:false,monorail:false,tram:false,lvorder});
       }
     }

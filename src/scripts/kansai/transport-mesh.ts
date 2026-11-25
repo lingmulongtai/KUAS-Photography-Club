@@ -104,14 +104,16 @@ export function drawBridgePolyline(
   const first=segments[0].a,last=segments[segments.length-1].b;
   const startFree=!onTileEdge(first,bounds),endFree=!onTileEdge(last,bounds);
   const startG=ground(first),endG=ground(last);
-  const rampLen=Math.min(elevated?18:10,total*.3);
+  const rampLen=Math.min(elevated?Math.max(20,clearance*4.2):10,total*.38);
+  const smooth=(t:number)=>t*t*(3-2*t);
   const deckZ=(p:Point,dist:number)=>{
     const g=ground(p);
     const chord=total>0&&total<260?startG+(endG-startG)*(dist/total):-Infinity;
     let lift=clearance;
-    if(!elevated&&rampLen>0){
-      if(startFree&&dist<rampLen)lift=.32+(clearance-.32)*(dist/rampLen);
-      else if(endFree&&total-dist<rampLen)lift=.32+(clearance-.32)*((total-dist)/rampLen);
+    if(rampLen>0){
+      const touch=.28;
+      if(startFree&&dist<rampLen)lift=touch+(clearance-touch)*smooth(dist/rampLen);
+      if(endFree&&total-dist<rampLen)lift=Math.min(lift,touch+(clearance-touch)*smooth((total-dist)/rampLen));
     }
     return Math.max(g,chord)+lift;
   };
@@ -174,15 +176,34 @@ export function drawRailPolyline(
   const gauge=shinkansen?1.435:1.067;
   const railHalf=gauge*.5;
   const trackOffsets=doubleTrack?[-1.55,1.55]:[0];
-  let distance=0;
+  const segments:{p0:Point;p1:Point;len:number;start:number}[]=[];
+  let total=0;
   for(let j=1;j<rawPoints.length;j++){
     const clipped=clipSegment(rawPoints[j-1],rawPoints[j],bounds);
     if(!clipped)continue;
     const [p0,p1]=clipped;
-    const g0=ground(p0),g1=ground(p1);
-    const a=xyz(p0,g0+lift),b=xyz(p1,g1+lift);
-    const len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    const pa=xyz(p0,0),pb=xyz(p1,0),len=Math.hypot(pb[0]-pa[0],pb[1]-pa[1]);
     if(len<.1)continue;
+    segments.push({p0,p1,len,start:total});
+    total+=len;
+  }
+  if(!segments.length)return;
+  const startFree=!onTileEdge(segments[0].p0,bounds),endFree=!onTileEdge(segments[segments.length-1].p1,bounds);
+  const rampLen=(raised&&!monorail)?Math.min(26,total*.35):0;
+  const smooth=(t:number)=>t*t*(3-2*t);
+  const railLift=(dist:number)=>{
+    if(rampLen<=0)return lift;
+    const surface=.48;
+    let h=lift;
+    if(startFree&&dist<rampLen)h=surface+(lift-surface)*smooth(dist/rampLen);
+    if(endFree&&total-dist<rampLen)h=Math.min(h,surface+(lift-surface)*smooth((total-dist)/rampLen));
+    return h;
+  };
+  let distance=0;
+  for(const seg of segments){
+    const {p0,p1,len,start}=seg;
+    const g0=ground(p0),g1=ground(p1);
+    const a=xyz(p0,g0+railLift(start)),b=xyz(p1,g1+railLift(start+len));
     const ux=(b[0]-a[0])/len,uy=(b[1]-a[1])/len;
     if(monorail){
       strip(mesh,a,b,bedWidth,CONCRETE,deckDepth);
