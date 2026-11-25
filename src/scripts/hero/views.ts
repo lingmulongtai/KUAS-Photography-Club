@@ -38,12 +38,18 @@ const HIKONE=toLocal(35.27645,136.25184); // 彦根城 天守 (public/kansai/lan
 const HIEI=toLocal(35.0616,135.8414); // 比叡山 山頂付近（京都・びわ湖を一望）
 const TODAIJI=toLocal(34.6889931,135.83987322); // 東大寺 大仏殿 (public/kansai/landmarks/index.json todaiji)
 const KASUGA=toLocal(34.6815749,135.8485364); // 春日大社 本殿 (public/kansai/landmarks/index.json kasuga-honden-1)
+const KIX=toLocal(34.4347,135.2440); // 関西国際空港 第1ターミナル・滑走路
+const ITAMI=toLocal(34.7845,135.4395); // 大阪国際空港（伊丹空港）ターミナル・32L/32R
+const KOBE_AIRPORT=toLocal(34.6335,135.2242); // 神戸空港 ターミナル・滑走路
 
 export const EXTRA_LANDMARKS = [
   { id: 'hikone', ja: '彦根城', en: 'Hikone Castle', lat: 35.27645, lon: 136.25184 },
   { id: 'hiei', ja: '比叡山', en: 'Mt. Hiei', lat: 35.0616, lon: 135.8414 },
   { id: 'todaiji', ja: '東大寺', en: 'Todai-ji', lat: 34.6889931, lon: 135.83987322 },
   { id: 'kasuga', ja: '春日大社', en: 'Kasuga Taisha', lat: 34.6815749, lon: 135.8485364 },
+  { id: 'kix', ja: '関西国際空港', en: 'Kansai International Airport', lat: 34.4347, lon: 135.2440 },
+  { id: 'itami', ja: '伊丹空港（大阪国際空港）', en: 'Itami Airport (Osaka Intl)', lat: 34.7845, lon: 135.4395 },
+  { id: 'kobeAirport', ja: '神戸空港', en: 'Kobe Airport', lat: 34.6335, lon: 135.2242 },
 ] as const;
 
 /** Frame the named structure or area using the same centre as its map pin. */
@@ -112,6 +118,9 @@ export const VIEWS = {
   hiei:{ja:'比叡山',en:'Mt. Hiei',eye:ahead(HIEI,110,900),ref:HIEI,above:320,bearing:290,pitch:-16,orbit:{center:HIEI,targetHeight:12}},
   todaiji:{ja:'東大寺',en:'Todai-ji',eye:ahead(TODAIJI,185,340),ref:TODAIJI,above:120,bearing:5,pitch:-16,orbit:{center:TODAIJI,targetHeight:28}},
   kasuga:{ja:'春日大社',en:'Kasuga Taisha',eye:ahead(KASUGA,240,260),ref:KASUGA,above:95,bearing:60,pitch:-17,orbit:{center:KASUGA,targetHeight:10}},
+  kix:{ja:'関西国際空港',en:'Kansai International Airport',eye:ahead(KIX,145,2150),ref:KIX,above:480,bearing:325,pitch:-13,orbit:{center:KIX,targetHeight:24}},
+  itami:{ja:'伊丹空港（大阪国際空港）',en:'Itami Airport',eye:ahead(ITAMI,140,1650),ref:ITAMI,above:340,bearing:320,pitch:-12,orbit:{center:ITAMI,targetHeight:18}},
+  kobeAirport:{ja:'神戸空港',en:'Kobe Airport',eye:ahead(KOBE_AIRPORT,165,1650),ref:KOBE_AIRPORT,above:340,bearing:345,pitch:-12,orbit:{center:KOBE_AIRPORT,targetHeight:18}},
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;
