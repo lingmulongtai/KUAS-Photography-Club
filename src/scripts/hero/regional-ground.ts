@@ -48,7 +48,10 @@ async function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[],curre
       uv[k*2]=(x-box[0])/(box[2]-box[0]);uv[k*2+1]=1-(z-box[1])/(box[3]-box[1]);
       minimum=Math.min(minimum,h);maximum=Math.max(maximum,h);
       if(i+1===columns || j+1===rows)continue;
-      if(x>=kyoto[0] && xs[i+1]<=kyoto[2] && z>=kyoto[1] && zs[j+1]<=kyoto[3])continue;
+      const inKyoto=x>=kyoto[0] && xs[i+1]<=kyoto[2] && z>=kyoto[1] && zs[j+1]<=kyoto[3];
+      // Keep the SW corner inside Kyoto's outer bounds where Osaka Bay enters, so sea water continues seamlessly across z=36000.
+      const osakaBayOverlap=xs[i+1]<-20500 && zs[j+1]>27500;
+      if(inKyoto && !osakaBayOverlap)continue;
       indices.set([k,k+columns,k+1,k+1,k+columns,k+columns+1],offset);offset+=6;
     }
     if(performance.now()>=deadline && !await giveFrame())return null;
@@ -82,7 +85,7 @@ const vertexShader = `
   }`;
 const fragmentShader = `
   uniform sampler2D uPhoto,uClose,uDistrict,uInset;
-  uniform vec4 uCloseBox,uDistrictBox,uInsetBox;
+  uniform vec4 uCloseBox,uDistrictBox,uInsetBox,uKyotoBox;
   uniform float uCloseMatch,uGroundFar;
   varying vec2 vUv;
   varying vec3 vWorld,vNormal;
@@ -96,18 +99,74 @@ const fragmentShader = `
     float fade=smoothstep(uGroundFar*.84,uGroundFar,radialDist);
     return fade>0.?mix(color,skyBackground(delta/max(radialDist,1e-4)),fade):color;
   }
+  float seaWave(vec2 p,vec2 drift,float med,float broad){
+    const mat2 R1=mat2(.80,-.60,.60,.80);
+    const mat2 R2=mat2(.54,.84,-.84,.54);
+    vec2 warp=vec2(vnoise(p*.022+drift*.22),vnoise(p*.022-drift*.19+13.7))-.5;
+    vec2 q0=p+warp*7.5;
+    float h=0.;
+    if(broad>.001){
+      h+=(vnoise(R1*(q0*.038)+drift*.35)-.5)*1.2*broad;
+      h+=(vnoise(R2*(q0*.082)-drift*.46+9.4)-.5)*.65*broad;
+    }
+    if(med>.001){
+      h+=(vnoise(R1*(q0*.19)+drift*.78+24.1)-.5)*.38*med;
+    }
+    return h;
+  }
+  vec3 renderSea(vec3 wp){
+    vec2 q=wp.xz;
+    float fp=max(length(dFdx(q)),length(dFdy(q)));
+    float broad=1.-smoothstep(2.,16.,fp);
+    float med=1.-smoothstep(.4,4.5,fp);
+    vec2 drift=vec2(uTime*.38,uTime*.26);
+    float eps=max(.55,fp*.5);
+    float h0=seaWave(q,drift,med,broad);
+    float hx=seaWave(q+vec2(eps,0.),drift,med,broad);
+    float hy=seaWave(q+vec2(0.,eps),drift,med,broad);
+    float gust=.58+.68*vnoise(q*.0012+vec2(uTime*.014,-uTime*.01));
+    vec2 slope=vec2(hx-h0,hy-h0)/eps*.11*gust;
+    vec3 n=normalize(vec3(slope.x,1.,slope.y));
+    vec3 view=normalize(wp-cameraPosition);
+    vec3 r=reflect(view,n);
+    r.y=clamp(abs(r.y)+.02,.015,1.);
+    vec3 rn=normalize(r);
+    float facing=clamp(dot(-view,n),0.,1.);
+    float fres=.045+.88*pow(1.-facing,4.5);
+    vec3 sky=skyColor(rn);
+    if(rn.y>.04){
+      vec2 cloudUv=q*.000035+rn.xz/max(rn.y+.18,.22)*.75+vec2(uTime*.0014,0.);
+      float cMask=smoothstep(.46,.78,fbm(cloudUv*2.1))*smoothstep(.04,.28,rn.y)*(1.-smoothstep(.55,.95,rn.y));
+      vec3 cCol=mix(uCloudLight*.88+uHorizon*.25,uHorizon*.45,uCity);
+      sky=mix(sky,cCol,cMask*.4);
+    }
+    float az=atan(rn.x,rn.z);
+    float ridge=.04+.035*vnoise(vec2(az*3.2+q.x*.00003,q.y*.00003+3.7));
+    float sill=1.-smoothstep(ridge*.6,ridge*1.15+.015,rn.y);
+    vec3 shoreCol=vec3(.09,.10,.11)*(skyLight(vec3(0.,.7,.7))+uSunLight*max(uSunDir.y,0.)*.5);
+    if(uCity>.01){
+      float glow=exp(-rn.y*16.)*(.45+.55*vnoise(vec2(az*12.+q.x*.0003,q.y*.0003)));
+      shoreCol+=vec3(1.,.64,.32)*glow*uCity*.24;
+    }
+    vec3 envRefl=mix(sky,shoreCol,sill*.48);
+    vec3 ambient=skyLight(vec3(0.,1.,0.))+uSunLight*max(uSunDir.y,0.);
+    vec3 col=mix(vec3(.009,.031,.047)*ambient,envRefl,fres);
+    float sunDot=max(dot(rn,uSunDir),0.);
+    float moonDot=max(dot(rn,uMoonDir),0.);
+    col+=uSunLight*(pow(sunDot,170.)*.55+pow(sunDot,24.)*.065);
+    col+=uMoonLight*(pow(moonDot,170.)*2.8+pow(moonDot,24.)*.28);
+    return fadeHorizon(applyHaze(col,vec3(0.),wp),wp);
+  }
   void main(){
     vec4 photo=texture2D(uPhoto,vUv);
     if(photo.a<.18)discard;
     int prefectureCode=owner(vWorld.xz);
-    if(photo.a<.62 && prefectureCode==0){
-      vec3 direction=normalize(vWorld-cameraPosition);
-      float fresnel=pow(1.-clamp(-direction.y,0.,1.),3.);
-      vec3 water=mix(shade(vec3(.024,.086,.105),vec3(0.,1.,0.),vWorld,1.),skyColor(reflect(direction,vec3(0.,1.,0.))),.09+.45*fresnel);
-      gl_FragColor=vec4(fadeHorizon(applyHaze(water,vec3(0.),vWorld),vWorld),1.);
+    bool insideKyoto=vWorld.x>=uKyotoBox.x && vWorld.z>=uKyotoBox.y && vWorld.x<=uKyotoBox.z && vWorld.z<=uKyotoBox.w;
+    if(prefectureCode==0 && (photo.a<.62 || insideKyoto)){
+      gl_FragColor=vec4(renderSea(vWorld),1.);
       return;
     }
-    if(prefectureCode==0)discard;
+    if(prefectureCode==0 || insideKyoto)discard;
     vec3 baseLow=textureGrad(uPhoto,vUv,vec2(.008,0.),vec2(0.,.008)).rgb;
     photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox,vWorld.xz,.08);
     photo.rgb=overlay(photo.rgb,uInset,uInsetBox,vWorld.xz,.08);
@@ -159,6 +218,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   const uClose={value:null as THREE.Texture|null},uCloseBox={value:new THREE.Vector4()},uCloseMatch={value:0};
   const uDistrict={value:null as THREE.Texture|null},uDistrictBox={value:new THREE.Vector4()};
   const uInset={value:null as THREE.Texture|null},uInsetBox={value:new THREE.Vector4()};
+  const uKyotoBox={value:new THREE.Vector4(...kyoto)};
   const uGroundFar={value:92000};
   let broad:RegionalPhoto|null=null,inset:RegionalPhoto|null=null,live:RegionalPhoto|null=null;
   // A first draw would upload every newly finished orthophoto at once. Keep the old
@@ -230,7 +290,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
         if(!await preparePhoto(photo,()=>state.distance<=activeUnload)){photo.dispose();return;}
         const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=activeUnload);
         if(!geometry){photo.dispose();return;}
-        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox},vertexShader,fragmentShader});
+        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox,uKyotoBox},vertexShader,fragmentShader,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
         const mesh=new THREE.Mesh(geometry,material);
         await (shaderReady??=prepare(mesh));
         if(state.distance>activeUnload){mesh.geometry.dispose();material.dispose();photo.dispose();return;}

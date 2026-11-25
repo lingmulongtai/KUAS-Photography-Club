@@ -12,10 +12,9 @@ import type {KamoChannel} from './kamo-channel';
 const senkoji=toLocal(35.0157751,135.6655983);
 
 /**
- * Rivers, the castle moat and ponds from the GSI water areas. The surface mirrors the sky,
- * glitters toward the sun and, after dark, shimmers with the lights along its banks.
- * Vertices are pulled a few metres toward the camera so the coarse terrain mesh, which
- * smooths over narrow channels, never hides them; buildings still do.
+ * Rivers, the castle moat, Lake Biwa, Seta River and ponds from GSI water areas.
+ * Surfaces mirror the sky, clouds, seasonal shoreline silhouettes, sun/moon glitter and
+ * nighttime city reflections, with organic multi-octave waves and directional river flow.
  */
 type WaterRoads = {
   uRoads: { value: THREE.Texture | null };
@@ -97,13 +96,14 @@ export function waterProfile(ring:readonly {x:number;y:number}[],attr:number):[n
   return [river?1:0,Math.cos(angle),Math.sin(angle)];
 }
 
-export function waterMaterial(env:Env,roads:WaterRoads,bias:number){
+export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceClearance=false){
   return new THREE.ShaderMaterial({
-    uniforms: { ...env, ...roads,uWaterBias:{value:bias} },
+    uniforms: { ...env, ...roads, uWaterBias:{value:bias}, uClearance:{value:surfaceClearance?1:0} },
     vertexShader: /* glsl */ `
       attribute float aStable;
       attribute vec3 aWater;
       uniform float uWaterBias;
+      uniform float uClearance;
       varying float vStable;
       varying vec3 vWater;
       varying vec3 vWorld;
@@ -113,8 +113,17 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number){
         vStable=aStable;vWater=aWater;
         vec3 toCam = cameraPosition - p;
         float dist = length(toCam);
-        float farLake = aWater.x > 1.5 ? smoothstep(2500., 14000., dist) : 0.;
-        float pull = mix(min(dist * .004, uWaterBias), max(uWaterBias, min(dist * .0035, 110.)), farLake);
+        float pull;
+        if (uClearance > .5) {
+          // Keep Lake Biwa's shoreline, Seta River and Osaka rivers cleanly above coarse 100-200 m
+          // terrain slopes at every range (so lakes never shrink up close), while staying below bridges.
+          float nearPull = clamp(dist * .0065, 1.25, aWater.x > 1.5 ? 11. : 6.5);
+          float farLake = aWater.x > 1.5 ? smoothstep(2600., 14000., dist) : 0.;
+          pull = mix(nearPull, max(nearPull, min(dist * .0038, 110.)), farLake);
+        } else {
+          float farLake = aWater.x > 1.5 ? smoothstep(2500., 14000., dist) : 0.;
+          pull = mix(min(dist * .004, uWaterBias), max(uWaterBias, min(dist * .0035, 110.)), farLake);
+        }
         p += toCam / max(dist,.01) * pull * (1.-aStable);
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
       }
@@ -125,6 +134,66 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number){
       varying vec3 vWorld;
       varying float vStable;
       varying vec3 vWater;
+
+      // Multi-octave rotated organic wave height (zero periodic grid regularity).
+      float waveHeight(vec2 p, vec2 drift, float fine, float med, float broad){
+        const mat2 R1 = mat2(.80, -.60, .60, .80);
+        const mat2 R2 = mat2(.54, .84, -.84, .54);
+        const mat2 R3 = mat2(-.38, .92, -.92, -.38);
+        vec2 warp = vec2(vnoise(p * .035 + drift * .25), vnoise(p * .035 - drift * .21 + 17.3)) - .5;
+        vec2 q0 = p + warp * 5.5;
+        float h = 0.;
+        if (broad > .001) {
+          vec2 a = R1 * (q0 * .055) + drift * .38;
+          h += (vnoise(a) - .5) * 1.15 * broad;
+          vec2 b = R2 * (q0 * .115) - drift * .52 + 11.4;
+          h += (vnoise(b) - .5) * .68 * broad;
+        }
+        if (med > .001) {
+          vec2 c = R3 * (q0 * .24) + drift * .85 + 29.7;
+          h += (vnoise(c) - .5) * .42 * med;
+        }
+        if (fine > .001) {
+          vec2 d = R1 * (p * .58) - drift * 1.35 + 47.1;
+          h += (vnoise(d) - .5) * .22 * fine;
+        }
+        return h;
+      }
+
+      // Environment reflection: sky dome, reflected cloud wisps, seasonal mountain/shoreline
+      // silhouette near the horizon, and warm nighttime bank/city light reflections.
+      vec3 reflectScenery(vec3 r, vec3 wp, bool lake, bool river){
+        vec3 sky = skyColor(r);
+        // Reflected cloud wisps in the upper sky.
+        if (r.y > .04) {
+          vec2 cloudUv = wp.xz * .00004 + r.xz / max(r.y + .18, .22) * .75 + vec2(uTime * .0015, 0.);
+          float cMask = smoothstep(.46, .78, fbm(cloudUv * 2.2)) * smoothstep(.04, .28, r.y) * (1. - smoothstep(.55, .95, r.y));
+          vec3 cCol = mix(uCloudLight * .88 + uHorizon * .25, uHorizon * .45, uCity);
+          sky = mix(sky, cCol, cMask * .42);
+        }
+        // Low-angle surrounding hills / shoreline / city silhouette mirrored on the water.
+        float az = atan(r.x, r.z);
+        float ridge = .055 + .048 * vnoise(vec2(az * 3.1 + wp.x * .00004, wp.z * .00004 + 4.2))
+                           + .026 * vnoise(vec2(az * 7.8 + 12.1, wp.x * .00007 - wp.z * .00007));
+        float ridgeScale = lake ? .85 : (river ? 1.25 : 1.55);
+        float sill = 1. - smoothstep(ridge * ridgeScale * .65, ridge * ridgeScale * 1.15 + .018, r.y);
+        vec3 hillBase = vec3(.08, .12, .08);
+        hillBase = mix(hillBase, vec3(.16, .10, .06), uAutumn * .65);
+        hillBase = mix(hillBase, vec3(.07, .14, .07), uSummer * .55);
+        hillBase = mix(hillBase, vec3(.14, .12, .13), uSpring * .4);
+        hillBase = mix(hillBase, vec3(.22, .24, .27), uSnow * .65);
+        vec3 cityTone = vec3(.11, .12, .13);
+        float urbanMix = river ? .55 : (lake ? .32 : .42);
+        vec3 landCol = mix(hillBase, cityTone, urbanMix) * (skyLight(vec3(0., .7, .7)) + uSunLight * max(uSunDir.y, 0.) * .55);
+        // Subtle warm city / shoreline glow reflected across water at night.
+        if (uCity > .01) {
+          float shoreBand = exp(-r.y * 18.) * (.45 + .55 * vnoise(vec2(az * 14. + wp.x * .0004, wp.z * .0004)));
+          landCol += vec3(1., .64, .32) * shoreBand * uCity * (river ? .42 : (lake ? .22 : .28));
+        }
+        float reflStrength = lake ? .58 : (river ? .68 : .76);
+        return mix(sky, landCol, sill * reflStrength);
+      }
+
       void main(){
         vec2 q = vWorld.xz;
         float footprint=max(length(dFdx(q)),length(dFdy(q)));
@@ -133,37 +202,76 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number){
         bool lake=vWater.x>1.5,river=vWater.x>.5&&!lake;
         vec2 axis=normalize(vWater.yz),crosswind=vec2(-axis.y,axis.x);
         vec2 along=vec2(dot(q,axis),dot(q,crosswind));
-        float t=uTime*(lake?.42:river?.60:.15);
-        vec2 phase=along*(lake?vec2(.22,.43):river?vec2(.38,.92):vec2(.18,.22));
-        float broad=1.-smoothstep(.6,5.,footprint),fine=1.-smoothstep(.18,1.3,footprint);
-        float envelope=vnoise(q*.015);
-        float a=sin(phase.x+2.8*envelope-t)*broad;
-        float b=sin(phase.y+.65*phase.x+4.*envelope+t*.73)*fine;
-        float ripple=lake?.050:river?.038:.012;
-        vec2 slope=ripple*(axis*a+crosswind*b*.63);
-        vec3 n=normalize(vec3(slope.x,1.,slope.y));
-        vec3 view=normalize(vWorld-cameraPosition),r=reflect(view,n);
-        r.y=clamp(abs(r.y)+(lake?.05:river?.085:.018),.02,1.);
-        float facing=clamp(dot(-view,n),0.,1.);
-        float fres=.025+.83*pow(1.-facing,4.5);
-        vec3 deep=lake?vec3(.009,.033,.044):river?vec3(.023,.041,.034):vec3(.019,.034,.025);
-        vec3 ambient=skyLight(vec3(0.,1.,0.))+uSunLight*max(uSunDir.y,0.);
-        vec3 col=mix(deep*ambient,skyColor(normalize(r)),fres);
-        float gloss=lake?100.:river?68.:150.;
-        float glint=pow(max(dot(normalize(r),uSunDir),0.),gloss);
-        col+=uSunLight*glint*.35+uMoonLight*pow(max(dot(normalize(r),uMoonDir),0.),gloss)*2.5;
-        gl_FragColor=vec4(applyHaze(col,vec3(0.),vWorld),1.);
+
+        float broad = 1. - smoothstep(1.2, 9.5, footprint);
+        float med   = 1. - smoothstep(.35, 3.2, footprint);
+        float fine  = 1. - smoothstep(.08, .95, footprint);
+
+        vec2 sampleCoord;
+        vec2 drift;
+        if (river) {
+          // Elongate wave shapes along the river channel and advect steadily downstream.
+          sampleCoord = vec2(along.x * .58, along.y * 1.45);
+          drift = vec2(-uTime * 1.55, sin(uTime * .23) * .12);
+        } else if (lake) {
+          sampleCoord = q * .85;
+          drift = vec2(uTime * .46, uTime * .31);
+        } else {
+          // Ponds & castle moats: calm, gentle ripples.
+          sampleCoord = q * 1.15;
+          drift = vec2(uTime * .14, -uTime * .10);
+        }
+
+        // Finite-difference slope of the organic wave field in world space.
+        float eps = max(.35, footprint * .5);
+        float h0 = waveHeight(sampleCoord, drift, fine, med, broad);
+        float hx = waveHeight(sampleCoord + vec2(eps, 0.), drift, fine, med, broad);
+        float hy = waveHeight(sampleCoord + vec2(0., eps), drift, fine, med, broad);
+        vec2 localGrad = vec2(hx - h0, hy - h0) / eps;
+
+        // Wind gusts create natural calm vs ruffled patches across Lake Biwa.
+        float gust = lake ? (.55 + .70 * vnoise(q * .0016 + vec2(uTime * .018, -uTime * .012))) : 1.;
+        float ripple = (lake ? .115 : river ? .095 : .032) * gust;
+        vec2 slope = river
+          ? (axis * (localGrad.x * .58) + crosswind * (localGrad.y * 1.45)) * ripple
+          : localGrad * ripple;
+        vec3 n = normalize(vec3(slope.x, 1., slope.y));
+
+        vec3 view = normalize(vWorld - cameraPosition);
+        vec3 r = reflect(view, n);
+        r.y = clamp(abs(r.y) + (lake ? .025 : river ? .04 : .012), .012, 1.);
+        vec3 rn = normalize(r);
+
+        float facing = clamp(dot(-view, n), 0., 1.);
+        float fres = .04 + .90 * pow(1. - facing, 4.6);
+        vec3 deep = lake ? vec3(.009, .032, .045) : river ? vec3(.020, .039, .033) : vec3(.016, .032, .024);
+        vec3 ambient = skyLight(vec3(0., 1., 0.)) + uSunLight * max(uSunDir.y, 0.);
+        vec3 envRefl = reflectScenery(rn, vWorld, lake, river);
+        vec3 col = mix(deep * ambient, envRefl, fres);
+
+        // Dual-lobe solar & lunar specular sparkle.
+        float sunDot = max(dot(rn, uSunDir), 0.);
+        float moonDot = max(dot(rn, uMoonDir), 0.);
+        float tight = lake ? 180. : river ? 120. : 240.;
+        float broadGloss = lake ? 26. : river ? 20. : 38.;
+        col += uSunLight * (pow(sunDot, tight) * .55 + pow(sunDot, broadGloss) * .065);
+        col += uMoonLight * (pow(moonDot, tight) * 2.8 + pow(moonDot, broadGloss) * .28);
+        gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
       }
     `,
   });
 }
 
+export type BiwaSurface = THREE.Group & { refit: (ground: (x: number, z: number) => number) => void };
+
 // The lake and the Seta reach above the weir share a surveyed 84.6 m surface.
-// Its small lift matches the detailed water in the basin, with no per-tile camera bias.
-export async function biwaSurface(env:Env,roads:WaterRoads){
+// Conforming edge vertices to the actual terrain grid and keeping continuous surface clearance
+// prevents coarse shoreline slopes from shrinking Lake Biwa up close or burying the Seta River.
+export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:number,z:number)=>number):Promise<BiwaSurface>{
   const bytes=await loadBinary('kansai/biwa-water.bin'),view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
-  const group=new THREE.Group();
+  const group=new THREE.Group() as BiwaSurface;
   group.name='lake-biwa-and-seta';
+  const parts:{geometry:THREE.BufferGeometry;isRiver:boolean}[]=[];
   let offset=8;
   for(const [i,profile] of [[0,[2,.83,.56]],[1,[1,-.16,.987]]] as const){
     const count=view.getUint32(4*i,true);
@@ -177,15 +285,120 @@ export async function biwaSurface(env:Env,roads:WaterRoads){
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
     geometry.computeBoundingSphere();
-    const material=waterMaterial(env,roads,.35);
-    if(i===0){
+    const isRiver=i===1;
+    // Keep tight near-shore uWaterBias=0.35 while uClearance & refit(ground) prevent coarse terrain from swallowing shores or Seta River.
+    const material=waterMaterial(env,roads,.35,true);
+    if(!isRiver){
       material.polygonOffset=true;
-      material.polygonOffsetFactor=-2;
-      material.polygonOffsetUnits=-8;
+      material.polygonOffsetFactor=-3;
+      material.polygonOffsetUnits=-10;
     }
     Object.assign(material.defaultAttributeValues,{aStable:[0],aWater:[...profile]});
-    group.add(new THREE.Mesh(geometry,material));
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name=isRiver?'seta-river':'lake-biwa';
+    group.add(mesh);
+    parts.push({geometry,isRiver});
   }
+  const refit=(ground:(x:number,z:number)=>number)=>{
+    for(const {geometry,isRiver} of parts){
+      const attr=geometry.getAttribute('position') as THREE.BufferAttribute;
+      const arr=attr.array as Float32Array;
+      // Keep water strictly below Seta-no-Karahashi (88.2 m) and shoreline roads while clearing coarse grid bulges.
+      const cap=isRiver?87.1:86.2;
+      const lift=isRiver?.55:.25;
+      for(let i=0;i<arr.length;i+=3){
+        const g=ground(arr[i],arr[i+2]);
+        arr[i+1]=Math.min(cap,Math.max(85,g+lift));
+      }
+      attr.needsUpdate=true;
+      geometry.computeBoundingSphere();
+    }
+  };
+  if(initialGround)refit(initialGround);
+  group.refit=refit;
+  return group;
+}
+
+/** Persistent Osaka Bay harbor basins, Yodo/Kanzaki/Okawa/Ajigawa/Kizugawa/Yamatogawa/Mukogawa rivers & Kobe Port. */
+export async function osakaWaterSurface(env:Env,roads:WaterRoads,initialGround?:(x:number,z:number)=>number):Promise<BiwaSurface>{
+  const bytes=await loadBinary('kansai/osaka-water.bin'),view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const bayVerts=view.getUint32(0,true);
+  const riverVerts=view.getUint32(4,true);
+  const group=new THREE.Group() as BiwaSurface;
+  group.name='osaka-bay-and-rivers';
+  const parts:{geometry:THREE.BufferGeometry;isBay:boolean}[]=[];
+
+  let offset=8;
+  // Part 0: Osaka Bay / harbor basins (code 5100) — wave/reflection profile matching open ocean & Lake Biwa.
+  if(bayVerts>0){
+    const positions=new Float32Array(bayVerts*3);
+    for(let n=0;n<bayVerts;n++){
+      positions[n*3]=view.getFloat32(offset,true);
+      positions[n*3+1]=0.35;
+      positions[n*3+2]=view.getFloat32(offset+4,true);
+      offset+=8;
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+    geometry.computeBoundingSphere();
+    // Flat coastal harbor water uses tight depth offset without tall camera-pull so it never pokes through seawalls or airports.
+    const material=waterMaterial(env,roads,1.1,false);
+    material.polygonOffset=true;
+    material.polygonOffsetFactor=-1;
+    material.polygonOffsetUnits=-4;
+    Object.assign(material.defaultAttributeValues,{aStable:[0.95],aWater:[2,0.8,0.6]});
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name='osaka-bay-harbors';
+    group.add(mesh);
+    parts.push({geometry,isBay:true});
+  }
+
+  // Part 1: Major rivers & canals (code 5200) — directional downstream flow stored per triangle vertex.
+  if(riverVerts>0){
+    const positions=new Float32Array(riverVerts*3);
+    const profiles=new Float32Array(riverVerts*3);
+    const dirOffset=8+bayVerts*8+riverVerts*8;
+    for(let n=0;n<riverVerts;n++){
+      positions[n*3]=view.getFloat32(offset,true);
+      positions[n*3+1]=0.4;
+      positions[n*3+2]=view.getFloat32(offset+4,true);
+      offset+=8;
+      const fx=view.getInt8(dirOffset+n*2)/127;
+      const fz=view.getInt8(dirOffset+n*2+1)/127;
+      const len=Math.hypot(fx,fz)||1;
+      profiles[n*3]=1;
+      profiles[n*3+1]=fx/len;
+      profiles[n*3+2]=fz/len;
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+    geometry.setAttribute('aWater',new THREE.BufferAttribute(profiles,3));
+    geometry.computeBoundingSphere();
+    const material=waterMaterial(env,roads,1.2,false);
+    material.polygonOffset=true;
+    material.polygonOffsetFactor=-2;
+    material.polygonOffsetUnits=-5;
+    Object.assign(material.defaultAttributeValues,{aStable:[0]});
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name='osaka-rivers';
+    group.add(mesh);
+    parts.push({geometry,isBay:false});
+  }
+
+  const refit=(ground:(x:number,z:number)=>number)=>{
+    for(const {geometry,isBay} of parts){
+      const attr=geometry.getAttribute('position') as THREE.BufferAttribute;
+      const arr=attr.array as Float32Array;
+      for(let i=0;i<arr.length;i+=3){
+        const g=ground(arr[i],arr[i+2]);
+        arr[i+1]=isBay?Math.min(1.6,Math.max(0.25,g+0.35)):Math.max(0.35,g+0.48);
+      }
+      attr.needsUpdate=true;
+      geometry.computeBoundingSphere();
+    }
+  };
+  if(initialGround)refit(initialGround);
+  group.refit=refit;
   return group;
 }
 
