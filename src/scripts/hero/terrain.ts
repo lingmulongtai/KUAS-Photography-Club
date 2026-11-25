@@ -185,12 +185,6 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 nr=texture2D(uRegionalNormal,boxUv(uRegionalBox,p)).xyz*2.-1.;
         n=normalize(mix(n,nr,regional));
 
-        float outerDistrict=uSurveyOn*(1.-basin);
-        if(outerDistrict>.5){
-          vec3 face=normalize(cross(dFdx(vWorld),dFdy(vWorld)));
-          n=normalize(mix(n,face*sign(face.y),.65));
-        }
-
         // aerial photo: the sharper city sheet where we have it
         // Composite front to back. An opaque local sheet completely covers the coarser samples.
         vec3 photo=vec3(0.);
@@ -311,10 +305,11 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         float railAA = clamp(fwidth(rd.rail) * .6, .12, 6.);
         float onRail = 1. - smoothstep(-railAA, railAA, rd.rail);
         float fine = 1. - smoothstep(.6, 2.5, fp);
-        // asphalt, a touch lighter and patched on the avenues
+        // asphalt: subtle aggregate grain up close and gentle surface wear, fading cleanly with pixel footprint
         float patchy = mix(.5, vnoise(p * .07), 1. - smoothstep(4., 12., fp));
-        vec3 asphalt = vec3(.085, .088, .094) * (.85 + .3 * patchy);
-        asphalt = mix(asphalt, asphalt * 1.25, onAve);
+        float asphaltGrain = mix(.5, vnoise(p * 1.45), 1. - smoothstep(.18, .65, fp * 1.45));
+        vec3 asphalt = vec3(.084, .087, .093) * (.84 + .22 * patchy + .14 * asphaltGrain);
+        asphalt = mix(asphalt, asphalt * 1.22, onAve);
         // markings on the avenues: a centre line, dashed lane lines, a line along each kerb
         float halfW = max(rd.centre - rd.avenue, 1.);
         vec2 e = vec2(1.5, 0.);
@@ -342,7 +337,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 street = mix(asphalt, vec3(.5, .5, .48), mark);
         vec3 paving = mix(vec3(.27,.26,.24),vec3(.16,.145,.12),garden);
         albedo = mix(albedo, paving * (.9 + .2 * patchy), walk * .85);
-        albedo = mix(albedo, street, onRoad * .93);
+        albedo = mix(albedo, street, onRoad * .98);
         // railway ballast
         albedo = mix(albedo, vec3(${RAIL_BALLAST.join(',')}), onRail * .9);
         // ambient occlusion: the ground along walls and in narrow alleys gets little sky
