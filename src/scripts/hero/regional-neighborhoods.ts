@@ -6,6 +6,7 @@ import {residentHouseBatch} from './buildings';
 import {facadeKind} from '../kansai/city-footprint';
 import type {PlacedHouse} from './panorama-blocks';
 import {ORIGIN,M_PER_DEG_LAT,M_PER_DEG_LON,toLocal,type Box} from './geo';
+import {regionalBudgetForTier,type RegionalQualityBudget} from './adaptive-quality';
 
 type Tile={key:string;x:number;y:number};
 type Batch={group:THREE.Group;batches:{mesh:Awaited<ReturnType<typeof residentHouseBatch>>;count:number}[];mask:THREE.DataTexture};
@@ -77,32 +78,37 @@ export async function regionalNeighborhoods(scene:THREE.Scene,env:Env,ground:(x:
     near=keys;
     for(const [key,b] of loaded){const t=wanted.get(key);if(t)maskFor(t,b.mask);}
   }
-  function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null,eye:{x:number;z:number}){
+  const defaultBudget=regionalBudgetForTier(lite?0:2);
+  function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null,eye:{x:number;z:number},budget:RegionalQualityBudget=defaultBudget){
     if(now<next)return;
     next=now+.18;
     activeBox.value.set(...(detail??[1,1,0,0] as Box));
     const [tx,ty]=tileXY(ORIGIN.lon+x/M_PER_DEG_LON,ORIGIN.lat-z/M_PER_DEG_LAT,12);
     const [ex,ey]=tileXY(ORIGIN.lon+eye.x/M_PER_DEG_LON,ORIGIN.lat-eye.z/M_PER_DEG_LAT,12);
-    const heading=Math.atan2(dirX,-dirZ),signature=[Math.floor(tx*4),Math.floor(ty*4),Math.round(heading*5),Math.floor(ex*4),Math.floor(ey*4)].join('/');
+    const maxRadius=budget.neighborhoodRadius;
+    const hideRadius=maxRadius+.9;
+    const heading=Math.atan2(dirX,-dirZ),signature=[Math.floor(tx*4),Math.floor(ty*4),Math.round(heading*5),Math.floor(ex*4),Math.floor(ey*4),budget.tier].join('/');
     if(signature!==previous){
       previous=signature;
       const jobs:{t:Tile;score:number}[]=[];
-      for(let j=-4;j<=4;j++)for(let i=-4;i<=4;i++){
+      const span=Math.ceil(maxRadius);
+      for(let j=-span;j<=span;j++)for(let i=-span;i<=span;i++){
         const a=Math.floor(tx)+i,b=Math.floor(ty)+j,key=district(a,b);
         if(!tiles[key])continue;
         const dx=a+.5-tx,dz=b+.5-ty,distance=Math.hypot(dx,dz);
         const forward=(dx*dirX+dz*dirZ)/Math.max(.01,distance);
-        if(distance>(lite?2.7:3.65) || (distance>1.55 && forward<.15))continue;
-        jobs.push({t:{key,x:a,y:b},score:distance*(1-.4*forward)});
+        // Only cull tiles strictly behind the camera beyond 1.8 tiles so wide-angle edges stay isotropic.
+        if(distance>maxRadius || (distance>1.8 && forward<-.15))continue;
+        jobs.push({t:{key,x:a,y:b},score:distance*(1-.4*Math.max(0,forward))});
       }
       const previousWanted=wanted;
       wanted=new Map(jobs.sort((a,b)=>a.score-b.score).map(({t})=>[t.key,t]));
       for(const [key,b] of loaded)if(!wanted.has(key)){
         const [a,row]=key.split('/').map(Number);
-        if((tx!==ex||ty!==ey) && previousWanted.has(key) && Math.hypot(a+.5-ex,row+.5-ey)<(lite?2.7:3.65)){
+        if((tx!==ex||ty!==ey) && previousWanted.has(key) && Math.hypot(a+.5-ex,row+.5-ey)<maxRadius){
           wanted.set(key,previousWanted.get(key)!);continue;
         }
-        if(Math.hypot(a+.5-tx,row+.5-ty)<(lite?3.3:4.4)){b.group.visible=false;continue;}
+        if(Math.hypot(a+.5-tx,row+.5-ty)<hideRadius){b.group.visible=false;continue;}
         scene.remove(b.group);dispose(b);loaded.delete(key);
       }
       for(const key of wanted.keys()){const b=loaded.get(key);if(b){b.group.visible=true;maskFor(wanted.get(key)!,b.mask);}}
@@ -112,10 +118,10 @@ export async function regionalNeighborhoods(scene:THREE.Scene,env:Env,ground:(x:
       if(!batch)continue;
       const distance=Math.max(0,Math.min(Math.hypot(t.x+.5-ex,t.y+.5-ey),Math.hypot(t.x+.5-tx,t.y+.5-ty))-.65);
       for(const {mesh,count} of batch.batches)
-        mesh.geometry.instanceCount=Math.max(1,Math.ceil(count/(1+distance*distance*(lite?2.2:1.4))));
+        mesh.geometry.instanceCount=Math.max(1,Math.ceil(count/(1+distance*distance*budget.neighborhoodFalloff)));
     }
     for(const t of wanted.values()){
-      if(pending.size>=2)break;
+      if(pending.size>=budget.buildingConcurrency)break;
       if(loaded.has(t.key)||pending.has(t.key)||(retry.get(t.key)??0)>now)continue;
       pending.add(t.key);
       void create(t).catch(error=>{retry.set(t.key,performance.now()/1000+15);console.warn('Distant neighborhood unavailable',t.key,error);})
