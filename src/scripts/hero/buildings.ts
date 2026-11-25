@@ -328,6 +328,8 @@ export const BUILDING_FS = /* glsl */ `
 
     vec3 albedo;
     vec3 emit = vec3(0.);
+    vec3 specRefl = vec3(0.);
+    float modernGlass = 0.;
     if (roof){
       if (wooden || role < 2.5){
         // kawara: blue-grey tiles, a few newer brown or slate roofs
@@ -383,14 +385,47 @@ export const BUILDING_FS = /* glsl */ `
         pane = mix(pane, pane * seen, deep);
       }
 
-      // glass by day: darker panes that pick up a little sky
-      float glassRefl = .03 + .18 * pow(clamp(1. - dot(-v, n), 0., 1.), 4.);
-      vec3 glass = vec3(.025, .03, .035);
-      if(tiny<1.)glass+=skyColor(reflect(v,n))*glassRefl*(1.-tiny);
-      glass *= 1. - .55 * head;
-      glass = mix(glass, wall * .55, mullion);
-      albedo = mix(wall, glass, pane * (.6 - .3 * tiny));
-      albedo = mix(albedo, wall * (.42 + .2 * max(n.y, 0.)), reveal);
+      // Modern commercial, office & high-rise towers get reflective glass curtain-wall facades.
+      modernGlass = wooden ? 0. : clamp((use == 4. ? .82 : use == 2. ? .55 : 0.) + smoothstep(18., 44., H) * .65, 0., 1.);
+      float curtain = modernGlass * smoothstep(.2, .85, modernGlass);
+      if (curtain > .01) {
+        // Curtain-wall glass spans wider across each floor with sleek aluminum mullions & dark spandrel bands.
+        float cwX = smoothstep(.04 - fw.x, .04 + fw.x, f.x) * (1. - smoothstep(.96 - fw.x, .96 + fw.x, f.x));
+        float cwY = smoothstep(.14 - fw.y, .14 + fw.y, f.y) * (1. - smoothstep(.94 - fw.y, .94 + fw.y, f.y));
+        pane = mix(pane, mix(cwX * cwY, .72, tiny) * valid, curtain * .85);
+      }
+
+      // Glass reflection: mirror sky, clouds, horizon glow & solar/lunar specular glints on modern towers.
+      float ndotv = clamp(dot(-v, n), 0., 1.);
+      float fresnel = pow(1. - ndotv, 3.6);
+      vec3 reflDir = reflect(v, n);
+      reflDir.y = clamp(reflDir.y + .06, -.1, 1.);
+      vec3 rNorm = normalize(reflDir);
+      vec3 skyRefl = skyColor(rNorm);
+      // Subtle reflected clouds & lower city horizon tone on vertical glass panes.
+      if (rNorm.y > .04) {
+        vec2 cUv = vWorld.xz * .000045 + rNorm.xz / max(rNorm.y + .22, .24) * .65 + vec2(uTime * .0014, 0.);
+        float cBand = smoothstep(.46, .78, fbm(cUv * 2.1)) * smoothstep(.04, .32, rNorm.y);
+        skyRefl = mix(skyRefl, mix(uCloudLight * .88 + uHorizon * .24, uHorizon * .45, uCity), cBand * .38);
+      } else {
+        skyRefl = mix(skyRefl, uHorizon * .42 + vec3(.03, .035, .04), smoothstep(.04, -.08, rNorm.y) * .65);
+      }
+      // Subtle per-pane glass tint variation & gentle structural curvature shimmer.
+      float paneVar = mix(.88 + .24 * hash12(id + seed * 19.3), 1., tiny);
+      vec3 glassTint = mix(vec3(.024, .030, .038), vec3(.018, .036, .052), modernGlass);
+      vec3 glass = glassTint * paneVar;
+      glass *= 1. - .52 * head * (1. - curtain * .65);
+      glass = mix(glass, wall * .52, mullion * (1. - curtain * .55));
+      float paneCoverage = pane * mix(.6 - .3 * tiny, .84 - .14 * tiny, modernGlass);
+      albedo = mix(wall, glass, paneCoverage);
+      albedo = mix(albedo, wall * (.42 + .2 * max(n.y, 0.)), reveal * (1. - curtain * .7));
+
+      // Direct specular reflection added after diffuse shading so curtain-wall towers genuinely mirror the sky & sun.
+      float reflAmt = mix(.05 + .22 * fresnel, .16 + .62 * fresnel, modernGlass) * paneCoverage * (1. - mullion * .7);
+      float sunGlint = pow(max(dot(rNorm, uSunDir), 0.), mix(96., 48., modernGlass)) * (.14 + .52 * modernGlass);
+      float moonGlint = pow(max(dot(rNorm, uMoonDir), 0.), 64.) * (1.1 + 1.8 * modernGlass);
+      specRefl = skyRefl * reflAmt * paneVar * mix(1., .72, tiny)
+               + (uSunLight * sunGlint + uMoonLight * moonGlint) * paneCoverage * (1. - mullion * .7) * sh;
 
       // lit windows at night: warm homes and hotels, cooler offices. Some buildings are dark.
       float awake = step(.22, fract(seed * 5.31));
@@ -428,7 +463,7 @@ export const BUILDING_FS = /* glsl */ `
       emit += teal * .25 * campus * (roof ? .4 : 1.) * (.4 + uCity);
     }
 
-    vec3 col = shade(seasonalSurface(albedo,n,vWorld), n, vWorld, sh);
+    vec3 col = shade(seasonalSurface(albedo,n,vWorld), n, vWorld, sh) + specRefl;
     gl_FragColor = vec4(applyHaze(col, emit, vWorld), 1.);
   }
 `;
