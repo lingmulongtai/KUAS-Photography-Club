@@ -145,14 +145,11 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       varying vec3 vWorld;
 
       vec2 boxUv(vec4 b, vec2 p){ return (p - b.xy) / (b.zw - b.xy); }
-      // World-fixed colour blocks across every photo sheet. Original gradients preserve mip
-      // filtering, and subpixel blocks fade out instead of shimmering on the distant slopes.
+      // Sample aerial photo sheets cleanly with explicit screen gradients so anisotropic/mip filtering stays crisp.
       vec3 blockPhoto(sampler2D image, vec4 box, vec2 p, float fp, vec2 dx, vec2 dy){
         vec2 scale=vec2(1.,-1.)/(box.zw-box.xy);
-        vec2 cell=(floor(p/8.)+.5)*8.;
-        vec2 at=mix(p,cell,1.-smoothstep(1.5,5.,fp));
-        vec2 blockUv=boxUv(box,at)*vec2(1.,-1.)+vec2(0.,1.);
-        return textureGrad(image,blockUv,dx*scale,dy*scale).rgb;
+        vec2 photoUv=boxUv(box,p)*vec2(1.,-1.)+vec2(0.,1.);
+        return textureGrad(image,photoUv,dx*scale,dy*scale).rgb;
       }
       float segment(vec2 p, vec4 s){
         vec2 ab = s.zw - s.xy;
@@ -199,7 +196,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         vec3 photo=vec3(0.);
         float remaining=1.,coverage=0.;
         vec2 dx=dFdx(p),dy=dFdy(p);
-        vec2 finePoint=mix(p,(floor(p/2.5)+.5)*2.5,1.-smoothstep(.5,2.,fp));
+        vec2 finePoint=p;
         for(int i=${sheets.length-1};i>=0;i--){
           vec4 box=uSheetBoxes[i],rect=uSheetUVs[i];
           float weight=inside(box,p,160.)*uCityOn;
@@ -243,7 +240,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
           // each layer of canopy fades to its average once its blobs shrink below a few pixels
           float k1 = 1. - smoothstep(.2, .45, fp * .22);
           float k2 = 1. - smoothstep(.2, .45, fp * .55);
-          vec2 canopyCell=(floor(p/4.)+.5)*4.;
+          vec2 canopyCell=p;
           float c1 = vnoise(canopyCell * .22);
           float c2 = vnoise(canopyCell * .55 + 7.);
           float canopy = mix(.5, c1, k1) * .65 + mix(.5, c2, k2) * .35;
