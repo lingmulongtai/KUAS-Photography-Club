@@ -66,8 +66,7 @@ function orientedPier(mesh:Mesh,cx:number,cy:number,ux:number,uy:number,topZ:num
   }
 }
 
-function onTileEdge(p:Point,bounds:Box){
-  const eps=1e-5;
+function onTileEdge(p:Point,bounds:Box,eps=1.5e-5){
   return p[0]<=bounds[0]+eps||p[0]>=bounds[2]-eps||p[1]<=bounds[1]+eps||p[1]>=bounds[3]-eps;
 }
 
@@ -75,6 +74,14 @@ export interface BridgeOptions {
   width:number;
   clearance:number;
   skip?:(p:Point)=>boolean;
+  /** True when the start/end node connects to another bridge/viaduct span in the same tile (never plunge to ground!). */
+  startConnected?:boolean;
+  endConnected?:boolean;
+  /** Optional target clearance at a connected joint so level changes (e.g. lvorder 1 -> 2) grade smoothly. */
+  startClearance?:number;
+  endClearance?:number;
+  /** True if a point sits over water (prevent bridges ending over water from diving into the river). */
+  isWater?:(p:Point)=>boolean;
 }
 
 export function drawBridgePolyline(
@@ -86,7 +93,7 @@ export function drawBridgePolyline(
   options:BridgeOptions,
 ){
   if(rawPoints.length<2)return;
-  const {width,clearance,skip}=options;
+  const {width,clearance,skip,startConnected=false,endConnected=false,startClearance,endClearance,isWater}=options;
   const elevated=clearance>2.5;
   const segments:{a:Point;b:Point;len:number;start:number}[]=[];
   let total=0;
@@ -102,15 +109,24 @@ export function drawBridgePolyline(
   }
   if(!segments.length)return;
   const first=segments[0].a,last=segments[segments.length-1].b;
-  const startFree=!onTileEdge(first,bounds),endFree=!onTileEdge(last,bounds);
+  const edgeMargin=elevated?4.5e-5:2e-5;
+  // Only ramp down to ground at truly free dry-land abutments — never at tile edges, connected viaduct joints, or over water!
+  const startFree=!startConnected && !onTileEdge(first,bounds,edgeMargin) && !onTileEdge(rawPoints[0],bounds,edgeMargin) && !isWater?.(first);
+  const endFree=!endConnected && !onTileEdge(last,bounds,edgeMargin) && !onTileEdge(rawPoints[rawPoints.length-1],bounds,edgeMargin) && !isWater?.(last);
   const startG=ground(first),endG=ground(last);
   const rampLen=Math.min(elevated?Math.max(20,clearance*4.2):10,total*.38);
+  const blendLen=Math.min(24,total*.45);
   // Subdivide segments at ramp crests so even 2-point spans reach full elevated clearance across the middle.
   const splitMarks:number[]=[];
   if(rampLen>0){
     if(startFree)splitMarks.push(rampLen);
     if(endFree&&total-rampLen>rampLen+.5)splitMarks.push(total-rampLen);
   }
+  if(blendLen>0){
+    if(startConnected && startClearance!==undefined && Math.abs(startClearance-clearance)>.2)splitMarks.push(blendLen);
+    if(endConnected && endClearance!==undefined && Math.abs(endClearance-clearance)>.2)splitMarks.push(total-blendLen);
+  }
+  splitMarks.sort((a,b)=>a-b);
   const subdivided:{a:Point;b:Point;len:number;start:number}[]=[];
   for(const seg of segments){
     const cuts=splitMarks.filter(m=>m>seg.start+.25&&m<seg.start+seg.len-.25);
@@ -127,12 +143,18 @@ export function drawBridgePolyline(
   const smooth=(t:number)=>t*t*(3-2*t);
   const deckZ=(p:Point,dist:number)=>{
     const g=ground(p);
-    const chord=total>0&&total<260?startG+(endG-startG)*(dist/total):-Infinity;
+    const chord=total>0&&total<650?startG+(endG-startG)*(dist/total):-Infinity;
     let lift=clearance;
+    if(startConnected && startClearance!==undefined && blendLen>0 && dist<blendLen){
+      lift=startClearance+(clearance-startClearance)*smooth(dist/blendLen);
+    }
+    if(endConnected && endClearance!==undefined && blendLen>0 && total-dist<blendLen){
+      lift=endClearance+(lift-endClearance)*smooth((total-dist)/blendLen);
+    }
     if(rampLen>0){
       const touch=.28;
-      if(startFree&&dist<rampLen)lift=touch+(clearance-touch)*smooth(dist/rampLen);
-      if(endFree&&total-dist<rampLen)lift=Math.min(lift,touch+(clearance-touch)*smooth((total-dist)/rampLen));
+      if(startFree&&dist<rampLen)lift=touch+(lift-touch)*smooth(dist/rampLen);
+      if(endFree&&total-dist<rampLen)lift=Math.min(lift,touch+(lift-touch)*smooth((total-dist)/rampLen));
     }
     return Math.max(g,chord)+lift;
   };
@@ -177,6 +199,8 @@ export interface RailOptions {
   monorail:boolean;
   tram:boolean;
   lvorder:number;
+  startConnected?:boolean;
+  endConnected?:boolean;
 }
 
 export function drawRailPolyline(
@@ -188,7 +212,7 @@ export function drawRailPolyline(
   options:RailOptions,
 ){
   if(rawPoints.length<2)return;
-  const {raised,doubleTrack,shinkansen,monorail,tram,lvorder}=options;
+  const {raised,doubleTrack,shinkansen,monorail,tram,lvorder,startConnected=false,endConnected=false}=options;
   const lift=monorail?7.2:raised?6.0+Math.max(0,lvorder-1)*3.6:tram?.38:.48;
   const bedWidth=monorail?2.4:doubleTrack?(raised?8.2:5.8):shinkansen?(raised?4.8:3.4):tram?2.2:(raised?3.8:2.85);
   const deckDepth=monorail?1.15:raised?.92:tram?.1:.26;
@@ -207,7 +231,9 @@ export function drawRailPolyline(
     total+=len;
   }
   if(!segments.length)return;
-  const startFree=!onTileEdge(segments[0].p0,bounds),endFree=!onTileEdge(segments[segments.length-1].p1,bounds);
+  const railEdge=raised?4.5e-5:1.5e-5;
+  const startFree=!startConnected && !onTileEdge(segments[0].p0,bounds,railEdge) && !onTileEdge(rawPoints[0],bounds,railEdge);
+  const endFree=!endConnected && !onTileEdge(segments[segments.length-1].p1,bounds,railEdge) && !onTileEdge(rawPoints[rawPoints.length-1],bounds,railEdge);
   const rampLen=(raised&&!monorail)?Math.min(26,total*.35):0;
   const splitMarks:number[]=[];
   if(rampLen>0){

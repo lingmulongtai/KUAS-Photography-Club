@@ -1,49 +1,7 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import { toLocal } from './geo';
-
-interface LakeBridgeSpec {
-  name: string;
-  west: [number, number]; // [lat, lon]
-  east: [number, number]; // [lat, lon]
-  width: number;
-  baseY: number;
-  approachH: number;
-  archPeakH: number;
-  archCenterT: number;
-  archWidthT: number;
-  pierCount: number;
-}
-
-/** Surveyed spans for Lake Biwa's two iconic cross-lake bridges so they remain visible from 20–35 km away. */
-const LAKE_BRIDGES: readonly LakeBridgeSpec[] = [
-  {
-    name: 'omi-ohashi',
-    // 近江大橋: Otsu (west) to Kusatsu (east), ~1.29 km across southern Lake Biwa.
-    west: [35.0029, 135.8934],
-    east: [35.0079, 135.9074],
-    width: 17,
-    baseY: 85.0,
-    approachH: 6.2,
-    archPeakH: 18.5,
-    archCenterT: 0.42,
-    archWidthT: 0.24,
-    pierCount: 16,
-  },
-  {
-    name: 'biwako-ohashi',
-    // 琵琶湖大橋: Katata (west) to Moriyama (east), ~1.40 km arched main span rising 26.3 m above the lake.
-    west: [35.1200, 135.9272],
-    east: [35.1180, 135.9438],
-    width: 15,
-    baseY: 85.0,
-    approachH: 6.8,
-    archPeakH: 26.3,
-    archCenterT: 0.34,
-    archWidthT: 0.22,
-    pierCount: 18,
-  },
-];
+import { LAKE_BRIDGES } from './biwa-bridges-data';
 
 function pushBox(
   pos: number[],
@@ -159,17 +117,29 @@ export function buildBiwaBridges(env: Env): THREE.Mesh {
 
   const material = new THREE.ShaderMaterial({
     uniforms: env,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -16,
     vertexShader: /* glsl */ `
       attribute vec3 aColor;
       attribute float aEmit;
       varying vec3 vWorld, vNormal, vColor;
       varying float vEmit;
       void main(){
-        vWorld = (modelMatrix * vec4(position, 1.)).xyz;
+        vec3 p = (modelMatrix * vec4(position, 1.)).xyz;
+        vWorld = p;
         vNormal = normalize(mat3(modelMatrix) * normal);
         vColor = aColor;
         vEmit = aEmit;
-        gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.);
+        // Match and slightly clear lake-biwa's distant camera-pull so both shore approaches remain
+        // 100% continuous above Lake Biwa at every distance from 100 m to 35 km.
+        vec3 toCam = cameraPosition - p;
+        float dist = length(toCam);
+        float nearPull = clamp(dist * .0068, 1.4, 11.4);
+        float farLake = smoothstep(2600., 14000., dist);
+        float pull = mix(nearPull, max(nearPull, min(dist * .0042, 118.)), farLake);
+        p += toCam / max(dist, .01) * pull;
+        gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
       }
     `,
     fragmentShader: /* glsl */ `
@@ -181,7 +151,7 @@ export function buildBiwaBridges(env: Env): THREE.Mesh {
         vec3 lit = shade(seasonalSurface(vColor, n, vWorld), n, vWorld, 1.);
         // Subtle warm bridge streetlamp ribbon along the span at night.
         float lamp = .55 + .45 * sin((vWorld.x + vWorld.z) * .16);
-        vec3 emit = vec3(1., .76, .46) * vEmit * lamp * .45 * uCity;
+        vec3 emit = vec3(1., .76, .46) * vEmit * lamp * .22 * uCity;
         gl_FragColor = vec4(applyHaze(lit, emit, vWorld), 1.);
       }
     `,
