@@ -171,10 +171,57 @@ const fragmentShader = `
     photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox,vWorld.xz,.08);
     photo.rgb=overlay(photo.rgb,uInset,uInsetBox,vWorld.xz,.08);
     photo.rgb=overlayMatched(photo.rgb,uClose,uCloseBox,vWorld.xz,mix(.08,.16,uCloseMatch),baseLow,uCloseMatch);
+    // Open Osaka Bay maritime waters inside Osaka/Hyogo prefecture boundaries (e.g. around Yumeshima
+    // and outer disposal breakwaters) sit at 0 m sea level with blue-grey water imagery: render them
+    // with the exact same animated sea shader so coastal tiles never show square photo boundaries.
+    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500.;
+    if (inBayZone && vWorld.y <= .22) {
+      float seaBlue = smoothstep(-.01, .025, photo.b - photo.r * .94) * (1. - smoothstep(.18, .34, photo.r));
+      float darkWater = (1. - smoothstep(.10, .20, max(photo.r, max(photo.g, photo.b)))) * step(photo.r, photo.b * 1.12);
+      if (max(seaBlue, darkWater) > .35) {
+        gl_FragColor = vec4(renderSea(vWorld), 1.);
+        return;
+      }
+    }
     vec3 n=normalize(vNormal);
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
     vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sunShadow(vWorld,n));
-    gl_FragColor=vec4(fadeHorizon(applyHaze(lit,vec3(0.),vWorld),vWorld),1.);
+    vec3 emit=vec3(0.);
+    if(uCity>.01){
+      // Urban plains & waterfronts (Osaka, Kobe, Sakai, Nishinomiya, Otsu, Nara) glow brightly with
+      // streetlamps, metropolitan hubs and arterial highways at night while forested slopes stay dark.
+      float green=smoothstep(.005,.038,photo.g-max(photo.r,photo.b*.92));
+      float luma=dot(photo.rgb,vec3(.2126,.7152,.0722));
+      float chroma=max(photo.r,max(photo.g,photo.b))-min(photo.r,min(photo.g,photo.b));
+      float neutral=1.-smoothstep(.03,.15,chroma);
+      float flatUrban=smoothstep(.84,.965,n.y)*(1.-smoothstep(130.,340.,vWorld.y));
+      float urban=(1.-green)*smoothstep(.06,.22,luma)*(.35+.65*neutral)*flatUrban;
+      if(urban>.01){
+        vec2 p=vWorld.xz;
+        float fp=max(length(dFdx(p)),length(dFdy(p)));
+        float dist=length(vWorld-cameraPosition);
+        // Streetlamp points (18 m grid) matching Kyoto's terrain night-light grain.
+        vec2 lampCell=p/18.;
+        float lampSeed=hash12(floor(lampCell));
+        vec2 lampAt=fract(lampCell)-.5-(vec2(lampSeed,fract(lampSeed*7.13))-.5)*.52;
+        float lampAA=max(fp/18.,.025);
+        float lampDot=1.-smoothstep(.20-lampAA,.20+lampAA,length(lampAt));
+        float lamps=mix(lampDot*step(lampSeed,.66)/(.66*3.1416*.20*.20),1.,smoothstep(.35,1.,lampAA*2.));
+        // Broader metropolitan arterial corridors & bright downtown Osaka/Kobe hubs visible from Mt. Ikoma & Mt. Maya.
+        float arterialX=exp(-pow((abs(fract(p.x/240.)-.5)*240.)/16.,2.));
+        float arterialZ=exp(-pow((abs(fract(p.y/240.)-.5)*240.)/16.,2.));
+        float grid=max(arterialX,arterialZ)*smoothstep(.24,.64,vnoise(p*.0014+7.3));
+        float hub=smoothstep(.30,.74,vnoise(p*.00065+2.1));
+        // Boost metropolitan core glow across central Osaka (Umeda-Namba-Tennoji) & Kobe Sannomiya.
+        float osakaMetro=exp(-dot(p-vec2(-23500.,36500.),p-vec2(-23500.,36500.))/(9500.*9500.));
+        float kobeMetro=exp(-dot(p-vec2(-51800.,35000.),p-vec2(-51800.,35000.))/(5500.*5500.));
+        float metro=1.+.35*max(osakaMetro,kobeMetro);
+        vec3 warmCol=mix(vec3(1.,.62,.26),vec3(1.,.84,.60),step(.68,lampSeed)*.55+grid*.35);
+        float gain=mix(.038,.095,smoothstep(400.,3800.,dist));
+        emit=warmCol*urban*metro*(.085*lamps*gain+grid*.055+hub*.015)*uCity*cityLightShimmer(vWorld);
+      }
+    }
+    gl_FragColor=vec4(fadeHorizon(applyHaze(lit,emit,vWorld),vWorld),1.);
   }`;
 
 export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture,needed:()=>boolean)=>Promise<void>) {
