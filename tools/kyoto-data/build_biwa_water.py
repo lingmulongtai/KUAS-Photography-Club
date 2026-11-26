@@ -53,40 +53,50 @@ def outline():
 
 def water_areas():
     lake = outline()
-    # Both Karahashi spans and the continuous channel from the lake to the Nango weir.
-    left, top = projected(135.895, 34.990)
-    right, bottom = projected(135.922, 34.943)
+    # Continuous Seta River channel from Lake Biwa past Seta-no-Karahashi, Ishiyama,
+    # Nango Araizeki weir, Shishitobi Gorge, and Amagase Reservoir down to Amagase Dam.
+    left, top = projected(135.828, 34.990)
+    right, bottom = projected(135.925, 34.872)
     corridor = box(left, top, right, bottom)
     guide = lake.buffer(180).union(corridor)
     tiles = []
-    for path in sorted((DATA.parent / 'kansai/surfaces/25').glob('*.bin')):
-        px, py = map(int, path.stem.split('-'))
-        if not guide.intersects(box(px*8*EXTENT, py*8*EXTENT, (px+1)*8*EXTENT, (py+1)*8*EXTENT)):
-            continue
-        data = path.read_bytes()
-        offsets = struct.unpack_from('<65I', data)
-        for i in range(64):
-            x, y = (px*8+i%8)*EXTENT, (py*8+i//8)*EXTENT
-            if offsets[i] == offsets[i+1] or not guide.intersects(box(x,y,x+EXTENT,y+EXTENT)):
+    for pref in ('25', '26'):
+        for path in sorted((DATA.parent / 'kansai/surfaces' / pref).glob('*.bin')):
+            px, py = map(int, path.stem.split('-'))
+            if not guide.intersects(box(px*8*EXTENT, py*8*EXTENT, (px+1)*8*EXTENT, (py+1)*8*EXTENT)):
                 continue
-            tile = vector_tile_pb2.tile.FromString(gzip.decompress(data[offsets[i]:offsets[i+1]]))
-            layer = next((v for v in tile.layers if v.name == 'WA'), None)
-            if layer is None:
-                continue
-            only_water = vector_tile_pb2.tile()
-            only_water.layers.append(layer)
-            wa = mapbox_vector_tile.decode(only_water.SerializeToString(), default_options={'y_coord_down': True})['WA']
-            assert wa['extent'] == EXTENT
-            polys = [shape(f['geometry']) for f in wa['features'] if f['properties'].get('vt_code') == 5200]
-            clipped = geom.intersection(geom.union_all(geom.make_valid(polys)), box(0,0,EXTENT,EXTENT), grid_size=1)
-            if not clipped.is_empty:
-                tiles.append(translate(clipped, x, y))
+            data = path.read_bytes()
+            offsets = struct.unpack_from('<65I', data)
+            for i in range(64):
+                x, y = (px*8+i%8)*EXTENT, (py*8+i//8)*EXTENT
+                if offsets[i] == offsets[i+1] or not guide.intersects(box(x,y,x+EXTENT,y+EXTENT)):
+                    continue
+                tile = vector_tile_pb2.tile.FromString(gzip.decompress(data[offsets[i]:offsets[i+1]]))
+                layer = next((v for v in tile.layers if v.name == 'WA'), None)
+                if layer is None:
+                    continue
+                only_water = vector_tile_pb2.tile()
+                only_water.layers.append(layer)
+                wa = mapbox_vector_tile.decode(only_water.SerializeToString(), default_options={'y_coord_down': True})['WA']
+                assert wa['extent'] == EXTENT
+                polys = [shape(f['geometry']) for f in wa['features'] if f['properties'].get('vt_code') == 5200]
+                if not polys:
+                    continue
+                clipped = geom.intersection(geom.union_all(geom.make_valid(polys)), box(0,0,EXTENT,EXTENT), grid_size=1)
+                if not clipped.is_empty:
+                    tiles.append(translate(clipped, x, y))
     union = geom.union_all(tiles, grid_size=1).intersection(guide)
     connected = next(p for p in parts(union) if p.covers(Point(*projected(135.895,35.025))))
     lake_part = lake.buffer(180).difference(corridor.difference(lake))
     channel = union.intersection(corridor).difference(lake_part)
-    # Bridge and weir decks can divide the surveyed channel into disjoint polygons.
-    channels = [p for p in parts(channel) if p.area > 8000 / .245**2]
+    # Bridge decks and Nango weir divide the surveyed channel into adjacent polygons;
+    # erode narrow mountain creeks first, bridge across deck gaps from Karahashi, then
+    # intersect back with the original surveyed banks along the main Seta River stem.
+    seed = Point(*projected(135.9065, 34.9731))
+    wide_core = channel.buffer(-24)
+    river_corridor = next(p for p in parts(wide_core.buffer(240)) if p.covers(seed))
+    main_channel = channel.intersection(wide_core.intersection(river_corridor).buffer(38))
+    channels = [p for p in parts(main_channel) if p.area > 300 / .245**2]
     return [geom.transform(g, home_coords).simplify(1.7) for g in
             (connected.intersection(lake_part), geom.union_all(channels))]
 
