@@ -562,7 +562,7 @@ const pinTrips = completeSpotPreviews((await getTrips())
                     ...Array.from(hero.querySelectorAll('.copy .ctas > *')).map((n) => rectOf(n)),
                   ]
                 : []),
-              skyVisible ? rectOf(hero.querySelector('.sky-chip')) : null,
+              skyVisible ? rectOf(skyChip) : null,
               rectOf(skyToggle),
               exploreGuide.hidden ? null : rectOf(exploreGuide),
               card.hidden ? null : rectOf(card),
@@ -1561,11 +1561,13 @@ const pinTrips = completeSpotPreviews((await getTrips())
     .hero.is-sky-open .sky-chip {
       display: grid;
       position: fixed;
-      left: max(10px, env(safe-area-inset-left, 0px));
-      right: max(10px, env(safe-area-inset-right, 0px));
+      left: max(12px, env(safe-area-inset-left, 0px));
+      right: max(12px, env(safe-area-inset-right, 0px));
       bottom: max(10px, env(safe-area-inset-bottom, 0px));
       z-index: 30;
-      max-width: 520px;
+      width: auto;
+      justify-self: stretch;
+      max-width: 480px;
       margin: 0 auto;
       padding: 12px 14px;
       gap: 4px;
