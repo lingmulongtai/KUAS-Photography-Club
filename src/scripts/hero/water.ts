@@ -486,28 +486,36 @@ export async function osakaWaterSurface(env:Env,roads:WaterRoads,initialGround?:
   const parts:{geometry:THREE.BufferGeometry;isBay:boolean}[]=[];
 
   let offset=8;
-  // Part 0: Osaka Bay / harbor basins (code 5100) — wave/reflection profile matching open ocean & Lake Biwa.
+  // Part 0: Osaka Bay / harbor basins (code 5100) — skip offshore KIX & Kobe Airport triangles
+  // where regional-ground.ts renderSea() already renders seamless open ocean without polygon color steps.
   if(bayVerts>0){
-    const positions=new Float32Array(bayVerts*3);
-    for(let n=0;n<bayVerts;n++){
-      positions[n*3]=view.getFloat32(offset,true);
-      positions[n*3+1]=0.35;
-      positions[n*3+2]=view.getFloat32(offset+4,true);
-      offset+=8;
+    const kept:number[]=[];
+    for(let n=0;n+2<bayVerts;n+=3){
+      const x0=view.getFloat32(offset,true),z0=view.getFloat32(offset+4,true);
+      const x1=view.getFloat32(offset+8,true),z1=view.getFloat32(offset+12,true);
+      const x2=view.getFloat32(offset+16,true),z2=view.getFloat32(offset+20,true);
+      offset+=24;
+      const cx=(x0+x1+x2)/3,cz=(z0+z1+z2)/3;
+      if(cz>55000 || (cx<-44500 && cz>37200))continue;
+      kept.push(x0,0.35,z0,x1,0.35,z1,x2,0.35,z2);
     }
-    const geometry=new THREE.BufferGeometry();
-    geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
-    geometry.computeBoundingSphere();
-    // Flat coastal harbor water uses tight depth offset without tall camera-pull so it never pokes through seawalls or airports.
-    const material=waterMaterial(env,roads,1.1,false);
-    material.polygonOffset=true;
-    material.polygonOffsetFactor=-1;
-    material.polygonOffsetUnits=-4;
-    Object.assign(material.defaultAttributeValues,{aStable:[0.95],aWater:[3,0.8,0.6]});
-    const mesh=new THREE.Mesh(geometry,material);
-    mesh.name='osaka-bay-harbors';
-    group.add(mesh);
-    parts.push({geometry,isBay:true});
+    offset=8+bayVerts*8;
+    if(kept.length){
+      const positions=new Float32Array(kept);
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+      geometry.computeBoundingSphere();
+      // Flat coastal harbor water uses tight depth offset without tall camera-pull so it never pokes through seawalls or airports.
+      const material=waterMaterial(env,roads,1.1,false);
+      material.polygonOffset=true;
+      material.polygonOffsetFactor=-1;
+      material.polygonOffsetUnits=-4;
+      Object.assign(material.defaultAttributeValues,{aStable:[0.95],aWater:[3,0.8,0.6]});
+      const mesh=new THREE.Mesh(geometry,material);
+      mesh.name='osaka-bay-harbors';
+      group.add(mesh);
+      parts.push({geometry,isBay:true});
+    }
   }
 
   // Part 1: Major rivers & canals (code 5200) — directional downstream flow stored per triangle vertex.

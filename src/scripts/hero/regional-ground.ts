@@ -84,9 +84,9 @@ const vertexShader = `
     gl_Position=projectionMatrix*viewMatrix*vec4(position,1.);
   }`;
 const fragmentShader = `
-  uniform sampler2D uPhoto,uMid,uClose,uDistrict,uInset;
-  uniform vec4 uMidBox,uCloseBox,uDistrictBox,uInsetBox,uKyotoBox;
-  uniform float uMidMatch,uCloseMatch,uGroundFar;
+  uniform sampler2D uPhoto,uMidPhoto,uClose,uDistrict,uInset;
+  uniform vec4 uMidPhotoBox,uCloseBox,uDistrictBox,uInsetBox,uKyotoBox;
+  uniform float uMidPhotoMatch,uCloseMatch,uGroundFar;
   varying vec2 vUv;
   varying vec3 vWorld,vNormal;
   ${ENV_GLSL}
@@ -170,7 +170,7 @@ const fragmentShader = `
     vec3 baseLow=textureGrad(uPhoto,vUv,vec2(.008,0.),vec2(0.,.008)).rgb;
     photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox,vWorld.xz,.08);
     photo.rgb=overlay(photo.rgb,uInset,uInsetBox,vWorld.xz,.08);
-    photo.rgb=overlayMatched(photo.rgb,uMid,uMidBox,vWorld.xz,.10,baseLow,uMidMatch);
+    photo.rgb=overlayMatched(photo.rgb,uMidPhoto,uMidPhotoBox,vWorld.xz,.10,baseLow,uMidPhotoMatch);
     photo.rgb=overlayMatched(photo.rgb,uClose,uCloseBox,vWorld.xz,mix(.08,.14,uCloseMatch),baseLow,uCloseMatch);
     // Exact runway-aligned island footprints for Kobe Airport & KIX (keeps low-elevation runways/aprons
     // solidly dry while every surrounding harbor & bay water pixel renders as seamless animated sea,
@@ -286,7 +286,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   };
 
   const states=patches.map(p=>({patch:p,distance:Infinity,pending:false,retry:0,mesh:null as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>|null}));
-  const uMid={value:null as THREE.Texture|null},uMidBox={value:new THREE.Vector4()},uMidMatch={value:0};
+  const uMidPhoto={value:null as THREE.Texture|null},uMidPhotoBox={value:new THREE.Vector4()},uMidPhotoMatch={value:0};
   const uClose={value:null as THREE.Texture|null},uCloseBox={value:new THREE.Vector4()},uCloseMatch={value:0};
   const uDistrict={value:null as THREE.Texture|null},uDistrictBox={value:new THREE.Vector4()};
   const uInset={value:null as THREE.Texture|null},uInsetBox={value:new THREE.Vector4()};
@@ -322,9 +322,9 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       onPhoto(broad??liveMid,inset??live);
     },
     sheet=>{
-      liveMid=sheet;uMid.value=sheet?.photo??null;
-      uMidBox.value.fromArray(sheet?.box??[0,0,0,0]);
-      uMidMatch.value=sheet?.raw?1:0;
+      liveMid=sheet;uMidPhoto.value=sheet?.photo??null;
+      uMidPhotoBox.value.fromArray(sheet?.box??[0,0,0,0]);
+      uMidPhotoMatch.value=sheet?.raw?1:0;
       onPhoto(broad??liveMid,inset??live);
     },
   );
@@ -372,7 +372,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
         if(!await preparePhoto(photo,()=>state.distance<=activeUnload)){photo.dispose();return;}
         const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=activeUnload);
         if(!geometry){photo.dispose();return;}
-        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uMid,uMidBox,uMidMatch,uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox,uKyotoBox},vertexShader,fragmentShader,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
+        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uMidPhoto,uMidPhotoBox,uMidPhotoMatch,uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox,uKyotoBox},vertexShader,fragmentShader,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
         const mesh=new THREE.Mesh(geometry,material);
         await (shaderReady??=prepare(mesh));
         if(state.distance>activeUnload){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
