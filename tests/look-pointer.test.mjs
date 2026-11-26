@@ -144,6 +144,27 @@ test('exploration permits vertical touch look without changing normal scrolling'
   assert.ok(h.look.state.pitch>0); assert.equal(h.taps(),0);
 });
 
+test('full touch look tilts pitch up and down in both panorama and orbit modes', (t) => {
+  let orbit=false;
+  const h=setup(t,()=>true,()=>orbit,()=>true);
+  const touch={pointerType:'touch'};
+  for (orbit of [false, true]) {
+    h.look.reset();
+    h.send('pointerdown',200,200,touch);
+    h.send('pointermove',202,280,{...touch,timeStamp:30});
+    h.send('pointerup',202,280,touch);
+    assert.ok(h.look.state.pitch>15, `downward swipe pitches up (orbit=${orbit})`);
+    assert.equal(h.taps(),0);
+
+    h.look.reset();
+    h.send('pointerdown',200,200,touch);
+    h.send('pointermove',198,120,{...touch,timeStamp:30});
+    h.send('pointerup',198,120,touch);
+    assert.ok(h.look.state.pitch<-15, `upward swipe pitches down (orbit=${orbit})`);
+    assert.equal(h.taps(),0);
+  }
+});
+
 test('viewpoint and object orbit follow the hand on mouse and touch', (t)=>{
   let orbit=false;
   const h=setup(t,()=>true,()=>orbit);
