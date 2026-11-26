@@ -353,14 +353,64 @@ function subdivideWaterTriangles(raw: Float32Array, maxEdge: number, defaultY: n
   return new Float32Array(out);
 }
 
-// The lake and the Seta reach above the weir share a surveyed 84.6 m surface.
+// Surveyed Lake Yogo (余呉湖 / 鏡湖, Nagahama, Shiga) shoreline from GSI experimental_bvmap waterarea (13/7195/3230).
+const LAKE_YOGO_RING: readonly [number, number][] = [
+  [35.53257,136.19193],[35.53243,136.1922],[35.532,136.19242],[35.53148,136.19315],[35.53152,136.19356],
+  [35.53138,136.19401],[35.53143,136.19502],[35.53142,136.19543],[35.53124,136.1957],[35.53117,136.19625],
+  [35.531,136.19657],[35.53122,136.19684],[35.5311,136.19713],[35.53085,136.19757],[35.53063,136.19777],
+  [35.53048,136.1982],[35.53033,136.19875],[35.53024,136.19922],[35.53021,136.19968],[35.53016,136.20025],
+  [35.53001,136.20079],[35.52975,136.20101],[35.52934,136.2013],[35.52893,136.20128],[35.52868,136.20117],
+  [35.52816,136.20094],[35.52765,136.20062],[35.52724,136.20027],[35.52656,136.20017],[35.52617,136.19996],
+  [35.52548,136.19916],[35.5251,136.19904],[35.52467,136.19914],[35.52382,136.19901],[35.52307,136.19914],
+  [35.52276,136.19904],[35.52233,136.19886],[35.52208,136.19861],[35.52168,136.19855],[35.52119,136.19884],
+  [35.52042,136.19858],[35.51998,136.19854],[35.51971,136.19856],[35.51927,136.19887],[35.51881,136.19883],
+  [35.51759,136.19915],[35.51731,136.199],[35.51707,136.19869],[35.51687,136.19826],[35.51645,136.19769],
+  [35.51619,136.19731],[35.51592,136.19716],[35.5155,136.19706],[35.51493,136.19644],[35.51467,136.19633],
+  [35.51433,136.1963],[35.51361,136.19565],[35.51334,136.19525],[35.51333,136.1947],[35.51345,136.1938],
+  [35.51337,136.19345],[35.51299,136.19265],[35.513,136.19216],[35.51317,136.19135],[35.51337,136.19105],
+  [35.51351,136.19072],[35.51359,136.19039],[35.51388,136.18971],[35.51412,136.1895],[35.51453,136.18953],
+  [35.51492,136.18966],[35.51546,136.18968],[35.51591,136.18972],[35.51617,136.18992],[35.51637,136.19031],
+  [35.51681,136.19055],[35.51707,136.19042],[35.51733,136.18984],[35.51757,136.18945],[35.51778,136.18917],
+  [35.51818,136.18906],[35.51874,136.18901],[35.51903,136.18886],[35.51945,136.1888],[35.51986,136.18911],
+  [35.52017,136.18919],[35.52071,136.18891],[35.52105,136.18863],[35.52129,136.18871],[35.52137,136.18941],
+  [35.52143,136.18984],[35.5216,136.19018],[35.52187,136.19028],[35.52233,136.18975],[35.52285,136.18971],
+  [35.52318,136.18966],[35.52352,136.18938],[35.52388,136.18911],[35.52419,136.18862],[35.52438,136.1884],
+  [35.52469,136.18829],[35.52507,136.18832],[35.52548,136.1882],[35.52599,136.18815],[35.5267,136.18827],
+  [35.52695,136.18828],[35.52725,136.18828],[35.52764,136.1883],[35.52793,136.18836],[35.52816,136.18867],
+  [35.52835,136.18898],[35.52868,136.18932],[35.52894,136.18932],[35.52931,136.18955],[35.52979,136.18948],
+  [35.53016,136.18956],[35.53037,136.18973],[35.53105,136.18981],[35.53179,136.18987],[35.53205,136.19],
+  [35.53223,136.19035],[35.53223,136.19084],[35.53214,136.19128],
+];
+
+function lakeYogoPositions(): Float32Array<ArrayBuffer> {
+  const contour = LAKE_YOGO_RING.map(([lat, lon]) => {
+    const p = toLocal(lat, lon);
+    return new THREE.Vector2(p.x, p.z);
+  });
+  const tris = THREE.ShapeUtils.triangulateShape(contour, []);
+  const raw = new Float32Array(tris.length * 9);
+  let k = 0;
+  for (const [i0, i1, i2] of tris) {
+    const a = contour[i0], b = contour[i1], c = contour[i2];
+    // Guarantee upward (+Y) CCW winding in XZ (negative 2D cross product (b-a)x(c-a) yields +Y normal)
+    const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    const p1 = cross > 0 ? c : b;
+    const p2 = cross > 0 ? b : c;
+    raw[k++] = a.x; raw[k++] = 132.8; raw[k++] = a.y;
+    raw[k++] = p1.x; raw[k++] = 132.8; raw[k++] = p1.y;
+    raw[k++] = p2.x; raw[k++] = 132.8; raw[k++] = p2.y;
+  }
+  return subdivideWaterTriangles(raw, 48, 132.8);
+}
+
+// The lake and the Seta reach above the weir share a surveyed 84.6 m surface, plus Lake Yogo (132.8 m).
 // Conforming edge vertices to the actual terrain grid and keeping continuous surface clearance
 // prevents coarse shoreline slopes from shrinking Lake Biwa up close or burying the Seta River.
 export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:number,z:number)=>number):Promise<BiwaSurface>{
   const bytes=await loadBinary('kansai/biwa-water.bin'),view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   const group=new THREE.Group() as BiwaSurface;
   group.name='lake-biwa-and-seta';
-  const parts:{geometry:THREE.BufferGeometry;isRiver:boolean}[]=[];
+  const parts:{geometry:THREE.BufferGeometry;kind:'biwa'|'seta'|'yogo'}[]=[];
   let offset=8;
   for(const [i,profile] of [[0,[2,.83,.56]],[1,[1,-.16,.987]]] as const){
     const count=view.getUint32(4*i,true);
@@ -388,18 +438,34 @@ export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:num
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=isRiver?'seta-river':'lake-biwa';
     group.add(mesh);
-    parts.push({geometry,isRiver});
+    parts.push({geometry,kind:isRiver?'seta':'biwa'});
+  }
+  // Lake Yogo (余呉湖 / 鏡湖) — ultra-calm mountain-rimmed mirror lake north of Lake Biwa.
+  {
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(lakeYogoPositions(),3));
+    geometry.computeBoundingSphere();
+    const material=waterMaterial(env,roads,.35,true);
+    material.polygonOffset=true;
+    material.polygonOffsetFactor=-3;
+    material.polygonOffsetUnits=-10;
+    Object.assign(material.defaultAttributeValues,{aStable:[0.98],aWater:[2,.83,.56]});
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name='lake-yogo';
+    group.add(mesh);
+    parts.push({geometry,kind:'yogo'});
   }
   const refit=(ground:(x:number,z:number)=>number)=>{
-    for(const {geometry,isRiver} of parts){
+    for(const {geometry,kind} of parts){
       const attr=geometry.getAttribute('position') as THREE.BufferAttribute;
       const arr=attr.array as Float32Array;
       // Keep water strictly below Seta-no-Karahashi (88.2 m) and shoreline roads while clearing coarse grid bulges.
-      const cap=isRiver?87.9:86.2;
-      const lift=isRiver?1.15:.25;
+      const base=kind==='yogo'?132.8:85;
+      const cap=kind==='yogo'?134.8:kind==='seta'?87.9:86.2;
+      const lift=kind==='seta'?1.15:kind==='yogo'?0.55:.25;
       for(let i=0;i<arr.length;i+=3){
         const g=ground(arr[i],arr[i+2]);
-        arr[i+1]=Math.min(cap,Math.max(85,g+lift));
+        arr[i+1]=Math.min(cap,Math.max(base,g+lift));
       }
       attr.needsUpdate=true;
       geometry.computeBoundingSphere();

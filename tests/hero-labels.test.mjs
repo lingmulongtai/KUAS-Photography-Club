@@ -43,7 +43,7 @@ test('ALL_PINS covers core spots, regional outings and extra landmarks with vali
   }
 
   // Representative pins span Kyoto, Shiga, Osaka, Nara and Hyogo.
-  for (const expected of ['tower', 'kuas', 'region-biwako-fireworks', 'region-setagawa', 'hikone', 'hiei', 'region-osaka-castle', 'region-expo-2025', 'abenoHarukas', 'umedaSky', 'tsutenkaku', 'region-nara-park', 'todaiji', 'kasuga', 'region-meriken', 'region-aquarium', 'region-nanzenji']) {
+  for (const expected of ['tower', 'kuas', 'region-biwako-fireworks', 'region-setagawa', 'hikone', 'yogo', 'hiei', 'region-osaka-castle', 'region-expo-2025', 'abenoHarukas', 'umedaSky', 'tsutenkaku', 'region-nara-park', 'todaiji', 'kasuga', 'region-meriken', 'region-aquarium', 'region-nanzenji']) {
     assert.ok(ids.has(expected), `expected 3D pin ${expected} is registered`);
   }
 });

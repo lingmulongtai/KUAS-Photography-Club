@@ -35,6 +35,7 @@ const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利�
 const KAMEOKA_RIDGE=toLocal(34.98660,135.55685); // Above the terrace slope, framing the campus beside the wooded ridge.
 const CONFLUENCE=toLocal(34.873831,135.676099); // Look upstream over the three rivers towards Kyoto.
 const HIKONE=toLocal(35.27645,136.25184); // 彦根城 天守 (public/kansai/landmarks/index.json hikone-keep)
+const YOGO=toLocal(35.52405,136.19357); // 余呉湖（鏡湖・滋賀県長浜市）
 const HIEI=toLocal(35.0616,135.8414); // 比叡山 山頂付近（京都・びわ湖を一望）
 const TODAIJI=toLocal(34.6889931,135.83987322); // 東大寺 大仏殿 (public/kansai/landmarks/index.json todaiji)
 const KASUGA=toLocal(34.6815749,135.8485364); // 春日大社 本殿 (public/kansai/landmarks/index.json kasuga-honden-1)
@@ -47,6 +48,7 @@ const TSUTENKAKU=toLocal(34.652540,135.506305); // 通天閣 (108 m)
 
 export const EXTRA_LANDMARKS = [
   { id: 'hikone', ja: '彦根城', en: 'Hikone Castle', lat: 35.27645, lon: 136.25184 },
+  { id: 'yogo', ja: '余呉湖', en: 'Lake Yogo', lat: 35.52405, lon: 136.19357 },
   { id: 'hiei', ja: '比叡山', en: 'Mt. Hiei', lat: 35.0616, lon: 135.8414 },
   { id: 'todaiji', ja: '東大寺', en: 'Todai-ji', lat: 34.6889931, lon: 135.83987322 },
   { id: 'kasuga', ja: '春日大社', en: 'Kasuga Taisha', lat: 34.6815749, lon: 135.8485364 },
@@ -121,6 +123,7 @@ export const VIEWS = {
   byodoin:spotOrbit('byodoin',200,95,95,7),
   philosopher:spotOrbit('philosopher',280,185,240,4),
   hikone:{ja:'彦根城',en:'Hikone Castle',eye:ahead(HIKONE,225,360),ref:HIKONE,above:125,bearing:45,pitch:-17,orbit:{center:HIKONE,targetHeight:22}},
+  yogo:{ja:'余呉湖',en:'Lake Yogo',eye:ahead(YOGO,175,1550),ref:YOGO,above:380,bearing:355,pitch:-13,orbit:{center:YOGO,targetHeight:4}},
   hiei:{ja:'比叡山',en:'Mt. Hiei',eye:ahead(HIEI,110,900),ref:HIEI,above:320,bearing:290,pitch:-16,orbit:{center:HIEI,targetHeight:12}},
   todaiji:{ja:'東大寺',en:'Todai-ji',eye:ahead(TODAIJI,185,340),ref:TODAIJI,above:120,bearing:5,pitch:-16,orbit:{center:TODAIJI,targetHeight:28}},
   kasuga:{ja:'春日大社',en:'Kasuga Taisha',eye:ahead(KASUGA,240,260),ref:KASUGA,above:95,bearing:60,pitch:-17,orbit:{center:KASUGA,targetHeight:10}},

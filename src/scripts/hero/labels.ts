@@ -96,6 +96,7 @@ const REGIONAL_PIN_STYLE: Record<string, RegionalPinStyle> = {
 
 const EXTRA_PIN_STYLE: Record<(typeof EXTRA_LANDMARKS)[number]['id'], { rank: number; above: number }> = {
   hikone: { rank: 1, above: 42 },
+  yogo: { rank: 2, above: 24 },
   hiei: { rank: 2, above: 45 },
   todaiji: { rank: 2, above: 54 },
   kasuga: { rank: 3, above: 24 },
