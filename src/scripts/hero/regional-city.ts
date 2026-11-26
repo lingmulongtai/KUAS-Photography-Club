@@ -1,4 +1,4 @@
-import {BUILDING_FS,buildCityAsync,prepareCityMaterials} from './buildings';
+import {BUILDING_FS,aviationBeaconMaterial,aviationBeaconPoints,buildCityAsync,prepareCityMaterials} from './buildings';
 import type {BoxBuilding,PolyBuilding} from './buildings-data';
 import {regionalNeighborhoods} from './regional-neighborhoods';
 import * as THREE from 'three';
@@ -15,6 +15,8 @@ import {SHADOW_LAYER} from './shadow';
 import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
 import {M_PER_DEG_LAT, M_PER_DEG_LON, ORIGIN, toLocal, type Box} from './geo';
 import {regionalBudgetForTier,type RegionalQualityBudget} from './adaptive-quality';
+import {inOsakaLandmarkMask} from './osaka-landmarks';
+import {inAirportBuildingMask} from './airports-data';
 
 type Ground=(x:number,z:number)=>number;
 type Layer={x:number;y:number;zoom:number;distance:number};
@@ -50,10 +52,27 @@ function streetMaterial(env:Env,boundary:Boundary){
     fragmentShader:`${ENV_GLSL} ${SHADOW_GLSL} ${HOME_BOUNDARY}
       varying vec3 vWorld,vNormal,vColor;
       void main(){
-        if(owner(vWorld.xz)==0)discard;
+        // Allow bridges, viaducts and piers crossing Osaka Bay harbors and Lake Biwa (where land owner == 0)
+        // so coastal bay spans are never sawtooth-clipped at the shoreline raster edge.
+        bool inKansaiWater=(vWorld.x>-76000. && vWorld.x<-18000. && vWorld.z>27000. && vWorld.z<68000.)
+                        || (vWorld.x>8000. && vWorld.x<48000. && vWorld.z>-42000. && vWorld.z<8000.);
+        if(owner(vWorld.xz)==0 && !inKansaiWater)discard;
         vec3 n=normalize(vNormal);
         vec3 color=shade(seasonalSurface(pow(vColor,vec3(2.2)),n,vWorld),n,vWorld,sunShadow(vWorld,n));
-        gl_FragColor=vec4(applyHaze(color,vec3(0.),vWorld),1.);
+        vec3 emit=vec3(0.);
+        if(uCity>.01 && n.y>.5){
+          // Warm pools of streetlamp light along regional avenues, viaducts & waterfront promenades at night.
+          vec2 p=vWorld.xz;
+          float fp=max(length(dFdx(p)),length(dFdy(p)));
+          vec2 cell=p/24.;
+          float s=hash12(floor(cell));
+          vec2 d=fract(cell)-.5;
+          float pool=exp(-dot(d,d)*14.)*step(.35,s);
+          float soft=mix(pool,.38,smoothstep(4.,14.,fp));
+          vec3 lampCol=mix(vec3(1.,.68,.36),vec3(1.,.84,.62),step(.68,s));
+          emit=lampCol*(.010+.038*soft)*uCity*cityLightShimmer(vWorld);
+        }
+        gl_FragColor=vec4(applyHaze(color,emit,vWorld),1.);
       }`});
 }
 
@@ -122,7 +141,12 @@ function streetMesh(tile:CompiledTile,materials:THREE.Material[],contains:(p:Poi
 
 async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:THREE.Material,env:Env,boundary:Boundary,ground:Ground,
   architecture:Architecture,lite:boolean,current:()=>boolean):Promise<Entry|null>{
-  const group=new THREE.Group(),street=streetMesh(tile,materials,architecture.contains);
+  const maskedPoint=(p:Point)=>{
+    if(architecture.contains(p))return true;
+    const lp=toLocal(p[1],p[0]);
+    return inOsakaLandmarkMask(lp.x,lp.z)||inAirportBuildingMask(lp.x,lp.z);
+  };
+  const group=new THREE.Group(),street=streetMesh(tile,materials,maskedPoint);
   if(street){group.add(street.mesh);street.mesh.layers.enable(SHADOW_LAYER);}
   type Site=ReturnType<Architecture['siteAt']>;
   const sites=new Map<Site,{boxes:BoxBuilding[];polys:PolyBuilding[]}>();
@@ -138,6 +162,7 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:T
       }
       cx=(west+east)*.5;cz=(north+south)*.5;
     }
+    if(inOsakaLandmarkMask(cx,cz)||inAirportBuildingMask(cx,cz))continue;
     const site=architecture.siteAt([ORIGIN.lon+cx/M_PER_DEG_LON,ORIGIN.lat-cz/M_PER_DEG_LAT]);
     let data=sites.get(site);
     if(!data){data={boxes:[],polys:[]};sites.set(site,data);}
@@ -169,7 +194,7 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:T
   };
   try{
     for(const [site,data] of sites){
-      const city=await buildCityAsync(env,{height:ground},data,()=>true,lite ? .6 : 1,current);
+      const city=await buildCityAsync(env,{height:ground},data,()=>true,lite ? .6 : 1,current,()=>false,undefined,undefined,false);
       if(!city){dispose();return null;}
       cities.push({site,city});
       for(const mat of city.materials)clipCityMaterial(mat,boundary);
@@ -191,7 +216,7 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:T
   }catch(error){dispose();throw error;}
 }
 
-function skylineMesh(g:Skyline,material:THREE.Material){
+function skylineMesh(g:Skyline,material:THREE.Material,beaconMat:THREE.ShaderMaterial){
   const {center,bounds,ranges}=g;
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.BufferAttribute(g.positions,3));
@@ -205,6 +230,8 @@ function skylineMesh(g:Skyline,material:THREE.Material){
   mesh.name='regional-skyline';
   geometry.boundingSphere=new THREE.Box3(new THREE.Vector3(bounds[0],bounds[1],bounds[2]),
     new THREE.Vector3(bounds[3],bounds[4],bounds[5])).getBoundingSphere(new THREE.Sphere());
+  const beacons=aviationBeaconPoints(g.beaconPos,g.beaconMeta,beaconMat);
+  if(beacons)mesh.add(beacons);
   const children=[...new Set(ranges.map(r=>r.tile))];
   let signature='';
   const indices=new Uint32Array(g.positions.length/3);
@@ -222,7 +249,7 @@ function skylineMesh(g:Skyline,material:THREE.Material){
     index.needsUpdate=true;
     geometry.setDrawRange(0,count);
   };
-  return {mesh,mask,dispose:()=>geometry.dispose()};
+  return {mesh,mask,dispose:()=>{geometry.dispose();beacons?.geometry.dispose();}};
 }
 
 export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.DirectionalLight;sky:THREE.HemisphereLight},ground:Ground,legacy:Box[],lite:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>,invalidateShadow:()=>void){
@@ -234,6 +261,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
   const readSkyline=skylineReader(ground);
   const queue=tileQueue(false,'orthometric'),material=surveyedMaterial(env,boundary);
+  const beaconMat=aviationBeaconMaterial(env);
   const streetMaterials=[material,streetMaterial(env,boundary)];
   const sacredMat=sacredMaterial(env,boundary);
   const warmStreetMaterials=[...streetMaterials,sacredMat];
@@ -319,7 +347,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
       loading.add(id);
       const job=t.zoom===16?queue.compile(t.x,t.y,sampleTile(t.x,t.y,ground))
         .then(tile=>wanted.has(id)?nearMesh(tile,streetMaterials,sacredMat,env,boundary,ground,architecture,lite,()=>wanted.has(id)):null):
-        readSkyline({x:t.x,y:t.y,legacy},()=>wanted.has(id)).then(data=>data && wanted.has(id)?skylineMesh(data,material):null);
+        readSkyline({x:t.x,y:t.y,legacy},()=>wanted.has(id)).then(data=>data && wanted.has(id)?skylineMesh(data,material,beaconMat):null);
       void job.then(async result=>{
         if(result?.mesh){
           if(t.zoom===16){

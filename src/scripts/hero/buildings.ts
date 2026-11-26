@@ -338,46 +338,78 @@ export const BUILDING_FS = /* glsl */ `
         float rows = 1. - smoothstep(.15, .4, max(fwWall.x * .6, fwWall.y * 3.));
         albedo *= .9 + .25 * mix(.5, vnoise(vWall * vec2(.6, 3.)), rows);
       } else {
-        // flat concrete roofs, some darker waterproofing
-        albedo = pick4(r1, vec3(.12, .13, .14), vec3(.18, .17, .15), vec3(.095, .12, .14), vec3(.23, .22, .19));
-        albedo *= .85 + .3 * mix(.5, vnoise(vWorld.xz * .15 + seed), 1. - smoothstep(.2, .5, fwWall.x * .15));
+        // flat concrete roofs: waterproof membrane tone + mid/far penthouse & rooftop equipment texture
+        albedo = pick4(r1, vec3(.12, .13, .145), vec3(.175, .165, .148), vec3(.095, .118, .135), vec3(.22, .208, .185));
+        float rFoot = max(fwWall.x, fwWall.y);
+        float fineR = 1. - smoothstep(.2, .55, rFoot * .15);
+        float medR = 1. - smoothstep(.25, .85, rFoot * .055);
+        // Subtle membrane seam grid & rooftop mechanical pad variation visible at mid-range overlooks
+        vec2 roofCell = vWorld.xz * .085 + vec2(seed * 19.3, seed * 37.1);
+        float equip = step(.72, hash12(floor(roofCell))) * smoothstep(.15, .32, min(fract(roofCell.x), 1. - fract(roofCell.x)))
+                    * smoothstep(.15, .32, min(fract(roofCell.y), 1. - fract(roofCell.y)));
+        float patchVar = mix(.5, vnoise(vWorld.xz * .045 + seed * 11.), medR);
+        float fineVar = mix(.5, vnoise(vWorld.xz * .16 + seed), fineR);
+        albedo *= .78 + .26 * patchVar + .18 * fineVar;
+        albedo = mix(albedo, albedo * (.68 + .55 * r2) + vec3(.03), equip * medR * .65);
       }
     } else {
       vec3 wall = wallColor(kind, seed, H);
-      // A darker plinth and the shadow below the eaves make a facade read as a building.
-      wall *= mix(.73,1.,smoothstep(0.,2.,vWall.y));
-      wall *= 1. - .22 * smoothstep(H-1.1,H-.15,vWall.y);
+      // Enrich concrete/urban architectural material palette (limestone, sandstone, tile, charcoal, cool steel)
+      // so mid & far skylines read as distinct buildings instead of uniform grey blocks.
+      if (!wooden) {
+        float archStyle = fract(seed * 23.71);
+        vec3 archTint = archStyle < .22 ? vec3(.90, .95, 1.04)   // cool steel / slate office
+                      : archStyle < .46 ? vec3(1.06, 1.00, .91)  // warm limestone / cream tile
+                      : archStyle < .66 ? vec3(1.04, .92, .83)   // sandstone / terracotta masonry
+                      : archStyle < .84 ? vec3(.84, .88, .92)    // sleek charcoal / dark granite
+                      : vec3(1.02, 1.01, .98);                   // crisp architectural white concrete
+        wall *= archTint;
+      }
+      // Vertical architectural massing: darker lobby/plinth base, brighter upper exposure, crisp roof crown/parapet.
+      float hNorm = clamp(vWall.y / max(H, 4.), 0., 1.);
+      float podiumH = min(5.2, max(2.2, H * .16));
+      wall *= mix(.64, 1., smoothstep(0., podiumH, vWall.y));
+      wall *= mix(.86, 1.08, hNorm);
+      float crownH = clamp(H * .065, 1.2, 3.8);
+      float inCrown = smoothstep(H - crownH, H - crownH * .35, vWall.y);
+      float corniceLine = smoothstep(H - crownH - 1.4, H - crownH - .2, vWall.y) * (1. - inCrown);
+      wall *= 1. - .28 * corniceLine;
+      wall = mix(wall, wall * (.78 + .32 * r2), inCrown * (wooden ? .35 : .85));
       // in densely built blocks the lower floors look onto narrow alleys and get little sky
       float block = smoothstep(.15, .65, builtAt(vWorld.xz, 30.));
       wall *= 1. - .38 * block * (1. - smoothstep(1., 11., vWall.y));
 
-      // windows on a floor grid
-      float floorH = wooden ? 2.9 : (use == 4. ? 3.7 : 3.1);
-      float cellW = wooden ? 2.4 : (use == 2. ? 3.4 : 2.9);
+      // windows on a floor grid with directional anti-aliasing (oblique angles keep horizontal floor ribbons crisp!)
+      float floorH = wooden ? 2.9 : (use == 4. || H > 28. ? 3.6 : 3.15);
+      float cellW = wooden ? 2.4 : (use == 2. ? 3.4 : 2.85);
       vec2 g = vec2(wallAt.x / cellW, (wallAt.y - .5) / floorH);
       vec2 id = floor(g);
       vec2 f = fract(g);
       vec2 fw = fwWall / vec2(cellW, floorH);
-      float wx = smoothstep(.18 - fw.x, .18 + fw.x, f.x) * (1. - smoothstep(.82 - fw.x, .82 + fw.x, f.x));
-      float wy = smoothstep(.32 - fw.y, .32 + fw.y, f.y) * (1. - smoothstep(.86 - fw.y, .86 + fw.y, f.y));
-      // a window cell under ~4 pixels can't be drawn without shimmering: everything that switches
-      // per cell blends to the facade's average as the cells shrink
-      float tiny = smoothstep(.12, .3, max(fw.x, fw.y));
-      float valid = mix(step(0., id.y) * step((id.y + 1.) * floorH, H + .2), step(0., vWall.y), tiny);
-      float pane = mix(wx * wy, .35, tiny) * valid;
+      float wx = smoothstep(.16 - fw.x, .16 + fw.x, f.x) * (1. - smoothstep(.84 - fw.x, .84 + fw.x, f.x));
+      float wy = smoothstep(.28 - fw.y, .28 + fw.y, f.y) * (1. - smoothstep(.86 - fw.y, .86 + fw.y, f.y));
+      // Separate X and Y anti-aliasing so oblique walls preserve crisp horizontal window strips
+      // instead of collapsing to a flat monotone box at 500 m.
+      float tinyX = smoothstep(.16, .46, fw.x);
+      float tinyY = smoothstep(.16, .46, fw.y);
+      float tiny = tinyX * tinyY;
+      float valid = mix(step(0., id.y) * step((id.y + 1.) * floorH, H - crownH * .45 + .5), step(1.2, vWall.y) * (1. - inCrown * .85), tinyY);
+      float paneX = mix(wx, .62, tinyX);
+      float paneY = mix(wy, .52, tinyY);
+      float pane = paneX * paneY * valid;
       // old wooden houses only have a window here and there
-      if (wooden) pane *= mix(step(.45, hash12(id + seed * 7.)), .55, tiny);
+      if (wooden) pane *= mix(step(.45, hash12(id + seed * 7.)), .55, max(tinyX, tinyY));
 
       // Concrete walls: each window sits in a recess. Seen at an angle the glass slides back from
       // the opening, so the opening's side and head show as darker concrete; the head also shades
       // the top of the glass, and a mullion splits the pane. Only while a window is big on screen.
-      float deep = wooden ? 0. : 1. - smoothstep(.05, .14, max(fw.x, fw.y));
+      float deep = wooden ? 0. : 1. - smoothstep(.05, .16, max(fw.x, fw.y));
       float reveal = 0., head = 0., mullion = 0.;
       if (deep > 0.){
         float vn = max(dot(-v, n), .15);
         vec2 slide = vec2(dot(v, across) * alongSign, v.y) * .3 / vn / vec2(cellW, floorH);
         vec2 q = g - id + slide;
-        float seen = step(.18, q.x) * step(q.x, .82) * step(.32, q.y) * step(q.y, .86);
+        float seen = step(.16, q.x) * step(q.x, .84) * step(.28, q.y) * step(q.y, .86);
         float hole = wx * wy * valid;
         reveal = hole * (1. - seen) * deep;
         head = smoothstep(.66, .86, q.y) * seen * deep;
@@ -385,19 +417,37 @@ export const BUILDING_FS = /* glsl */ `
         pane = mix(pane, pane * seen, deep);
       }
 
-      // Modern commercial, office & high-rise towers get reflective glass curtain-wall facades.
-      modernGlass = wooden ? 0. : clamp((use == 4. ? .82 : use == 2. ? .55 : 0.) + smoothstep(18., 44., H) * .65, 0., 1.);
-      float curtain = modernGlass * smoothstep(.2, .85, modernGlass);
+      // Modern commercial, office, hotel & high-rise towers get reflective glass curtain-wall facades.
+      // Regional skyline buildings arrive with use==0, so also infer modern glass facades from height + seed.
+      float inferredModern = wooden ? 0. : smoothstep(14., 36., H) * (.35 + .65 * step(.42, fract(seed * 19.37)));
+      modernGlass = wooden ? 0. : clamp(max((use == 4. ? .86 : use == 2. ? .52 : 0.) + smoothstep(16., 42., H) * .55, inferredModern), 0., 1.);
+      float curtain = modernGlass * smoothstep(.18, .82, modernGlass);
       if (curtain > .01) {
         // Curtain-wall glass spans wider across each floor with sleek aluminum mullions & dark spandrel bands.
-        float cwX = smoothstep(.04 - fw.x, .04 + fw.x, f.x) * (1. - smoothstep(.96 - fw.x, .96 + fw.x, f.x));
-        float cwY = smoothstep(.14 - fw.y, .14 + fw.y, f.y) * (1. - smoothstep(.94 - fw.y, .94 + fw.y, f.y));
-        pane = mix(pane, mix(cwX * cwY, .72, tiny) * valid, curtain * .85);
+        float cwX = mix(smoothstep(.04 - fw.x, .04 + fw.x, f.x) * (1. - smoothstep(.96 - fw.x, .96 + fw.x, f.x)), .82, tinyX);
+        float cwY = mix(smoothstep(.15 - fw.y, .15 + fw.y, f.y) * (1. - smoothstep(.93 - fw.y, .93 + fw.y, f.y)), .68, tinyY);
+        pane = mix(pane, cwX * cwY * valid, curtain * .85);
+      }
+
+      // Multi-scale architectural macro-facade texture for mid & far distances (500 m – 8 km):
+      // Gaussian pre-filtered 2-floor & 4-floor spandrel bands + structural vertical bay columns
+      // prevent buildings from collapsing into flat monotone grey boxes while staying 100% shimmer-free.
+      if (!wooden) {
+        float d2y = fw.y * .5, d4y = fw.y * .25, d3x = fw.x * .333;
+        float ribbon2 = cos(6.283185 * (vWall.y - .5) / (floorH * 2.)) * exp(-d2y * d2y * 7.5);
+        float ribbon4 = cos(6.283185 * (vWall.y - .5) / (floorH * 4.)) * exp(-d4y * d4y * 7.5);
+        float colBay = cos(6.283185 * vWall.x / (cellW * 3.)) * exp(-d3x * d3x * 7.5);
+        float midMask = smoothstep(.14, .44, max(fw.x, fw.y)) * valid;
+        // Blend crisp architectural floor striations and structural vertical bay shadows into pane & wall tone.
+        float macroPane = clamp(.52 + .24 * ribbon2 + .14 * ribbon4 - .13 * colBay * (1. - curtain * .5), .15, .92);
+        pane = mix(pane, macroPane * valid, midMask * .62);
+        // Subtle structural pier shading on concrete walls between bays & floors.
+        wall *= 1. + midMask * (.08 * colBay + .07 * ribbon4);
       }
 
       // Glass reflection: mirror sky, clouds, horizon glow & solar/lunar specular glints on modern towers.
       float ndotv = clamp(dot(-v, n), 0., 1.);
-      float fresnel = pow(1. - ndotv, 3.6);
+      float fresnel = pow(1. - ndotv, 3.4);
       vec3 reflDir = reflect(v, n);
       reflDir.y = clamp(reflDir.y + .06, -.1, 1.);
       vec3 rNorm = normalize(reflDir);
@@ -410,45 +460,59 @@ export const BUILDING_FS = /* glsl */ `
       } else {
         skyRefl = mix(skyRefl, uHorizon * .42 + vec3(.03, .035, .04), smoothstep(.04, -.08, rNorm.y) * .65);
       }
-      // Subtle per-pane glass tint variation & gentle structural curvature shimmer.
-      float paneVar = mix(.88 + .24 * hash12(id + seed * 19.3), 1., tiny);
-      vec3 glassTint = mix(vec3(.024, .030, .038), vec3(.018, .036, .052), modernGlass);
+      // Per-pane & per-floor glass tint variation (distinct blue-teal, slate-grey, bronze-tinted towers).
+      float paneVar = mix(.85 + .30 * hash12(id + seed * 19.3), .92 + .16 * hash12(floor(id * vec2(.25, .5)) + seed * 13.7), tiny);
+      vec3 towerGlass = pick4(fract(seed * 37.9), vec3(.018, .036, .056), vec3(.024, .034, .042), vec3(.036, .032, .028), vec3(.016, .044, .052));
+      vec3 glassTint = mix(vec3(.022, .028, .036), towerGlass, modernGlass);
       vec3 glass = glassTint * paneVar;
       glass *= 1. - .52 * head * (1. - curtain * .65);
       glass = mix(glass, wall * .52, mullion * (1. - curtain * .55));
-      float paneCoverage = pane * mix(.6 - .3 * tiny, .84 - .14 * tiny, modernGlass);
+      float paneCoverage = pane * mix(.68 - .16 * tiny, .88 - .10 * tiny, modernGlass);
       albedo = mix(wall, glass, paneCoverage);
       albedo = mix(albedo, wall * (.42 + .2 * max(n.y, 0.)), reveal * (1. - curtain * .7));
 
-      // Direct specular reflection added after diffuse shading so curtain-wall towers genuinely mirror the sky & sun.
-      float reflAmt = mix(.05 + .22 * fresnel, .16 + .62 * fresnel, modernGlass) * paneCoverage * (1. - mullion * .7);
-      float sunGlint = pow(max(dot(rNorm, uSunDir), 0.), mix(96., 48., modernGlass)) * (.14 + .52 * modernGlass);
-      float moonGlint = pow(max(dot(rNorm, uMoonDir), 0.), 64.) * (1.1 + 1.8 * modernGlass);
-      specRefl = skyRefl * reflAmt * paneVar * mix(1., .72, tiny)
+      // Direct specular reflection added after diffuse shading so curtain-wall & mid-rise windows genuinely mirror the sky & sun.
+      float skyscraperBoost = 1. + .38 * smoothstep(46., 110., H) * modernGlass;
+      float reflAmt = mix(.06 + .24 * fresnel, .18 + .64 * fresnel, modernGlass) * paneCoverage * (1. - mullion * .7) * skyscraperBoost;
+      float sunGlint = pow(max(dot(rNorm, uSunDir), 0.), mix(90., 42., modernGlass)) * (.16 + .58 * modernGlass) * skyscraperBoost;
+      float moonGlint = pow(max(dot(rNorm, uMoonDir), 0.), 60.) * (1.1 + 1.8 * modernGlass);
+      specRefl = skyRefl * reflAmt * paneVar * mix(1., .86, tiny)
                + (uSunLight * sunGlint + uMoonLight * moonGlint) * paneCoverage * (1. - mullion * .7) * sh;
 
-      // lit windows at night: warm homes and hotels, cooler offices. Some buildings are dark.
-      float awake = step(.22, fract(seed * 5.31));
-      float rate = uLit * (wooden ? .8 : 1.) * (use == 4. ? 1.3 : 1.) * awake;
-      // Once single windows shrink under a few pixels, groups of rooms along a floor (2, then 4
-      // windows wide) switch together, so every distance keeps points of light a few pixels
-      // across. Fewer groups light than single windows would, so the city stays dark masses
-      // with points of light rather than a lit sheet. Neighbouring group sizes cross-fade
-      // without popping, and only beyond that does a facade fade to a dim average.
+      // Lit windows at night: crisp amber homes/hotels and cool offices across near, mid, AND far skylines
+      // calibrated against the 0.12 night bloom threshold so cities sparkle vividly without fogging out.
+      float awake = step(.16, fract(seed * 5.31));
+      float urbanTall = smoothstep(14., 38., H);
+      float effLit = max(uLit, .22);
+      float rate = effLit * (wooden ? .48 : (.56 + .22 * urbanTall)) * (use == 4. ? 1.18 : 1.) * awake;
+      // Multi-scale window-cluster LOD: preserve crisp illuminated window dashes/points across every distance
+      // (1x1 near -> 2x1 -> 4x2 -> 8x2 far) without collapsing brightness or causing bloom whiteout.
       float cells = max(fw.x, fw.y);
-      rate *= mix(1., .25, tiny);
-      float lod = clamp(log2(max(cells * 3., 1.)), 0., 2.);
-      vec2 k0 = vec2(exp2(floor(lod)), 1.), k1 = vec2(min(k0.x * 2., 4.), 1.);
-      k0.y = max(1., k0.x * .5); k1.y = max(1., k1.x * .5);
+      rate *= mix(1., .36, smoothstep(.2, 1.4, cells));
+      float lod = clamp(log2(max(cells * 2.8, 1.)), 0., 3.);
+      vec2 k0 = vec2(exp2(floor(lod)), 1.), k1 = vec2(min(k0.x * 2., 8.), 1.);
+      k0.y = max(1., min(2., k0.x * .5)); k1.y = max(1., min(2., k1.x * .5));
       float lit0 = step(hash12(floor(id / k0) * vec2(1.7, 3.1) + seed * 31. + (k0.x - 1.) * .37), rate);
       float lit1 = step(hash12(floor(id / k1) * vec2(1.7, 3.1) + seed * 31. + (k1.x - 1.) * .37), rate);
       float lit = mix(lit0, lit1, fract(lod));
-      lit = mix(lit, rate * .4, smoothstep(1.4, 2.8, cells));
-      float coolMix = (use == 4. ? .8 : .15) * mix(step(.4, hash12(id + seed)), .6, tiny);
-      emit += cityWindowRadiance(coolMix, wooden) * lit * pane * (1. - mullion);
-      // shopfronts glow along the street
-      float groundFloor=1.-smoothstep(floorH-fwWall.y,floorH+fwWall.y,vWall.y-.5);
-      if (use == 3. || use == 5.) emit += WARM_WINDOW * groundFloor * mix(smoothstep(.1,.5,f.y),.7,tiny) * valid * mix(1.2,.05,tiny) * uCity;
+      lit = mix(lit, rate * .52, smoothstep(3.0, 6.5, cells));
+      float coolMix = ((use == 4. || urbanTall > .45) ? .68 : .18) * mix(step(.38, hash12(id + seed)), .58, tiny);
+      float litPane = mix(pane, max(pane, .64 * valid), smoothstep(.18, .55, cells));
+      float farBoost = 1. + .16 * smoothstep(.25, 1.2, cells) * (wooden ? .2 : .75);
+      emit += cityWindowRadiance(coolMix, wooden) * lit * litPane * (1. - mullion) * farBoost * .58;
+      // Street-level commercial shopfronts & hotel/office lobbies glow warmly along urban blocks.
+      float groundFloor = 1. - smoothstep(floorH * 1.1 - fwWall.y, floorH * 1.1 + fwWall.y, vWall.y - .4);
+      bool commercialFront = (use == 3. || use == 5.) || (!wooden && H >= 7. && fract(seed * 11.37) > .42);
+      if (commercialFront) {
+        float shopFade = mix(.42, .09, smoothstep(.2, 1.6, cells));
+        emit += WARM_WINDOW * groundFloor * mix(smoothstep(.1, .5, f.y), .75, tinyY) * step(0., vWall.y) * shopFade * uCity;
+      }
+      // Select tall skyscrapers (>=52 m) get subtle architectural parapet/crown accent uplighting at night.
+      if (!wooden && H >= 52. && fract(seed * 17.31) > .56) {
+        float crownAccent = smoothstep(H - 2.6, H - .5, vWall.y);
+        vec3 crownCol = fract(seed * 41.7) > .45 ? vec3(.86, .92, 1.0) : vec3(1.0, .82, .56);
+        emit += crownCol * crownAccent * .18 * uCity;
+      }
       emit *= cityLightShimmer(vWorld);
     }
 
@@ -477,6 +541,66 @@ const DEPTH_FS = /* glsl */ `
     gl_FragColor = packDepthToRGBA(gl_FragCoord.z);
   }
 `;
+
+/**
+ * Shared material for Japanese rooftop aviation obstacle lights (航空障害灯) on high-rises.
+ * Medium-intensity red beacons (>=85 m) pulse smoothly; low-intensity red beacons (45–85 m) burn steadily.
+ */
+export function aviationBeaconMaterial(env: Env): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: env,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */ `
+      ${ENV_GLSL}
+      attribute vec2 aBeacon; // x: phase [0..1], y: flash (1 = pulsing medium-intensity, 0 = steady red)
+      varying float vPower;
+      void main(){
+        vec4 wp = modelMatrix * vec4(position, 1.);
+        vec4 mv = viewMatrix * wp;
+        float dist = max(35., -mv.z);
+        float night = smoothstep(.18, .68, uCity);
+        float pulse = aBeacon.y > .5
+          ? (.22 + .78 * pow(.5 + .5 * sin(uTime * 3.4 + aBeacon.x * 6.28318), 2.4))
+          : (.86 + .14 * sin(uTime * 1.4 + aBeacon.x * 12.566));
+        float farFade = 1. - smoothstep(18000., 34000., dist);
+        vPower = night * pulse * farFade * (aBeacon.y > .5 ? 1.55 : 1.08);
+        float basePx = aBeacon.y > .5 ? 2400. : 1750.;
+        gl_PointSize = clamp(basePx / dist + (aBeacon.y > .5 ? 3.2 : 2.3), 2.6, 11.5);
+        gl_Position = vPower > .02 ? projectionMatrix * mv : vec4(2., 2., 2., 1.);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      varying float vPower;
+      void main(){
+        vec2 d = gl_PointCoord - .5;
+        float r2 = dot(d, d);
+        if (r2 > .25) discard;
+        float core = exp(-r2 * 24.);
+        float halo = exp(-r2 * 5.5) * .48;
+        vec3 red = mix(vec3(1.0, .06, .02), vec3(1.0, .38, .22), core * .65);
+        gl_FragColor = vec4(red * (core * 1.45 + halo) * vPower, 1.);
+      }
+    `,
+  });
+}
+
+/** Build a lightweight Points cloud for rooftop aviation obstacle lights. */
+export function aviationBeaconPoints(
+  positions: Float32Array,
+  meta: Float32Array,
+  material: THREE.ShaderMaterial,
+): THREE.Points | null {
+  if (!positions.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('aBeacon', new THREE.BufferAttribute(meta, 2));
+  geo.computeBoundingSphere();
+  const pts = new THREE.Points(geo, material);
+  pts.name = 'aviation-beacons';
+  return pts;
+}
 
 /* ---------- building the meshes ---------- */
 
@@ -657,7 +781,7 @@ function instanceShape(shape: THREE.InstancedBufferGeometry, source: THREE.Insta
   return geometry;
 }
 
-export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate=()=>false, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>) {
+export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: CityData, keep: (b: BoxBuilding) => boolean, quality: number, dressed: CityPredicate=()=>false, panoramaEye?: PanoramaEye, replaceable?: ReadonlySet<BoxBuilding | PolyBuilding>, emitBeacons = true) {
   const group = new THREE.Group();
   const fallback = new THREE.Group();
   if (replaceable) group.add(fallback);
@@ -671,6 +795,9 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
   const polyDepth = new THREE.ShaderMaterial({ uniforms:env, vertexShader: POLY_VS, fragmentShader: DEPTH_FS });
   const stepMat = new THREE.ShaderMaterial({ uniforms: env, vertexShader: INSTANCE_VS, fragmentShader: BUILDING_FS, defines: { STEPPED: 1 } });
   const stepDepth = new THREE.ShaderMaterial({ uniforms:env, vertexShader: INSTANCE_VS, fragmentShader: DEPTH_FS, defines: { STEPPED: 1 } });
+  const beaconMat = emitBeacons ? aviationBeaconMaterial(env) : null;
+  const beaconPos: number[] = [];
+  const beaconMeta: number[] = [];
   const flat = flatShape();
   const pitched = pitchedShape();
   const stepped = steppedShape();
@@ -702,6 +829,21 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
     const c = chunkOf(b.x, b.z, b);
     if (roofFor(b).type > 0) c.pitched.push({ b, y, seed });
     else c.flat.push({ b, y, seed });
+    if (emitBeacons && b.h >= 45 && (b.kind & 3) !== CLASS.wooden && !dressed(b)) {
+      const top = y + b.h + 1.9;
+      const flash = b.h >= 85 ? 1 : 0;
+      const ca = Math.cos(b.angle), sa = Math.sin(b.angle);
+      const hw = b.w * 0.42, hd = b.d * 0.42;
+      if (b.h >= 75) {
+        beaconPos.push(b.x + ca * hw - sa * hd, top, b.z + sa * hw + ca * hd);
+        beaconMeta.push(seed, flash);
+        beaconPos.push(b.x - ca * hw + sa * hd, top, b.z - sa * hw - ca * hd);
+        beaconMeta.push(seed, flash);
+      } else {
+        beaconPos.push(b.x, top, b.z);
+        beaconMeta.push(seed, flash);
+      }
+    }
   }
   for(let i=0;i<data.polys.length;i++) {
     if(i && i%512===0)yield;
@@ -709,7 +851,15 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
     const cx = p.ring[0];
     const cz = p.ring[1];
     const y = hf.height(cx, cz) + p.ground;
-    chunkOf(cx, cz, p).polys.push({ p, y, seed: hash1(i * 13 + 5) });
+    const seed = hash1(i * 13 + 5);
+    chunkOf(cx, cz, p).polys.push({ p, y, seed });
+    if (emitBeacons && p.h >= 45 && (p.kind & 3) !== CLASS.wooden && !dressed(p)) {
+      let mx = 0, mz = 0;
+      const m = p.ring.length / 2;
+      for (let k = 0; k < m; k++) { mx += p.ring[k * 2]; mz += p.ring[k * 2 + 1]; }
+      beaconPos.push(mx / m, y + p.h + 1.9, mz / m);
+      beaconMeta.push(seed, p.h >= 85 ? 1 : 0);
+    }
   }
 
   /**
@@ -799,15 +949,19 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
       }
     }
   }
+  if (beaconMat && beaconPos.length) {
+    const beacons = aviationBeaconPoints(new Float32Array(beaconPos), new Float32Array(beaconMeta), beaconMat);
+    if (beacons) group.add(beacons);
+  }
   complete=true;
   return {
     group, overview, fallback,
     // Streamed street tiles also own materials for details that are created later.
     materials: [instMat, polyMat, stepMat, detailMat],
     dispose(){
-      group.traverse(object=>{if(object instanceof THREE.Mesh)object.geometry.dispose();});
+      group.traverse(object=>{if(object instanceof THREE.Mesh || object instanceof THREE.Points)object.geometry.dispose();});
       overview?.traverse(object=>{if(object instanceof THREE.Mesh)object.geometry.dispose();});
-      for(const material of [instMat,polyMat,stepMat,detailMat,instDepth,polyDepth,stepDepth,proxyMaterial])material?.dispose();
+      for(const material of [instMat,polyMat,stepMat,detailMat,instDepth,polyDepth,stepDepth,proxyMaterial,beaconMat])material?.dispose();
       flat.dispose();pitched.dispose();stepped.dispose();
     },
     /**
@@ -858,9 +1012,10 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
   };
   } finally {
     if(!complete){
-      group.traverse(object=>{const mesh=object as THREE.Mesh;if(mesh.isMesh)mesh.geometry.dispose();});
+      group.traverse(object=>{if(object instanceof THREE.Mesh || object instanceof THREE.Points)object.geometry.dispose();});
       overview?.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); });
       proxyMaterial?.dispose();
+      beaconMat?.dispose();
       for(const material of [detailMat,instMat,polyMat,instDepth,polyDepth,stepMat,stepDepth])material.dispose();
       flat.dispose();pitched.dispose();stepped.dispose();
     }
@@ -884,8 +1039,8 @@ export function buildCity(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,ke
 }
 
 /** Keep the renderer responsive while a neighbouring region builds its city. */
-export async function buildCityAsync(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye,replaceable?:ReadonlySet<BoxBuilding | PolyBuilding>) {
-  const steps=buildCitySteps(env,hf,data,keep,quality,dressed,panoramaEye,replaceable);
+export async function buildCityAsync(env:Env,hf:Pick<Heightfield,'height'>,data:CityData,keep:(b:BoxBuilding)=>boolean,quality:number,current:()=>boolean,dressed:CityPredicate=()=>false,panoramaEye?:PanoramaEye,replaceable?:ReadonlySet<BoxBuilding | PolyBuilding>,emitBeacons=true) {
+  const steps=buildCitySteps(env,hf,data,keep,quality,dressed,panoramaEye,replaceable,emitBeacons);
   try {
     while(current()){
       const deadline=performance.now()+5;

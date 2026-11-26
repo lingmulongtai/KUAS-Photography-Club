@@ -32,6 +32,7 @@ import { buildBeacons, buildLandmarks } from './landmarks';
 import { biwaSurface, buildWaterAsync, osakaWaterSurface, waterSteps, type BiwaSurface } from './water';
 import { buildBiwaBridges } from './biwa-bridges';
 import { buildKansaiAirports } from './airports';
+import { buildOsakaLandmarks } from './osaka-landmarks';
 import { inAirportClearing } from './airports-data';
 import { createAdaptiveQuality } from './adaptive-quality';
 import { createLabels, type HeroTrip } from './labels';
@@ -135,10 +136,10 @@ export type HeroMode = 'city' | 'campus';
 
 const RAD = Math.PI / 180;
 
-/** Sharper local photos and the views that look over them; each loads when one of its views is first chosen. */
+/** Sharper local photos and the views that look over them; each loads when one of its views is first chosen or approached. */
 const REGIONAL_PHOTOS: { key: 'arashiyama' | 'higashiyama'; views: HeroView[] }[] = [
-  { key: 'arashiyama', views: ['arashiyama','togetsukyo'] },
-  { key: 'higashiyama', views: ['shogunzuka','inariRidge','kiyomizu','yasaka'] },
+  { key: 'arashiyama', views: ['arashiyama','togetsukyo','region-daikakuji','region-hirosawa','region-sagano','region-hozukyo'] },
+  { key: 'higashiyama', views: ['shogunzuka','inariRidge','kiyomizu','yasaka','region-nanzenji','region-eikando','region-philosopher'] },
 ];
 
 export function createHero(
@@ -236,6 +237,7 @@ export function createHero(
   let terrainRecenter: ((c: { x: number; z: number },anchored?:boolean) => void) | null = null;
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
+  let ensureNearbyRegionalPhotos: ((p: { x: number; z: number }) => void) | null = null;
   let ensureCityRegion:((center:{x:number;z:number},bearing?:number)=>Promise<void>|undefined)|null=null;
   let prefetchCityRegion:((center:{x:number;z:number},target?:HeroView)=>void)|null=null;
   let plantTreesAsync: ((eye: { x: number; z: number }, bearing: number) => void) | null = null;
@@ -504,32 +506,44 @@ export function createHero(
       value=>terrain.setPhoto(sharedPhoto+1,value?.photo??null,value?.box),
       error=>console.warn('Tennozan imagery unavailable',error),
     )):null;
+    const loadRegionalPhotoAt = (i: number) => {
+      const r = regions[i];
+      let job = regionalPhotos[i];
+      if (!job) {
+        const progressive = !lite && !heroOpened;
+        const file = lite || progressive ? r.meta.mobile.file : r.meta.file;
+        job = loadTexture(file, aniso).then(photo => {
+          if (i === sharedPhoto && sharedSlot) sharedSlot.setFallback({ photo, box: r.meta.box });
+          else terrain.setPhoto(i + 1, photo, r.meta.box);
+          if (progressive) {
+            schedulePostOpenUpgrade(async () => {
+              const full = await loadTexture(r.meta.file, aniso, 'low');
+              await uploadPhoto(renderer, full, () => true);
+              if (i === sharedPhoto && sharedSlot) sharedSlot.setFallback({ photo: full, box: r.meta.box });
+              else terrain.setPhoto(i + 1, full, r.meta.box);
+              photo.dispose();
+            }, 0);
+          }
+        }).catch(error => { regionalPhotos[i] = undefined; console.warn(`${r.key} imagery unavailable`, error); });
+        regionalPhotos[i] = job;
+      }
+      return job;
+    };
     const loadViewRegionalPhotos = (v: HeroView) => {
       const pending: Promise<unknown>[] = [];
       regions.forEach((r, i) => {
         if (!r.views.includes(v)) return;
-        let job = regionalPhotos[i];
-        if (!job) {
-          const progressive=!lite&&!heroOpened;
-          const file=lite||progressive?r.meta.mobile.file:r.meta.file;
-          job=loadTexture(file,aniso).then(photo=>{
-            if(i===sharedPhoto&&sharedSlot)sharedSlot.setFallback({photo,box:r.meta.box});
-            else terrain.setPhoto(i+1,photo,r.meta.box);
-            if(progressive){
-              schedulePostOpenUpgrade(async()=>{
-                const full=await loadTexture(r.meta.file,aniso,'low');
-                await uploadPhoto(renderer,full,()=>true);
-                if(i===sharedPhoto&&sharedSlot)sharedSlot.setFallback({photo:full,box:r.meta.box});
-                else terrain.setPhoto(i+1,full,r.meta.box);
-                photo.dispose();
-              },0);
-            }
-          }).catch(error=>{regionalPhotos[i]=undefined;console.warn(`${r.key} imagery unavailable`,error);});
-          regionalPhotos[i]=job;
-        }
-        pending.push(job);
+        pending.push(loadRegionalPhotoAt(i));
       });
       return Promise.all(pending);
+    };
+    ensureNearbyRegionalPhotos = (p) => {
+      regions.forEach((r, i) => {
+        const b = r.meta.box;
+        const dx = Math.max(b[0] - p.x, 0, p.x - b[2]);
+        const dz = Math.max(b[1] - p.z, 0, p.z - b[3]);
+        if (dx * dx + dz * dz < 2800 * 2800) void loadRegionalPhotoAt(i);
+      });
     };
     type Sheet={photo:THREE.Texture;box:Box};
     let localPhoto:Sheet|null=null,regionalPhoto:Sheet|null=null;
@@ -1216,8 +1230,10 @@ export function createHero(
     let regionalLoad:Promise<void>|undefined;
     ensureRegionalGround=()=>regionalLoad??=import('./regional-ground')
       .then(async({regionalGround})=>{
-        const legacy=[BUILDINGS_BOX,...(await cityRegions).regions.map(r=>r.box)];
-        return regionalGround(scene,env,hf,aniso,legacy,(base,detail)=>{
+        // Exclude only areas that already have dedicated high-res aerial sheets so gaps like
+        // Daikaku-ji / Hirosawa Pond / Sagano (between aerialCity and Arashiyama) receive live sharp imagery.
+        const photoLegacy=[...(meta.aerialBasin?.sheets.map(s=>s.box)??[meta.aerialCity.box]),...(await cityRegions).regions.map(r=>r.box)];
+        return regionalGround(scene,env,hf,aniso,photoLegacy,(base,detail)=>{
           districtBase=base;
           if(!detailRegion){
             const backdrop=base??eastBackdrop;
@@ -1236,6 +1252,8 @@ export function createHero(
         }).catch(error=>console.warn('Osaka river & bay water unavailable',error));
         const airports=buildKansaiAirports(env,result.ground);
         void prepare(airports).then(()=>{scene.add(airports);});
+        const osakaIcons=buildOsakaLandmarks(env,result.ground);
+        void prepare(osakaIcons).then(()=>{scene.add(osakaIcons);});
         void import('./regional-fireworks').then(({regionalFireworks})=>{
           updateFireworks=regionalFireworks(scene,env,result.ground,!!opts.reducedMotion,prepare);
         }).catch(error=>console.warn('Regional fireworks unavailable',error));
@@ -1518,7 +1536,8 @@ export function createHero(
     warmRegionalOnInteract?.();
     const request=++flightRequest;
     const needsRegional = target.startsWith('region-') || target === 'hikone' || target === 'todaiji' || target === 'kasuga'
-      || target === 'kix' || target === 'itami' || target === 'kobeAirport';
+      || target === 'kix' || target === 'itami' || target === 'kobeAirport'
+      || target === 'abenoHarukas' || target === 'umedaSky' || target === 'tsutenkaku';
     if(needsRegional && !regional && ensureRegionalGround){
       opts.onAreaLoading?.(true);
       void ensureRegionalGround().then(()=>{
@@ -1625,6 +1644,7 @@ export function createHero(
       followForest?.(freePosition,yaw/RAD);
       if(now>=nextAreaCheck){
         ensureCityRegion?.(freePosition,yaw/RAD);
+        ensureNearbyRegionalPhotos?.(freePosition);
         nextAreaCheck=now+250;
       }
       if(freeCenter.distanceTo(freePosition)>600){

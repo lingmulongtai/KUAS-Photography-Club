@@ -9,7 +9,7 @@ self.onmessage=async({data}:{data:{id:number;request?:Request;values?:Float32Arr
     const result=await compileSkyline(request,centers=>new Promise(resolve=>{
       heights.set(id,resolve);self.postMessage({id,centers},{transfer:[centers.buffer]});
     }),async()=>true);
-    const transfer=result?[result.positions.buffer,result.normals.buffer,result.uv.buffer,result.colors.buffer,result.identity.buffer]:[];
+    const transfer=result?[result.positions.buffer,result.normals.buffer,result.uv.buffer,result.colors.buffer,result.identity.buffer,result.beaconPos.buffer,result.beaconMeta.buffer]:[];
     self.postMessage({id,result},{transfer});
   }catch(error){self.postMessage({id,error:String(error)});}
 };
