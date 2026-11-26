@@ -937,10 +937,11 @@ export function createHero(
       }).catch(error=>{eastTexture=undefined;throw error;}));
       return {photo,upgradeFile:null as string|null};
     };
+    const LAKE_REMAINDERS=new Set(['yamashina','uji','south','tennozan']);
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
-      const lakeRemainder=r.id==='yamashina' && await ensureLake()?'kansai/yamashina-lake-remainder.json.gz':undefined;
+      const lakeRemainder=LAKE_REMAINDERS.has(r.id) && await ensureLake()?`kansai/${r.id}-lake-remainder.json.gz`:undefined;
       const results=await Promise.allSettled([loadRegionalBuildings(r),
-        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file),forestBits(r.lines.file,Boolean(lakeRemainder))] as const);
+        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file),forestBits(r.lines.file,r.id==='yamashina' && Boolean(lakeRemainder))] as const);
       const [b,l,p,coverage,forest]=results;
       let livePhoto=p.status==='fulfilled'?p.value.photo:null;
       const upgradeFile=p.status==='fulfilled'?p.value.upgradeFile:null;

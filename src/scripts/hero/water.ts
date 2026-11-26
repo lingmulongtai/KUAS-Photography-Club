@@ -323,8 +323,7 @@ export type BiwaSurface = THREE.Group & { refit: (ground: (x: number, z: number)
 
 // Recursively bisect river triangles whose longest edge exceeds maxEdge so refit(ground)
 // tracks interior DEM bulges across wide channels instead of letting terrain poke through up close.
-function subdivideWaterTriangles(raw: Float32Array, maxEdge: number, defaultY: number): Float32Array<ArrayBuffer> {
-  const maxSq = maxEdge * maxEdge;
+function subdivideWaterTriangles(raw: Float32Array, maxEdge: number | ((x: number, z: number) => number), defaultY: number): Float32Array<ArrayBuffer> {
   const out: number[] = [];
   const stack: number[] = [];
   for (let i = 0; i < raw.length; i += 9) {
@@ -333,6 +332,8 @@ function subdivideWaterTriangles(raw: Float32Array, maxEdge: number, defaultY: n
       const cz = stack.pop()!, cx = stack.pop()!;
       const bz = stack.pop()!, bx = stack.pop()!;
       const az = stack.pop()!, ax = stack.pop()!;
+      const limit = typeof maxEdge === 'number' ? maxEdge : maxEdge((ax + bx + cx) / 3, (az + bz + cz) / 3);
+      const maxSq = limit * limit;
       const ab = (bx - ax) * (bx - ax) + (bz - az) * (bz - az);
       const bc = (cx - bx) * (cx - bx) + (cz - bz) * (cz - bz);
       const ca = (ax - cx) * (ax - cx) + (az - cz) * (az - cz);
@@ -430,32 +431,39 @@ export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:num
       offset+=8;
     }
     const isRiver=i===1;
-    // Subdivide long river triangles finely so refit(ground) tracks coarse 100-200 m terrain bulges
-    // and narrow gorge walls along the entire Seta River from Lake Biwa to Amagase Dam.
-    if(isRiver)positions=subdivideWaterTriangles(positions,24,85);
+    // Subdivide river triangles adaptively: 24 m across coarse-DEM Seta Gorge (x > 7000) and
+    // 38 m across the finer 30 m Kyoto DEM (Uji River, Three-River Confluence, upper Yodo River).
+    if(isRiver)positions=subdivideWaterTriangles(positions,(x)=>x>7000?24:38,85);
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
     if(isRiver){
-      // Suppress vertex camera-pull right underneath Seta-no-Karahashi's low 88.37 m timber/concrete deck
-      // so the bridge span, railings and bronze giboshi finials always render cleanly above the river.
+      // Suppress vertex camera-pull right underneath Seta-no-Karahashi's low 88.37 m timber/concrete deck,
+      // and orient downstream flow per reach (Seta south, Uji west-northwest, Confluence/Yodo southwest).
       const vCount=positions.length/3;
       const stable=new Float32Array(vCount);
+      const flow=new Float32Array(vCount*3);
       for(let n=0;n<vCount;n++){
-        const dBridge=karahashiDist(positions[n*3],positions[n*3+2]);
+        const vx=positions[n*3],vz=positions[n*3+2];
+        const dBridge=karahashiDist(vx,vz);
         stable[n]=dBridge<76?1-smooth01((dBridge-26)/50):0;
+        let fx=-0.68,fz=0.73; // Fushimi / Three-River Confluence / Yodo: southwest
+        if(vx>11500 && vz<9800){fx=-0.08;fz=0.997;} // Seta upper & Nango: south
+        else if(vx>1500){fx=-0.85;fz=-0.52;} // Amagase / Uji River: west-northwest
+        flow[n*3]=1;flow[n*3+1]=fx;flow[n*3+2]=fz;
       }
       geometry.setAttribute('aStable',new THREE.BufferAttribute(stable,1));
+      geometry.setAttribute('aWater',new THREE.BufferAttribute(flow,3));
     }
     geometry.computeBoundingSphere();
     // Keep tight near-shore uWaterBias=0.35 while uClearance & refit(ground) prevent terrain from burying the channel.
-    // Lake Biwa applies polygonOffset against coarse distant shorelines; Seta River keeps default depth offset under bridges.
+    // Lake Biwa applies polygonOffset against coarse distant shorelines; Seta-Uji-Yodo keeps default depth offset under bridges.
     const material=waterMaterial(env,roads,.35,true);
     if(!isRiver){
       material.polygonOffset=true;
       material.polygonOffsetFactor=-3;
       material.polygonOffsetUnits=-10;
+      Object.assign(material.defaultAttributeValues,{aStable:[0],aWater:[...profile]});
     }
-    Object.assign(material.defaultAttributeValues,isRiver?{aWater:[...profile]}:{aStable:[0],aWater:[...profile]});
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=isRiver?'seta-river':'lake-biwa';
     if(isRiver)mesh.renderOrder=2;
@@ -482,20 +490,23 @@ export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:num
       const attr=geometry.getAttribute('position') as THREE.BufferAttribute;
       const arr=attr.array as Float32Array;
       if(kind==='seta'){
-        // Conform smoothly above coarse terrain chords all the way from Lake Biwa (85 m) down through
-        // Nango Weir, Shishitobi Gorge and Amagase Reservoir, while dipping cleanly under Seta-no-Karahashi (88.37 m).
+        // Conform smoothly above terrain chords all the way from Lake Biwa (85 m) down through
+        // Seta River, Nango Weir, Shishitobi Gorge, Amagase Reservoir, Uji River, Three-River
+        // Confluence, and upper Yodo River (joining osaka-water.bin seamlessly at Hirakata).
         for(let i=0;i<arr.length;i+=3){
           const x=arr[i],z=arr[i+2];
           const g0=ground(x,z);
           // Sample at half the subdivided triangle edge (14 m) and bound the lift so coarse
-          // 100 m DEM creases stay submerged without ever climbing steep Shishitobi Gorge walls.
+          // 100 m DEM creases stay submerged without ever climbing steep gorge walls.
           const gx=0.5*(ground(x-14,z)+ground(x+14,z));
           const gz=0.5*(ground(x,z-14)+ground(x,z+14));
-          const chord=Math.min(g0+1.2,Math.max(g0,gx,gz));
-          // Match Lake Biwa's 85 m floor at the upper exit, then follow true descending valley elevation downstream.
-          const lakeBlend=1-smooth01((z-2400)/1800);
-          let y=Math.max(g0+0.72,chord+0.55);
-          if(lakeBlend>0)y=Math.max(y,85*lakeBlend+(g0+0.72)*(1-lakeBlend));
+          const coarseSeta=x>7000;
+          const chord=Math.min(g0+(coarseSeta?1.2:0.55),Math.max(g0,gx,gz));
+          // Match Lake Biwa's 85 m floor exclusively at the upper Seta River exit (x > 11000).
+          const lakeBlend=x>11000?1-smooth01((z-2400)/1800):0;
+          const lift=coarseSeta?0.72:0.48;
+          let y=Math.max(g0+lift,chord+(coarseSeta?0.55:0.40));
+          if(lakeBlend>0)y=Math.max(y,85*lakeBlend+(g0+lift)*(1-lakeBlend));
           // Keep water cleanly below Seta-no-Karahashi's 88.37-88.43 m deck in the immediate 26 m bridge corridor.
           const dBridge=karahashiDist(x,z);
           if(dBridge<76){
