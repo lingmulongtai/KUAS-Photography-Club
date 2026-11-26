@@ -29,10 +29,17 @@ interface MeshBuilder {
   lightCol: number[];
   lightSize: number[];
   lightPhase: number[];
+  glowPos: number[];
+  glowUv: number[];
+  glowCol: number[];
 }
 
 function createBuilder(): MeshBuilder {
-  return { pos: [], nrm: [], col: [], emit: [], glass: [], surf: [], lightPos: [], lightCol: [], lightSize: [], lightPhase: [] };
+  return {
+    pos: [], nrm: [], col: [], emit: [], glass: [], surf: [],
+    lightPos: [], lightCol: [], lightSize: [], lightPhase: [],
+    glowPos: [], glowUv: [], glowCol: [],
+  };
 }
 
 /** Local frame oriented along vector (ux, uz) with right perpendicular (rx, rz) = (-uz, ux). */
@@ -181,6 +188,31 @@ function addLight(b: MeshBuilder, p: [number, number, number], rgb: RGB, size: n
   b.lightPhase.push(phase);
 }
 
+/** Add a soft radial floodlight pool illuminating terminal gates, aprons and roadways at night. */
+function pushApronGlow(
+  b: MeshBuilder,
+  f: LocalFrame,
+  along: number,
+  across: number,
+  len: number,
+  wid: number,
+  rgb: RGB,
+  yOff = 0.55,
+) {
+  const hl = len * 0.5, hw = wid * 0.5;
+  const p0 = toWorld(f, along - hl, across - hw, yOff);
+  const p1 = toWorld(f, along - hl, across + hw, yOff);
+  const p2 = toWorld(f, along + hl, across + hw, yOff);
+  const p3 = toWorld(f, along + hl, across - hw, yOff);
+  const uvs: [number, number][] = [[-1, -1], [-1, 1], [1, 1], [-1, -1], [1, 1], [1, -1]];
+  const verts = [p0, p1, p2, p0, p2, p3];
+  for (let i = 0; i < 6; i++) {
+    b.glowPos.push(verts[i][0], verts[i][1], verts[i][2]);
+    b.glowUv.push(uvs[i][0], uvs[i][1]);
+    b.glowCol.push(rgb[0], rgb[1], rgb[2]);
+  }
+}
+
 /** Build an authentic Air Traffic Control Tower (podium + ribbed shaft + equipment gallery + flared glazed cab + radome + beacons). */
 function pushControlTower(b: MeshBuilder, f: LocalFrame, along: number, across: number, baseY: number, height: number) {
   const concrete: RGB = [0.68, 0.70, 0.72];
@@ -189,7 +221,7 @@ function pushControlTower(b: MeshBuilder, f: LocalFrame, along: number, across: 
   const roofWhite: RGB = [0.84, 0.86, 0.88];
   // Operations base podium with glazed windows
   pushBox(b, f, along, across, baseY - 1.5, 34, 28, Math.min(14, height * 0.24) + 1.5, [0.56, 0.59, 0.62], {
-    emit: 0.34, glass: 0.58, surf: SURF.terminalGlass, skipBottom: true,
+    emit: 0.46, glass: 0.58, surf: SURF.terminalGlass, skipBottom: true,
   });
   // Fluted vertical concrete shaft with vertical dark service core strips
   const shaftH = height - 11.5;
@@ -197,28 +229,39 @@ function pushControlTower(b: MeshBuilder, f: LocalFrame, along: number, across: 
   pushBox(b, f, along, across, baseY, 13.6, 5.2, shaftH - 2, trimDark, { skipBottom: true });
   pushBox(b, f, along, across, baseY, 5.2, 13.6, shaftH - 2, trimDark, { skipBottom: true });
   // Cantilevered equipment & radar gallery below cab
-  pushBox(b, f, along, across, baseY + shaftH - 3.2, 17.5, 17.5, 3.2, trimDark, { emit: 0.16 });
+  pushBox(b, f, along, across, baseY + shaftH - 3.2, 17.5, 17.5, 3.2, trimDark, { emit: 0.24 });
   pushBox(b, f, along, across, baseY + shaftH, 19.5, 19.5, 1.4, concrete);
   // Flared panoramic glazed ATC control cab (bright warm-cyan instrument room glow at night!)
   pushBox(b, f, along, across, baseY + shaftH + 1.4, 20.5, 20.5, 6.4, cabGlass, {
-    emit: 0.92, glass: 0.96, surf: SURF.terminalGlass, topRgb: roofWhite,
+    emit: 1.0, glass: 0.96, surf: SURF.terminalGlass, topRgb: roofWhite,
   });
   // Overhanging sun-visor roof + upper antenna deck + white ASR radome
-  pushBox(b, f, along, across, baseY + shaftH + 7.8, 24.0, 24.0, 1.8, roofWhite, { emit: 0.15 });
+  pushBox(b, f, along, across, baseY + shaftH + 7.8, 24.0, 24.0, 1.8, roofWhite, { emit: 0.22 });
   pushBox(b, f, along, across, baseY + shaftH + 9.6, 8.2, 8.2, 4.8, [0.86, 0.88, 0.90]);
   pushBox(b, f, along, across, baseY + shaftH + 14.4, 0.8, 0.8, 5.5, [0.80, 0.24, 0.20]);
-  // Red aviation obstruction beacon + rotating green/white airport aerodrome beacon
+  // Restrained red aviation obstruction beacon + vivid rotating emerald/white airport aerodrome beacon
   const anchorY = baseYAt(f, along, across) + baseY;
-  addLight(b, toWorldFixedY(f, along, across, anchorY + shaftH + 20.2), [1.0, 0.12, 0.08], 6.4, 1.0);
-  addLight(b, toWorldFixedY(f, along + 7, across, anchorY + shaftH + 11.2), [0.30, 1.0, 0.56], 7.2, 2.0);
+  addLight(b, toWorldFixedY(f, along, across, anchorY + shaftH + 20.2), [1.0, 0.10, 0.06], 4.6, 1.0);
+  addLight(b, toWorldFixedY(f, along + 7, across, anchorY + shaftH + 11.2), [0.16, 1.0, 0.46], 7.4, 2.0);
 }
 
 /** Build a tall apron floodlight mast illuminating terminal gates & stands at night. */
-function pushApronFloodlight(b: MeshBuilder, f: LocalFrame, along: number, across: number, height = 24) {
+function pushApronFloodlight(
+  b: MeshBuilder,
+  f: LocalFrame,
+  along: number,
+  across: number,
+  height = 24,
+  lampCol: RGB = [1.0, 0.90, 0.72],
+  glowRadius = 115,
+) {
   pushBox(b, f, along, across, -0.6, 1.2, 1.2, height + 0.6, [0.58, 0.60, 0.62], { skipBottom: true });
-  pushBox(b, f, along, across, height - 0.8, 5.5, 1.6, 1.4, [0.85, 0.86, 0.88], { emit: 1.0 });
+  pushBox(b, f, along, across, height - 0.8, 5.8, 1.8, 1.5, [0.90, 0.92, 0.94], { emit: 1.0 });
   const anchorY = baseYAt(f, along, across);
-  addLight(b, toWorldFixedY(f, along, across, anchorY + height + 0.6), [1.0, 0.92, 0.78], 6.0, 0);
+  addLight(b, toWorldFixedY(f, along, across, anchorY + height + 0.8), lampCol, 6.8, 0);
+  if (glowRadius > 0) {
+    pushApronGlow(b, f, along, across, glowRadius * 2, glowRadius * 2, [lampCol[0] * 0.42, lampCol[1] * 0.40, lampCol[2] * 0.36], 0.55);
+  }
 }
 
 /**
@@ -289,81 +332,89 @@ function pushRunway(
     }
   }
 
-  // 1. Bright Runway Edge Lights (REDL every 50 m: crisp white, switching to golden amber in final 600 m!)
-  const edgeStep = 50;
+  // 1. Bright Runway Edge Lights (REDL every 45 m: crisp warm-white, switching to vivid golden amber in final 600 m!)
+  const edgeStep = 45;
   for (let s = -halfL; s <= halfL; s += edgeStep) {
     const nearEnd = halfL - Math.abs(s) < 600;
-    const edgeRgb: RGB = nearEnd ? [1.0, 0.78, 0.24] : [1.0, 0.97, 0.90];
+    const edgeRgb: RGB = nearEnd ? [1.0, 0.66, 0.10] : [1.0, 0.96, 0.86];
     for (const side of [-1, 1]) {
-      addLight(b, toWorld(f, s, side * (halfW + 2.6), y + 1.15), edgeRgb, 4.2, 0);
+      addLight(b, toWorld(f, s, side * (halfW + 2.6), y + 1.15), edgeRgb, nearEnd ? 4.9 : 4.5, 0);
     }
   }
-  // 2. Dense Runway Centerline Lights (RCL every 35 m: white -> alternating red/white last 900 m -> red last 300 m)
-  const clStep = 35;
+  // 2. Dense Runway Centerline Lights (RCL every 30 m: white -> alternating ruby-red/white last 900 m -> ruby-red last 300 m)
+  const clStep = 30;
   let clIdx = 0;
-  for (let s = -halfL + 35; s <= halfL - 35; s += clStep, clIdx++) {
+  for (let s = -halfL + 30; s <= halfL - 30; s += clStep, clIdx++) {
     const distFromEnd = halfL - Math.abs(s);
     const clRgb: RGB = distFromEnd < 300
-      ? [1.0, 0.18, 0.12]
-      : (distFromEnd < 900 && clIdx % 2 === 1) ? [1.0, 0.24, 0.16] : [0.98, 0.98, 0.95];
-    addLight(b, toWorld(f, s, 0, y + 0.95), clRgb, 3.0, 0);
+      ? [1.0, 0.10, 0.06]
+      : (distFromEnd < 900 && clIdx % 2 === 1) ? [1.0, 0.14, 0.08] : [0.98, 0.98, 0.94];
+    addLight(b, toWorld(f, s, 0, y + 0.95), clRgb, 3.4, 0);
   }
 
-  // 3. Threshold green/red bar + Touchdown Zone (TDZ) white bars + ICAO-accurate PAPI + ALSF-II Approach Lights
+  // 3. Vivid emerald threshold wing bars + ruby end lights + TDZ bars + ICAO PAPI + ALSF-II Approach Lights
   const approachLen = opts?.approachLen ?? 540;
   const papiSideStart = opts?.papiSides?.[0] ?? -1; // default pilot's LEFT side when landing from start (dir=-1 -> -rx)
   const papiSideEnd = opts?.papiSides?.[1] ?? 1;    // default pilot's LEFT side when landing from end (dir=+1 -> +rx)
   for (const dir of [-1, 1] as const) {
-    // Threshold green wing bars + end red lights
-    for (let k = -5; k <= 5; k++) {
-      addLight(b, toWorld(f, dir * halfL, k * (width / 10.5), y + 1.25), [0.18, 1.0, 0.42], 4.4, 0);
-      if (Math.abs(k) <= 3) {
-        addLight(b, toWorld(f, dir * (halfL + 4), k * (width / 8), y + 1.15), [1.0, 0.14, 0.10], 3.4, 0);
+    // Threshold vivid emerald-green wing bars + ruby-red end lights
+    for (let k = -6; k <= 6; k++) {
+      addLight(b, toWorld(f, dir * halfL, k * (width / 11.5), y + 1.25), [0.06, 1.0, 0.36], 5.3, 0);
+      if (Math.abs(k) <= 4) {
+        addLight(b, toWorld(f, dir * (halfL + 5), k * (width / 8.5), y + 1.15), [1.0, 0.08, 0.05], 4.3, 0);
       }
     }
     // Touchdown zone (TDZ) twin white light bars for first 650 m past threshold
-    for (let d = 90; d <= Math.min(630, halfL - 150); d += 90) {
+    for (let d = 80; d <= Math.min(640, halfL - 150); d += 80) {
       for (const side of [-1, 1]) {
-        addLight(b, toWorld(f, dir * (halfL - d), side * (halfW * 0.30), y + 0.95), [1.0, 0.98, 0.92], 2.9, 0);
+        addLight(b, toWorld(f, dir * (halfL - d), side * (halfW * 0.30), y + 0.95), [1.0, 0.97, 0.90], 3.3, 0);
       }
     }
     // ICAO/JCAB PAPI (4 light units perpendicular to runway, 16 m OUTSIDE runway edge, abeam aiming point 340 m past threshold!)
-    // Inner 2 lights (closest to runway, p=0,1) = RED; Outer 2 lights (farthest from runway, p=2,3) = WHITE.
+    // Inner 2 lights (closest to runway, p=0,1) = RUBY RED; Outer 2 lights (farthest from runway, p=2,3) = WHITE.
     const papiSide = dir === -1 ? papiSideStart : papiSideEnd;
     const papiAlong = dir * (halfL - 340);
     for (let p = 0; p < 4; p++) {
       const across = papiSide * (halfW + 16 + p * 7.5);
-      // Physical dark housing box beside runway
       pushBox(b, f, papiAlong, across, y, 2.2, 2.8, 1.1, [0.18, 0.19, 0.20]);
-      const papiCol: RGB = p < 2 ? [1.0, 0.14, 0.10] : [1.0, 0.98, 0.90];
-      // PAPI stays visible in late afternoon/dusk/night (phase 0.5 gives subtle daytime/dusk boost)
-      addLight(b, toWorld(f, papiAlong, across, y + 1.45), papiCol, 4.8, 0.5);
+      const papiCol: RGB = p < 2 ? [1.0, 0.08, 0.05] : [1.0, 0.98, 0.90];
+      addLight(b, toWorld(f, papiAlong, across, y + 1.45), papiCol, 5.6, 0.5);
     }
 
-    // Approach Lighting System (ALSF-II): centerline barrettes + 300 m decision crossbar + red side row bars + sequenced rabbit strobes
+    // Approach Lighting System (ALSF-II): warm-white centerline barrettes + 300 m decision crossbar + vivid red side bars + cyan-white rabbit strobes
     if (opts?.overWater) {
       pushBox(b, f, dir * (halfL + approachLen * 0.5 + 26), 0, y - 3.6, approachLen, 8.5, 3.8, [0.42, 0.44, 0.46]);
     }
-    for (let d = 55; d <= approachLen; d += 50) {
-      const isCrossbar = Math.abs(d - 280) < 30;
+    for (let d = 50; d <= approachLen; d += 45) {
+      const isCrossbar = Math.abs(d - 280) < 28;
       const span = isCrossbar ? 6 : 1;
       for (let k = -span; k <= span; k++) {
-        addLight(b, toWorld(f, dir * (halfL + d), k * 4.5, y + 1.8), [1.0, 0.95, 0.85], isCrossbar ? 4.8 : 4.2, 0);
+        addLight(b, toWorld(f, dir * (halfL + d), k * 4.5, y + 1.8), [1.0, 0.94, 0.80], isCrossbar ? 5.2 : 4.5, 0);
       }
-      // Red side-row barrettes in inner 270 m (ALSF-II signature!)
-      if (d <= 265) {
+      // Vivid ruby-red side-row barrettes in inner 275 m (ALSF-II signature!)
+      if (d <= 275) {
         for (const side of [-1, 1]) {
-          addLight(b, toWorld(f, dir * (halfL + d), side * (halfW * 0.36), y + 1.7), [1.0, 0.16, 0.12], 3.8, 0);
+          addLight(b, toWorld(f, dir * (halfL + d), side * (halfW * 0.36), y + 1.7), [1.0, 0.09, 0.06], 4.5, 0);
         }
       }
-      // Sequenced flashing white rabbit strobe sweeping cleanly toward threshold!
-      addLight(b, toWorld(f, dir * (halfL + d), 0, y + 2.4), [0.94, 0.99, 1.0], 6.4, 3.0 + (approachLen - d) / approachLen);
+      // Sequenced flashing cyan-white rabbit strobe sweeping cleanly toward threshold!
+      addLight(b, toWorld(f, dir * (halfL + d), 0, y + 2.4), [0.80, 0.96, 1.0], 7.2, 3.0 + (approachLen - d) / approachLen);
     }
   }
 }
 
-/** Build a parallel taxiway with textured asphalt, yellow centerline, crisp blue edge lights & green centerline lights. */
-function pushTaxiway(b: MeshBuilder, f: LocalFrame, length: number, across: number, y: number, connectors: number[], runwayAcross = 0, drawPavement = true) {
+/** Build a parallel taxiway with dense sapphire-blue edge lights, emerald-green centerlines, and alternating amber wig-wag runway guard lights. */
+function pushTaxiway(
+  b: MeshBuilder,
+  f: LocalFrame,
+  length: number,
+  across: number,
+  y: number,
+  connectors: number[],
+  runwayAcross = 0,
+  drawPavement = true,
+  wigwags = true,
+) {
   const taxiAsphalt: RGB = [0.128, 0.133, 0.142];
   const yellow: RGB = [0.78, 0.64, 0.16];
   if (drawPavement) {
@@ -371,23 +422,43 @@ function pushTaxiway(b: MeshBuilder, f: LocalFrame, length: number, across: numb
     pushStripTop(b, f, 0, across, y + 0.15, length - 10, 0.85, yellow);
   }
   const halfL = length * 0.5;
-  for (let s = -halfL; s <= halfL; s += 60) {
+  // Dense cobalt/sapphire-blue taxiway edge ribbons (every 38 m)
+  for (let s = -halfL; s <= halfL; s += 38) {
     for (const side of [-1, 1]) {
-      addLight(b, toWorld(f, s, across + side * 12.5, y + 0.95), [0.18, 0.52, 1.0], 3.1, 0);
+      addLight(b, toWorld(f, s, across + side * 12.5, y + 0.95), [0.08, 0.44, 1.0], 4.0, 0);
     }
-    addLight(b, toWorld(f, s, across, y + 0.85), [0.18, 0.96, 0.44], 2.4, 0);
+  }
+  // Vivid emerald-green taxiway centerline lights (every 32 m)
+  for (let s = -halfL; s <= halfL; s += 32) {
+    addLight(b, toWorld(f, s, across, y + 0.85), [0.06, 1.0, 0.38], 3.2, 0);
   }
   const midAcross = (across + runwayAcross) * 0.5;
   const spanAcross = Math.abs(across - runwayAcross);
+  const signToTaxi = across >= runwayAcross ? 1 : -1;
   for (const s of connectors) {
     if (drawPavement) {
       pushStripTop(b, f, s, midAcross, y + 0.08, 25, spanAcross, taxiAsphalt, 0, SURF.asphalt);
       pushStripTop(b, f, s, midAcross, y + 0.14, 0.8, spanAcross - 12, yellow);
     }
-    const steps = Math.max(2, Math.round(spanAcross / 45));
+    const steps = Math.max(3, Math.round(spanAcross / 28));
     for (let k = 1; k < steps; k++) {
       const a = runwayAcross + ((across - runwayAcross) * k) / steps;
-      addLight(b, toWorld(f, s, a, y + 0.85), [0.18, 0.96, 0.44], 2.4, 0);
+      // Alternating green/yellow lead-off centerline near runway exit (ICAO standard!)
+      const leadRgb: RGB = k <= 2 ? (k % 2 === 1 ? [0.08, 1.0, 0.38] : [1.0, 0.78, 0.10]) : [0.06, 1.0, 0.38];
+      addLight(b, toWorld(f, s, a, y + 0.85), leadRgb, 3.1, 0);
+      if (k % 2 === 0) {
+        addLight(b, toWorld(f, s - 12, a, y + 0.95), [0.08, 0.44, 1.0], 3.7, 0);
+        addLight(b, toWorld(f, s + 12, a, y + 0.95), [0.08, 0.44, 1.0], 3.7, 0);
+      }
+    }
+    // Runway Guard Lights ("wig-wags" — alternating flashing golden amber) + red stop bar at runway holding point
+    if (wigwags && Math.abs(runwayAcross) < 1) {
+      const holdAcross = runwayAcross + signToTaxi * 68;
+      addLight(b, toWorld(f, s - 14, holdAcross, y + 1.3), [1.0, 0.68, 0.06], 4.6, 4.0);
+      addLight(b, toWorld(f, s + 14, holdAcross, y + 1.3), [1.0, 0.68, 0.06], 4.6, 4.5);
+      for (const rx of [-7, 0, 7]) {
+        addLight(b, toWorld(f, s + rx, holdAcross, y + 0.9), [1.0, 0.10, 0.06], 3.2, 0);
+      }
     }
   }
 }
@@ -438,9 +509,11 @@ function pushAccessBridge(
     }
     for (const side of [-1, 1]) {
       pushBox(b, frame, 0, side * (width * 0.5 - 0.7), ym + 0.2, segLen, 1.2, 1.4, [0.66, 0.68, 0.70]);
+      // Warm golden roadway lamps along both parapets of Sky Gate Bridge R & Kobe Sky Bridge
+      addLight(b, toWorldFixedY(frame, 0, side * (width * 0.44), baseY + ym + 4.8), [1.0, 0.80, 0.40], 4.2, 0);
     }
-    if (i % 2 === 0) {
-      addLight(b, toWorldFixedY(frame, 0, 0, baseY + ym + 4.8), [1.0, 0.84, 0.56], 3.8, 0);
+    if (i % 3 === 0) {
+      pushApronGlow(b, frame, 0, 0, segLen * 1.6, width * 1.4, [0.52, 0.40, 0.20], ym + 0.5);
     }
   }
   for (let i = 1; i < piers; i++) {
@@ -464,11 +537,20 @@ function pushWorldControlTower(b: MeshBuilder, lat: number, lon: number, height:
 }
 
 /** Place an apron floodlight mast directly at a surveyed geographic coordinate. */
-function pushWorldApronLight(b: MeshBuilder, lat: number, lon: number, ground: GroundFn, height = 24, minGround = 0) {
+function pushWorldApronLight(
+  b: MeshBuilder,
+  lat: number,
+  lon: number,
+  ground: GroundFn,
+  height = 24,
+  minGround = 0,
+  lampCol: RGB = [1.0, 0.88, 0.64],
+  glowRadius = 115,
+) {
   const p = toLocal(lat, lon);
   const y = Math.max(minGround, ground(p.x, p.z));
   const f: LocalFrame = { cx: p.x, cy: y, cz: p.z, ux: 1, uz: 0, rx: 0, rz: 1 };
-  pushApronFloodlight(b, f, 0, 0, height);
+  pushApronFloodlight(b, f, 0, 0, height, lampCol, glowRadius);
 }
 
 /** Build a marked helicopter pad (asphalt pad + bold yellow 'H' + crisp green perimeter lights). */
@@ -508,22 +590,52 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
     const { frame: fA, length: lenA } = frameFromEndpoints(a0, a1, rwyA.deckOffset, islandGround);
     const { frame: fB, length: lenB } = frameFromEndpoints(b0, b1, rwyB.deckOffset, islandGround);
 
-    // Island 1 — Runway A (06R/24L) + taxiway lighting aligned over real GSI aerial orthophoto
+    // Island 1 — Runway A (06R/24L) + parallel & apron taxiway blue/green lighting over real GSI orthophoto
     pushRunway(b, fA, lenA, rwyA.width, 0, { approachLen: 680, overWater: true });
-    pushTaxiway(b, fA, lenA + 180, -190, 0, [-1520, -960, -400, 160, 720, 1320], 0, false);
-    pushTaxiway(b, fA, lenA - 180, -268, 0, [-1140, -400, 420, 1180], -190, false);
-
-    // Island 2 — Runway B (06L/24R) + taxiway lighting aligned over real GSI aerial orthophoto
-    pushRunway(b, fB, lenB, rwyB.width, 0, { approachLen: 680, overWater: true });
-    pushTaxiway(b, fB, lenB + 160, 195, 0, [-1820, -1120, -360, 360, 1120, 1820], 0, false);
-
-    // Apron floodlight masts along the real surveyed Terminal 1 & Terminal 2 aprons
-    for (const [lat, lon] of [
-      [34.4302, 135.2392], [34.4322, 135.2422], [34.4342, 135.2451], [34.4362, 135.2481], [34.4379, 135.2508],
-      [34.4334, 135.2248], [34.4368, 135.2294], [34.4392, 135.2328],
-    ] as const) {
-      pushWorldApronLight(b, lat, lon, ground, 24, 0.5);
+    pushTaxiway(b, fA, lenA + 180, -190, 0, [-1520, -960, -400, 160, 720, 1320], 0, false, true);
+    pushTaxiway(b, fA, lenA - 140, -268, 0, [-1140, -400, 420, 1180], -190, false, false);
+    // Terminal 1 SE & NW airside apron taxi lanes + cross-island taxiway bridges into Island 2!
+    pushTaxiway(b, fA, 2850, -370, 0, [-1280, -680, 0, 680, 1280], -268, false, false);
+    pushTaxiway(b, fA, 2200, -860, 0, [-980, 980], -370, false, false);
+    // Cross-channel connecting taxiways linking Island 1 and Island 2 (glowing blue/green over the sea channel!)
+    for (const sBridge of [-1020, 1040]) {
+      for (let a = -900; a >= -1320; a -= 35) {
+        addLight(b, toWorld(fA, sBridge, a, 1.0), [0.06, 1.0, 0.38], 3.2, 0);
+        addLight(b, toWorld(fA, sBridge - 14, a, 1.1), [0.08, 0.44, 1.0], 3.9, 0);
+        addLight(b, toWorld(fA, sBridge + 14, a, 1.1), [0.08, 0.44, 1.0], 3.9, 0);
+      }
     }
+
+    // Island 2 — Runway B (06L/24R) + parallel & Terminal 2 apron taxiways
+    pushRunway(b, fB, lenB, rwyB.width, 0, { approachLen: 680, overWater: true });
+    pushTaxiway(b, fB, lenB + 160, 195, 0, [-1820, -1120, -360, 360, 1120, 1820], 0, false, true);
+    pushTaxiway(b, fB, 2400, 340, 0, [-950, -250, 450, 1050], 195, false, false);
+
+    // Rich warm-sodium & cool-LED apron floodlights + ground light pools illuminating KIX Terminal 1 (1.7 km!),
+    // Aeroplaza/KIX Station, Cargo SW/NE aprons, and Terminal 2 so night KIX gleams vividly across Osaka Bay!
+    const kixWarm: RGB = [1.0, 0.84, 0.48];
+    const kixCool: RGB = [0.86, 0.94, 1.0];
+    for (let s = -860; s <= 860; s += 145) {
+      const col = Math.abs(s) < 260 ? kixCool : kixWarm;
+      // SE Airside gate stands (facing Runway A)
+      pushApronFloodlight(b, fA, s, -520, 26, col, 130);
+      // NW Airside stands + landside Aeroplaza/Station loop
+      pushApronFloodlight(b, fA, s, -780, 26, s % 290 === 0 ? kixCool : kixWarm, 130);
+    }
+    // Broad luminous apron wash along KIX T1 Main Building & both 1.7 km wings + KIX Station concourse
+    pushApronGlow(b, fA, 0, -640, 1850, 420, [0.52, 0.46, 0.34], 0.65);
+    pushApronGlow(b, fA, 40, -760, 680, 280, [0.46, 0.56, 0.68], 0.72);
+    // SW & NE International Cargo aprons on Island 1
+    for (const s of [-1380, -1160, 1120, 1340, 1520]) {
+      pushApronFloodlight(b, fA, s, -540, 24, kixWarm, 125);
+      pushApronFloodlight(b, fA, s, -760, 24, kixWarm, 115);
+    }
+    // KIX Terminal 2 & LCC apron stands on Island 2
+    for (let s = -460; s <= 940; s += 175) {
+      pushApronFloodlight(b, fB, s, 460, 23, s % 350 === 0 ? kixCool : kixWarm, 125);
+      pushApronFloodlight(b, fB, s, 610, 23, kixWarm, 110);
+    }
+    pushApronGlow(b, fB, 240, 520, 1520, 320, [0.48, 0.45, 0.36], 0.65);
 
     // 3.75 km Sky Gate Bridge R (関西国際空港連絡橋) — aligned to exact GSI RailCL / orthophoto span
     pushAccessBridge(b, [34.4376, 135.2636], [34.4138, 135.2948], 0, 30, 29, 28, true);
@@ -543,17 +655,22 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
     // Runway 32L/14R (3,000 m, approach right over 千里川土手) & Runway 32R/14L (1,828 m)
     pushRunway(b, f32L, len32L, rwy32L.width, 0, { approachLen: 460, papiSides: [-1, -1] });
     pushRunway(b, f32R, len32R, rwy32R.width, 0, { approachLen: 260, papiSides: [-1, 1] });
-    // Blue/green taxiway lights aligned along the real GSI orthophoto taxiways
-    pushTaxiway(b, f32L, len32L - 120, 145, 0, [-1350, -820, -250, 320, 880, 1380], 0, false);
-    pushTaxiway(b, f32R, len32R - 80, 135, 0, [-760, -300, 180, 680], 0, false);
+    // Vibrant blue/green/amber taxiway ribbons aligned along real GSI orthophoto taxiways
+    pushTaxiway(b, f32L, len32L - 120, 145, 0, [-1350, -820, -250, 320, 880, 1380], 0, false, true);
+    pushTaxiway(b, f32R, len32R - 80, 135, 0, [-760, -300, 180, 680], 0, false, true);
 
-    // Apron floodlight masts illuminating the real surveyed Itami Terminal & hangar aprons at night
-    for (const [lat, lon] of [
-      [34.7867, 135.4426], [34.7882, 135.4414], [34.7897, 135.4401], [34.7912, 135.4388],
-      [34.7932, 135.4368], [34.7845, 135.4455],
-    ] as const) {
-      pushWorldApronLight(b, lat, lon, ground, 22);
+    // Apron floodlight masts & warm/LED light pools illuminating Itami Terminal fingers & hangar aprons at night
+    const itmWarm: RGB = [1.0, 0.85, 0.52];
+    const itmCool: RGB = [0.88, 0.95, 1.0];
+    const itmApronLights: [number, number, RGB][] = [
+      [34.7852, 135.4444, itmWarm], [34.7867, 135.4426, itmCool], [34.7882, 135.4414, itmWarm],
+      [34.7897, 135.4401, itmCool], [34.7912, 135.4388, itmWarm], [34.7926, 135.4374, itmCool],
+      [34.7940, 135.4358, itmWarm], [34.7834, 135.4462, itmWarm],
+    ];
+    for (const [lat, lon, col] of itmApronLights) {
+      pushWorldApronLight(b, lat, lon, ground, 22, 0, col, 105);
     }
+    pushApronGlow(b, f32R, 40, 290, 1180, 260, [0.46, 0.42, 0.34], 0.6);
   }
 
   // =========================================================================
@@ -566,14 +683,19 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
 
     // Runway 09/27 (2,500 m) draped over real Kobe Airport island + over-water approach light piers
     pushRunway(b, fK, lenK, rwy.width, 0, { approachLen: 520, overWater: true });
-    pushTaxiway(b, fK, lenK + 90, -155, 0, [-1120, -520, 0, 520, 1120], 0, false);
+    pushTaxiway(b, fK, lenK + 90, -155, 0, [-1120, -520, 0, 520, 1120], 0, false, true);
+    pushTaxiway(b, fK, 1450, -250, 0, [-520, 0, 520], -155, false, false);
 
-    // Apron floodlight masts along the real surveyed Kobe Airport Terminal & west heliport aprons
-    for (const [lat, lon] of [
-      [34.6361, 135.2268], [34.6362, 135.2287], [34.6363, 135.2305], [34.6352, 135.2188],
-    ] as const) {
-      pushWorldApronLight(b, lat, lon, ground, 21, 0.5);
+    // Apron floodlight masts & luminous gate wash along Kobe Airport Terminal & west heliport aprons
+    const kobeWarm: RGB = [1.0, 0.85, 0.52];
+    const kobeCool: RGB = [0.86, 0.94, 1.0];
+    for (const [lat, lon, col] of [
+      [34.6359, 135.2248, kobeWarm], [34.6361, 135.2268, kobeCool], [34.6362, 135.2287, kobeWarm],
+      [34.6363, 135.2305, kobeCool], [34.6352, 135.2188, kobeWarm], [34.6349, 135.2158, kobeWarm],
+    ] as [number, number, RGB][]) {
+      pushWorldApronLight(b, lat, lon, ground, 21, 0.5, col, 105);
     }
+    pushApronGlow(b, fK, 320, -320, 880, 220, [0.44, 0.44, 0.38], 0.6);
 
     // 1.2 km Kobe Sky Bridge (神戸スカイブリッジ) — curved cleanly along the real Port Island -> Airport span
     pushAccessBridge(b, [34.6396, 135.2328], [34.6514, 135.2279], 0, 24, 24, 14, false, [34.6458, 135.2320]);
@@ -701,7 +823,59 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
   solidMesh.frustumCulled = false;
   group.add(solidMesh);
 
-  // Crisp, vivid additive airfield lighting points (runway edge/centerline/TDZ, PAPI, ALSF-II, taxiways, floodlights)
+  // Smooth additive radial apron floodlight pools illuminating KIX, Itami and Kobe concrete gates at night
+  if (b.glowPos.length) {
+    const glowGeo = new THREE.BufferGeometry();
+    glowGeo.setAttribute('position', new THREE.Float32BufferAttribute(b.glowPos, 3));
+    glowGeo.setAttribute('aUv', new THREE.Float32BufferAttribute(b.glowUv, 2));
+    glowGeo.setAttribute('aColor', new THREE.Float32BufferAttribute(b.glowCol, 3));
+    glowGeo.computeBoundingSphere();
+    const glowMat = new THREE.ShaderMaterial({
+      uniforms: env,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -4,
+      vertexShader: /* glsl */ `
+        attribute vec2 aUv;
+        attribute vec3 aColor;
+        varying vec2 vUv;
+        varying vec3 vColor;
+        varying vec3 vWorld;
+        void main(){
+          vec4 wp = modelMatrix * vec4(position, 1.);
+          vWorld = wp.xyz;
+          vUv = aUv;
+          vColor = aColor;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        ${ENV_GLSL}
+        varying vec2 vUv;
+        varying vec3 vColor;
+        varying vec3 vWorld;
+        void main(){
+          float r2 = dot(vUv, vUv);
+          if (r2 > 1.) discard;
+          float falloff = exp(-r2 * 3.1) * (1. - smoothstep(.62, 1., r2));
+          float night = smoothstep(.04, .42, uCity);
+          float dist = length(vWorld - cameraPosition);
+          float distFade = 1. - smoothstep(14000., 32000., dist);
+          vec3 col = vColor * falloff * night * distFade * .44;
+          gl_FragColor = vec4(col, 1.);
+        }
+      `,
+    });
+    const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+    glowMesh.name = 'kansai-airports-apron-glow';
+    glowMesh.frustumCulled = false;
+    group.add(glowMesh);
+  }
+
+  // Crisp, vivid jewel-colored additive airfield lighting points (runway edge/centerline/TDZ, PAPI, ALSF-II, taxiways, wig-wags, floodlights)
   const lightGeo = new THREE.BufferGeometry();
   lightGeo.setAttribute('position', new THREE.Float32BufferAttribute(b.lightPos, 3));
   lightGeo.setAttribute('aColor', new THREE.Float32BufferAttribute(b.lightCol, 3));
@@ -726,29 +900,36 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
         vec4 wp = modelMatrix * vec4(position, 1.);
         vec4 mv = viewMatrix * wp;
         float dist = max(12., -mv.z);
-        // Brilliant at dusk & night so all three airports sparkle like jewel-lit airfields from afar.
-        float nightGain = smoothstep(.03, .38, uCity);
+        // Vivid jewel-colored airfield optics across dusk & night.
+        float nightGain = smoothstep(.02, .34, uCity);
         float pulse = 1.;
-        if (aPhase >= 2.9) {
-          // Sequenced ALSF-II rabbit strobe sweeping rapidly toward threshold
-          float wave = fract(uTime * 2.0 - (aPhase - 3.0));
-          pulse = smoothstep(.0, .06, wave) * (1. - smoothstep(.06, .18, wave)) * 2.8;
-          nightGain = max(nightGain, .42);
+        float maxDist0 = 18000., maxDist1 = 40000.;
+        if (aPhase >= 3.9) {
+          // Runway Guard Lights ("wig-wags"): crisp alternating golden-amber flash at taxiway holding points
+          pulse = .22 + 1.38 * smoothstep(-.1, .55, sin(uTime * 5.2 + (aPhase - 4.0) * 6.28318));
+          nightGain = max(nightGain, .32);
+        } else if (aPhase >= 2.9) {
+          // Sequenced ALSF-II cyan-white rabbit strobe sweeping rapidly toward threshold
+          float wave = fract(uTime * 2.1 - (aPhase - 3.0));
+          pulse = smoothstep(.0, .06, wave) * (1. - smoothstep(.06, .18, wave)) * 3.1;
+          nightGain = max(nightGain, .45);
         } else if (aPhase >= 1.9) {
-          // Rotating green/white aerodrome beacon atop control tower
-          pulse = .38 + 1.65 * pow(max(0., sin(uTime * 2.1)), 5.);
-          nightGain = max(nightGain, .30);
+          // Rotating emerald/white aerodrome beacon atop control tower
+          pulse = .42 + 1.75 * pow(max(0., sin(uTime * 2.1)), 4.5);
+          nightGain = max(nightGain, .32);
         } else if (aPhase >= 0.9) {
-          // Red obstruction beacon pulse
-          pulse = .45 + 1.10 * smoothstep(.15, .85, sin(uTime * 3.1));
-          nightGain = max(nightGain, .25);
+          // Restrained red ATC obstruction beacon (realistic shorter atmospheric fade)
+          pulse = .25 + .75 * smoothstep(.15, .85, sin(uTime * 3.1));
+          nightGain = max(nightGain, .20);
+          maxDist0 = 4500.;
+          maxDist1 = 13500.;
         } else if (aPhase >= 0.4) {
           // PAPI remains distinctly visible even in overcast/daytime final approach!
-          nightGain = max(nightGain, .45);
+          nightGain = max(nightGain, .52);
         }
-        vColor = aColor * (.52 + .58 * nightGain);
-        vAlpha = nightGain * pulse * (1. - smoothstep(18000., 38000., dist));
-        gl_PointSize = clamp(aSize * 460. / dist + 1.3, 1.8, 7.8);
+        vColor = aColor * (.68 + .84 * nightGain);
+        vAlpha = nightGain * pulse * (1. - smoothstep(maxDist0, maxDist1, dist));
+        gl_PointSize = clamp(aSize * 520. / dist + 1.5, 2.0, 8.8);
         gl_Position = vAlpha > .01 ? projectionMatrix * mv : vec4(2., 2., 2., 1.);
       }
     `,
@@ -759,8 +940,11 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
         vec2 d = gl_PointCoord - .5;
         float r2 = dot(d, d);
         if (r2 > .25) discard;
-        float core = exp(-r2 * 24.) + .22 * exp(-r2 * 7.);
-        gl_FragColor = vec4(vColor * core, vAlpha);
+        float core = exp(-r2 * 26.);
+        float halo = exp(-r2 * 6.5) * .36;
+        // Keep chromatic halo deeply saturated so emerald, sapphire, amber & ruby runway optics stay vividly colorful
+        vec3 haloCol = pow(clamp(vColor, 0., 1.), vec3(1.25)) * max(vColor.r, max(vColor.g, vColor.b));
+        gl_FragColor = vec4(vColor * core + haloCol * halo, vAlpha);
       }
     `,
   });

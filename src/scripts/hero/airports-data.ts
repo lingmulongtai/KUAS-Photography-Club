@@ -51,11 +51,11 @@ export interface AtcTowerSpec {
   height: number;
 }
 
-/** Surveyed ATC Control Tower sites (tall glazed cabs + aerodrome beacons above the real surveyed terminals). */
+/** Surveyed ATC Control Tower sites verified on z17 GSI orthophotos (tall glazed cabs + aerodrome beacons). */
 export const ATC_TOWERS: readonly AtcTowerSpec[] = [
-  { id: 'kix', lat: 34.4326, lon: 135.2422, height: 86 },
-  { id: 'itami', lat: 34.7874, lon: 135.4434, height: 50 },
-  { id: 'kobeAirport', lat: 34.6368, lon: 135.2305, height: 46 },
+  { id: 'kix', lat: 34.43375, lon: 135.23775, height: 86 },
+  { id: 'itami', lat: 34.78882, lon: 135.44359, height: 50 },
+  { id: 'kobeAirport', lat: 34.63675, lon: 135.22590, height: 46 },
 ];
 
 const localXZ = (lat: number, lon: number) => {
@@ -114,7 +114,7 @@ export function inAirportClearing(x: number, z: number): boolean {
 export function inAirportBuildingMask(x: number, z: number): boolean {
   for (const [tx, tz] of ATC_TOWER_LOCAL) {
     const dx = x - tx, dz = z - tz;
-    if (dx * dx + dz * dz < 26 * 26) return true;
+    if (dx * dx + dz * dz < 24 * 24) return true;
   }
   return false;
 }
