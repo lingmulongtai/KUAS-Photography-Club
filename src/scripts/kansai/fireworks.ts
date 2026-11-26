@@ -32,6 +32,7 @@ function displayPrimitive(wide:boolean){
       out vec4 v_color;
       out float v_water;
       vec2 viewFromLaunch(){return czm_encodedCameraPositionMCHigh.xy+czm_encodedCameraPositionMCLow.xy-position3DHigh.xy-position3DLow.xy;}
+      float cameraHeight(){return max(4.,czm_encodedCameraPositionMCHigh.z+czm_encodedCameraPositionMCLow.z-position3DHigh.z-position3DLow.z);}
       ${simulation(wide)}
       void main(){
         vec3 offset; float size,alpha;

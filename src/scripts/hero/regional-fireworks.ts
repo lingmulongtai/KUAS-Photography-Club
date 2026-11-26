@@ -31,6 +31,7 @@ export function regionalFireworks(scene:THREE.Scene,env:Env,ground:(x:number,z:n
         uniform float u_elapsed,uPixels; uniform vec3 uAnchor;
         varying vec4 v_color;varying float v_water;
         vec2 viewFromLaunch(){return (cameraPosition.xz-uAnchor.xz)*vec2(1.,-1.)-position.xy;}
+        float cameraHeight(){return max(4.,cameraPosition.y-uAnchor.y);}
         ${simulation(wide)}
         void main(){
           vec3 offset;float size,alpha;
@@ -43,7 +44,8 @@ export function regionalFireworks(scene:THREE.Scene,env:Env,ground:(x:number,z:n
       fragmentShader:`
         varying vec4 v_color; varying float v_water; uniform float uCity;
         void main(){${pointShape}
-          gl_FragColor=vec4(v_color.rgb*2.4,v_color.a*intensity*smoothstep(.15,.6,uCity));
+          float gain=mix(2.4,1.15,v_water);
+          gl_FragColor=vec4(v_color.rgb*gain,v_color.a*intensity*smoothstep(.15,.6,uCity));
         }`});
     const points=new THREE.Points(geometry,material);
     points.position.copy(anchor);points.name=place.id;points.visible=false;
