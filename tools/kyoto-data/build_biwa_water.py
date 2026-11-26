@@ -51,17 +51,34 @@ def outline():
     return geom.transform(lake, lambda pts: np.column_stack(projected(*pts.T)))
 
 
+def osaka_river_footprint():
+    path = DATA / 'kansai/osaka-water.bin'
+    if not path.exists():
+        return Polygon()
+    raw = gzip.decompress(path.read_bytes())
+    bay_n, riv_n = struct.unpack_from('<II', raw, 0)
+    pts = np.frombuffer(raw, dtype='<f4', count=riv_n * 2, offset=8 + bay_n * 8).reshape(-1, 3, 2)
+    tris = [Polygon(t) for t in pts if t[:, 0].max() > -18000 and t[:, 1].min() < 26000]
+    if not tris:
+        return Polygon()
+    return geom.union_all(geom.make_valid(tris)).buffer(0)
+
+
 def water_areas():
     lake = outline()
-    # Continuous Seta River channel from Lake Biwa past Seta-no-Karahashi, Ishiyama,
-    # Nango Araizeki weir, Shishitobi Gorge, and Amagase Reservoir down to Amagase Dam.
-    left, top = projected(135.828, 34.990)
-    right, bottom = projected(135.925, 34.872)
+    # Continuous waterway from Lake Biwa past Seta-no-Karahashi, Ishiyama, Nango weir,
+    # Shishitobi Gorge, Amagase Reservoir & Dam, Uji River (Byodo-in / Fushimi),
+    # Three-River Confluence (Katsura / Kamo / Uji / Kizu), and upper Yodo River joining osaka-water.bin.
+    left, top = projected(135.585, 34.990)
+    right, bottom = projected(135.925, 34.775)
     corridor = box(left, top, right, bottom)
     guide = lake.buffer(180).union(corridor)
     tiles = []
-    for pref in ('25', '26'):
-        for path in sorted((DATA.parent / 'kansai/surfaces' / pref).glob('*.bin')):
+    for pref in ('25', '26', '27'):
+        pref_dir = DATA.parent / 'kansai/surfaces' / pref
+        if not pref_dir.exists():
+            continue
+        for path in sorted(pref_dir.glob('*.bin')):
             px, py = map(int, path.stem.split('-'))
             if not guide.intersects(box(px*8*EXTENT, py*8*EXTENT, (px+1)*8*EXTENT, (py+1)*8*EXTENT)):
                 continue
@@ -89,16 +106,23 @@ def water_areas():
     connected = next(p for p in parts(union) if p.covers(Point(*projected(135.895,35.025))))
     lake_part = lake.buffer(180).difference(corridor.difference(lake))
     channel = union.intersection(corridor).difference(lake_part)
-    # Bridge decks and Nango weir divide the surveyed channel into adjacent polygons;
-    # erode narrow mountain creeks first, bridge across deck gaps from Karahashi, then
-    # intersect back with the original surveyed banks along the main Seta River stem.
+    # Bridge decks, Nango weir, and Amagase Dam divide the surveyed channel into adjacent polygons;
+    # erode narrow mountain creeks first, bridge across structure gaps from Karahashi, then
+    # intersect back with the original surveyed banks along the continuous Seta-Uji-Yodo river system.
     seed = Point(*projected(135.9065, 34.9731))
-    wide_core = channel.buffer(-24)
+    wide_core = channel.buffer(-22)
     river_corridor = next(p for p in parts(wide_core.buffer(240)) if p.covers(seed))
-    main_channel = channel.intersection(wide_core.intersection(river_corridor).buffer(38))
+    main_channel = channel.intersection(wide_core.intersection(river_corridor).buffer(36))
     channels = [p for p in parts(main_channel) if p.area > 300 / .245**2]
-    return [geom.transform(g, home_coords).simplify(1.7) for g in
-            (connected.intersection(lake_part), geom.union_all(channels))]
+    lake_local = geom.transform(connected.intersection(lake_part), home_coords).simplify(1.7)
+    river_local = geom.transform(geom.union_all(channels), home_coords).simplify(1.7)
+    # Exclude Kyoto's always-loaded core box (Kamo & upper Katsura in lines.bin) and existing
+    # osaka-water.bin Yodo River triangles so every junction meets edge-to-edge without overlap.
+    core_box = box(-9000, -7000, 4600, 6200)
+    osaka_overlap = osaka_river_footprint()
+    river_local = river_local.difference(core_box).difference(osaka_overlap)
+    river_local = geom.union_all([p for p in parts(river_local) if p.area > 400])
+    return [lake_local, river_local]
 
 
 def rings(p):
@@ -111,8 +135,8 @@ def save(name, data):
     (DATA / 'kansai' / name).write_bytes(gzip.compress(json.dumps(data,separators=(',',':')).encode(),mtime=0))
 
 
-def trim_old_region(water):
-    meta = next(r['lines'] for r in json.loads((DATA/'regions.json').read_bytes())['regions'] if r['id']=='yamashina')
+def trim_old_region(water, region_id='yamashina'):
+    meta = next(r['lines'] for r in json.loads((DATA/'regions.json').read_bytes())['regions'] if r['id']==region_id)
     data = gzip.decompress((DATA/meta['file']).read_bytes())
     count, = struct.unpack_from('<I',data)
     kinds = np.frombuffer(data, 'B', count, 4)
@@ -122,28 +146,31 @@ def trim_old_region(water):
     xy = np.column_stack([(packed[i] | packed[i+1]<<8).view(np.int16).astype(np.int64).cumsum()*meta['q']+meta['box'][j]
                           for j,i in enumerate((0,2))])
     remove, replacements = [], []
+    # Buffer slightly so region river polygons matching our persistent river never leave sliver duplicates.
+    mask = water.buffer(3.5)
     for i in np.where(kinds==2)[0].tolist():
         end = i+1
         while end<count and kinds[end]==3:
             end+=1
         coords = [xy[start[j]:start[j+1]] for j in range(i,end)]
         p = Polygon(coords[0],coords[1:]).buffer(0)
-        if not water.intersects(p):
+        if not mask.intersects(p):
             continue
         remove.extend(range(i,end))
-        replacements.extend(rings(piece) for piece in parts(p.difference(water)) if piece.area>3)
+        replacements.extend(rings(piece) for piece in parts(p.difference(mask)) if piece.area>12)
     checksum=2166136261
     for value in data:
         checksum=((checksum^value)*16777619)&0xffffffff
-    save('yamashina-lake-remainder.json.gz',{'baseChecksum':checksum,'replace':remove,'polygons':replacements,'attr':0})
+    save(f'{region_id}-lake-remainder.json.gz',{'baseChecksum':checksum,'replace':remove,'polygons':replacements,'attr':0})
 
 
 if __name__ == '__main__':
     lake, river = water_areas()
     print('areas in square metres:', lake.area, river.area, flush=True)
-    assert 640e6 < lake.area < 700e6 and river.area > .5e6
+    assert 640e6 < lake.area < 700e6 and river.area > 5e6
     assert lake.covers(Point(*R.to_local(35.0262,135.8967)))
     assert river.covers(Point(*R.to_local(34.9731,135.9065)))
+    assert river.covers(Point(*R.to_local(34.8920,135.8065)))
     payload = []
     for area in (lake, river):
         triangles = geom.constrained_delaunay_triangles(area)
@@ -155,4 +182,6 @@ if __name__ == '__main__':
         payload.append(points.tobytes())
     header = struct.pack('<II', *(len(p)//8 for p in payload))
     (DATA / 'kansai/biwa-water.bin').write_bytes(gzip.compress(header+b''.join(payload), mtime=0))
-    trim_old_region(lake.union(river))
+    combined = lake.union(river)
+    for rid in ('yamashina', 'uji', 'south', 'tennozan'):
+        trim_old_region(combined, rid)
