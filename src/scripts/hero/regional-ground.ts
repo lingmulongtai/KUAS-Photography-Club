@@ -114,9 +114,8 @@ const fragmentShader = `
     }
     return h;
   }
-  vec3 renderSea(vec3 wp){
+  vec3 renderSea(vec3 wp,float fp){
     vec2 q=wp.xz;
-    float fp=max(length(dFdx(q)),length(dFdy(q)));
     float broad=1.-smoothstep(2.,16.,fp);
     float med=1.-smoothstep(.4,4.5,fp);
     vec2 drift=vec2(uTime*.38,uTime*.26);
@@ -158,6 +157,10 @@ const fragmentShader = `
     return fadeHorizon(applyHaze(col,vec3(0.),wp),wp);
   }
   void main(){
+    // Evaluate screen-space derivatives and sun shadow in uniform control flow before any discard/return.
+    vec3 n=normalize(vNormal);
+    float sh=sunShadow(vWorld,n);
+    float groundFp=max(length(dFdx(vWorld.xz)),length(dFdy(vWorld.xz)));
     vec4 photo=texture2D(uPhoto,vUv);
     int prefectureCode=owner(vWorld.xz);
     bool insideKyoto=vWorld.x>=uKyotoBox.x && vWorld.z>=uKyotoBox.y && vWorld.x<=uKyotoBox.z && vWorld.z<=uKyotoBox.w;
@@ -165,7 +168,7 @@ const fragmentShader = `
     // alpha fringes around KIX, Kobe Airport, Port Island, or Yumeshima seawalls.
     bool inOsakaBay=vWorld.x>-72000. && vWorld.x<-19500. && vWorld.z>28500. && vWorld.z<76000.;
     if(prefectureCode==0 && (inOsakaBay || (photo.a>=.18 && (photo.a<.62 || insideKyoto)))){
-      gl_FragColor=vec4(renderSea(vWorld),1.);
+      gl_FragColor=vec4(renderSea(vWorld,groundFp),1.);
       return;
     }
     if(photo.a<.18 && !inOsakaBay)discard;
@@ -200,13 +203,12 @@ const fragmentShader = `
       float darkWater = (1. - smoothstep(.10, .22, max(photo.r, max(photo.g, photo.b)))) * step(photo.r, photo.b * 1.15);
       bool flatOpenSea = vWorld.y <= .06 && coolOrNeutral > .55;
       if (flatOpenSea || max(seaBlue, darkWater) > .32) {
-        gl_FragColor = vec4(renderSea(vWorld), 1.);
+        gl_FragColor = vec4(renderSea(vWorld, groundFp), 1.);
         return;
       }
     }
-    vec3 n=normalize(vNormal);
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
-    vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sunShadow(vWorld,n));
+    vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sh);
     vec3 emit=vec3(0.);
     if(uCity>.01){
       // Urban plains & waterfronts (Osaka, Kobe, Sakai, Nishinomiya, Otsu, Nara) glow brightly with
@@ -225,7 +227,7 @@ const fragmentShader = `
       float urban=(1.-green)*smoothstep(.06,.22,luma)*(.35+.65*neutral)*flatUrban*airfieldMask;
       if(urban>.01){
         vec2 p=vWorld.xz;
-        float fp=max(length(dFdx(p)),length(dFdy(p)));
+        float fp=groundFp;
         float dist=length(vWorld-cameraPosition);
         // Streetlamp points (18 m grid) matching Kyoto's terrain night-light grain.
         vec2 lampCell=p/18.;
