@@ -260,7 +260,7 @@ function pushApronFloodlight(
   const anchorY = baseYAt(f, along, across);
   addLight(b, toWorldFixedY(f, along, across, anchorY + height + 0.8), lampCol, 6.8, 0);
   if (glowRadius > 0) {
-    pushApronGlow(b, f, along, across, glowRadius * 2, glowRadius * 2, [lampCol[0] * 0.42, lampCol[1] * 0.40, lampCol[2] * 0.36], 0.55);
+    pushApronGlow(b, f, along, across, glowRadius * 1.45, glowRadius * 1.45, [lampCol[0] * 0.24, lampCol[1] * 0.21, lampCol[2] * 0.16], 0.55);
   }
 }
 
@@ -623,19 +623,19 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
       pushApronFloodlight(b, fA, s, -780, 26, s % 290 === 0 ? kixCool : kixWarm, 130);
     }
     // Broad luminous apron wash along KIX T1 Main Building & both 1.7 km wings + KIX Station concourse
-    pushApronGlow(b, fA, 0, -640, 1850, 420, [0.52, 0.46, 0.34], 0.65);
-    pushApronGlow(b, fA, 40, -760, 680, 280, [0.46, 0.56, 0.68], 0.72);
+    pushApronGlow(b, fA, 0, -640, 1850, 380, [0.34, 0.28, 0.18], 0.65);
+    pushApronGlow(b, fA, 40, -760, 620, 240, [0.28, 0.35, 0.44], 0.72);
     // SW & NE International Cargo aprons on Island 1
     for (const s of [-1380, -1160, 1120, 1340, 1520]) {
-      pushApronFloodlight(b, fA, s, -540, 24, kixWarm, 125);
-      pushApronFloodlight(b, fA, s, -760, 24, kixWarm, 115);
+      pushApronFloodlight(b, fA, s, -540, 24, kixWarm, 105);
+      pushApronFloodlight(b, fA, s, -760, 24, kixWarm, 95);
     }
     // KIX Terminal 2 & LCC apron stands on Island 2
     for (let s = -460; s <= 940; s += 175) {
-      pushApronFloodlight(b, fB, s, 460, 23, s % 350 === 0 ? kixCool : kixWarm, 125);
-      pushApronFloodlight(b, fB, s, 610, 23, kixWarm, 110);
+      pushApronFloodlight(b, fB, s, 460, 23, s % 350 === 0 ? kixCool : kixWarm, 105);
+      pushApronFloodlight(b, fB, s, 610, 23, kixWarm, 90);
     }
-    pushApronGlow(b, fB, 240, 520, 1520, 320, [0.48, 0.45, 0.36], 0.65);
+    pushApronGlow(b, fB, 240, 520, 1520, 290, [0.32, 0.27, 0.19], 0.65);
 
     // 3.75 km Sky Gate Bridge R (関西国際空港連絡橋) — aligned to exact GSI RailCL / orthophoto span
     pushAccessBridge(b, [34.4376, 135.2636], [34.4138, 135.2948], 0, 30, 29, 28, true);
@@ -860,11 +860,11 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
         void main(){
           float r2 = dot(vUv, vUv);
           if (r2 > 1.) discard;
-          float falloff = exp(-r2 * 3.1) * (1. - smoothstep(.62, 1., r2));
+          float falloff = exp(-r2 * 3.4) * (1. - smoothstep(.62, 1., r2));
           float night = smoothstep(.04, .42, uCity);
           float dist = length(vWorld - cameraPosition);
-          float distFade = 1. - smoothstep(14000., 32000., dist);
-          vec3 col = vColor * falloff * night * distFade * .44;
+          float distFade = 1. - smoothstep(4500., 12500., dist);
+          vec3 col = vColor * falloff * night * distFade * .20;
           gl_FragColor = vec4(col, 1.);
         }
       `,
@@ -903,7 +903,7 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
         // Vivid jewel-colored airfield optics across dusk & night.
         float nightGain = smoothstep(.02, .34, uCity);
         float pulse = 1.;
-        float maxDist0 = 18000., maxDist1 = 40000.;
+        float maxDist0 = 10000., maxDist1 = 26000.;
         if (aPhase >= 3.9) {
           // Runway Guard Lights ("wig-wags"): crisp alternating golden-amber flash at taxiway holding points
           pulse = .22 + 1.38 * smoothstep(-.1, .55, sin(uTime * 5.2 + (aPhase - 4.0) * 6.28318));
@@ -927,9 +927,11 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
           // PAPI remains distinctly visible even in overcast/daytime final approach!
           nightGain = max(nightGain, .52);
         }
-        vColor = aColor * (.68 + .84 * nightGain);
+        // Attenuate distant additive point pileup so faraway airports (e.g. Kobe seen from KIX) sparkle cleanly without blooming white.
+        float farAtten = mix(1.0, .14, smoothstep(3200., 13500., dist));
+        vColor = aColor * (.62 + .78 * nightGain) * farAtten;
         vAlpha = nightGain * pulse * (1. - smoothstep(maxDist0, maxDist1, dist));
-        gl_PointSize = clamp(aSize * 520. / dist + 1.5, 2.0, 8.8);
+        gl_PointSize = clamp(aSize * 460. / dist + .75, 1.15, 7.8);
         gl_Position = vAlpha > .01 ? projectionMatrix * mv : vec4(2., 2., 2., 1.);
       }
     `,

@@ -131,7 +131,7 @@ export const VIEWS = {
   itami:{ja:'伊丹空港（大阪国際空港）',en:'Itami Airport',eye:ahead(ITAMI,140,1650),ref:ITAMI,above:340,bearing:320,pitch:-12,orbit:{center:ITAMI,targetHeight:18}},
   kobeAirport:{ja:'神戸空港',en:'Kobe Airport',eye:ahead(KOBE_AIRPORT,165,1650),ref:KOBE_AIRPORT,above:340,bearing:345,pitch:-12,orbit:{center:KOBE_AIRPORT,targetHeight:18}},
   abenoHarukas:{ja:'あべのハルカス',en:'Abeno Harukas',eye:ahead(ABENO_HARUKAS,220,760),ref:ABENO_HARUKAS,above:250,bearing:40,pitch:-10,orbit:{center:ABENO_HARUKAS,targetHeight:150}},
-  umedaSky:{ja:'梅田スカイビル',en:'Umeda Sky Building',eye:ahead(UMEDA_SKY,210,560),ref:UMEDA_SKY,above:195,bearing:30,pitch:-10,orbit:{center:UMEDA_SKY,targetHeight:95}},
+  umedaSky:{ja:'梅田スカイビル',en:'Umeda Sky Building',eye:ahead(UMEDA_SKY,188,480),ref:UMEDA_SKY,above:185,bearing:8,pitch:-10,orbit:{center:UMEDA_SKY,targetHeight:95}},
   tsutenkaku:{ja:'通天閣',en:'Tsutenkaku',eye:ahead(TSUTENKAKU,200,320),ref:TSUTENKAKU,above:105,bearing:20,pitch:-11,orbit:{center:TSUTENKAKU,targetHeight:58}},
 } satisfies Record<string, ViewDef>;
 
