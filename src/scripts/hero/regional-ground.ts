@@ -84,9 +84,9 @@ const vertexShader = `
     gl_Position=projectionMatrix*viewMatrix*vec4(position,1.);
   }`;
 const fragmentShader = `
-  uniform sampler2D uPhoto,uClose,uDistrict,uInset;
-  uniform vec4 uCloseBox,uDistrictBox,uInsetBox,uKyotoBox;
-  uniform float uCloseMatch,uGroundFar;
+  uniform sampler2D uPhoto,uMid,uClose,uDistrict,uInset;
+  uniform vec4 uMidBox,uCloseBox,uDistrictBox,uInsetBox,uKyotoBox;
+  uniform float uMidMatch,uCloseMatch,uGroundFar;
   varying vec2 vUv;
   varying vec3 vWorld,vNormal;
   ${ENV_GLSL}
@@ -170,16 +170,33 @@ const fragmentShader = `
     vec3 baseLow=textureGrad(uPhoto,vUv,vec2(.008,0.),vec2(0.,.008)).rgb;
     photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox,vWorld.xz,.08);
     photo.rgb=overlay(photo.rgb,uInset,uInsetBox,vWorld.xz,.08);
-    photo.rgb=overlayMatched(photo.rgb,uClose,uCloseBox,vWorld.xz,mix(.08,.16,uCloseMatch),baseLow,uCloseMatch);
-    // Open Osaka Bay maritime waters inside Osaka/Hyogo prefecture boundaries (e.g. around Yumeshima
-    // and outer disposal breakwaters) sit at 0 m sea level with blue-grey water imagery: render them
-    // with the exact same animated sea shader so coastal tiles never show square photo boundaries.
-    bool onKobeAirport = vWorld.x > -50800. && vWorld.x < -46900. && vWorld.z > 40200. && vWorld.z < 41800.;
-    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500. && !onKobeAirport;
-    if (inBayZone && vWorld.y <= .22) {
-      float seaBlue = smoothstep(-.01, .025, photo.b - photo.r * .94) * (1. - smoothstep(.18, .34, photo.r));
-      float darkWater = (1. - smoothstep(.10, .20, max(photo.r, max(photo.g, photo.b)))) * step(photo.r, photo.b * 1.12);
-      if (max(seaBlue, darkWater) > .35) {
+    photo.rgb=overlayMatched(photo.rgb,uMid,uMidBox,vWorld.xz,.10,baseLow,uMidMatch);
+    photo.rgb=overlayMatched(photo.rgb,uClose,uCloseBox,vWorld.xz,mix(.08,.14,uCloseMatch),baseLow,uCloseMatch);
+    // Exact runway-aligned island footprints for Kobe Airport & KIX (keeps low-elevation runways/aprons
+    // solidly dry while every surrounding harbor & bay water pixel renders as seamless animated sea,
+    // eliminating GSI orthophoto sea-glare tiles around Kobe Airport, KIX, and Yumeshima).
+    vec2 ukbD = vWorld.xz - vec2(-48893., 41148.);
+    float ukbAlong = dot(ukbD, vec2(.996, -.094));
+    float ukbAcross = dot(ukbD, vec2(.094, .996));
+    bool onKobeIsland = ukbAlong > -1440. && ukbAlong < 1470. && ukbAcross > -585. && ukbAcross < 185.;
+    vec2 kix1D = vWorld.xz - vec2(-47055., 63937.);
+    float kix1Along = dot(kix1D, vec2(.775, -.632));
+    float kix1Across = dot(kix1D, vec2(.632, .775));
+    bool onKix1 = kix1Along > -2160. && kix1Along < 2240. && kix1Across > -1040. && kix1Across < 230.;
+    vec2 kix2D = vWorld.xz - vec2(-48967., 62538.);
+    float kix2Along = dot(kix2D, vec2(.775, -.632));
+    float kix2Across = dot(kix2D, vec2(.632, .775));
+    bool onKix2 = kix2Along > -2300. && kix2Along < 2280. && kix2Across > -340. && kix2Across < 840.;
+    bool inKixChannel = !onKix1 && !onKix2 && kix1Along > -2500. && kix1Along < 2500. && kix1Across > -1550. && kix1Across < -960.;
+    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500. && !onKobeIsland && !onKix1 && !onKix2;
+    if (inBayZone && (vWorld.y <= .16 || (inKixChannel && vWorld.y <= .45))) {
+      // Open bay water at sea level (including bright white/silver sun-glare sea tiles around Kobe Airport)
+      // has neutral/cool RGB (b >= r * 0.86), whereas reclaimed sand/earth is warm (r >> b).
+      float coolOrNeutral = smoothstep(.82, .91, photo.b / max(photo.r, .01));
+      float seaBlue = smoothstep(-.01, .025, photo.b - photo.r * .94) * (1. - smoothstep(.20, .38, photo.r));
+      float darkWater = (1. - smoothstep(.10, .22, max(photo.r, max(photo.g, photo.b)))) * step(photo.r, photo.b * 1.15);
+      bool flatOpenSea = vWorld.y <= .06 && coolOrNeutral > .55;
+      if (flatOpenSea || max(seaBlue, darkWater) > .32 || (inKixChannel && coolOrNeutral > .45)) {
         gl_FragColor = vec4(renderSea(vWorld), 1.);
         return;
       }
@@ -192,12 +209,11 @@ const fragmentShader = `
       // Urban plains & waterfronts (Osaka, Kobe, Sakai, Nishinomiya, Otsu, Nara) glow brightly with
       // streetlamps, metropolitan hubs and arterial highways at night while forested slopes and
       // active airport airfields (KIX, Kobe Airport, Itami) stay dark so real airfield lighting pops.
-      bool inKixAirfield = vWorld.x > -52500. && vWorld.x < -44200. && vWorld.z > 60200. && vWorld.z < 66800.;
       vec2 itmD = vWorld.xz - vec2(-29138., 24612.);
       float itmAlong = dot(itmD, vec2(-.706, -.708));
       float itmAcross = dot(itmD, vec2(.708, -.706));
       bool inItamiAirfield = itmAlong > -1720. && itmAlong < 2120. && itmAcross > -180. && itmAcross < 680.;
-      float airfieldMask = (inKixAirfield || onKobeAirport || inItamiAirfield) ? 0. : 1.;
+      float airfieldMask = (onKix1 || onKix2 || onKobeIsland || inItamiAirfield) ? 0. : 1.;
       float green=smoothstep(.005,.038,photo.g-max(photo.r,photo.b*.92));
       float luma=dot(photo.rgb,vec3(.2126,.7152,.0722));
       float chroma=max(photo.r,max(photo.g,photo.b))-min(photo.r,min(photo.g,photo.b));
@@ -270,12 +286,13 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
   };
 
   const states=patches.map(p=>({patch:p,distance:Infinity,pending:false,retry:0,mesh:null as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>|null}));
+  const uMid={value:null as THREE.Texture|null},uMidBox={value:new THREE.Vector4()},uMidMatch={value:0};
   const uClose={value:null as THREE.Texture|null},uCloseBox={value:new THREE.Vector4()},uCloseMatch={value:0};
   const uDistrict={value:null as THREE.Texture|null},uDistrictBox={value:new THREE.Vector4()};
   const uInset={value:null as THREE.Texture|null},uInsetBox={value:new THREE.Vector4()};
   const uKyotoBox={value:new THREE.Vector4(...kyoto)};
   const uGroundFar={value:92000};
-  let broad:RegionalPhoto|null=null,inset:RegionalPhoto|null=null,live:RegionalPhoto|null=null;
+  let broad:RegionalPhoto|null=null,inset:RegionalPhoto|null=null,liveMid:RegionalPhoto|null=null,live:RegionalPhoto|null=null;
   // A first draw would upload every newly finished orthophoto at once. Keep the old
   // coverage visible and prepare at most one full-resolution sheet per animation frame.
   let uploads=Promise.resolve();
@@ -294,28 +311,38 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
     broad=base;inset=detail;
     uDistrict.value=base?.photo??null;uDistrictBox.value.fromArray(base?.box??[0,0,0,0]);
     uInset.value=detail?.photo??null;uInsetBox.value.fromArray(detail?.box??[0,0,0,0]);
-    onPhoto(broad,inset??live);
+    onPhoto(broad??liveMid,inset??live);
   });
-  const photos=regionalPhoto(aniso,sheet=>{
-    live=sheet;uClose.value=sheet?.photo??null;
-    uCloseBox.value.fromArray(sheet?.box??[0,0,0,0]);
-    uCloseMatch.value=sheet?.raw?1:0;
-    onPhoto(broad,inset??live);
-  });
+  const photos=regionalPhoto(
+    aniso,
+    sheet=>{
+      live=sheet;uClose.value=sheet?.photo??null;
+      uCloseBox.value.fromArray(sheet?.box??[0,0,0,0]);
+      uCloseMatch.value=sheet?.raw?1:0;
+      onPhoto(broad??liveMid,inset??live);
+    },
+    sheet=>{
+      liveMid=sheet;uMid.value=sheet?.photo??null;
+      uMidBox.value.fromArray(sheet?.box??[0,0,0,0]);
+      uMidMatch.value=sheet?.raw?1:0;
+      onPhoto(broad??liveMid,inset??live);
+    },
+  );
   let shaderReady:Promise<unknown>|undefined;
   let running=0,last= -Infinity;
   const fallbackBudget=regionalBudgetForTier(2);
   let activeUnload=fallbackBudget.groundUnload;
-  function update(x:number,z:number,y:number,now:number,destination?:{x:number;z:number},dirX=0,dirZ=0,budget:RegionalQualityBudget=fallbackBudget) {
+  function update(x:number,z:number,y:number,now:number,destination?:{x:number;z:number},dirX=0,dirZ=0,budget:RegionalQualityBudget=fallbackBudget,dirY=-0.25) {
     if(now-last<.15)return;
     last=now;
     // Smoothly approach the adaptive spherical horizon radius so tier changes never pop.
     uGroundFar.value=THREE.MathUtils.lerp(uGroundFar.value,budget.groundFar,.25);
     activeUnload=budget.groundUnload;
     const altitude=Math.max(0,y-ground(x,z));
-    // Target the ground ahead along the camera's sightline (or the flight landing point) so
-    // close-up orthophotos sharpen what the viewer is actually looking at rather than behind them.
-    const ahead=destination?0:Math.min(altitude*.85,650);
+    // When orbiting a landmark or flying to one, center orthophoto sheets squarely on the target;
+    // otherwise intersect the camera's sightline with the ground plane so oblique views sharpen ahead.
+    const pitchDown=Math.max(.12,-dirY);
+    const ahead=destination?0:THREE.MathUtils.clamp(altitude/pitchDown,Math.min(altitude*.85,400),2400);
     const targetX=destination?.x??(x+dirX*ahead);
     const targetZ=destination?.z??(z+dirZ*ahead);
     const coveredZoom=districts(targetX,targetZ,now);
@@ -345,7 +372,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
         if(!await preparePhoto(photo,()=>state.distance<=activeUnload)){photo.dispose();return;}
         const geometry=await patchGeometry(state.patch.box,kyoto,ground,fine,()=>state.distance<=activeUnload);
         if(!geometry){photo.dispose();return;}
-        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox,uKyotoBox},vertexShader,fragmentShader,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
+        const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uMid,uMidBox,uMidMatch,uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox,uKyotoBox},vertexShader,fragmentShader,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
         const mesh=new THREE.Mesh(geometry,material);
         await (shaderReady??=prepare(mesh));
         if(state.distance>activeUnload){mesh.geometry.dispose();material.dispose();photo.dispose();return;}

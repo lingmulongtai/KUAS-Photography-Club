@@ -25,10 +25,12 @@ export const districtSampling=`
     if(any(lessThanEqual(uv,vec2(0.))) || any(greaterThanEqual(uv,vec2(1.))))return base;
     vec2 texUv=vec2(uv.x,1.-uv.y);
     vec4 aerial=texture2D(map,texUv);
-    vec3 rgb=aerial.rgb;
+    if(aerial.a<.02)return base;
+    vec3 rgb=aerial.a<.99?clamp(aerial.rgb/aerial.a,0.,1.):aerial.rgb;
     if(matchTone>.5){
-      vec3 mapLow=textureGrad(map,texUv,vec2(.045,0.),vec2(0.,.045)).rgb;
-      vec3 gain=clamp((baseLow+.04)/(mapLow+.04),vec3(.68),vec3(1.48));
+      vec4 mapLow=textureGrad(map,texUv,vec2(.045,0.),vec2(0.,.045));
+      float valid=smoothstep(.82,.99,mapLow.a);
+      vec3 gain=mix(vec3(1.),clamp((baseLow+.05)/(mapLow.rgb+.05),vec3(.74),vec3(1.36)),valid);
       rgb=clamp(rgb*gain,0.,1.);
     }
     vec2 edge=min(uv,1.-uv);

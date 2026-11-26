@@ -550,7 +550,7 @@ export function createHero(
     const closePhotos=createNearbyPhotos(
       async()=> (await loadJSON<{photos:PhotoSheet[]}>('photos-osaka.json')).photos,
       async sheet=>({photo:await loadTexture(lite?sheet.mobile.file:sheet.file,aniso),box:sheet.box}),
-      photo=>{localPhoto=photo;sharedSlot?.setOverride(localPhoto??regionalPhoto);},value=>value.photo.dispose(),
+      photo=>{localPhoto=photo;sharedSlot?.setOverride(regionalPhoto??localPhoto);},value=>value.photo.dispose(),
       error=>console.warn('Close transport imagery unavailable; retaining regional photo',error),
       meta.otokuni?[meta.otokuni]:[],
     );
@@ -1230,16 +1230,18 @@ export function createHero(
     let regionalLoad:Promise<void>|undefined;
     ensureRegionalGround=()=>regionalLoad??=import('./regional-ground')
       .then(async({regionalGround})=>{
-        // Exclude only areas that already have dedicated high-res aerial sheets so gaps like
-        // Daikaku-ji / Hirosawa Pond / Sagano (between aerialCity and Arashiyama) receive live sharp imagery.
-        const photoLegacy=[...(meta.aerialBasin?.sheets.map(s=>s.box)??[meta.aerialCity.box]),...(await cityRegions).regions.map(r=>r.box)];
+        // Keep only the harmonized central Kyoto core quiet on opening; everywhere else (including
+        // Daikaku-ji / Hirosawa Pond, Sagano, Itami, Umeda, Kameoka, Uji, Kobe Airport, KIX & Lake Yogo)
+        // receives the wider two-tier live GSI orthophoto pyramid without static tile-seam cutoffs.
+        const [cw,cn,ce,cs]=meta.aerialCity.box;
+        const photoLegacy:Box[]=[[cw+700,cn+700,ce-700,cs-700]];
         return regionalGround(scene,env,hf,aniso,photoLegacy,(base,detail)=>{
           districtBase=base;
           if(!detailRegion){
             const backdrop=base??eastBackdrop;
             terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
           }
-          regionalPhoto=detail??base;sharedSlot?.setOverride(localPhoto??regionalPhoto);
+          regionalPhoto=detail??base;sharedSlot?.setOverride(regionalPhoto??localPhoto);
         },prepare,(photo,needed)=>uploadPhoto(renderer,photo,needed));
       })
       .then(result=>{
@@ -1789,11 +1791,13 @@ export function createHero(
       const horizontal=Math.hypot(regionalDirection.x,regionalDirection.z)||1;
       const dirX=regionalDirection.x/horizontal,dirZ=regionalDirection.z/horizontal;
       const budget=adaptiveQuality.budget;
-      // Hold departure high-res aerial imagery & nearby buildings during the first half of a flight
-      // so the foreground stays crisp while lifting off, then hand off cleanly to the destination.
-      const photoTarget=flight&&flight.t>=0.52?flight.p3:undefined;
-      regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime,photoTarget,dirX,dirZ,budget);
-      const detailEye=flight&&flight.t>=0.48?flight.p3:camera.position;
+      // Hold departure high-res aerial imagery & nearby buildings during the first half of a flight,
+      // then center on the destination/orbit landmark (so wide airports & lakes load crisp edge-to-edge).
+      const photoTarget = flight
+        ? (flight.t >= 0.45 ? flight.destCenter : undefined)
+        : (!exploring && mode === 'city' && VIEW.orbit ? VIEW.orbit.center : undefined);
+      regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime,photoTarget,dirX,dirZ,budget,regionalDirection.y);
+      const detailEye=flight&&flight.t>=0.48?flight.destCenter:(!exploring&&mode==='city'&&VIEW.orbit?VIEW.orbit.center:camera.position);
       if(regionalCity){
         regionalCity.update(detailEye.x,detailEye.z,dirX,dirZ,regionalTime,activeRegionBox,camera.position,budget);
       }

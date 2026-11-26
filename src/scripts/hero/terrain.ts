@@ -146,10 +146,13 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
 
       vec2 boxUv(vec4 b, vec2 p){ return (p - b.xy) / (b.zw - b.xy); }
       // Sample aerial photo sheets cleanly with explicit screen gradients so anisotropic/mip filtering stays crisp.
-      vec3 blockPhoto(sampler2D image, vec4 box, vec2 p, float fp, vec2 dx, vec2 dy){
+      vec4 blockPhotoSample(sampler2D image, vec4 box, vec2 p, vec2 dx, vec2 dy){
         vec2 scale=vec2(1.,-1.)/(box.zw-box.xy);
         vec2 photoUv=boxUv(box,p)*vec2(1.,-1.)+vec2(0.,1.);
-        return textureGrad(image,photoUv,dx*scale,dy*scale).rgb;
+        return textureGrad(image,photoUv,dx*scale,dy*scale);
+      }
+      vec3 blockPhoto(sampler2D image, vec4 box, vec2 p, float fp, vec2 dx, vec2 dy){
+        return blockPhotoSample(image,box,p,dx,dy).rgb;
       }
       float segment(vec2 p, vec4 s){
         vec2 ab = s.zw - s.xy;
@@ -219,8 +222,15 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         ${photos.map((_, i) => `
         if (uPhotoOn${i} > 0.) {
           float k = inside(uPhotoBox${i}, p, 120.) ${i===0?"* (1.-coverage*(1.-uRegionClose))":""};
-          if(k>0.)photo = mix(photo, blockPhoto(uPhoto${i},uPhotoBox${i},p,fp,dx,dy), k);
-          detail = max(detail, k);
+          if(k>0.){
+            vec4 samplePhoto = blockPhotoSample(uPhoto${i},uPhotoBox${i},p,dx,dy);
+            if(samplePhoto.a>.02){
+              vec3 sampleRgb = samplePhoto.a<.99?clamp(samplePhoto.rgb/samplePhoto.a,0.,1.):samplePhoto.rgb;
+              float w = k * samplePhoto.a;
+              photo = mix(photo, sampleRgb, w);
+              detail = max(detail, w);
+            }
+          }
         }`).join('')}
 
         vec3 surveyPhoto=photo;

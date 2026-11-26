@@ -20,8 +20,8 @@ export interface RegionalQualityBudget {
   groundUnload: number;
   /** Maximum concurrent ground patch downloads/uploads. */
   groundConcurrency: number;
-  /** Live close-up orthophoto grid radius (1 => 3x3 tiles, 2 => 5x5 tiles). */
-  photoRadius: 1 | 2;
+  /** Live close-up orthophoto grid radius (1 => 3x3 tiles, 2 => 5x5 tiles, 3 => 7x7 tiles). */
+  photoRadius: 1 | 2 | 3;
   /** Maximum live GSI orthophoto zoom level when close to the ground. */
   photoMaxZoom: 16 | 17;
 }
@@ -38,7 +38,7 @@ const BUDGETS: readonly RegionalQualityBudget[] = [
     groundLoad: 74000,
     groundUnload: 82000,
     groundConcurrency: 2,
-    photoRadius: 1,
+    photoRadius: 2,
     photoMaxZoom: 16,
   },
   {
@@ -66,7 +66,7 @@ const BUDGETS: readonly RegionalQualityBudget[] = [
     groundLoad: 106000,
     groundUnload: 114000,
     groundConcurrency: 3,
-    photoRadius: 2,
+    photoRadius: 3,
     photoMaxZoom: 17,
   },
   {
@@ -80,7 +80,7 @@ const BUDGETS: readonly RegionalQualityBudget[] = [
     groundLoad: 122000,
     groundUnload: 130000,
     groundConcurrency: 3,
-    photoRadius: 2,
+    photoRadius: 3,
     photoMaxZoom: 17,
   },
 ];
