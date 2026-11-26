@@ -20,7 +20,7 @@ export function createSunShadow(renderer: THREE.WebGLRenderer, scene: THREE.Scen
   const target = new THREE.WebGLRenderTarget(size, size, { depthTexture: depth, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 4000);
   camera.layers.set(SHADOW_LAYER);
-  const fallback = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  const fallback = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
   env.uShadowMap.value = depth;
   // allocate the depth texture now: until it exists, every shader that samples it would fail to draw
   {
@@ -41,11 +41,22 @@ export function createSunShadow(renderer: THREE.WebGLRenderer, scene: THREE.Scen
   let lastRender = 0;
   const swapped: [THREE.Mesh, THREE.Material | THREE.Material[]][] = [];
 
+  const shadowDir = new THREE.Vector3();
+
   function fit(sunDir: THREE.Vector3) {
     region.getCenter(center);
-    camera.position.copy(center).addScaledVector(sunDir, 20000);
+    // Keep the orthographic shadow camera slightly above the horizon plane during sub-horizon
+    // twilight (alt -1.2°..+1.0°) so mountains still cast watertight basin shadows without
+    // grazing coplanar shadow acne or terrain backface flips across alt = 0°.
+    shadowDir.copy(sunDir);
+    if (shadowDir.y < 0.018) {
+      const hLen = Math.hypot(shadowDir.x, shadowDir.z) || 1;
+      const clampedH = Math.sqrt(1 - 0.018 * 0.018);
+      shadowDir.set(shadowDir.x / hLen * clampedH, 0.018, shadowDir.z / hLen * clampedH);
+    }
+    camera.position.copy(center).addScaledVector(shadowDir, 20000);
     camera.up.set(0, 1, 0);
-    if (Math.abs(sunDir.y) > 0.98) camera.up.set(0, 0, -1);
+    if (Math.abs(shadowDir.y) > 0.98) camera.up.set(0, 0, -1);
     camera.lookAt(center);
     camera.updateMatrixWorld();
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -66,7 +77,8 @@ export function createSunShadow(renderer: THREE.WebGLRenderer, scene: THREE.Scen
     camera.updateProjectionMatrix();
     env.uShadowMatrix.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     env.uShadowWorld.value = Math.max(maxX - minX, maxY - minY) / size;
-    env.uShadowBias.value = 1.5 / (camera.far - camera.near);
+    const grazing = 1 + 2.5 * Math.max(0, 1 - shadowDir.y / 0.12);
+    env.uShadowBias.value = (1.5 * grazing) / (camera.far - camera.near);
   }
 
   return {
@@ -90,7 +102,10 @@ export function createSunShadow(renderer: THREE.WebGLRenderer, scene: THREE.Scen
       // Small movements can reuse a recent map. A time-slider jump needs the
       // new direction immediately, especially for long shadows at low sun.
       const now = performance.now();
-      if (!dirty && now - lastRender < 200 && alignment > Math.cos(2 * Math.PI / 180)) return;
+      const lowSun = sunDir.y < 0.14;
+      const minInterval = lowSun ? 50 : 200;
+      const minJump = lowSun ? 0.45 * Math.PI / 180 : 2 * Math.PI / 180;
+      if (!dirty && now - lastRender < minInterval && alignment > Math.cos(minJump)) return;
       lastRender = now;
       dirty = false;
       last.copy(sunDir);

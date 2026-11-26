@@ -1386,7 +1386,7 @@ export function createHero(
     env.uMoonLight.value.setRGB(0.5, 0.58, 0.78).multiplyScalar(0.07 * moon.illumination * moonUp * dark);
     // Keep Three.js PBR lights (used by Expo 3D Tiles and regional GLB landmarks) evenly balanced across all angles.
     landmarkLights.sun.color.copy(env.uSunLight.value).add(env.uMoonLight.value);
-    landmarkLights.sun.position.copy(env.uCity.value > .8 ? env.uMoonDir.value : env.uSunDir.value);
+    landmarkLights.sun.position.copy(directSun > 0 ? env.uSunDir.value : env.uMoonDir.value);
     landmarkLights.sky.color.copy(env.uMid.value).lerp(env.uHorizon.value, .45);
     landmarkLights.sky.groundColor.copy(env.uHorizon.value).multiplyScalar(.55);
     // moonlight brightens much faster than the lit fraction grows (a full moon is ~10× a half

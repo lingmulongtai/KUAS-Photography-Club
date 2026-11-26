@@ -122,7 +122,9 @@ const BrightPassShader = {
       float soft = clamp(l - t + k, 0., 2. * k);
       soft = soft * soft / (4. * k);
       float part = max(soft, l - t) / max(l, 1e-4);
-      float whole = smoothstep(t, t + .01, l);
+      // Soft knee on the daylight/twilight bloom ramp avoids a 0.01 luminance cliff
+      // that otherwise strobes across dawn clouds, horizon glow, and city lights (06:00-07:00).
+      float whole = smoothstep(max(0., t - .18), t + .32, l);
       float halo = mix(part, whole, uWhole);
       if (uWhole < 1. && halo > 0.) {
         float depth = textureLod(uDepth, uv, 0.).r;
