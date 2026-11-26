@@ -544,7 +544,8 @@ const DEPTH_FS = /* glsl */ `
 
 /**
  * Shared material for Japanese rooftop aviation obstacle lights (航空障害灯) on high-rises.
- * Medium-intensity red beacons (>=85 m) pulse smoothly; low-intensity red beacons (45–85 m) burn steadily.
+ * Medium-intensity red beacons (>=115 m) pulse crisply; low-intensity red beacons (65–115 m)
+ * burn faintly nearby and dissolve naturally into atmospheric haze at distance.
  */
 export function aviationBeaconMaterial(env: Env): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
@@ -554,21 +555,28 @@ export function aviationBeaconMaterial(env: Env): THREE.ShaderMaterial {
     blending: THREE.AdditiveBlending,
     vertexShader: /* glsl */ `
       ${ENV_GLSL}
-      attribute vec2 aBeacon; // x: phase [0..1], y: flash (1 = pulsing medium-intensity, 0 = steady red)
+      attribute vec2 aBeacon; // x: phase [0..1], y: flash (1 = pulsing medium-intensity, 0 = steady low-intensity)
       varying float vPower;
       void main(){
         vec4 wp = modelMatrix * vec4(position, 1.);
         vec4 mv = viewMatrix * wp;
         float dist = max(35., -mv.z);
         float night = smoothstep(.18, .68, uCity);
-        float pulse = aBeacon.y > .5
-          ? (.22 + .78 * pow(.5 + .5 * sin(uTime * 3.4 + aBeacon.x * 6.28318), 2.4))
+        bool isMedium = aBeacon.y > .5;
+        float pulse = isMedium
+          ? (.12 + .88 * pow(.5 + .5 * sin(uTime * 3.1 + aBeacon.x * 6.28318), 3.0))
           : (.86 + .14 * sin(uTime * 1.4 + aBeacon.x * 12.566));
-        float farFade = 1. - smoothstep(18000., 34000., dist);
-        vPower = night * pulse * farFade * (aBeacon.y > .5 ? 1.55 : 1.08);
-        float basePx = aBeacon.y > .5 ? 2400. : 1750.;
-        gl_PointSize = clamp(basePx / dist + (aBeacon.y > .5 ? 3.2 : 2.3), 2.6, 11.5);
-        gl_Position = vPower > .02 ? projectionMatrix * mv : vec4(2., 2., 2., 1.);
+        // Realistic atmospheric distance falloff: low-intensity 32 cd bulbs fade by 5.2 km,
+        // medium-intensity 2,000 cd flashing beacons soften cleanly before 11.5 km overlooks.
+        float farFade = isMedium
+          ? (1. - smoothstep(3800., 11500., dist))
+          : (1. - smoothstep(1800., 5200., dist));
+        vPower = night * pulse * farFade * (isMedium ? .68 : .42);
+        float basePx = isMedium ? 680. : 420.;
+        gl_PointSize = isMedium
+          ? clamp(basePx / dist + 1.2, 1.5, 4.6)
+          : clamp(basePx / dist + 1.0, 1.3, 3.4);
+        gl_Position = vPower > .015 ? projectionMatrix * mv : vec4(2., 2., 2., 1.);
       }
     `,
     fragmentShader: /* glsl */ `
@@ -577,10 +585,10 @@ export function aviationBeaconMaterial(env: Env): THREE.ShaderMaterial {
         vec2 d = gl_PointCoord - .5;
         float r2 = dot(d, d);
         if (r2 > .25) discard;
-        float core = exp(-r2 * 24.);
-        float halo = exp(-r2 * 5.5) * .48;
-        vec3 red = mix(vec3(1.0, .06, .02), vec3(1.0, .38, .22), core * .65);
-        gl_FragColor = vec4(red * (core * 1.45 + halo) * vPower, 1.);
+        float core = exp(-r2 * 34.);
+        float halo = exp(-r2 * 9.0) * .18;
+        vec3 red = mix(vec3(1.0, .07, .03), vec3(1.0, .34, .18), core * .55);
+        gl_FragColor = vec4(red * (core * 1.15 + halo) * vPower, 1.);
       }
     `,
   });
@@ -829,12 +837,12 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
     const c = chunkOf(b.x, b.z, b);
     if (roofFor(b).type > 0) c.pitched.push({ b, y, seed });
     else c.flat.push({ b, y, seed });
-    if (emitBeacons && b.h >= 45 && (b.kind & 3) !== CLASS.wooden && !dressed(b)) {
+    if (emitBeacons && b.h >= 65 && b.w * b.d >= 180 && (b.kind & 3) !== CLASS.wooden && !dressed(b)) {
       const top = y + b.h + 1.9;
-      const flash = b.h >= 85 ? 1 : 0;
+      const flash = b.h >= 115 ? 1 : 0;
       const ca = Math.cos(b.angle), sa = Math.sin(b.angle);
       const hw = b.w * 0.42, hd = b.d * 0.42;
-      if (b.h >= 75) {
+      if (b.h >= 135) {
         beaconPos.push(b.x + ca * hw - sa * hd, top, b.z + sa * hw + ca * hd);
         beaconMeta.push(seed, flash);
         beaconPos.push(b.x - ca * hw + sa * hd, top, b.z - sa * hw - ca * hd);
@@ -853,12 +861,18 @@ export function* buildCitySteps(env: Env, hf: Pick<Heightfield,'height'>, data: 
     const y = hf.height(cx, cz) + p.ground;
     const seed = hash1(i * 13 + 5);
     chunkOf(cx, cz, p).polys.push({ p, y, seed });
-    if (emitBeacons && p.h >= 45 && (p.kind & 3) !== CLASS.wooden && !dressed(p)) {
-      let mx = 0, mz = 0;
+    if (emitBeacons && p.h >= 65 && (p.kind & 3) !== CLASS.wooden && !dressed(p)) {
+      let mx = 0, mz = 0, area2 = 0;
       const m = p.ring.length / 2;
-      for (let k = 0; k < m; k++) { mx += p.ring[k * 2]; mz += p.ring[k * 2 + 1]; }
-      beaconPos.push(mx / m, y + p.h + 1.9, mz / m);
-      beaconMeta.push(seed, p.h >= 85 ? 1 : 0);
+      for (let k = 0; k < m; k++) {
+        const j = (k + 1) % m;
+        mx += p.ring[k * 2]; mz += p.ring[k * 2 + 1];
+        area2 += p.ring[k * 2] * p.ring[j * 2 + 1] - p.ring[j * 2] * p.ring[k * 2 + 1];
+      }
+      if (Math.abs(area2) * 0.5 >= 180) {
+        beaconPos.push(mx / m, y + p.h + 1.9, mz / m);
+        beaconMeta.push(seed, p.h >= 115 ? 1 : 0);
+      }
     }
   }
 

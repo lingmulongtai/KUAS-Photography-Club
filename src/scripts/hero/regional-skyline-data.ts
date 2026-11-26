@@ -13,7 +13,7 @@ export type Request={x:number;y:number;legacy:Box[]};
 export type Range={start:number;count:number;tile:string};
 export type Skyline={
   positions:Float32Array<ArrayBuffer>;normals:Float32Array<ArrayBuffer>;uv:Float32Array<ArrayBuffer>;colors:Uint8Array<ArrayBuffer>;identity:Uint16Array<ArrayBuffer>;
-  /** Rooftop aviation obstacle lights on high-rises (>=52 m): [localEast, localNorth, elevation] and [phase, pulseFlag]. */
+  /** Rooftop aviation obstacle lights on tall towers (>=72 m): [localEast, localNorth, elevation] and [phase, pulseFlag]. */
   beaconPos:Float32Array<ArrayBuffer>;beaconMeta:Float32Array<ArrayBuffer>;
   ranges:Range[];center:{x:number;z:number};bounds:number[];
 };
@@ -72,12 +72,12 @@ export async function compileSkyline({x,y,legacy}:Request,sample:Heights,coopera
     const area=Math.abs(footprint.reduce((sum,p,k)=>{const q=footprint[(k+1)%footprint.length];return sum+p[0]*q[1]-q[0]*p[1];},0))*.5;
     const kind=facadeKind(true,area,b.height);
     for(let j=start;j<mesh.positions.length/3;j++)identity.push(kind,Math.round(b.style*65535),Math.round(b.height*4));
-    // Japanese aviation law obstacle lights (航空障害灯) on high-rises >= 52 m.
-    if(b.height>=52 && !b.min){
+    // Japanese aviation law obstacle lights (航空障害灯) on genuine high-rises >= 72 m (avoiding narrow annex fragments).
+    if(b.height>=72 && area>=220 && !b.min){
       const topZ=base+b.height+2.0;
-      const flash=b.height>=85?1:0;
-      if(b.height>=85 && footprint.length>=3){
-        // Two beacons on opposite roof corners for skyscrapers >= 85 m.
+      const flash=b.height>=115?1:0;
+      if(b.height>=145 && footprint.length>=3){
+        // Two beacons on opposite roof corners only for major supertall skyscrapers >= 145 m.
         let minP=footprint[0],maxP=footprint[0];
         for(const p of footprint){
           if(p[0]+p[1]<minP[0]+minP[1])minP=p;
