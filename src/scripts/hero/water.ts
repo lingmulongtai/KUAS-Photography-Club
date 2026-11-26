@@ -119,7 +119,7 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
           // terrain slopes at every range (so lakes & rivers never shrink or dry up close), while staying below bridges.
           float nearPull = aWater.x > 1.5
             ? clamp(dist * .0065, 1.25, 11.)
-            : clamp(dist * .0095, 2.2, 7.2);
+            : clamp(dist * .0045, .75, 2.5);
           float farLake = aWater.x > 1.5 ? smoothstep(2600., 14000., dist) : 0.;
           pull = mix(nearPull, max(nearPull, min(dist * .0038, 110.)), farLake);
         } else {
@@ -411,6 +411,14 @@ export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:num
   const group=new THREE.Group() as BiwaSurface;
   group.name='lake-biwa-and-seta';
   const parts:{geometry:THREE.BufferGeometry;kind:'biwa'|'seta'|'yogo'}[]=[];
+  // Seta-no-Karahashi bridge centerline endpoints in local metres (deck height = 88.37-88.43 m).
+  const karaW=toLocal(34.9733849,135.9049509),karaE=toLocal(34.9727382,135.9075769);
+  const karaDx=karaE.x-karaW.x,karaDz=karaE.z-karaW.z,karaLen2=karaDx*karaDx+karaDz*karaDz;
+  const smooth01=(t:number)=>{const c=Math.max(0,Math.min(1,t));return c*c*(3-2*c);};
+  const karahashiDist=(x:number,z:number)=>{
+    const u=Math.max(-0.1,Math.min(1.1,((x-karaW.x)*karaDx+(z-karaW.z)*karaDz)/karaLen2));
+    return Math.hypot(x-(karaW.x+karaDx*u),z-(karaW.z+karaDz*u));
+  };
   let offset=8;
   for(const [i,profile] of [[0,[2,.83,.56]],[1,[1,-.16,.987]]] as const){
     const count=view.getUint32(4*i,true);
@@ -422,21 +430,35 @@ export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:num
       offset+=8;
     }
     const isRiver=i===1;
-    // Subdivide long 100-300 m river triangles so refit(ground) conforms to channel-center DEM bulges.
-    if(isRiver)positions=subdivideWaterTriangles(positions,32,85);
+    // Subdivide long river triangles finely so refit(ground) tracks coarse 100-200 m terrain bulges
+    // and narrow gorge walls along the entire Seta River from Lake Biwa to Amagase Dam.
+    if(isRiver)positions=subdivideWaterTriangles(positions,24,85);
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+    if(isRiver){
+      // Suppress vertex camera-pull right underneath Seta-no-Karahashi's low 88.37 m timber/concrete deck
+      // so the bridge span, railings and bronze giboshi finials always render cleanly above the river.
+      const vCount=positions.length/3;
+      const stable=new Float32Array(vCount);
+      for(let n=0;n<vCount;n++){
+        const dBridge=karahashiDist(positions[n*3],positions[n*3+2]);
+        stable[n]=dBridge<76?1-smooth01((dBridge-26)/50):0;
+      }
+      geometry.setAttribute('aStable',new THREE.BufferAttribute(stable,1));
+    }
     geometry.computeBoundingSphere();
-    // Keep tight near-shore uWaterBias=0.35 while uClearance & refit(ground) prevent coarse terrain from swallowing shores or Seta River.
+    // Keep tight near-shore uWaterBias=0.35 while uClearance & refit(ground) prevent terrain from burying the channel.
+    // Lake Biwa applies polygonOffset against coarse distant shorelines; Seta River keeps default depth offset under bridges.
     const material=waterMaterial(env,roads,.35,true);
     if(!isRiver){
       material.polygonOffset=true;
       material.polygonOffsetFactor=-3;
       material.polygonOffsetUnits=-10;
     }
-    Object.assign(material.defaultAttributeValues,{aStable:[0],aWater:[...profile]});
+    Object.assign(material.defaultAttributeValues,isRiver?{aWater:[...profile]}:{aStable:[0],aWater:[...profile]});
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=isRiver?'seta-river':'lake-biwa';
+    if(isRiver)mesh.renderOrder=2;
     group.add(mesh);
     parts.push({geometry,kind:isRiver?'seta':'biwa'});
   }
@@ -459,13 +481,37 @@ export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:num
     for(const {geometry,kind} of parts){
       const attr=geometry.getAttribute('position') as THREE.BufferAttribute;
       const arr=attr.array as Float32Array;
-      // Keep water strictly below Seta-no-Karahashi (88.2 m) and shoreline roads while clearing coarse grid bulges.
-      const base=kind==='yogo'?132.8:85;
-      const cap=kind==='yogo'?134.8:kind==='seta'?87.9:86.2;
-      const lift=kind==='seta'?1.15:kind==='yogo'?0.55:.25;
-      for(let i=0;i<arr.length;i+=3){
-        const g=ground(arr[i],arr[i+2]);
-        arr[i+1]=Math.min(cap,Math.max(base,g+lift));
+      if(kind==='seta'){
+        // Conform smoothly above coarse terrain chords all the way from Lake Biwa (85 m) down through
+        // Nango Weir, Shishitobi Gorge and Amagase Reservoir, while dipping cleanly under Seta-no-Karahashi (88.37 m).
+        for(let i=0;i<arr.length;i+=3){
+          const x=arr[i],z=arr[i+2];
+          const g0=ground(x,z);
+          // Sample at half the subdivided triangle edge (14 m) and bound the lift so coarse
+          // 100 m DEM creases stay submerged without ever climbing steep Shishitobi Gorge walls.
+          const gx=0.5*(ground(x-14,z)+ground(x+14,z));
+          const gz=0.5*(ground(x,z-14)+ground(x,z+14));
+          const chord=Math.min(g0+1.2,Math.max(g0,gx,gz));
+          // Match Lake Biwa's 85 m floor at the upper exit, then follow true descending valley elevation downstream.
+          const lakeBlend=1-smooth01((z-2400)/1800);
+          let y=Math.max(g0+0.72,chord+0.55);
+          if(lakeBlend>0)y=Math.max(y,85*lakeBlend+(g0+0.72)*(1-lakeBlend));
+          // Keep water cleanly below Seta-no-Karahashi's 88.37-88.43 m deck in the immediate 26 m bridge corridor.
+          const dBridge=karahashiDist(x,z);
+          if(dBridge<76){
+            const under=Math.min(87.98,Math.max(87.65,g0+0.25));
+            y=under+(y-under)*smooth01((dBridge-26)/50);
+          }
+          arr[i+1]=y;
+        }
+      }else{
+        const base=kind==='yogo'?132.8:85;
+        const cap=kind==='yogo'?134.8:86.2;
+        const lift=kind==='yogo'?0.55:.25;
+        for(let i=0;i<arr.length;i+=3){
+          const g=ground(arr[i],arr[i+2]);
+          arr[i+1]=Math.min(cap,Math.max(base,g+lift));
+        }
       }
       attr.needsUpdate=true;
       geometry.computeBoundingSphere();
