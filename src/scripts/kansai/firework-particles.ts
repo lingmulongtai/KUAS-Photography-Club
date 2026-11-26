@@ -6,12 +6,18 @@ export function particles(wide:boolean){
     directions.push(dx,dy,dz);stages.push(shell,kind,index,tail);
   }
   for(let shell=0;shell<shells;shell++){
+    // Ascending mortar trail
     for(let i=0;i<10;i++)vertex(shell,0,i,0);
+    // Burst sparks + tails, plus real optical water-plane mirror reflections for every other spark
     for(let i=0;i<sparks;i++){
       const z=1-2*(i+.5)/sparks,angle=i*2.39996323,r=Math.sqrt(1-z*z);
-      for(let tail=0;tail<7;tail++)vertex(shell,1,i,tail,Math.cos(angle)*r,Math.sin(angle)*r,z);
+      const dx=Math.cos(angle)*r,dy=Math.sin(angle)*r;
+      for(let tail=0;tail<7;tail++)vertex(shell,1,i,tail,dx,dy,z);
+      // 3 fine wave-scattered glint copies per reflected spark form an authentic broken water reflection
+      if(i%2===0){
+        for(let g=0;g<3;g++)vertex(shell,2,i,g,dx,dy,z);
+      }
     }
-    for(let i=0;i<60;i++)vertex(shell,2,i,0);
   }
   return {positions,directions,stages};
 }
@@ -56,14 +62,39 @@ export const simulation=(wide:boolean)=>`
             if(willow && tail>1.)rgb=vec3(1.,.80,.52);
             size=(tail<.5?5.5:4.1)*(1.-.32*age/life);
           }else{
+            // Optical mirror reflection of the actual burst spark projected onto the water surface,
+            // softly broken up along wave slopes and bounded to the local water body.
             v_water=1.;
-            vec2 viewer=viewFromLaunch();
-            vec2 toward=viewer/max(1.,length(viewer));
-            float f=(i+.5)/60.;
-            offset.xy=toward*f*(lake?100.:33.)+vec2(-toward.y,toward.x)*sin(i*19.2+shell*7.+u_elapsed*1.8)*(lake?16.:5.)*(1.+f);
-            offset.z=1.45;
-            alpha=min(1.,age*4.5)*(1.-age/life)*(.33+.15*sin(i*2.+u_elapsed*3.));
-            size=(lake?14.:9.)*(1.-.35*f);
+            float t=age-tail*.055;
+            float distance=radius*(.91+.09*sin(i*13.4+shell))*(1.-exp(-1.9*max(t,0.)));
+            vec3 direction=sparkDirection;if(fan)direction.z=abs(direction.z);
+            vec3 spark=direction*distance+vec3(2.*t,0.,apex-(willow?9.:5.)*t*t);
+            if(t>=0. && spark.z>4.){
+              vec2 camXY=viewFromLaunch();
+              float camZ=max(8.,cameraHeight());
+              float hitT=camZ/(camZ+spark.z);
+              vec2 reflXY=camXY+hitT*(spark.xy-camXY);
+              vec2 toCam=camXY-reflXY;
+              float toCamLen=max(1.,length(toCam));
+              vec2 viewDir=toCam/toCamLen;
+              vec2 perp=vec2(-viewDir.y,viewDir.x);
+              // Gentle organic wave scatter along view ray & across ripples (no neon stripes!)
+              float ripplePhase=u_elapsed*3.1+i*4.7+tail*13.3+shell*9.1;
+              float scatterAlong=(tail-1.)*(lake?12.:4.5)+sin(ripplePhase)*(lake?5.5:2.2);
+              float scatterCross=cos(ripplePhase*1.37+i)*(lake?2.8:1.1);
+              reflXY+=viewDir*scatterAlong+perp*scatterCross;
+              // Fade smoothly outside the local river/bay water footprint so reflections never spill onto dry land.
+              float maxWaterR=lake?260.:46.;
+              float inWater=1.-smoothstep(maxWaterR*.65,maxWaterR,length(reflXY));
+              // Fresnel-weighted reflection: brighter at low grazing angles, subtle from steep overhead views.
+              float grazing=clamp(toCamLen/max(camZ*1.4,1.),.15,1.);
+              float shimmer=.55+.45*sin(u_elapsed*5.2+i*11.7+tail*5.3);
+              offset=vec3(reflXY.x,reflXY.y,.25);
+              if(willow && tail>.5)rgb=vec3(1.,.78,.48);
+              rgb*=.78;
+              alpha=pow(1.-age/life,.72)*inWater*grazing*shimmer*(tail<.5?.24:.15);
+              size=(lake?4.8:3.4)*(1.+.22*tail)*(1.-.28*age/life);
+            }
           }
         }
         v_color=vec4(rgb,alpha);
@@ -71,7 +102,10 @@ export const simulation=(wide:boolean)=>`
 `;
 export const pointShape=`
         vec2 p=(gl_PointCoord-.5)*2.;
-        p.y*=mix(1.,5.5,v_water);
+        // Subtle horizontal wave-glint elongation (1.9x instead of garish 5.5x smeared ovals)
+        p.y*=mix(1.,1.95,v_water);
         float d=dot(p,p);if(d>=1.)discard;
-        float intensity=exp(-3.6*d)*(1.-smoothstep(.72,1.,d));
+        float core=exp(-3.8*d);
+        float soft=exp(-2.1*d)*.55;
+        float intensity=mix(core,soft,v_water)*(1.-smoothstep(.72,1.,d));
 `;

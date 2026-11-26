@@ -1,4 +1,4 @@
-import {BUILDING_FS,buildCityAsync,prepareCityMaterials} from './buildings';
+import {BUILDING_FS,aviationBeaconMaterial,aviationBeaconPoints,buildCityAsync,prepareCityMaterials} from './buildings';
 import type {BoxBuilding,PolyBuilding} from './buildings-data';
 import {regionalNeighborhoods} from './regional-neighborhoods';
 import * as THREE from 'three';
@@ -14,6 +14,9 @@ import {json} from '../kansai/sources';
 import {SHADOW_LAYER} from './shadow';
 import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
 import {M_PER_DEG_LAT, M_PER_DEG_LON, ORIGIN, toLocal, type Box} from './geo';
+import {regionalBudgetForTier,type RegionalQualityBudget} from './adaptive-quality';
+import {inOsakaLandmarkMask} from './osaka-landmarks';
+import {inAirportBuildingMask} from './airports-data';
 
 type Ground=(x:number,z:number)=>number;
 type Layer={x:number;y:number;zoom:number;distance:number};
@@ -49,10 +52,27 @@ function streetMaterial(env:Env,boundary:Boundary){
     fragmentShader:`${ENV_GLSL} ${SHADOW_GLSL} ${HOME_BOUNDARY}
       varying vec3 vWorld,vNormal,vColor;
       void main(){
-        if(owner(vWorld.xz)==0)discard;
+        // Allow bridges, viaducts and piers crossing Osaka Bay harbors and Lake Biwa (where land owner == 0)
+        // so coastal bay spans are never sawtooth-clipped at the shoreline raster edge.
+        bool inKansaiWater=(vWorld.x>-76000. && vWorld.x<-18000. && vWorld.z>27000. && vWorld.z<68000.)
+                        || (vWorld.x>8000. && vWorld.x<48000. && vWorld.z>-42000. && vWorld.z<8000.);
+        if(owner(vWorld.xz)==0 && !inKansaiWater)discard;
         vec3 n=normalize(vNormal);
         vec3 color=shade(seasonalSurface(pow(vColor,vec3(2.2)),n,vWorld),n,vWorld,sunShadow(vWorld,n));
-        gl_FragColor=vec4(applyHaze(color,vec3(0.),vWorld),1.);
+        vec3 emit=vec3(0.);
+        if(uCity>.01 && n.y>.5){
+          // Warm pools of streetlamp light along regional avenues, viaducts & waterfront promenades at night.
+          vec2 p=vWorld.xz;
+          float fp=max(length(dFdx(p)),length(dFdy(p)));
+          vec2 cell=p/24.;
+          float s=hash12(floor(cell));
+          vec2 d=fract(cell)-.5;
+          float pool=exp(-dot(d,d)*14.)*step(.35,s);
+          float soft=mix(pool,.38,smoothstep(4.,14.,fp));
+          vec3 lampCol=mix(vec3(1.,.68,.36),vec3(1.,.84,.62),step(.68,s));
+          emit=lampCol*(.010+.038*soft)*uCity*cityLightShimmer(vWorld);
+        }
+        gl_FragColor=vec4(applyHaze(color,emit,vWorld),1.);
       }`});
 }
 
@@ -121,7 +141,12 @@ function streetMesh(tile:CompiledTile,materials:THREE.Material[],contains:(p:Poi
 
 async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:THREE.Material,env:Env,boundary:Boundary,ground:Ground,
   architecture:Architecture,lite:boolean,current:()=>boolean):Promise<Entry|null>{
-  const group=new THREE.Group(),street=streetMesh(tile,materials,architecture.contains);
+  const maskedPoint=(p:Point)=>{
+    if(architecture.contains(p))return true;
+    const lp=toLocal(p[1],p[0]);
+    return inOsakaLandmarkMask(lp.x,lp.z)||inAirportBuildingMask(lp.x,lp.z);
+  };
+  const group=new THREE.Group(),street=streetMesh(tile,materials,maskedPoint);
   if(street){group.add(street.mesh);street.mesh.layers.enable(SHADOW_LAYER);}
   type Site=ReturnType<Architecture['siteAt']>;
   const sites=new Map<Site,{boxes:BoxBuilding[];polys:PolyBuilding[]}>();
@@ -137,6 +162,7 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:T
       }
       cx=(west+east)*.5;cz=(north+south)*.5;
     }
+    if(inOsakaLandmarkMask(cx,cz)||inAirportBuildingMask(cx,cz))continue;
     const site=architecture.siteAt([ORIGIN.lon+cx/M_PER_DEG_LON,ORIGIN.lat-cz/M_PER_DEG_LAT]);
     let data=sites.get(site);
     if(!data){data={boxes:[],polys:[]};sites.set(site,data);}
@@ -168,7 +194,7 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:T
   };
   try{
     for(const [site,data] of sites){
-      const city=await buildCityAsync(env,{height:ground},data,()=>true,lite ? .6 : 1,current);
+      const city=await buildCityAsync(env,{height:ground},data,()=>true,lite ? .6 : 1,current,()=>false,undefined,undefined,false);
       if(!city){dispose();return null;}
       cities.push({site,city});
       for(const mat of city.materials)clipCityMaterial(mat,boundary);
@@ -190,7 +216,7 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:T
   }catch(error){dispose();throw error;}
 }
 
-function skylineMesh(g:Skyline,material:THREE.Material){
+function skylineMesh(g:Skyline,material:THREE.Material,beaconMat:THREE.ShaderMaterial){
   const {center,bounds,ranges}=g;
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.BufferAttribute(g.positions,3));
@@ -204,6 +230,8 @@ function skylineMesh(g:Skyline,material:THREE.Material){
   mesh.name='regional-skyline';
   geometry.boundingSphere=new THREE.Box3(new THREE.Vector3(bounds[0],bounds[1],bounds[2]),
     new THREE.Vector3(bounds[3],bounds[4],bounds[5])).getBoundingSphere(new THREE.Sphere());
+  const beacons=aviationBeaconPoints(g.beaconPos,g.beaconMeta,beaconMat);
+  if(beacons)mesh.add(beacons);
   const children=[...new Set(ranges.map(r=>r.tile))];
   let signature='';
   const indices=new Uint32Array(g.positions.length/3);
@@ -221,7 +249,7 @@ function skylineMesh(g:Skyline,material:THREE.Material){
     index.needsUpdate=true;
     geometry.setDrawRange(0,count);
   };
-  return {mesh,mask,dispose:()=>geometry.dispose()};
+  return {mesh,mask,dispose:()=>{geometry.dispose();beacons?.geometry.dispose();}};
 }
 
 export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.DirectionalLight;sky:THREE.HemisphereLight},ground:Ground,legacy:Box[],lite:boolean,prepare:(model:THREE.Object3D)=>Promise<unknown>,invalidateShadow:()=>void){
@@ -233,6 +261,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
   const skyline=new Set(tiles),packs=new Set(Object.values(prefectures).flat());
   const readSkyline=skylineReader(ground);
   const queue=tileQueue(false,'orthometric'),material=surveyedMaterial(env,boundary);
+  const beaconMat=aviationBeaconMaterial(env);
   const streetMaterials=[material,streetMaterial(env,boundary)];
   const sacredMat=sacredMaterial(env,boundary);
   const warmStreetMaterials=[...streetMaterials,sacredMat];
@@ -247,35 +276,46 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
     neighborhoods.setNear(near);
     for(const [id,entry] of loaded)if(id.startsWith('12/'))entry.mask?.(near);
   }
-  function plan(px:number,pz:number,eye:Eye){
+  const defaultBudget=regionalBudgetForTier(lite?0:2);
+  function plan(px:number,pz:number,dirX:number,dirZ:number,eye:Eye,budget:RegionalQualityBudget){
     const lo=ORIGIN.lon+px/M_PER_DEG_LON,la=ORIGIN.lat-pz/M_PER_DEG_LAT;
-    const [cx,cy]=tileXY(lo,la,16).map(Math.floor);
-    const [ex,ey]=tileXY(ORIGIN.lon+eye.x/M_PER_DEG_LON,ORIGIN.lat-eye.z/M_PER_DEG_LAT,16).map(Math.floor);
-    const signature=[cx,cy,ex,ey].join('/');
+    const [tx16,ty16]=tileXY(lo,la,16);
+    const [ex16,ey16]=tileXY(ORIGIN.lon+eye.x/M_PER_DEG_LON,ORIGIN.lat-eye.z/M_PER_DEG_LAT,16);
+    const cx=Math.floor(tx16),cy=Math.floor(ty16),ex=Math.floor(ex16),ey=Math.floor(ey16);
+    const heading=Math.round(Math.atan2(dirX,-dirZ)*4);
+    const signature=[cx,cy,ex,ey,heading,budget.tier].join('/');
     if(last===signature)return;
     last=signature;
     const jobs:Layer[]=[];
     const insideKyoto=legacy.some(b=>px>b[0]+1400 && px<b[2]-1400 && pz>b[1]+1400 && pz<b[3]-1400);
-    const radius=lite?2:3;
     for(const zoom of insideKyoto?[12]:[16,12]){
-      const r=zoom===16?radius:2;
-      const [ax,ay]=zoom===16?[cx,cy]:[cx>>4,cy>>4];
-      for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){
+      const maxR=zoom===16?budget.detailRadius:budget.skylineRadius;
+      const span=Math.ceil(maxR);
+      const [ftx,fty]=zoom===16?[tx16,ty16]:[tx16/16,ty16/16];
+      const ax=Math.floor(ftx),ay=Math.floor(fty);
+      for(let j=-span;j<=span;j++)for(let i=-span;i<=span;i++){
         const x=ax+i,y=ay+j;
         if(zoom===12 ? !skyline.has(x+'/'+y) : !packs.has((x>>4)+'/'+(y>>4)))continue;
+        // Isotropic Euclidean circle so turning the camera never shows farther at screen edges than center.
+        const dx=x+.5-ftx,dz=y+.5-fty,radial=Math.hypot(dx,dz);
+        if(radial>maxR)continue;
         const [w,n]=lonLat(x,y,zoom),[e,s]=lonLat(x+1,y+1,zoom);
         const a=toLocal(n,w),b=toLocal(s,e);
         if(legacy.some(box=>a.x>=box[0] && a.z>=box[1] && b.x<=box[2] && b.z<=box[3]))continue;
-        jobs.push({x,y,zoom,distance:i*i+j*j+(zoom===12?2:0)});
+        const forward=(dx*dirX+dz*dirZ)/Math.max(.01,radial);
+        // Load tiles straight ahead first while keeping the outer boundary strictly circular.
+        jobs.push({x,y,zoom,distance:radial*(1-.35*Math.max(0,forward))+(zoom===12?2.2:0)});
       }
     }
     const previous=wanted;
     wanted=new Map(jobs.sort((a,b)=>a.distance-b.distance).map(t=>[key(t),t]));
-    // A flight prefetches the destination. Keep roofs still visible at its departure point.
+    // Keep already-loaded tiles inside a slightly larger circular hysteresis band or around the departure eye.
     for(const [id,t] of previous){
       if(wanted.has(id) || !loaded.has(id))continue;
-      const col=t.zoom===16?ex:ex>>4,row=t.zoom===16?ey:ey>>4;
-      if(Math.max(Math.abs(t.x-col),Math.abs(t.y-row))<=(t.zoom===16?radius:2))wanted.set(id,t);
+      const keepR=(t.zoom===16?budget.detailRadius+.75:budget.skylineRadius+.55);
+      const [ftx,fty]=t.zoom===16?[tx16,ty16]:[tx16/16,ty16/16];
+      const [fex,fey]=t.zoom===16?[ex16,ey16]:[ex16/16,ey16/16];
+      if(Math.hypot(t.x+.5-ftx,t.y+.5-fty)<=keepR || Math.hypot(t.x+.5-fex,t.y+.5-fey)<=keepR)wanted.set(id,t);
     }
     for(const [id,entry] of loaded)if(!wanted.has(id)){
       if(entry.mesh)scene.remove(entry.mesh);
@@ -286,7 +326,7 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
     for(const id of retry.keys())if(!wanted.has(id))retry.delete(id);
     remask();
   }
-  function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null,eye:Eye){
+  function update(x:number,z:number,dirX:number,dirZ:number,now:number,detail:Box|null,eye:Eye,budget:RegionalQualityBudget=defaultBudget){
     let pick: {distance:number;build?:()=>void}={distance:Infinity};
     const schedule:ScheduleDetail=(distance,build)=>{if(distance<pick.distance)pick={distance,build};};
     for(const entry of loaded.values())if(entry.lod?.(eye,schedule))shadowDirty=true;
@@ -294,20 +334,20 @@ export async function regionalCity(scene:THREE.Scene,env:Env,lights:{sun:THREE.D
     if(shadowDirty && now>=nextShadow){invalidateShadow();shadowDirty=false;nextShadow=now+.25;}
     if(now<next)return;
     next=now+.09;
-    architecture.update(x,z,now);
-    neighborhoods.update(x,z,dirX,dirZ,now,detail,eye);
+    architecture.update(eye.x,eye.z,now);
+    neighborhoods.update(x,z,dirX,dirZ,now,detail,eye,budget);
     if(landmarkRevision!==architecture.revision){
       landmarkRevision=architecture.revision;shadowDirty=true;
       for(const [id,entry] of loaded)if(id.startsWith('16/'))entry.mask?.(near);
     }
-    plan(x,z,eye);
+    plan(x,z,dirX,dirZ,eye,budget);
     for(const [id,t] of wanted){
-      if(loading.size>=2)break;
+      if(loading.size>=budget.buildingConcurrency)break;
       if(loaded.has(id)||loading.has(id)||(retry.get(id)??0)>now)continue;
       loading.add(id);
       const job=t.zoom===16?queue.compile(t.x,t.y,sampleTile(t.x,t.y,ground))
         .then(tile=>wanted.has(id)?nearMesh(tile,streetMaterials,sacredMat,env,boundary,ground,architecture,lite,()=>wanted.has(id)):null):
-        readSkyline({x:t.x,y:t.y,legacy},()=>wanted.has(id)).then(data=>data && wanted.has(id)?skylineMesh(data,material):null);
+        readSkyline({x:t.x,y:t.y,legacy},()=>wanted.has(id)).then(data=>data && wanted.has(id)?skylineMesh(data,material,beaconMat):null);
       void job.then(async result=>{
         if(result?.mesh){
           if(t.zoom===16){

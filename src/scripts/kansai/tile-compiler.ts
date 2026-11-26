@@ -11,6 +11,7 @@ import {railStructure} from './rail';
 import {insideSacredFootprint,sacredForZ16,type SacredSite} from './sacred-sites';
 import {bridgeClearance,drawBridgePolyline,drawRailPolyline} from './transport-mesh';
 import {drawSetaBridges,isSetaDeck,type VerticalDatum} from './seta-bridge';
+import {isBiwaBridgeDeck} from '../hero/biwa-bridges-data';
 import {combineTileMeshes,type TileGeometry} from './tile-geometry';
 import {toLocal} from '../hero/geo';
 
@@ -157,20 +158,82 @@ export function tileCompiler(){
     const karahashi=y===25964&&(x===57508||x===57509);
     const bounds:[number,number,number,number]=[west,south,east,north];
     if(karahashi)drawSetaBridges(groundMesh,bounds,local,datum,ground);
+    const pointToSegDeg=(p:Point,a:Point,b:Point)=>{
+      const dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy;
+      const t=l2>1e-14?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2)):0;
+      return Math.hypot((p[0]-(a[0]+dx*t))*0.82,p[1]-(a[1]+dy*t));
+    };
     const roadLayer=tile?.layers.RdCL;
-    if(roadLayer)for(let i=0;i<roadLayer.length;i++){
-      const f=roadLayer.feature(i),props=f.properties;
-      const code=Number(props.vt_code);
-      const clearance=bridgeClearance(Number(props.vt_lvorder??0),Number(props.vt_motorway??0)===1,String(props.vt_rdctg??''));
-      const width=roadWidth(props.vt_rnkwidth);
-      const skip=karahashi&&code===2703?isSetaDeck:undefined;
-      for(const line of f.loadGeometry()){
-        const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
-        drawBridgePolyline(groundMesh,pts,bounds,ground,xyz,{width,clearance,skip});
+    if(roadLayer){
+      const roadEntries:{pts:Point[];width:number;clearance:number;skip?:(p:Point)=>boolean;dir:Point;mid:Point}[]=[];
+      for(let i=0;i<roadLayer.length;i++){
+        const f=roadLayer.feature(i),props=f.properties;
+        const code=Number(props.vt_code);
+        const clearance=bridgeClearance(Number(props.vt_lvorder??0),Number(props.vt_motorway??0)===1,String(props.vt_rdctg??''));
+        const width=roadWidth(props.vt_rnkwidth);
+        const skip=code===2703?(karahashi?(p:Point)=>isSetaDeck(p)||isBiwaBridgeDeck(p):isBiwaBridgeDeck):undefined;
+        for(const line of f.loadGeometry()){
+          const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
+          if(pts.length<2)continue;
+          const a=pts[0],b=pts[pts.length-1],dl=Math.hypot(b[0]-a[0],b[1]-a[1])||1;
+          const mid=pts[Math.floor(pts.length/2)];
+          roadEntries.push({pts,width,clearance,skip,dir:[(b[0]-a[0])/dl,(b[1]-a[1])/dl],mid});
+        }
+      }
+      // Prefer higher-clearance / wider spans first and suppress ONLY true stacked duplicate centrelines
+      // (both endpoints & midpoint within ~3.5 m) so continuing spans and divided river bridges are never dropped.
+      roadEntries.sort((a,b)=>b.clearance-a.clearance||b.width-a.width);
+      const keptRoads:typeof roadEntries=[];
+      for(const r of roadEntries){
+        const rStart=r.pts[0],rEnd=r.pts[r.pts.length-1];
+        const duplicate=keptRoads.some(d=>{
+          const align=Math.abs(d.dir[0]*r.dir[0]+d.dir[1]*r.dir[1]);
+          if(align<0.92)return false;
+          let midNear=false,startNear=false,endNear=false;
+          for(let k=1;k<d.pts.length;k++){
+            if(!midNear && pointToSegDeg(r.mid,d.pts[k-1],d.pts[k])<0.000035)midNear=true;
+            if(!startNear && pointToSegDeg(rStart,d.pts[k-1],d.pts[k])<0.000045)startNear=true;
+            if(!endNear && pointToSegDeg(rEnd,d.pts[k-1],d.pts[k])<0.000045)endNear=true;
+          }
+          return midNear && startNear && endNear;
+        });
+        if(duplicate)continue;
+        keptRoads.push(r);
+      }
+      // Detect connected elevated joints between adjacent GSI road segments so multi-segment expressways
+      // and bridges meet at the exact same symmetric height instead of plunging down or stepping at joints!
+      const nearPt=(p:Point,q:Point)=>Math.hypot((p[0]-q[0])*0.82,p[1]-q[1])<0.000085;
+      const jointInfo=(idx:number,pt:Point)=>{
+        let connected=false,sumC=keptRoads[idx].clearance,count=1;
+        for(let j=0;j<keptRoads.length;j++){
+          if(j===idx)continue;
+          const o=keptRoads[j];
+          for(const v of o.pts){
+            if(nearPt(pt,v)){connected=true;sumC+=o.clearance;count++;break;}
+          }
+        }
+        return {connected,clearance:connected?sumC/count:undefined};
+      };
+      for(let i=0;i<keptRoads.length;i++){
+        const r=keptRoads[i];
+        const sInfo=jointInfo(i,r.pts[0]);
+        const eInfo=jointInfo(i,r.pts[r.pts.length-1]);
+        drawBridgePolyline(groundMesh,r.pts,bounds,ground,xyz,{
+          width:r.width,
+          clearance:r.clearance,
+          skip:r.skip,
+          startConnected:sInfo.connected,
+          endConnected:eInfo.connected,
+          startClearance:sInfo.clearance,
+          endClearance:eInfo.clearance,
+          isWater:inWater,
+        });
       }
     }
-    const trackPoints:Point[]=[];
+    const trackSegs:[Point,Point][]=[];
     const trackLayer=tile?.layers.RailTrCL;
+    const raisedRailPts:Point[][]=[];
+    const railJobs:{pts:Point[];opts:Parameters<typeof drawRailPolyline>[5]}[]=[];
     if(trackLayer)for(let i=0;i<trackLayer.length;i++){
       const f=trackLayer.feature(i),props=f.properties,code=Number(props.vt_code);
       if(code>=2820&&code<2830)continue; // Aerial ropeways/cableways are not steel ballast tracks.
@@ -180,8 +243,10 @@ export function tileCompiler(){
       const lvorder=Number(props.vt_lvorder??0);
       for(const line of f.loadGeometry()){
         const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
-        for(const p of pts)if(here(p))trackPoints.push(p);
-        drawRailPolyline(groundMesh,pts,bounds,ground,xyz,{raised:structure==='raised',doubleTrack:false,shinkansen,monorail,tram,lvorder});
+        for(let k=1;k<pts.length;k++)trackSegs.push([pts[k-1],pts[k]]);
+        const raised=structure==='raised';
+        if(raised)raisedRailPts.push(pts);
+        railJobs.push({pts,opts:{raised,doubleTrack:false,shinkansen,monorail,tram,lvorder}});
       }
     }
     const railLayer=tile?.layers.RailCL;
@@ -195,11 +260,23 @@ export function tileCompiler(){
       for(const line of f.loadGeometry()){
         const pts=line.map(v=>lonLat(x+v.x/f.extent,y+v.y/f.extent,16));
         if(pts.length<2)continue;
-        // Skip routes already modelled track-by-track in RailTrCL to avoid double-stacking.
-        const mid=pts[Math.floor(pts.length/2)];
-        if(trackPoints.some(t=>Math.abs(t[0]-mid[0])<.00022&&Math.abs(t[1]-mid[1])<.00018))continue;
-        drawRailPolyline(groundMesh,pts,bounds,ground,xyz,{raised:structure==='raised',doubleTrack,shinkansen:false,monorail:false,tram:false,lvorder});
+        // Skip routes already modelled track-by-track in RailTrCL (distance to segment avoids gaps on long straights).
+        const samples=[pts[Math.floor(pts.length/2)],pts[Math.floor(pts.length/4)],pts[Math.floor((pts.length*3)/4)]];
+        if(samples.some(s=>trackSegs.some(([a,b])=>pointToSegDeg(s,a,b)<0.00024)))continue;
+        const raised=structure==='raised';
+        if(raised)raisedRailPts.push(pts);
+        railJobs.push({pts,opts:{raised,doubleTrack,shinkansen:false,monorail:false,tram:false,lvorder}});
       }
+    }
+    const nearRailPt=(p:Point,q:Point)=>Math.hypot((p[0]-q[0])*0.82,p[1]-q[1])<0.000075;
+    for(const job of railJobs){
+      if(job.opts.raised && job.pts.length>=2){
+        const p0=job.pts[0],p1=job.pts[job.pts.length-1];
+        const connectedToOther=(pt:Point)=>inWater(pt)||raisedRailPts.some(o=>o!==job.pts && o.some(v=>nearRailPt(pt,v)));
+        job.opts.startConnected=connectedToOther(p0);
+        job.opts.endConnected=connectedToOther(p1);
+      }
+      drawRailPolyline(groundMesh,job.pts,bounds,ground,xyz,job.opts);
     }
     if(datum!=='orthometric')for(const f of fields){
         for(const rings of polygons(f,x>>4,y>>4,12)){

@@ -32,6 +32,44 @@ function dispose(group:THREE.Object3D){
   for(const image of images)image.close();
 }
 
+interface NightGlow { color: number; intensity: number }
+const NIGHT_GLOW: { [id: string]: NightGlow } = {
+  'kobe-port-tower': { color: 0xff2a18, intensity: 0.42 },
+  'kobe-maritime-museum': { color: 0xcce4ff, intensity: 0.24 },
+  'kobe-harbor-hotel': { color: 0xffd9a0, intensity: 0.22 },
+  'kobe-city-museum': { color: 0xffcf92, intensity: 0.16 },
+  'osaka-keep': { color: 0xffca7a, intensity: 0.26 },
+  'hikone-keep': { color: 0xffca7a, intensity: 0.22 },
+  'todaiji': { color: 0xffb25c, intensity: 0.16 },
+  'todaiji-nandaimon': { color: 0xffb25c, intensity: 0.15 },
+  'biwa-museum': { color: 0xffd8a4, intensity: 0.15 },
+};
+
+function nightGlowFor(id: string): NightGlow {
+  if (NIGHT_GLOW[id]) return NIGHT_GLOW[id];
+  if (id.startsWith('nankinmachi-')) return { color: 0xff8e36, intensity: 0.20 };
+  if (id.startsWith('kasuga-')) return { color: 0xffa648, intensity: 0.15 };
+  if (id.startsWith('maya-cable-')) return { color: 0xffdca8, intensity: 0.16 };
+  return { color: 0xffd69c, intensity: 0.09 };
+}
+
+function applyLandmarkNight(model: THREE.Object3D, id: string, city: number) {
+  const glow = nightGlowFor(id);
+  const strength = glow.intensity * city;
+  model.traverse(obj => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    for (const mat of Array.isArray(obj.material) ? obj.material : [obj.material]) {
+      if (mat instanceof THREE.MeshStandardMaterial) {
+        if (!mat.userData.nightInit) {
+          mat.userData.nightInit = true;
+          mat.emissive.setHex(glow.color);
+        }
+        mat.emissiveIntensity = strength;
+      }
+    }
+  });
+}
+
 export async function regionalLandmarks(scene:THREE.Scene,env:Env,lights:{sun:THREE.DirectionalLight;sky:THREE.HemisphereLight},ground:(x:number,z:number)=>number,prepare:(model:THREE.Object3D)=>Promise<unknown>){
   const catalogue=await json<Record[]>('landmarks/index.json');
   const excludesTree=landmarkClearings(catalogue.filter(r=>r.approaches?.length));
@@ -39,27 +77,33 @@ export async function regionalLandmarks(scene:THREE.Scene,env:Env,lights:{sun:TH
     distance:Infinity,pending:false,retry:0}));
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const {sun,sky}=lights;
-  let revision=0,pending=0,next=0;
+  let revision=0,pending=0,next=0,lastCity=-1;
   function update(x:number,z:number,now:number){
     if(now<next)return;
     next=now+.2;
+    const city=env.uCity.value;
+    const cityChanged=Math.abs(city-lastCity)>.015;
+    if(cityChanged)lastCity=city;
     sun.color.copy(env.uSunLight.value).add(env.uMoonLight.value);
-    sun.position.copy(env.uCity.value>.8?env.uMoonDir.value:env.uSunDir.value);
+    sun.position.copy(city>.8?env.uMoonDir.value:env.uSunDir.value);
     sky.color.copy(env.uMid.value).lerp(env.uHorizon.value,.4).multiplyScalar(1.15);
     sky.groundColor.copy(env.uHorizon.value).multiplyScalar(.38);
     for(const r of rows){
       r.distance=Math.hypot(r.x-x,r.z-z);
-      if(r.group && r.distance>4200){
+      if(r.group && r.distance>6200){
         scene.remove(r.group);dispose(r.group);r.group=null;revision++;
+      } else if (r.group && cityChanged) {
+        applyLandmarkNight(r.group, r.id, city);
       }
     }
     for(const r of rows.sort((a,b)=>a.distance-b.distance)){
-      if(pending>=2 || r.distance>3100)break;
+      if(pending>=2 || r.distance>4800)break;
       if(r.group || r.pending || r.retry>now)continue;
       r.pending=true;pending++;
       void loader.loadAsync(r.file).then(async({scene:model})=>{
+        applyLandmarkNight(model, r.id, env.uCity.value);
         await prepare(model);
-        if(r.distance>4200){dispose(model);return;}
+        if(r.distance>6200){dispose(model);return;}
         model.position.set(r.x,ground(r.x,r.z),r.z);
         model.name=r.id;
         scene.add(model);r.group=model;revision++;

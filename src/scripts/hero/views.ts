@@ -32,18 +32,32 @@ const TOWER = toLocal(KYOTO_TOWER_LOCATION.lat, KYOTO_TOWER_LOCATION.lon);
 const SENKOJI = toLocal(35.0157751, 135.6655983); // OSM node/4323065493: 大悲閣千光寺
 const ATAGO_RIDGE = toLocal(35.052699, 135.655073); // On the eastern flank, above the Katsura valley.
 const KINKAKU = toLocal(35.0395092, 135.7284548); // OSM way/403406106: 舎利殿の建物
-const KAMEOKA_RIDGE=toLocal(34.98287,135.55802); // South of the terrace, overlooking the campus and basin.
+const KAMEOKA_RIDGE=toLocal(34.98660,135.55685); // Above the terrace slope, framing the campus beside the wooded ridge.
 const CONFLUENCE=toLocal(34.873831,135.676099); // Look upstream over the three rivers towards Kyoto.
 const HIKONE=toLocal(35.27645,136.25184); // 彦根城 天守 (public/kansai/landmarks/index.json hikone-keep)
+const YOGO=toLocal(35.52405,136.19357); // 余呉湖（鏡湖・滋賀県長浜市）
 const HIEI=toLocal(35.0616,135.8414); // 比叡山 山頂付近（京都・びわ湖を一望）
 const TODAIJI=toLocal(34.6889931,135.83987322); // 東大寺 大仏殿 (public/kansai/landmarks/index.json todaiji)
 const KASUGA=toLocal(34.6815749,135.8485364); // 春日大社 本殿 (public/kansai/landmarks/index.json kasuga-honden-1)
+const KIX=toLocal(34.4347,135.2440); // 関西国際空港 第1ターミナル・滑走路
+const ITAMI=toLocal(34.7868,135.4408); // 大阪国際空港（伊丹空港）ターミナル・32L/32R
+const KOBE_AIRPORT=toLocal(34.6335,135.2242); // 神戸空港 ターミナル・滑走路
+const ABENO_HARUKAS=toLocal(34.646181,135.513396); // あべのハルカス (300 m)
+const UMEDA_SKY=toLocal(34.705244,135.490177); // 梅田スカイビル (173 m)
+const TSUTENKAKU=toLocal(34.652540,135.506305); // 通天閣 (108 m)
 
 export const EXTRA_LANDMARKS = [
   { id: 'hikone', ja: '彦根城', en: 'Hikone Castle', lat: 35.27645, lon: 136.25184 },
+  { id: 'yogo', ja: '余呉湖', en: 'Lake Yogo', lat: 35.52405, lon: 136.19357 },
   { id: 'hiei', ja: '比叡山', en: 'Mt. Hiei', lat: 35.0616, lon: 135.8414 },
   { id: 'todaiji', ja: '東大寺', en: 'Todai-ji', lat: 34.6889931, lon: 135.83987322 },
   { id: 'kasuga', ja: '春日大社', en: 'Kasuga Taisha', lat: 34.6815749, lon: 135.8485364 },
+  { id: 'kix', ja: '関西国際空港', en: 'Kansai International Airport', lat: 34.4347, lon: 135.2440 },
+  { id: 'itami', ja: '伊丹空港（大阪国際空港）', en: 'Itami Airport (Osaka Intl)', lat: 34.7868, lon: 135.4408 },
+  { id: 'kobeAirport', ja: '神戸空港', en: 'Kobe Airport', lat: 34.6335, lon: 135.2242 },
+  { id: 'abenoHarukas', ja: 'あべのハルカス', en: 'Abeno Harukas', lat: 34.646181, lon: 135.513396 },
+  { id: 'umedaSky', ja: '梅田スカイビル', en: 'Umeda Sky Building', lat: 34.705244, lon: 135.490177 },
+  { id: 'tsutenkaku', ja: '通天閣', en: 'Tsutenkaku', lat: 34.652540, lon: 135.506305 },
 ] as const;
 
 /** Frame the named structure or area using the same centre as its map pin. */
@@ -100,7 +114,7 @@ export const VIEWS = {
   ryoanji: spotOrbit('ryoanji',110,65,180,7),
   togetsukyo: spotOrbit('arashiyama',330,160,180,8),
   kameoka:spotOrbit('kameoka',820,540,240,15),
-  kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:KAMEOKA_RIDGE,ref:KAMEOKA_RIDGE,above:168,bearing:345.95,pitch:-7.72},
+  kameokaTerrace:{ja:'かめおか霧のテラス',en:'Kameoka Kiri Terrace',eye:KAMEOKA_RIDGE,ref:KAMEOKA_RIDGE,above:152,bearing:346.79,pitch:-7.42},
   tennozan:{ja:'天王山',en:'Mt. Tennozan',eye:CONFLUENCE,ref:CONFLUENCE,above:894,bearing:22.14,pitch:-8.34},
   sonobe:spotOrbit('sonobe',1100,650,180,8),
   yamashina:spotOrbit('yamashina',1000,650,180,8),
@@ -109,9 +123,16 @@ export const VIEWS = {
   byodoin:spotOrbit('byodoin',200,95,95,7),
   philosopher:spotOrbit('philosopher',280,185,240,4),
   hikone:{ja:'彦根城',en:'Hikone Castle',eye:ahead(HIKONE,225,360),ref:HIKONE,above:125,bearing:45,pitch:-17,orbit:{center:HIKONE,targetHeight:22}},
+  yogo:{ja:'余呉湖',en:'Lake Yogo',eye:ahead(YOGO,175,1550),ref:YOGO,above:380,bearing:355,pitch:-13,orbit:{center:YOGO,targetHeight:4}},
   hiei:{ja:'比叡山',en:'Mt. Hiei',eye:ahead(HIEI,110,900),ref:HIEI,above:320,bearing:290,pitch:-16,orbit:{center:HIEI,targetHeight:12}},
   todaiji:{ja:'東大寺',en:'Todai-ji',eye:ahead(TODAIJI,185,340),ref:TODAIJI,above:120,bearing:5,pitch:-16,orbit:{center:TODAIJI,targetHeight:28}},
   kasuga:{ja:'春日大社',en:'Kasuga Taisha',eye:ahead(KASUGA,240,260),ref:KASUGA,above:95,bearing:60,pitch:-17,orbit:{center:KASUGA,targetHeight:10}},
+  kix:{ja:'関西国際空港',en:'Kansai International Airport',eye:ahead(KIX,145,2150),ref:KIX,above:480,bearing:325,pitch:-13,orbit:{center:KIX,targetHeight:24}},
+  itami:{ja:'伊丹空港（大阪国際空港）',en:'Itami Airport',eye:ahead(ITAMI,140,1650),ref:ITAMI,above:340,bearing:320,pitch:-12,orbit:{center:ITAMI,targetHeight:18}},
+  kobeAirport:{ja:'神戸空港',en:'Kobe Airport',eye:ahead(KOBE_AIRPORT,165,1650),ref:KOBE_AIRPORT,above:340,bearing:345,pitch:-12,orbit:{center:KOBE_AIRPORT,targetHeight:18}},
+  abenoHarukas:{ja:'あべのハルカス',en:'Abeno Harukas',eye:ahead(ABENO_HARUKAS,220,760),ref:ABENO_HARUKAS,above:250,bearing:40,pitch:-10,orbit:{center:ABENO_HARUKAS,targetHeight:150}},
+  umedaSky:{ja:'梅田スカイビル',en:'Umeda Sky Building',eye:ahead(UMEDA_SKY,188,480),ref:UMEDA_SKY,above:185,bearing:8,pitch:-10,orbit:{center:UMEDA_SKY,targetHeight:95}},
+  tsutenkaku:{ja:'通天閣',en:'Tsutenkaku',eye:ahead(TSUTENKAKU,200,320),ref:TSUTENKAKU,above:105,bearing:20,pitch:-11,orbit:{center:TSUTENKAKU,targetHeight:58}},
 } satisfies Record<string, ViewDef>;
 
 export type HeroView = keyof typeof VIEWS;

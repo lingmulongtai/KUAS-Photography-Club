@@ -96,9 +96,16 @@ const REGIONAL_PIN_STYLE: Record<string, RegionalPinStyle> = {
 
 const EXTRA_PIN_STYLE: Record<(typeof EXTRA_LANDMARKS)[number]['id'], { rank: number; above: number }> = {
   hikone: { rank: 1, above: 42 },
+  yogo: { rank: 2, above: 24 },
   hiei: { rank: 2, above: 45 },
   todaiji: { rank: 2, above: 54 },
   kasuga: { rank: 3, above: 24 },
+  kix: { rank: 1, above: 86 },
+  itami: { rank: 1, above: 54 },
+  kobeAirport: { rank: 1, above: 52 },
+  abenoHarukas: { rank: 1, above: 306 },
+  umedaSky: { rank: 1, above: 178 },
+  tsutenkaku: { rank: 2, above: 112 },
 };
 
 export const ALL_PINS: readonly MapPinDef[] = [

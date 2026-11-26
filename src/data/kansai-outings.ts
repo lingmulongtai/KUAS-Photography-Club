@@ -15,7 +15,7 @@ export const OUTINGS = [
   {id:'nanzenji', pref:'26', ja:'東山・南禅寺', en:'Higashiyama · Nanzen-ji', lon:135.7933, lat:35.0112, range:620, heading:73},
   {id:'eikando', pref:'26', ja:'東山・永観堂', en:'Higashiyama · Eikan-do', lon:135.7946, lat:35.0142, range:550, heading:90},
   {id:'philosopher', pref:'26', ja:'東山・哲学の道', en:'Higashiyama · Philosopher’s Path', lon:135.7959795, lat:35.0168503, range:640, heading:350},
-  {id:'maya', pref:'28', ja:'神戸・摩耶山（摩耶ケーブル駅）', en:'Kobe · Mt. Maya cable station', lon:135.21614, lat:34.71983, range:1200, heading:330},
+  {id:'maya', pref:'28', ja:'神戸・摩耶山（山頂・掬星台）', en:'Kobe · Mt. Maya Summit (Kikuseidai)', lon:135.2043, lat:34.7329, targetHeight:14, pitch:-12, range:420, heading:175},
   {id:'nankinmachi', pref:'28', ja:'神戸・南京町（中華街）', en:'Kobe · Nankinmachi Chinatown', lon:135.188127, lat:34.688218, range:520, heading:75},
   {id:'meriken', pref:'28', ja:'神戸・メリケンパーク', en:'Kobe · Meriken Park', lon:135.18835, lat:34.6818, range:1100, heading:319},
   {id:'gyoen', pref:'26', ja:'京都御苑', en:'Kyoto Gyoen National Garden', lon:135.76214, lat:35.0235, range:1170, heading:12},

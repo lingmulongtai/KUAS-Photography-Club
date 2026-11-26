@@ -6,7 +6,8 @@ import {runInNewContext} from 'node:vm';
 const bundle = buildSync({
   stdin: {
     contents: `export * from './src/scripts/kansai/transport-mesh';
-export {Mesh} from './src/scripts/kansai/mesh';`,
+export {Mesh} from './src/scripts/kansai/mesh';
+export {LAKE_BRIDGES, isBiwaBridgeDeck} from './src/scripts/hero/biwa-bridges-data';`,
     resolveDir: process.cwd(),
   },
   bundle: true,
@@ -16,7 +17,7 @@ export {Mesh} from './src/scripts/kansai/mesh';`,
 });
 const mod = { exports: {} };
 runInNewContext(bundle.outputFiles[0].text, { module: mod });
-const { bridgeClearance, clipSegment, drawBridgePolyline, drawRailPolyline, Mesh } = mod.exports;
+const { bridgeClearance, clipSegment, drawBridgePolyline, drawRailPolyline, Mesh, LAKE_BRIDGES, isBiwaBridgeDeck } = mod.exports;
 
 const bounds = [135.5, 34.65, 135.51, 34.66];
 const xyz = ([lon, lat], h) => [(lon - 135.505) * 91500, (lat - 34.655) * 111000, h];
@@ -71,4 +72,42 @@ test('surface and elevated railways emit ballast, steel rails, and Shinkansen so
   let maxZ = -Infinity;
   for (let i = 2; i < shinkansen.positions.length; i += 3) maxZ = Math.max(maxZ, shinkansen.positions[i]);
   assert.ok(maxZ > 19.1, 'elevated Shinkansen viaduct includes raised concrete sound walls');
+});
+
+test('connected viaduct joints, tile edges and over-water spans never plunge down to ground', () => {
+  const connected = new Mesh();
+  drawBridgePolyline(connected, [[135.502, 34.655], [135.506, 34.655]], bounds, () => 10, xyz, {
+    width: 14, clearance: 6.2, startConnected: true, endConnected: true, startClearance: 6.2, endClearance: 6.2,
+  });
+  const deckYs = [];
+  for (let i = 0; i < connected.positions.length; i += 3) {
+    if (connected.normals[i + 2] > 0.9 && connected.colors[(i / 3) * 4] === 88) deckYs.push(connected.positions[i + 2]);
+  }
+  assert.ok(deckYs.length > 0 && Math.min(...deckYs) > 16.1, 'connected elevated roadway stays continuously at 16.2 m');
+
+  const waterSpan = new Mesh();
+  drawBridgePolyline(waterSpan, [[135.502, 34.655], [135.505, 34.655]], bounds, () => 0, xyz, {
+    width: 14, clearance: 6.2, isWater: () => true,
+  });
+  const waterDeckYs = [];
+  for (let i = 0; i < waterSpan.positions.length; i += 3) {
+    if (waterSpan.normals[i + 2] > 0.9 && waterSpan.colors[(i / 3) * 4] === 88) waterDeckYs.push(waterSpan.positions[i + 2]);
+  }
+  assert.ok(waterDeckYs.length > 0 && Math.min(...waterDeckYs) > 6.1, 'over-water bridge endpoints never dive into water');
+
+  const tileEdgeSpan = new Mesh();
+  // Endpoint within 3 m of tile east edge (135.51 - 3e-5) must stay elevated across the tile split.
+  drawBridgePolyline(tileEdgeSpan, [[135.504, 34.655], [135.50997, 34.655]], bounds, () => 4, xyz, {
+    width: 14, clearance: 6.2, startConnected: true,
+  });
+  const edgeDeckYs = [];
+  for (let i = 0; i < tileEdgeSpan.positions.length; i += 3) {
+    if (tileEdgeSpan.normals[i + 2] > 0.9 && tileEdgeSpan.colors[(i / 3) * 4] === 88) edgeDeckYs.push(tileEdgeSpan.positions[i + 2]);
+  }
+  assert.ok(edgeDeckYs.length > 0 && Math.min(...edgeDeckYs) > 10.1, 'tile-boundary bridge stays elevated across the seam');
+
+  assert.equal(LAKE_BRIDGES.length, 2);
+  assert.equal(isBiwaBridgeDeck([135.903, 34.99725]), true, 'exact Omi Ohashi centerline is masked in tile compiler');
+  assert.equal(isBiwaBridgeDeck([135.934, 35.1216]), true, 'exact Biwako Ohashi centerline is masked in tile compiler');
+  assert.equal(isBiwaBridgeDeck([135.900, 35.005]), false, 'open Lake Biwa north of Omi Ohashi has no phantom bridge');
 });
