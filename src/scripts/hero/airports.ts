@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
 import { toLocal } from './geo';
-import { AIRPORT_RUNWAYS, HELIPADS } from './airports-data';
-export { AIRPORT_RUNWAYS, HELIPADS, inAirportBuildingMask, type RunwaySpec, type HelipadSpec } from './airports-data';
+import { AIRPORT_RUNWAYS, ATC_TOWERS, HELIPADS } from './airports-data';
+export { AIRPORT_RUNWAYS, ATC_TOWERS, HELIPADS, inAirportBuildingMask, type AtcTowerSpec, type RunwaySpec, type HelipadSpec } from './airports-data';
 
 type RGB = [number, number, number];
 type GroundFn = (x: number, z: number) => number;
@@ -179,84 +179,6 @@ function addLight(b: MeshBuilder, p: [number, number, number], rgb: RGB, size: n
   b.lightCol.push(rgb[0], rgb[1], rgb[2]);
   b.lightSize.push(size);
   b.lightPhase.push(phase);
-}
-
-/** Build an arched/curved airfoil roof (terminals & arched maintenance hangars). */
-function pushCurvedRoof(
-  b: MeshBuilder,
-  f: LocalFrame,
-  along: number,
-  across: number,
-  baseY: number,
-  len: number,
-  wid: number,
-  archRise: number,
-  thickness: number,
-  rgb: RGB,
-  segments = 8,
-  surf: number = SURF.hangarMetal,
-) {
-  const hl = len * 0.5;
-  const anchorY = baseYAt(f, along, across);
-  for (let i = 0; i < segments; i++) {
-    const t0 = i / segments - 0.5;
-    const t1 = (i + 1) / segments - 0.5;
-    const w0 = across + t0 * wid;
-    const w1 = across + t1 * wid;
-    const y0 = anchorY + baseY + Math.cos(t0 * Math.PI) * archRise;
-    const y1 = anchorY + baseY + Math.cos(t1 * Math.PI) * archRise;
-    const p00 = toWorldFixedY(f, along - hl, w0, y0 + thickness);
-    const p01 = toWorldFixedY(f, along - hl, w1, y1 + thickness);
-    const p11 = toWorldFixedY(f, along + hl, w1, y1 + thickness);
-    const p10 = toWorldFixedY(f, along + hl, w0, y0 + thickness);
-    const slope = (y1 - y0) / (w1 - w0);
-    const inv = 1 / Math.hypot(slope, 1);
-    const nx = -f.rx * slope * inv, ny = inv, nz = -f.rz * slope * inv;
-    pushQuad(b, p00, p01, p11, p10, [nx, ny, nz], rgb, 0.04, 0.22, surf);
-  }
-}
-
-/** Build a high-detail Maintenance Hangar (ANA/JAL/Cargo) with arched truss roof, ribbed walls, tall hangar doors & lit bays. */
-function pushMaintenanceHangar(
-  b: MeshBuilder,
-  f: LocalFrame,
-  along: number,
-  across: number,
-  len: number,
-  wid: number,
-  wallH: number,
-  doorSide: -1 | 1,
-  accentRgb: RGB,
-) {
-  const wallCol: RGB = [0.64, 0.67, 0.70];
-  const roofCol: RGB = [0.56, 0.60, 0.64];
-  const doorCol: RGB = [0.46, 0.50, 0.54];
-  // Main hangar hall
-  pushBox(b, f, along, across, -1.2, len, wid, wallH + 1.2, wallCol, { topRgb: roofCol, emit: 0.14, surf: SURF.hangarMetal, skipBottom: true });
-  // Sweeping arched hangar roof shell
-  pushCurvedRoof(b, f, along, across, wallH - 0.5, len + 2, wid + 3, 5.2, 1.1, roofCol, 8, SURF.hangarMetal);
-  // Airline color fascia header above hangar doors
-  pushBox(b, f, along, across + doorSide * (wid * 0.5 + 0.6), wallH - 3.6, len - 4, 1.4, 3.2, accentRgb, { emit: 0.26 });
-  // Tall sliding hangar bay doors with illuminated interior bay glow at night
-  const bays = Math.max(2, Math.round(len / 48));
-  const baySpan = (len - 14) / bays;
-  for (let i = 0; i < bays; i++) {
-    const ba = along - (len - 14) * 0.5 + (i + 0.5) * baySpan;
-    const isLitBay = i % 2 === 0;
-    pushBox(
-      b, f, ba, across + doorSide * (wid * 0.5 + 0.35), 0,
-      baySpan * 0.84, 0.9, wallH - 4.4,
-      isLitBay ? [0.22, 0.26, 0.30] : doorCol,
-      { emit: isLitBay ? 0.68 : 0.12, glass: isLitBay ? 0.35 : 0.05 },
-    );
-  }
-  // Attached maintenance office/workshop wing on back side
-  pushBox(b, f, along, across - doorSide * (wid * 0.5 + 11), -1.0, len * 0.85, 20, wallH * 0.55 + 1.0, [0.54, 0.57, 0.60], {
-    emit: 0.30, glass: 0.55, surf: SURF.terminalGlass, skipBottom: true,
-  });
-  // Apron floodlight mast lighting the aircraft maintenance stand at night
-  const mastPos = toWorld(f, along, across + doorSide * (wid * 0.5 + 18), wallH + 6);
-  addLight(b, mastPos, [1.0, 0.90, 0.72], 5.6, 0);
 }
 
 /** Build an authentic Air Traffic Control Tower (podium + ribbed shaft + equipment gallery + flared glazed cab + radome + beacons). */
@@ -470,7 +392,7 @@ function pushTaxiway(b: MeshBuilder, f: LocalFrame, length: number, across: numb
   }
 }
 
-/** Build a sea bridge connecting an offshore airport island to the mainland/Port Island. */
+/** Build a straight or gently curved sea bridge connecting an offshore airport island to land. */
 function pushAccessBridge(
   b: MeshBuilder,
   startLatLon: [number, number],
@@ -480,47 +402,79 @@ function pushAccessBridge(
   peakH: number,
   piers: number,
   truss = false,
+  midLatLon?: [number, number],
 ) {
   const a = toLocal(startLatLon[0], startLatLon[1]);
   const c = toLocal(endLatLon[0], endLatLon[1]);
-  const { frame, length } = frameFromEndpoints(a, c, baseY);
-  const steps = Math.max(18, Math.round(length / 130));
+  const m = midLatLon
+    ? toLocal(midLatLon[0], midLatLon[1])
+    : { x: (a.x + c.x) * 0.5, z: (a.z + c.z) * 0.5 };
+  const evalXZ = (t: number) => {
+    const u = 1 - t;
+    return {
+      x: u * u * a.x + 2 * u * t * m.x + t * t * c.x,
+      z: u * u * a.z + 2 * u * t * m.z + t * t * c.z,
+    };
+  };
+  const approxLen = Math.hypot(m.x - a.x, m.z - a.z) + Math.hypot(c.x - m.x, c.z - m.z);
+  const steps = Math.max(18, Math.round(approxLen / 120));
   const deckCol: RGB = [0.20, 0.21, 0.22];
   const trussCol: RGB = [0.54, 0.58, 0.62];
   const pierCol: RGB = [0.46, 0.47, 0.46];
   const yAt = (t: number) => {
     const endFade = Math.sin(Math.min(1, t / 0.12) * Math.PI * 0.5) * Math.sin(Math.min(1, (1 - t) / 0.12) * Math.PI * 0.5);
     const u = (t - 0.5) / 0.28;
-    return 4.2 + (11.5 - 4.2) * endFade + (peakH - 11.5) * Math.exp(-u * u * 1.4);
+    return 3.6 + (11.0 - 3.6) * endFade + (peakH - 11.0) * Math.exp(-u * u * 1.4);
   };
   for (let i = 0; i < steps; i++) {
     const t0 = i / steps, t1 = (i + 1) / steps, tm = (t0 + t1) * 0.5;
+    const p0 = evalXZ(t0), p1 = evalXZ(t1);
+    const { frame, length: segBaseLen } = frameFromEndpoints(p0, p1, baseY);
     const ym = yAt(tm);
-    const segLen = length / steps + 1.5;
-    const along = (tm - 0.5) * length;
-    pushBox(b, frame, along, 0, ym - 2.4, segLen, width, 2.6, deckCol, { topRgb: deckCol, topSurf: SURF.asphalt });
+    const segLen = segBaseLen + 2.2;
+    pushBox(b, frame, 0, 0, ym - 2.4, segLen, width, 2.6, deckCol, { topRgb: deckCol, topSurf: SURF.asphalt });
     if (truss) {
-      pushBox(b, frame, along, 0, ym - 7.8, segLen, width * 0.72, 5.4, trussCol, { skipBottom: true });
+      pushBox(b, frame, 0, 0, ym - 7.8, segLen, width * 0.72, 5.4, trussCol, { skipBottom: true });
     }
     for (const side of [-1, 1]) {
-      pushBox(b, frame, along, side * (width * 0.5 - 0.7), ym + 0.2, segLen, 1.2, 1.4, [0.66, 0.68, 0.70]);
+      pushBox(b, frame, 0, side * (width * 0.5 - 0.7), ym + 0.2, segLen, 1.2, 1.4, [0.66, 0.68, 0.70]);
     }
     if (i % 2 === 0) {
-      addLight(b, toWorldFixedY(frame, along, 0, baseY + ym + 4.8), [1.0, 0.84, 0.56], 3.8, 0);
+      addLight(b, toWorldFixedY(frame, 0, 0, baseY + ym + 4.8), [1.0, 0.84, 0.56], 3.8, 0);
     }
   }
   for (let i = 1; i < piers; i++) {
     const t = i / piers;
+    const p0 = evalXZ(Math.max(0, t - 0.01)), p1 = evalXZ(Math.min(1, t + 0.01));
+    const { frame } = frameFromEndpoints(p0, p1, baseY);
+    const pm = evalXZ(t);
+    frame.cx = pm.x;
+    frame.cz = pm.z;
     const ym = yAt(t);
-    const along = (t - 0.5) * length;
-    pushBox(b, frame, along, 0, -4, 7.5, width * 0.55, ym + (truss ? -3.5 : 1.8), pierCol);
+    pushBox(b, frame, 0, 0, -4, 7.5, width * 0.55, ym + (truss ? -3.5 : 1.8), pierCol);
   }
+}
+
+/** Place an ATC Control Tower directly at a surveyed geographic coordinate. */
+function pushWorldControlTower(b: MeshBuilder, lat: number, lon: number, height: number, ground: GroundFn, minGround = 0) {
+  const p = toLocal(lat, lon);
+  const y = Math.max(minGround, ground(p.x, p.z));
+  const f: LocalFrame = { cx: p.x, cy: y, cz: p.z, ux: 1, uz: 0, rx: 0, rz: 1 };
+  pushControlTower(b, f, 0, 0, 0, height);
+}
+
+/** Place an apron floodlight mast directly at a surveyed geographic coordinate. */
+function pushWorldApronLight(b: MeshBuilder, lat: number, lon: number, ground: GroundFn, height = 24, minGround = 0) {
+  const p = toLocal(lat, lon);
+  const y = Math.max(minGround, ground(p.x, p.z));
+  const f: LocalFrame = { cx: p.x, cy: y, cz: p.z, ux: 1, uz: 0, rx: 0, rz: 1 };
+  pushApronFloodlight(b, f, 0, 0, height);
 }
 
 /** Build a marked helicopter pad (asphalt pad + bold yellow 'H' + crisp green perimeter lights). */
 function pushHelipad(b: MeshBuilder, lat: number, lon: number, ground: GroundFn, deckOffset: number) {
   const p = toLocal(lat, lon);
-  const y = Math.max(0.4, ground(p.x, p.z)) + deckOffset;
+  const y = Math.max(0.5, ground(p.x, p.z)) + deckOffset;
   const f: LocalFrame = { cx: p.x, cy: y, cz: p.z, ux: 1, uz: 0, rx: 0, rz: 1 };
   pushStripTop(b, f, 0, 0, 0.14, 34, 34, [0.14, 0.15, 0.16], 0, SURF.asphalt);
   const yellow: RGB = [0.84, 0.68, 0.16];
@@ -534,14 +488,14 @@ function pushHelipad(b: MeshBuilder, lat: number, lon: number, ground: GroundFn,
 }
 
 /**
- * Build high-detail 3D models for Kansai International Airport (KIX),
- * Osaka International Airport / Itami (ITM), and Kobe Airport (UKB),
- * aligned to exact OSM/AIP runway coordinates with textured pavements/turf,
- * high-detail terminals, control towers, maintenance hangars, ICAO PAPI,
- * and brilliant full-spectrum night airfield lighting.
+ * Build terrain-draped runways, full-spectrum ICAO airfield lighting (edge/centerline/PAPI/ALSF-II),
+ * surveyed ATC control towers, apron floodlights, and offshore access bridges for KIX, Itami (ITM),
+ * and Kobe Airport (UKB). Real GSI aerial orthophotos and surveyed GSI/PLATEAU buildings render the
+ * islands, aprons, terminals, finger piers, rail stations and hangars directly at 0 m offset.
  */
 export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
   const b = createBuilder();
+  const islandGround: GroundFn = (x, z) => Math.max(0.5, ground(x, z));
 
   // =========================================================================
   // 1. 関西国際空港 (Kansai International Airport — KIX)
@@ -551,66 +505,28 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
     const rwyB = AIRPORT_RUNWAYS[1];
     const a0 = toLocal(rwyA.start[0], rwyA.start[1]), a1 = toLocal(rwyA.end[0], rwyA.end[1]);
     const b0 = toLocal(rwyB.start[0], rwyB.start[1]), b1 = toLocal(rwyB.end[0], rwyB.end[1]);
-    const { frame: fA, length: lenA } = frameFromEndpoints(a0, a1, rwyA.deckOffset);
-    const { frame: fB, length: lenB } = frameFromEndpoints(b0, b1, rwyB.deckOffset);
+    const { frame: fA, length: lenA } = frameFromEndpoints(a0, a1, rwyA.deckOffset, islandGround);
+    const { frame: fB, length: lenB } = frameFromEndpoints(b0, b1, rwyB.deckOffset, islandGround);
 
-    // Island 1 (textured coastal turf + riprap seawall + concrete apron)
-    pushBox(b, fA, 40, -455, -6.8, 4520, 1340, 6.8, [0.40, 0.42, 0.41], {
-      topRgb: [0.22, 0.26, 0.20], surf: SURF.seawall, topSurf: SURF.turf, skipBottom: true,
-    });
-    pushStripTop(b, fA, 0, -565, 0.06, 2750, 560, [0.34, 0.35, 0.36], 0, SURF.concrete);
+    // Island 1 — Runway A (06R/24L) + taxiway lighting aligned over real GSI aerial orthophoto
     pushRunway(b, fA, lenA, rwyA.width, 0, { approachLen: 680, overWater: true });
-    pushTaxiway(b, fA, lenA + 220, -185, 0, [-1600, -1020, -440, 0, 440, 1020, 1600], 0);
-    pushTaxiway(b, fA, lenA - 120, -255, 0, [-1180, -440, 440, 1180], -185);
+    pushTaxiway(b, fA, lenA + 180, -190, 0, [-1520, -960, -400, 160, 720, 1320], 0, false);
+    pushTaxiway(b, fA, lenA - 180, -268, 0, [-1140, -400, 420, 1180], -190, false);
 
-    // Iconic Renzo Piano Terminal 1 (1.7 km sweeping airfoil roof + North/South wings + 30 jet bridges)
-    const t1Across = -625;
-    const t1Roof: RGB = [0.78, 0.81, 0.84];
-    const t1Glass: RGB = [0.10, 0.17, 0.24];
-    pushBox(b, fA, 0, t1Across, 0, 315, 120, 23, t1Glass, { topRgb: t1Roof, emit: 0.68, glass: 0.90, surf: SURF.terminalGlass });
-    pushCurvedRoof(b, fA, 0, t1Across, 22.5, 336, 152, 13.0, 1.8, t1Roof, 10);
-    for (const dir of [-1, 1]) {
-      pushBox(b, fA, dir * 508, t1Across + 12, 0, 705, 48, 14.5, t1Glass, { topRgb: t1Roof, emit: 0.56, glass: 0.85, surf: SURF.terminalGlass });
-      pushCurvedRoof(b, fA, dir * 508, t1Across + 12, 14.2, 712, 58, 5.4, 1.2, t1Roof, 8);
-      for (let g = 0; g < 11; g++) {
-        const gs = dir * (195 + g * 58);
-        pushBox(b, fA, gs, t1Across + 58, 4.5, 5.5, 44, 4.2, [0.74, 0.76, 0.78], { emit: 0.34, glass: 0.45 });
-        pushBox(b, fA, gs, t1Across - 34, 4.5, 5.5, 36, 4.2, [0.74, 0.76, 0.78], { emit: 0.34, glass: 0.45 });
-        if (g % 3 === 1) pushApronFloodlight(b, fA, gs, t1Across + 96, 26);
-      }
-    }
-    // KIX Station + Aeroplaza + Hotel Nikko + Parking decks
-    pushBox(b, fA, 0, t1Across - 155, 0, 268, 70, 17, [0.58, 0.61, 0.64], { emit: 0.48, glass: 0.62, surf: SURF.terminalGlass });
-    pushBox(b, fA, 0, t1Across - 265, 0, 224, 84, 28, [0.68, 0.70, 0.73], { emit: 0.44, glass: 0.72, surf: SURF.terminalGlass });
-    for (const dir of [-1, 1]) {
-      pushBox(b, fA, dir * 215, t1Across - 175, 0, 140, 94, 18, [0.54, 0.56, 0.58], { emit: 0.24 });
-    }
-    // KIX 86 m Air Traffic Control Tower
-    pushControlTower(b, fA, 220, t1Across - 270, 0, 86);
-    // KIX North & South Maintenance & Cargo Hangar complexes
-    pushMaintenanceHangar(b, fA, -1420, -545, 195, 94, 21, 1, [0.10, 0.28, 0.62]);
-    pushMaintenanceHangar(b, fA, -1140, -545, 175, 90, 19, 1, [0.72, 0.14, 0.16]);
-    pushMaintenanceHangar(b, fA, 1180, -545, 185, 92, 20, 1, [0.14, 0.36, 0.64]);
-    pushMaintenanceHangar(b, fA, 1460, -545, 195, 94, 21, 1, [0.68, 0.18, 0.22]);
-
-    // Island 2 (exact surveyed 06L/24R + Terminal 2 + twin sea-channel bridges)
-    pushBox(b, fB, 0, 195, -6.8, 4620, 1280, 6.8, [0.40, 0.42, 0.41], {
-      topRgb: [0.21, 0.25, 0.19], surf: SURF.seawall, topSurf: SURF.turf, skipBottom: true,
-    });
+    // Island 2 — Runway B (06L/24R) + taxiway lighting aligned over real GSI aerial orthophoto
     pushRunway(b, fB, lenB, rwyB.width, 0, { approachLen: 680, overWater: true });
-    pushTaxiway(b, fB, lenB + 200, 195, 0, [-1880, -1180, -380, 380, 1180, 1880], 0);
-    pushStripTop(b, fB, 180, 485, 0.06, 1400, 360, [0.34, 0.35, 0.36], 0, SURF.concrete);
-    pushBox(b, fB, 80, 540, 0, 425, 74, 12, [0.74, 0.76, 0.78], { topRgb: [0.80, 0.82, 0.84], emit: 0.46, glass: 0.55, surf: SURF.terminalGlass });
-    pushBox(b, fB, 520, 540, 0, 285, 68, 12, [0.74, 0.76, 0.78], { topRgb: [0.80, 0.82, 0.84], emit: 0.44, glass: 0.55, surf: SURF.terminalGlass });
-    pushApronFloodlight(b, fB, -60, 455, 22);
-    pushApronFloodlight(b, fB, 220, 455, 22);
-    pushApronFloodlight(b, fB, 520, 455, 22);
-    // Twin connecting taxiway bridges spanning between Island 1 and Island 2
-    pushBox(b, fA, -620, -1125, -2.5, 68, 380, 2.8, [0.36, 0.38, 0.40], { topSurf: SURF.asphalt });
-    pushBox(b, fA, 620, -1125, -2.5, 68, 380, 2.8, [0.36, 0.38, 0.40], { topSurf: SURF.asphalt });
+    pushTaxiway(b, fB, lenB + 160, 195, 0, [-1820, -1120, -360, 360, 1120, 1820], 0, false);
 
-    // 3.75 km Sky Gate Bridge R (関西国際空港連絡橋)
-    pushAccessBridge(b, [34.4310, 135.2520], [34.4126, 135.2918], 0, 30, 29, 28, true);
+    // Apron floodlight masts along the real surveyed Terminal 1 & Terminal 2 aprons
+    for (const [lat, lon] of [
+      [34.4302, 135.2392], [34.4322, 135.2422], [34.4342, 135.2451], [34.4362, 135.2481], [34.4379, 135.2508],
+      [34.4334, 135.2248], [34.4368, 135.2294], [34.4392, 135.2328],
+    ] as const) {
+      pushWorldApronLight(b, lat, lon, ground, 24, 0.5);
+    }
+
+    // 3.75 km Sky Gate Bridge R (関西国際空港連絡橋) — aligned to exact GSI RailCL / orthophoto span
+    pushAccessBridge(b, [34.4376, 135.2636], [34.4138, 135.2948], 0, 30, 29, 28, true);
   }
 
   // =========================================================================
@@ -621,58 +537,23 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
     const rwy32R = AIRPORT_RUNWAYS[3];
     const p0 = toLocal(rwy32L.start[0], rwy32L.start[1]), p1 = toLocal(rwy32L.end[0], rwy32L.end[1]);
     const q0 = toLocal(rwy32R.start[0], rwy32R.start[1]), q1 = toLocal(rwy32R.end[0], rwy32R.end[1]);
-    // Drape inland runways & lights seamlessly onto real surveyed terrain — ZERO ugly flat solid-green carpet!
-    // The real high-resolution GSI aerial photograph provides natural grass, perimeter roads & apron markings.
     const { frame: f32L, length: len32L } = frameFromEndpoints(p0, p1, rwy32L.deckOffset, ground);
     const { frame: f32R, length: len32R } = frameFromEndpoints(q0, q1, rwy32R.deckOffset, ground);
 
-    // Runway 32L/14R (exact 3,000 m surveyed — approach directly over 千里川土手!)
-    // PAPI on SW side (-1) for 32L and NE/SW clean clearings
+    // Runway 32L/14R (3,000 m, approach right over 千里川土手) & Runway 32R/14L (1,828 m)
     pushRunway(b, f32L, len32L, rwy32L.width, 0, { approachLen: 460, papiSides: [-1, -1] });
-    // Runway 32R/14L (exact 1,828 m surveyed — offset +307 m NE, extending NW to 14L!)
     pushRunway(b, f32R, len32R, rwy32R.width, 0, { approachLen: 260, papiSides: [-1, 1] });
-    // Taxiway edge & centerline lights aligned along the real taxiways between 32L, 32R, and Terminal apron
-    // (drawPavement=false lets the real GSI orthophoto taxiway markings shine crisply by day while lights sparkle at night!)
+    // Blue/green taxiway lights aligned along the real GSI orthophoto taxiways
     pushTaxiway(b, f32L, len32L - 120, 145, 0, [-1350, -820, -250, 320, 880, 1380], 0, false);
-    pushTaxiway(b, f32R, len32R - 80, 112, 0, [-780, -320, 180, 680], 0, false);
+    pushTaxiway(b, f32R, len32R - 80, 135, 0, [-760, -300, 180, 680], 0, false);
 
-    // Sculpted Itami Terminal Complex (aligned to exact surveyed NE apron: across ~520..620 m from 32L)
-    const termAcross = 545;
-    const termGlass: RGB = [0.10, 0.17, 0.24];
-    const termRoof: RGB = [0.76, 0.78, 0.80];
-    // Central Block + La Sora Rooftop Observation Deck + sweeping curved roof
-    pushBox(b, f32L, 125, termAcross, -1.2, 240, 88, 20.5, termGlass, {
-      topRgb: [0.58, 0.60, 0.62], emit: 0.66, glass: 0.86, surf: SURF.terminalGlass, skipBottom: true,
-    });
-    pushCurvedRoof(b, f32L, 125, termAcross, 19.2, 232, 74, 4.8, 1.1, termRoof, 6);
-    // North Wing (JAL, red accent) & South Wing (ANA, blue accent) + finger piers + 14 articulated jet bridges
-    for (const [dir, accent] of [[-1, [0.06, 0.24, 0.62] as RGB], [1, [0.76, 0.12, 0.16] as RGB]] as const) {
-      const wingCenter = 125 + dir * 255;
-      pushBox(b, f32L, wingCenter, termAcross - 14, -1.2, 275, 56, 16.5, termGlass, {
-        topRgb: termRoof, emit: 0.56, glass: 0.82, surf: SURF.terminalGlass, skipBottom: true,
-      });
-      // Airline wing roof fascia band
-      pushBox(b, f32L, wingCenter, termAcross - 42, 13.4, 272, 2.0, 2.2, accent, { emit: 0.35 });
-      // Boarding finger pier extending west toward 32R apron
-      pushBox(b, f32L, 125 + dir * 305, termAcross - 88, -1.0, 32, 108, 12.2, [0.68, 0.71, 0.74], {
-        emit: 0.44, glass: 0.65, surf: SURF.terminalGlass, skipBottom: true,
-      });
-      for (let g = 0; g < 6; g++) {
-        const gs = 125 + dir * (135 + g * 44);
-        pushBox(b, f32L, gs, termAcross - 58, 4.4, 5.2, 36, 3.8, [0.74, 0.76, 0.78], { emit: 0.34, glass: 0.45 });
-        if (g % 2 === 0) pushApronFloodlight(b, f32L, gs, termAcross - 88, 22);
-      }
+    // Apron floodlight masts illuminating the real surveyed Itami Terminal & hangar aprons at night
+    for (const [lat, lon] of [
+      [34.7867, 135.4426], [34.7882, 135.4414], [34.7897, 135.4401], [34.7912, 135.4388],
+      [34.7932, 135.4368], [34.7845, 135.4455],
+    ] as const) {
+      pushWorldApronLight(b, lat, lon, ground, 22);
     }
-    // Forecourt multi-story parking & Osaka Monorail Itami Airport Station on east side of terminal
-    pushBox(b, f32L, 125, termAcross + 96, -1.2, 360, 56, 15.5, [0.56, 0.58, 0.60], { emit: 0.32, glass: 0.35, skipBottom: true });
-    // Itami ATC Control Tower at exact surveyed site (along +266, across +510)
-    pushControlTower(b, f32L, 266, 510, 0, 50);
-    // South ANA Maintenance Hangars (整備地区 — along -1140..-760, across ~400)
-    pushMaintenanceHangar(b, f32L, -1120, 385, 165, 84, 22, -1, [0.06, 0.24, 0.62]);
-    pushMaintenanceHangar(b, f32L, -885, 415, 155, 82, 21, -1, [0.06, 0.24, 0.62]);
-    // North JAL Maintenance Hangars & Cargo Complex (along +960..+1360, across ~475)
-    pushMaintenanceHangar(b, f32L, 960, 468, 165, 84, 22, -1, [0.76, 0.12, 0.16]);
-    pushMaintenanceHangar(b, f32L, 1210, 478, 155, 80, 20, -1, [0.76, 0.12, 0.16]);
   }
 
   // =========================================================================
@@ -681,48 +562,32 @@ export function buildKansaiAirports(env: Env, ground: GroundFn): THREE.Group {
   {
     const rwy = AIRPORT_RUNWAYS[4];
     const p0 = toLocal(rwy.start[0], rwy.start[1]), p1 = toLocal(rwy.end[0], rwy.end[1]);
-    const { frame: fK, length: lenK } = frameFromEndpoints(p0, p1, rwy.deckOffset);
+    const { frame: fK, length: lenK } = frameFromEndpoints(p0, p1, rwy.deckOffset, islandGround);
 
-    // Reclaimed Airport Island seawall platform (textured mowed grass + riprap seawall + concrete apron)
-    pushBox(b, fK, 0, -145, -6.4, 3180, 960, 6.4, [0.40, 0.42, 0.41], {
-      topRgb: [0.22, 0.26, 0.20], surf: SURF.seawall, topSurf: SURF.turf, skipBottom: true,
-    });
-    pushStripTop(b, fK, -80, -340, 0.06, 1820, 310, [0.34, 0.35, 0.36], 0, SURF.concrete);
-
-    // Runway 09/27 (exact 2,500 m surveyed) + over-water approach light piers at both ends
+    // Runway 09/27 (2,500 m) draped over real Kobe Airport island + over-water approach light piers
     pushRunway(b, fK, lenK, rwy.width, 0, { approachLen: 520, overWater: true });
-    pushTaxiway(b, fK, lenK + 110, -155, 0, [-1160, -540, 0, 540, 1160], 0);
+    pushTaxiway(b, fK, lenK + 90, -155, 0, [-1120, -520, 0, 520, 1120], 0, false);
 
-    // Kobe Airport Main Passenger Terminal + curved signature wave roof + jet bridges
-    const termAcross = -435;
-    pushBox(b, fK, 140, termAcross, 0, 295, 70, 16.5, [0.10, 0.18, 0.25], {
-      topRgb: [0.76, 0.79, 0.82], emit: 0.62, glass: 0.86, surf: SURF.terminalGlass,
-    });
-    pushCurvedRoof(b, fK, 140, termAcross, 16.2, 312, 86, 6.4, 1.3, [0.78, 0.81, 0.84], 8);
-    for (let g = -2; g <= 2; g++) {
-      pushBox(b, fK, 140 + g * 54, termAcross + 54, 4.2, 5.2, 38, 3.8, [0.74, 0.76, 0.78], { emit: 0.34, glass: 0.45 });
+    // Apron floodlight masts along the real surveyed Kobe Airport Terminal & west heliport aprons
+    for (const [lat, lon] of [
+      [34.6361, 135.2268], [34.6362, 135.2287], [34.6363, 135.2305], [34.6352, 135.2188],
+    ] as const) {
+      pushWorldApronLight(b, lat, lon, ground, 21, 0.5);
     }
-    pushApronFloodlight(b, fK, 30, termAcross + 92, 22);
-    pushApronFloodlight(b, fK, 250, termAcross + 92, 22);
-    // International Sub-Terminal (T2) west of main terminal
-    pushBox(b, fK, -190, termAcross + 12, 0, 180, 60, 13.0, [0.68, 0.71, 0.74], {
-      topRgb: [0.78, 0.80, 0.82], emit: 0.50, glass: 0.68, surf: SURF.terminalGlass,
-    });
-    // Kobe Airport ATC Control Tower
-    pushControlTower(b, fK, 360, termAcross + 18, 0, 46);
-    // West Helicopter & Business Jet Maintenance Hangars (Fire/Police/Coast Guard/Airbus Helicopters)
-    pushMaintenanceHangar(b, fK, -940, termAcross + 28, 120, 60, 14.5, 1, [0.78, 0.18, 0.14]);
-    pushMaintenanceHangar(b, fK, -770, termAcross + 28, 120, 60, 14.5, 1, [0.14, 0.38, 0.68]);
-    pushMaintenanceHangar(b, fK, -595, termAcross + 28, 130, 62, 15.0, 1, [0.16, 0.48, 0.64]);
-    // Port Liner station & parking decks north of terminal
-    pushBox(b, fK, 140, termAcross - 92, 0, 265, 54, 12.5, [0.56, 0.58, 0.60], { emit: 0.32 });
 
-    // 1.2 km Kobe Sky Bridge (神戸スカイブリッジ)
-    pushAccessBridge(b, [34.6378, 135.2248], [34.6486, 135.2254], 0, 24, 24, 14, false);
+    // 1.2 km Kobe Sky Bridge (神戸スカイブリッジ) — curved cleanly along the real Port Island -> Airport span
+    pushAccessBridge(b, [34.6396, 135.2328], [34.6514, 135.2279], 0, 24, 24, 14, false, [34.6458, 135.2320]);
   }
 
   // =========================================================================
-  // 4. Marked Helipads (Kobe Airport, Itami, Maishima, Kyoto)
+  // 4. Surveyed ATC Control Towers (KIX 86 m, Itami 50 m, Kobe 46 m)
+  // =========================================================================
+  for (const tower of ATC_TOWERS) {
+    pushWorldControlTower(b, tower.lat, tower.lon, tower.height, ground, tower.id === 'itami' ? 0 : 0.5);
+  }
+
+  // =========================================================================
+  // 5. Marked Helipads (Kobe Airport, Itami, Maishima, Kyoto)
   // =========================================================================
   for (const pad of HELIPADS) {
     pushHelipad(b, pad.lat, pad.lon, ground, pad.deckOffset);

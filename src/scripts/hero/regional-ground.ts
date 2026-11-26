@@ -174,7 +174,8 @@ const fragmentShader = `
     // Open Osaka Bay maritime waters inside Osaka/Hyogo prefecture boundaries (e.g. around Yumeshima
     // and outer disposal breakwaters) sit at 0 m sea level with blue-grey water imagery: render them
     // with the exact same animated sea shader so coastal tiles never show square photo boundaries.
-    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500.;
+    bool onKobeAirport = vWorld.x > -50800. && vWorld.x < -46900. && vWorld.z > 40200. && vWorld.z < 41800.;
+    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500. && !onKobeAirport;
     if (inBayZone && vWorld.y <= .22) {
       float seaBlue = smoothstep(-.01, .025, photo.b - photo.r * .94) * (1. - smoothstep(.18, .34, photo.r));
       float darkWater = (1. - smoothstep(.10, .20, max(photo.r, max(photo.g, photo.b)))) * step(photo.r, photo.b * 1.12);
@@ -189,13 +190,20 @@ const fragmentShader = `
     vec3 emit=vec3(0.);
     if(uCity>.01){
       // Urban plains & waterfronts (Osaka, Kobe, Sakai, Nishinomiya, Otsu, Nara) glow brightly with
-      // streetlamps, metropolitan hubs and arterial highways at night while forested slopes stay dark.
+      // streetlamps, metropolitan hubs and arterial highways at night while forested slopes and
+      // active airport airfields (KIX, Kobe Airport, Itami) stay dark so real airfield lighting pops.
+      bool inKixAirfield = vWorld.x > -52500. && vWorld.x < -44200. && vWorld.z > 60200. && vWorld.z < 66800.;
+      vec2 itmD = vWorld.xz - vec2(-29138., 24612.);
+      float itmAlong = dot(itmD, vec2(-.706, -.708));
+      float itmAcross = dot(itmD, vec2(.708, -.706));
+      bool inItamiAirfield = itmAlong > -1720. && itmAlong < 2120. && itmAcross > -180. && itmAcross < 680.;
+      float airfieldMask = (inKixAirfield || onKobeAirport || inItamiAirfield) ? 0. : 1.;
       float green=smoothstep(.005,.038,photo.g-max(photo.r,photo.b*.92));
       float luma=dot(photo.rgb,vec3(.2126,.7152,.0722));
       float chroma=max(photo.r,max(photo.g,photo.b))-min(photo.r,min(photo.g,photo.b));
       float neutral=1.-smoothstep(.03,.15,chroma);
       float flatUrban=smoothstep(.84,.965,n.y)*(1.-smoothstep(130.,340.,vWorld.y));
-      float urban=(1.-green)*smoothstep(.06,.22,luma)*(.35+.65*neutral)*flatUrban;
+      float urban=(1.-green)*smoothstep(.06,.22,luma)*(.35+.65*neutral)*flatUrban*airfieldMask;
       if(urban>.01){
         vec2 p=vWorld.xz;
         float fp=max(length(dFdx(p)),length(dFdy(p)));

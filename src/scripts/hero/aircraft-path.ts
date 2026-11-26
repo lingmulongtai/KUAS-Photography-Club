@@ -118,7 +118,7 @@ export const HELICOPTER_FLIGHTS: readonly HelicopterFlight[] = [
     id: 'heli-itami',
     padIndex: 1,
     route: [
-      [34.7782, 135.4510, 0],
+      [34.7834, 135.4472, 0],
       [34.7735, 135.4680, 195],
       [34.7985, 135.4850, 245],
       [34.8115, 135.4540, 215],
@@ -393,10 +393,9 @@ export function airlinerPose(
   const ux = dx / len, uz = dz / len;
   const rx = -uz, rz = ux; // right perpendicular (+1 right when looking along (ux, uz))
 
-  // Runway deck height matching airports.ts (Itami drapes cleanly onto real ground; KIX/UKB use fixed seawall decks)
-  const deckY = rwy.airportId === 'itami'
-    ? ground((a.x + b.x) * 0.5, (a.z + b.z) * 0.5) + rwy.deckOffset + 4.1
-    : rwy.deckOffset + 4.1;
+  // Runway deck height matching airports.ts (all five runways drape cleanly onto real surveyed terrain)
+  const midGround = ground((a.x + b.x) * 0.5, (a.z + b.z) * 0.5);
+  const deckY = (rwy.airportId === 'itami' ? midGround : Math.max(0.5, midGround)) + rwy.deckOffset + 4.1;
 
   const cycle = flight.cycleSeconds ?? 110;
   const p = ((flight.phase + seconds / cycle) % 1 + 1) % 1;
