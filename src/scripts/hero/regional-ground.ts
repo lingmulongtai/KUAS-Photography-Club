@@ -9,6 +9,7 @@ import {Grid,type Heightfield} from './heightfield';
 import {districtImagery,districtSampling,type District} from './regional-districts';
 import {regionalBudgetForTier,type RegionalQualityBudget} from './adaptive-quality';
 import {SHADOW_LAYER} from './shadow';
+import {applyYogoLakebed,YOGO_REFINE_BOX} from './yogo-shoreline';
 
 interface Patch {box: Box; file: string}
 interface GroundSurvey {grid: GridMeta; patches: Patch[]}
@@ -18,20 +19,24 @@ export function boxDistance(x:number,z:number,b:Box) {
   return Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]));
 }
 
-function patchAxis(lo:number,hi:number,edge0:number,edge1:number,step:number,fine:number[][]) {
+function patchAxis(lo:number,hi:number,edge0:number,edge1:number,step:number,fine:readonly (readonly [number,number,number])[]) {
   const values = new Set([lo,hi]);
   for(let n=lo+step;n<hi;n+=step)values.add(n);
-  for(const [start,end] of fine){
-    for(let n=Math.max(lo,start);n<Math.min(hi,end);n+=40)values.add(n);
+  for(const [start,end,fineStep] of fine){
+    for(let n=Math.max(lo,start);n<Math.min(hi,end);n+=fineStep)values.add(n);
   }
   for(const edge of [edge0,edge1])if(edge>lo && edge<hi)values.add(edge);
   return [...values].sort((a,b)=>a-b);
 }
 
 async function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[],current:()=>boolean) {
-  const overlap=fine.map(g=>g.meta.box).filter(b=>b[0]<box[2] && b[2]>box[0] && b[1]<box[3] && b[3]>box[1]);
-  const xs=patchAxis(box[0],box[2],kyoto[0],kyoto[2],200,overlap.map(b=>[b[0],b[2]]));
-  const zs=patchAxis(box[1],box[3],kyoto[1],kyoto[3],200,overlap.map(b=>[b[1],b[3]]));
+  const refineBoxes: {box:readonly [number,number,number,number];step:number}[] = [
+    ...fine.map(g=>({box:g.meta.box,step:40})),
+    {box:YOGO_REFINE_BOX,step:25},
+  ];
+  const overlap=refineBoxes.filter(({box:b})=>b[0]<box[2] && b[2]>box[0] && b[1]<box[3] && b[3]>box[1]);
+  const xs=patchAxis(box[0],box[2],kyoto[0],kyoto[2],200,overlap.map(({box:b,step})=>[b[0],b[2],step] as const));
+  const zs=patchAxis(box[1],box[3],kyoto[1],kyoto[3],200,overlap.map(({box:b,step})=>[b[1],b[3],step] as const));
   const pos=new Float32Array(xs.length*zs.length*3),uv=new Float32Array(xs.length*zs.length*2);
   const columns=xs.length,rows=zs.length,vertices=rows*columns;
   const indices=vertices>65535?new Uint32Array(6*(columns-1)*(rows-1)):new Uint16Array(6*(columns-1)*(rows-1));
@@ -292,6 +297,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       const [w,n,e,s]=g.meta.box,edge=Math.min(x-w,e-x,z-n,s-z);
       if(edge>0)h=THREE.MathUtils.lerp(h,g.sample(x,z),THREE.MathUtils.smoothstep(edge,0,320));
     }
+    h=applyYogoLakebed(x,z,h);
     if(d>=600)return h;
     const rim=hf.height(THREE.MathUtils.clamp(x,kyoto[0],kyoto[2]),THREE.MathUtils.clamp(z,kyoto[1],kyoto[3]));
     return THREE.MathUtils.lerp(rim,h,THREE.MathUtils.smoothstep(d,0,600));

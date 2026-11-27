@@ -8,20 +8,24 @@ const {build}=require('esbuild'),Module=require('node:module');
 test('regional water follows the Yamashina canal bends without a camera-dependent floating bank',async(t)=>{
   const result=await build({stdin:{resolveDir:process.cwd(),contents:`
     export {biwaSurface,waterProfile,buildWater,buildWaterAsync} from './src/scripts/hero/water.ts';
+    export {applyYogoLakebed,inYogoLake,YOGO_WATER_LEVEL} from './src/scripts/hero/yogo-shoreline.ts';
     export {loadLines} from './src/scripts/hero/lines-data.ts';
     export {loadHeightfield} from './src/scripts/hero/heightfield.ts';
     export {createEnv} from './src/scripts/hero/env.ts';
   `},bundle:true,platform:'node',format:'cjs',write:false,logLevel:'silent'});
   const mod=new Module(import.meta.url);mod.filename=import.meta.filename;mod.paths=modulePaths();mod._compile(result.outputFiles[0].text,import.meta.filename);
-  const {biwaSurface,waterProfile,buildWater,buildWaterAsync,loadLines,loadHeightfield,createEnv}=mod.exports;
+  const {biwaSurface,waterProfile,buildWater,buildWaterAsync,applyYogoLakebed,inYogoLake,YOGO_WATER_LEVEL,loadLines,loadHeightfield,createEnv}=mod.exports;
   const original=globalThis.fetch;globalThis.fetch=async path=>new Response(await readFile(new URL('../public'+path,import.meta.url)));t.after(()=>{globalThis.fetch=original;});
   const meta=JSON.parse(await readFile(new URL('../public/kyoto/terrain.json',import.meta.url))),hf=await loadHeightfield(meta);
-  const biwa=await biwaSurface(createEnv(),{}),[lake,river]=biwa.children;
+  const biwa=await biwaSurface(createEnv(),{}),[lake,river,yogo]=biwa.children;
   const {Raycaster,Vector3}=require('three');
   const rayAt=(lat,lon)=>new Raycaster(new Vector3((lon-135.7595)*91284.17129262601,1500,(35.0036-lat)*110940.6404266756),new Vector3(0,-1,0));
   for(const [lat,lon] of [[35.025,135.895],[35.027,135.898],[35.25,136.1]]){
     assert.ok(Math.abs(rayAt(lat,lon).intersectObject(lake)[0].point.y-85)<1e-6,'same surveyed lake on both sides of the old corner');
   }
+  assert.ok(Math.abs(rayAt(35.52405,136.19357).intersectObject(yogo)[0].point.y-YOGO_WATER_LEVEL)<1e-4,'z15 Lake Yogo covers centre');
+  assert.equal(inYogoLake(39620,-57800),true,'Lake Yogo centre is inside z15 mask');
+  assert.ok(applyYogoLakebed(39620,-57800,145)<YOGO_WATER_LEVEL,'Lake Yogo bed is carved cleanly below water level');
   assert.equal(rayAt(35.208,136.063).intersectObject(lake).length,0,'Okishima remains land');
   assert.ok(Math.abs(rayAt(34.9731,135.9065).intersectObject(river)[0].point.y-85)<1e-6,'water beneath Karahashi');
   assert.ok(Math.abs(rayAt(34.8920,135.8065).intersectObject(river)[0].point.y-85)<1e-6,'continuous river channel reaches Uji Bridge past Amagase Dam');

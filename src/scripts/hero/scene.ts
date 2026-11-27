@@ -33,6 +33,7 @@ import { biwaSurface, buildWaterAsync, osakaWaterSurface, waterSteps, type BiwaS
 import { buildBiwaBridges } from './biwa-bridges';
 import { buildKansaiAirports } from './airports';
 import { buildOsakaLandmarks } from './osaka-landmarks';
+import { inYogoLake } from './yogo-shoreline';
 import { inAirportClearing } from './airports-data';
 import { createAdaptiveQuality } from './adaptive-quality';
 import { createLabels, type HeroTrip } from './labels';
@@ -740,7 +741,7 @@ export function createHero(
       if(x>=b[0] && x<b[2] && z>=b[1] && z<b[3])return woodlandRaster.sample(x,z) || (island(x,z)?1:0);
       return regional?.canopy(x,z)??0;
     },
-    (x,z) => !!cultivated?.(x,z) || regionalCity?.excludesTree(x,z)===true || inAirportClearing(x,z) || todaijiClearing(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
+    (x,z) => !!cultivated?.(x,z) || regionalCity?.excludesTree(x,z)===true || inAirportClearing(x,z) || inYogoLake(x,z) || todaijiClearing(x,z) || buildingsMask(x,z) || outerExcluded(x,z) || rockGarden(x,z) || inariClearing(x,z) ||
       replacesByodoin(x,z) || (roadsAndWater(x,z) && !island(x,z)) || fireClearing(x,z),
     [...campusTreeSpots(hf),...cherries], !cover);
     let forestRefreshPending=false;
