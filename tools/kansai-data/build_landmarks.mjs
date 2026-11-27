@@ -157,7 +157,7 @@ try{
   }
   const [lon,lat]=geo(station.x,station.z);
   manifest.push({id:'station-district',pref:'26',lon,lat,file:'/kyoto/kyoto-station-district.glb',rings});
-  for(const catalogue of ['surveyed-sites.json','temple-roofs.json']){
+  for(const catalogue of ['surveyed-sites.json','temple-roofs.json','osaka-surveys.json']){
     manifest.push(...JSON.parse(await fs.readFile(new URL(catalogue,output))));
   }
   await fs.writeFile(new URL('index.json',output),JSON.stringify(manifest)+'\n');
