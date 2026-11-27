@@ -5,7 +5,7 @@ import { RAIL_BALLAST } from './rail-ballast';
 import { BUILT_GLSL } from './building-occlusion';
 import { STROKES } from './daimonji';
 import type { Box } from './geo';
-import { toLocal } from './geo';
+import { BAY_HANDOFF, toLocal } from './geo';
 import type { Heightfield } from './heightfield';
 import type { BasinSheet, GridMeta } from './data';
 import type {KamoChannel} from './kamo-channel';
@@ -82,6 +82,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
     uOuterPhoto: {value:tex.outer?.photo??tex.aerialWide},
     uOuterBox: {value:v4(tex.outer?.box??tex.normalFarBox)},
     uOuterOn: {value:tex.outer?1:0},
+    /** 1 while the regional ground draws Osaka Bay south-west of BAY_HANDOFF (see regional-ground.ts). */
+    uBayHandoff: {value:0},
     uKamoMask:{value:tex.aerialWide},
     uKamoBox:{value:new THREE.Vector4(0,0,1,1)},
     uKamoOn:{value:0},
@@ -135,6 +137,7 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
       uniform sampler2D uOuterPhoto;
       uniform vec4 uOuterBox;
       uniform float uOuterOn;
+      uniform float uBayHandoff;
       uniform sampler2D uKamoMask;
       uniform vec4 uKamoBox;
       uniform float uKamoOn;
@@ -172,6 +175,8 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         float dist = length(vWorld - cameraPosition);
         // ground covered by one pixel, in metres (the longer side of its footprint)
         float fp = max(length(dFdx(p)), length(dFdy(p)));
+        // Two meshes with different triangulations at sea level fight for depth in thin triangles.
+        if (uBayHandoff > .5 && p.x < ${BAY_HANDOFF.x}. && p.y > ${BAY_HANDOFF.z}.) discard;
         vec2 riverUv=boxUv(uKamoBox,p);
         vec2 river=texture2D(uKamoMask,riverUv).rg*inside(uKamoBox,p,1.)*uKamoOn;
 

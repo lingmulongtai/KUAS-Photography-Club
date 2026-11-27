@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {decodeTreeCover} from './tree-cover';
 import {loadBinary,loadGrid, loadJSON, loadTexture, type GridMeta} from './data';
 import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
-import type {Box} from './geo';
+import {BAY_HANDOFF,type Box} from './geo';
 import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
 import {regionalPhoto,type RegionalPhoto} from './regional-photo';
 import {Grid,type Heightfield} from './heightfield';
@@ -19,13 +19,13 @@ export function boxDistance(x:number,z:number,b:Box) {
   return Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]));
 }
 
-function patchAxis(lo:number,hi:number,edge0:number,edge1:number,step:number,fine:readonly (readonly [number,number,number])[]) {
+function patchAxis(lo:number,hi:number,edges:readonly number[],step:number,fine:readonly (readonly [number,number,number])[]) {
   const values = new Set([lo,hi]);
   for(let n=lo+step;n<hi;n+=step)values.add(n);
   for(const [start,end,fineStep] of fine){
     for(let n=Math.max(lo,start);n<Math.min(hi,end);n+=fineStep)values.add(n);
   }
-  for(const edge of [edge0,edge1])if(edge>lo && edge<hi)values.add(edge);
+  for(const edge of edges)if(edge>lo && edge<hi)values.add(edge);
   return [...values].sort((a,b)=>a-b);
 }
 
@@ -35,8 +35,8 @@ async function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[],curre
     {box:YOGO_REFINE_BOX,step:25},
   ];
   const overlap=refineBoxes.filter(({box:b})=>b[0]<box[2] && b[2]>box[0] && b[1]<box[3] && b[3]>box[1]);
-  const xs=patchAxis(box[0],box[2],kyoto[0],kyoto[2],200,overlap.map(({box:b,step})=>[b[0],b[2],step] as const));
-  const zs=patchAxis(box[1],box[3],kyoto[1],kyoto[3],200,overlap.map(({box:b,step})=>[b[1],b[3],step] as const));
+  const xs=patchAxis(box[0],box[2],[kyoto[0],kyoto[2],BAY_HANDOFF.x],200,overlap.map(({box:b,step})=>[b[0],b[2],step] as const));
+  const zs=patchAxis(box[1],box[3],[kyoto[1],kyoto[3],BAY_HANDOFF.z],200,overlap.map(({box:b,step})=>[b[1],b[3],step] as const));
   const pos=new Float32Array(xs.length*zs.length*3),uv=new Float32Array(xs.length*zs.length*2);
   const columns=xs.length,rows=zs.length,vertices=rows*columns;
   const indices=vertices>65535?new Uint32Array(6*(columns-1)*(rows-1)):new Uint16Array(6*(columns-1)*(rows-1));
@@ -56,7 +56,7 @@ async function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[],curre
       if(i+1===columns || j+1===rows)continue;
       const inKyoto=x>=kyoto[0] && xs[i+1]<=kyoto[2] && z>=kyoto[1] && zs[j+1]<=kyoto[3];
       // Keep the SW corner inside Kyoto's outer bounds where Osaka Bay enters, so sea water continues seamlessly across z=36000.
-      const osakaBayOverlap=xs[i+1]<-20500 && zs[j+1]>27500;
+      const osakaBayOverlap=xs[i+1]<=BAY_HANDOFF.x && zs[j]>=BAY_HANDOFF.z;
       if(inKyoto && !osakaBayOverlap)continue;
       indices.set([k,k+columns,k+1,k+1,k+columns,k+columns+1],offset);offset+=6;
     }
@@ -169,13 +169,16 @@ const fragmentShader = `
     float groundFp=max(length(dFdx(vWorld.xz)),length(dFdy(vWorld.xz)));
     vec4 photo=texture2D(uPhoto,vUv);
     int prefectureCode=owner(vWorld.xz);
-    bool insideKyoto=vWorld.x>=uKyotoBox.x && vWorld.z>=uKyotoBox.y && vWorld.x<=uKyotoBox.z && vWorld.z<=uKyotoBox.w;
+    // South-west of the bay handoff this ground replaces Kyoto's terrain outright, land and sea alike.
+    bool handoff=vWorld.x<${BAY_HANDOFF.x}. && vWorld.z>${BAY_HANDOFF.z}.;
+    bool insideKyoto=!handoff && vWorld.x>=uKyotoBox.x && vWorld.z>=uKyotoBox.y && vWorld.x<=uKyotoBox.z && vWorld.z<=uKyotoBox.w;
     // Inside Osaka Bay every prefectureCode==0 pixel is sea; never discard along coarse 50 m ground-patch
     // alpha fringes around KIX, Kobe Airport, Port Island, or Yumeshima seawalls. Harbour basins inside
     // municipal limits come from osaka-water.bin. A sea-level height test is not used: the DEM over
     // water interpolates across each triangle, so it drew the triangles as a saw-tooth of sea and photo.
     bool inOsakaBay=vWorld.x>-72000. && vWorld.x<-19500. && vWorld.z>28500. && vWorld.z<76000.;
-    if(prefectureCode==0 && (inOsakaBay || (photo.a>=.18 && (photo.a<.62 || insideKyoto)))){
+    bool sea=prefectureCode==0 && (inOsakaBay || (photo.a>=.18 && (photo.a<.62 || insideKyoto)));
+    if(sea){
       gl_FragColor=vec4(renderSea(vWorld,groundFp),1.);
       return;
     }
@@ -385,5 +388,8 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       }).catch(()=>{state.retry=last+10;}).finally(()=>{state.pending=false;running--;});
     }
   }
-  return {bounds:grid.box,ground,canopy,update,imagery:{uDistrict,uDistrictBox,uInset,uInsetBox}};
+  // Every patch that overlaps Kyoto's terrain south-west of BAY_HANDOFF is on screen.
+  const handoff=states.filter(({patch:{box:b}})=>b[0]<BAY_HANDOFF.x && b[2]>kyoto[0] && b[3]>BAY_HANDOFF.z && b[1]<kyoto[3]);
+  const bayHandoffReady=()=>handoff.length>0 && handoff.every(s=>s.mesh);
+  return {bounds:grid.box,ground,canopy,update,bayHandoffReady,imagery:{uDistrict,uDistrictBox,uInset,uInsetBox}};
 }

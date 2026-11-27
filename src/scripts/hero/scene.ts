@@ -236,6 +236,8 @@ export function createHero(
   let travelBounds:Box=[-34000,-19000,13000,20000];
   let orbitObstruction: ((x:number,z:number)=>number) | undefined;
   let terrainRecenter: ((c: { x: number; z: number },anchored?:boolean) => void) | null = null;
+  // Kyoto's terrain yields Osaka Bay to the regional ground once its patches are drawn.
+  const bayHandoff = { value: 0 };
   let cancelTerrainRecenter: (() => void) | null = null;
   let ensureRegionalPhoto: ((v: HeroView)=>void) | null = null;
   let ensureNearbyRegionalPhotos: ((p: { x: number; z: number }) => void) | null = null;
@@ -485,6 +487,7 @@ export function createHero(
       // The regional base is composited first; local imagery stays sharper on top.
       photos: [meta.far.box,...regions.map((r) => r.meta.box)],
     }, opts.quality > 0.75 ? 640 : 400);
+    terrain.uniforms.uBayHandoff = bayHandoff;
     const regionalPhotos: (Promise<unknown> | undefined)[] = [];
     // Tennozan and Arashiyama are disjoint, so reuse one sampler to stay within
     // WebGL's minimum texture-unit limit rather than adding a fourth photo slot.
@@ -1811,6 +1814,7 @@ export function createHero(
         ? (flight.t >= 0.45 ? flight.destCenter : undefined)
         : (!exploring && mode === 'city' && VIEW.orbit ? VIEW.orbit.center : undefined);
       regional?.update(camera.position.x,camera.position.z,camera.position.y,regionalTime,photoTarget,dirX,dirZ,budget,regionalDirection.y);
+      bayHandoff.value=regional?.bayHandoffReady()?1:0;
       const detailEye=flight&&flight.t>=0.48?flight.destCenter:(!exploring&&mode==='city'&&VIEW.orbit?VIEW.orbit.center:camera.position);
       if(regionalCity){
         regionalCity.update(detailEye.x,detailEye.z,dirX,dirZ,regionalTime,activeRegionBox,camera.position,budget);
