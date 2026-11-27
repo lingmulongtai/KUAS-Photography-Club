@@ -24,6 +24,8 @@ test('regional water follows the Yamashina canal bends without a camera-dependen
   }
   assert.equal(rayAt(35.208,136.063).intersectObject(lake).length,0,'Okishima remains land');
   assert.ok(Math.abs(rayAt(34.9731,135.9065).intersectObject(river)[0].point.y-85)<1e-6,'water beneath Karahashi');
+  assert.ok(Math.abs(rayAt(34.8920,135.8065).intersectObject(river)[0].point.y-85)<1e-6,'continuous river channel reaches Uji Bridge past Amagase Dam');
+  assert.equal(rayAt(34.8893,135.8077).intersectObject(river).length,0,'Byodo-in grounds stay dry beside Uji River');
   assert.equal(lake.material.uniforms.uWaterBias.value,.35,'near-shore lake bias stays tight');
   assert.equal(lake.material.polygonOffset,true,'distant Lake Biwa applies depth polygon offset');
   assert.ok(lake.material.polygonOffsetFactor<0&&lake.material.polygonOffsetUnits<0,'depth offset biases lake in front of coarse ground');
@@ -32,6 +34,11 @@ test('regional water follows the Yamashina canal bends without a camera-dependen
   assert.equal(waterProfile([{x:0,y:0},{x:100,y:0},{x:100,y:5},{x:0,y:5}],0)[0],1);
   assert.equal(waterProfile([{x:0,y:0},{x:60,y:0},{x:60,y:60},{x:0,y:60}],0)[0],0);
   const regions=JSON.parse(await readFile(new URL('../public/kyoto/regions.json',import.meta.url))).regions;
+  for(const id of ['yamashina','uji','south','tennozan']){
+    const region=regions.find(r=>r.id===id);assert.ok(region);
+    const trimmed=await loadLines(`kansai/${id}-lake-remainder.json.gz`,region.lines.file,region.lines.box,region.lines.q);
+    assert.ok(trimmed.length>0,`${id} lake remainder applies cleanly with matching checksum`);
+  }
   for(const region of regions.filter(r=>r.id==='yamashina')){
     const lines=await loadLines(undefined,region.lines.file,region.lines.box,region.lines.q);
     const water=buildWater(createEnv(),hf,lines,{},24,undefined,true),p=water.geometry.getAttribute('position');

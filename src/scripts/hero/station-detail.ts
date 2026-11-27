@@ -159,7 +159,7 @@ function stationMaterial(source: THREE.MeshStandardMaterial, env: Env, groundY: 
           vec2 frame = 1. - smoothstep(vec2(.025) - pixel*.5, vec2(.025) + pixel*.5, seam);
           float bars = max(frame.x, frame.y);
           vec3 incident = normalize(vWorld - cameraPosition);
-          float grazing = pow(1. - abs(dot(incident,n)), 3.);
+          float grazing = pow(max(0., 1. - abs(dot(incident,n))), 3.);
           col = mix(col * .36 + skyColor(reflect(incident,n)) * .22, col * .52, bars);
           opacity = mix(.16 + .34*grazing, .88, bars);
           light += uCity * mix(vec3(.055,.036,.021),vec3(.018,.014,.009),bars);

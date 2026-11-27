@@ -138,13 +138,13 @@ export function buildRailways(env:Env,ground:(x:number,z:number)=>number,routes:
         gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`,
     fragmentShader:`${ENV_GLSL}${SHADOW_GLSL}
       varying vec3 vWorld;varying vec3 vNormal;varying vec3 vLocal;flat varying vec3 vColor;flat varying float vVisible;flat varying float vStyle;
-      void main(){if(vVisible<.5)discard;vec3 n=normalize(vNormal);float side=step(1.3,abs(vLocal.x));float band=step(-.3,vLocal.y)*step(vLocal.y,1.05)*side;
+      void main(){vec3 n=normalize(vNormal);float sh=sunShadow(vWorld,n);if(vVisible<.5)discard;float side=step(1.3,abs(vLocal.x));float band=step(-.3,vLocal.y)*step(vLocal.y,1.05)*side;
         float pane=step(.17,fract((vLocal.z+100.)/1.65))*band;vec3 alb=mix(vColor,vec3(.22,.25,.26),step(1.1,vLocal.y));
         if(vStyle>.5 && vStyle<1.5){alb=mix(vec3(.42,.45,.46),vColor,side*step(-1.1,vLocal.y)*step(vLocal.y,-.65));alb=mix(alb,vec3(.22,.25,.26),step(1.1,vLocal.y));}
         if(vStyle>1.5){alb=mix(vColor,vec3(.67,.62,.51),step(-.25,vLocal.y));alb=mix(alb,vec3(.22,.25,.26),step(1.1,vLocal.y));}
         if(vStyle>2.5){alb=mix(vec3(.73,.76,.78),vColor,side*step(-.9,vLocal.y)*step(vLocal.y,-.48));}
         alb=mix(alb,vec3(.035,.06,.075),pane);vec3 emit=vec3(.8,.61,.32)*pane*uCity*.5;
-        gl_FragColor=vec4(applyHaze(shade(alb,n,vWorld,sunShadow(vWorld,n)),emit,vWorld),1.);}`});
+        gl_FragColor=vec4(applyHaze(shade(alb,n,vWorld,sh),emit,vWorld),1.);}`});
   const trainMesh=new THREE.Mesh(vehicles,vehicleMaterial);trainMesh.frustumCulled=false;group.add(trainMesh);
   let clock=0;
   function update(dt:number){

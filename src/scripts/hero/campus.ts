@@ -110,7 +110,7 @@ export function createCampusMesh(env:Env,geo:THREE.BufferGeometry){
           emit += vec3(1., .9, .76) * lit * mull * .9 * uCity;
         } else if (m == 2) albedo = vec3(.55, .56, .56);
         else if (m == 3){
-          float seam=abs(fract(vCell.x/.45)-.5),fw=fwidth(vCell.x/.45);
+          float seam=abs(fract(vCell.x/.45)-.5),fw=cellWidth.x/.45;
           float line=1.-smoothstep(.015-fw,.015+fw,seam);
           line=mix(line,.03,smoothstep(.1,.4,fw));
           albedo = vec3(.13, .15, .16) * (.95 + .1 * vnoise(vCell * .3))*(1.-line*.2);
@@ -127,7 +127,7 @@ export function createCampusMesh(env:Env,geo:THREE.BufferGeometry){
         }
         else if (m == 7 || m == 15){
           vec2 brick=vec2(vCell.x/.23+mod(floor(vCell.y/.075),2.)*.5,vCell.y/.075);
-          vec2 fw=fwidth(brick),g=fract(brick);
+          vec2 fw=vec2(cellWidth.x/.23,cellWidth.y/.075),g=fract(brick);
           float joint=smoothstep(.04-fw.x,.04+fw.x,g.x)*smoothstep(.07-fw.y,.07+fw.y,g.y);
           joint=mix(joint,.9,smoothstep(.2,.7,max(fw.x,fw.y)));
           albedo=(m==7?vec3(.61,.55,.44):vec3(.34,.15,.09))*mix(.83,1.,joint);

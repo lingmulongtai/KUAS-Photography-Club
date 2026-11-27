@@ -114,9 +114,8 @@ const fragmentShader = `
     }
     return h;
   }
-  vec3 renderSea(vec3 wp){
+  vec3 renderSea(vec3 wp,float fp){
     vec2 q=wp.xz;
-    float fp=max(length(dFdx(q)),length(dFdy(q)));
     float broad=1.-smoothstep(2.,16.,fp);
     float med=1.-smoothstep(.4,4.5,fp);
     vec2 drift=vec2(uTime*.38,uTime*.26);
@@ -158,14 +157,21 @@ const fragmentShader = `
     return fadeHorizon(applyHaze(col,vec3(0.),wp),wp);
   }
   void main(){
+    // Evaluate screen-space derivatives and sun shadow in uniform control flow before any discard/return.
+    vec3 n=normalize(vNormal);
+    float sh=sunShadow(vWorld,n);
+    float groundFp=max(length(dFdx(vWorld.xz)),length(dFdy(vWorld.xz)));
     vec4 photo=texture2D(uPhoto,vUv);
-    if(photo.a<.18)discard;
     int prefectureCode=owner(vWorld.xz);
     bool insideKyoto=vWorld.x>=uKyotoBox.x && vWorld.z>=uKyotoBox.y && vWorld.x<=uKyotoBox.z && vWorld.z<=uKyotoBox.w;
-    if(prefectureCode==0 && (photo.a<.62 || insideKyoto)){
-      gl_FragColor=vec4(renderSea(vWorld),1.);
+    // Inside Osaka Bay every prefectureCode==0 pixel is sea; never discard along coarse 50 m ground-patch
+    // alpha fringes around KIX, Kobe Airport, Port Island, or Yumeshima seawalls.
+    bool inOsakaBay=vWorld.x>-72000. && vWorld.x<-19500. && vWorld.z>28500. && vWorld.z<76000.;
+    if(prefectureCode==0 && (inOsakaBay || (photo.a>=.18 && (photo.a<.62 || insideKyoto)))){
+      gl_FragColor=vec4(renderSea(vWorld,groundFp),1.);
       return;
     }
+    if(photo.a<.18 && !inOsakaBay)discard;
     if(prefectureCode==0 || insideKyoto)discard;
     vec3 baseLow=textureGrad(uPhoto,vUv,vec2(.008,0.),vec2(0.,.008)).rgb;
     photo.rgb=overlay(photo.rgb,uDistrict,uDistrictBox,vWorld.xz,.08);
@@ -173,8 +179,8 @@ const fragmentShader = `
     photo.rgb=overlayMatched(photo.rgb,uMidPhoto,uMidPhotoBox,vWorld.xz,.10,baseLow,uMidPhotoMatch);
     photo.rgb=overlayMatched(photo.rgb,uClose,uCloseBox,vWorld.xz,mix(.08,.14,uCloseMatch),baseLow,uCloseMatch);
     // Exact runway-aligned island footprints for Kobe Airport & KIX (keeps low-elevation runways/aprons
-    // solidly dry while every surrounding harbor & bay water pixel renders as seamless animated sea,
-    // eliminating GSI orthophoto sea-glare tiles around Kobe Airport, KIX, and Yumeshima).
+    // solidly dry and suppresses procedural streetlamps on airfields, while offshore KIX relies on its
+    // surveyed 3 m seawall boundary in owner() so no color-threshold noise chews into the islands or channel).
     vec2 ukbD = vWorld.xz - vec2(-48893., 41148.);
     float ukbAlong = dot(ukbD, vec2(.996, -.094));
     float ukbAcross = dot(ukbD, vec2(.094, .996));
@@ -182,28 +188,27 @@ const fragmentShader = `
     vec2 kix1D = vWorld.xz - vec2(-47055., 63937.);
     float kix1Along = dot(kix1D, vec2(.775, -.632));
     float kix1Across = dot(kix1D, vec2(.632, .775));
-    bool onKix1 = kix1Along > -2160. && kix1Along < 2240. && kix1Across > -1040. && kix1Across < 230.;
+    bool onKix1 = kix1Along > -2260. && kix1Along < 2360. && kix1Across > -1060. && kix1Across < 280.;
     vec2 kix2D = vWorld.xz - vec2(-48967., 62538.);
     float kix2Along = dot(kix2D, vec2(.775, -.632));
     float kix2Across = dot(kix2D, vec2(.632, .775));
-    bool onKix2 = kix2Along > -2300. && kix2Along < 2280. && kix2Across > -340. && kix2Across < 840.;
-    bool inKixChannel = !onKix1 && !onKix2 && kix1Along > -2500. && kix1Along < 2500. && kix1Across > -1550. && kix1Across < -960.;
-    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500. && !onKobeIsland && !onKix1 && !onKix2;
-    if (inBayZone && (vWorld.y <= .16 || (inKixChannel && vWorld.y <= .45))) {
+    bool onKix2 = kix2Along > -2420. && kix2Along < 2620. && kix2Across > -360. && kix2Across < 1120.;
+    bool onKixOffshore = vWorld.x < -43500. && vWorld.z > 58000.;
+    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500. && !onKobeIsland && !onKixOffshore;
+    if (inBayZone && vWorld.y <= .16) {
       // Open bay water at sea level (including bright white/silver sun-glare sea tiles around Kobe Airport)
       // has neutral/cool RGB (b >= r * 0.86), whereas reclaimed sand/earth is warm (r >> b).
       float coolOrNeutral = smoothstep(.82, .91, photo.b / max(photo.r, .01));
       float seaBlue = smoothstep(-.01, .025, photo.b - photo.r * .94) * (1. - smoothstep(.20, .38, photo.r));
       float darkWater = (1. - smoothstep(.10, .22, max(photo.r, max(photo.g, photo.b)))) * step(photo.r, photo.b * 1.15);
       bool flatOpenSea = vWorld.y <= .06 && coolOrNeutral > .55;
-      if (flatOpenSea || max(seaBlue, darkWater) > .32 || (inKixChannel && coolOrNeutral > .45)) {
-        gl_FragColor = vec4(renderSea(vWorld), 1.);
+      if (flatOpenSea || max(seaBlue, darkWater) > .32) {
+        gl_FragColor = vec4(renderSea(vWorld, groundFp), 1.);
         return;
       }
     }
-    vec3 n=normalize(vNormal);
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
-    vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sunShadow(vWorld,n));
+    vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sh);
     vec3 emit=vec3(0.);
     if(uCity>.01){
       // Urban plains & waterfronts (Osaka, Kobe, Sakai, Nishinomiya, Otsu, Nara) glow brightly with
@@ -222,7 +227,7 @@ const fragmentShader = `
       float urban=(1.-green)*smoothstep(.06,.22,luma)*(.35+.65*neutral)*flatUrban*airfieldMask;
       if(urban>.01){
         vec2 p=vWorld.xz;
-        float fp=max(length(dFdx(p)),length(dFdy(p)));
+        float fp=groundFp;
         float dist=length(vWorld-cameraPosition);
         // Streetlamp points (18 m grid) matching Kyoto's terrain night-light grain.
         vec2 lampCell=p/18.;

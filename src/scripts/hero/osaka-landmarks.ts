@@ -867,6 +867,7 @@ export function buildOsakaLandmarks(env: Env, ground: GroundFn): THREE.Group {
         vec3 col = pow(vColor, vec3(2.2));
         float st = floor(vStyle + .5);
         float fp = max(length(dFdx(vWorld)), length(dFdy(vWorld)));
+        vec3 fwWorld = fwidth(vWorld);
         float win = 1.;
         float nightPattern = 1.;
 
@@ -875,8 +876,8 @@ export function buildOsakaLandmarks(env: Env, ground: GroundFn): THREE.Group {
           float along = abs(n.x) > abs(n.z) ? vWorld.z : vWorld.x;
           float fY = fract(vWorld.y / 4.2);
           float fX = fract(along / 3.2);
-          float fwY = fwidth(vWorld.y / 4.2);
-          float fwX = fwidth(along / 3.2);
+          float fwY = fwWorld.y / 4.2;
+          float fwX = (abs(n.x) > abs(n.z) ? fwWorld.z : fwWorld.x) / 3.2;
           float tY = smoothstep(.18, .46, fwY);
           float tX = smoothstep(.18, .46, fwX);
           float bandY = mix(smoothstep(.14 - fwY, .14 + fwY, fY) * (1. - smoothstep(.86 - fwY, .86 + fwY, fY)), .72, tY);

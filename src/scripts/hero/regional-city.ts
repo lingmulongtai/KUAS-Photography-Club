@@ -52,18 +52,20 @@ function streetMaterial(env:Env,boundary:Boundary){
     fragmentShader:`${ENV_GLSL} ${SHADOW_GLSL} ${HOME_BOUNDARY}
       varying vec3 vWorld,vNormal,vColor;
       void main(){
+        // Compute screen-space derivatives and sun shadow in uniform control flow before discard.
+        vec3 n=normalize(vNormal);
+        float sh=sunShadow(vWorld,n);
+        float fp=max(length(dFdx(vWorld.xz)),length(dFdy(vWorld.xz)));
         // Allow bridges, viaducts and piers crossing Osaka Bay harbors and Lake Biwa (where land owner == 0)
         // so coastal bay spans are never sawtooth-clipped at the shoreline raster edge.
         bool inKansaiWater=(vWorld.x>-76000. && vWorld.x<-18000. && vWorld.z>27000. && vWorld.z<68000.)
                         || (vWorld.x>8000. && vWorld.x<48000. && vWorld.z>-42000. && vWorld.z<8000.);
         if(owner(vWorld.xz)==0 && !inKansaiWater)discard;
-        vec3 n=normalize(vNormal);
-        vec3 color=shade(seasonalSurface(pow(vColor,vec3(2.2)),n,vWorld),n,vWorld,sunShadow(vWorld,n));
+        vec3 color=shade(seasonalSurface(pow(vColor,vec3(2.2)),n,vWorld),n,vWorld,sh);
         vec3 emit=vec3(0.);
         if(uCity>.01 && n.y>.5){
           // Warm pools of streetlamp light along regional avenues, viaducts & waterfront promenades at night.
           vec2 p=vWorld.xz;
-          float fp=max(length(dFdx(p)),length(dFdy(p)));
           vec2 cell=p/24.;
           float s=hash12(floor(cell));
           vec2 d=fract(cell)-.5;

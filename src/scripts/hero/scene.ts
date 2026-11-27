@@ -937,10 +937,11 @@ export function createHero(
       }).catch(error=>{eastTexture=undefined;throw error;}));
       return {photo,upgradeFile:null as string|null};
     };
+    const LAKE_REMAINDERS=new Set(['yamashina','uji','south','tennozan']);
     const regionLoader=createRegionalLoader(async(r:CityRegion)=>{
-      const lakeRemainder=r.id==='yamashina' && await ensureLake()?'kansai/yamashina-lake-remainder.json.gz':undefined;
+      const lakeRemainder=LAKE_REMAINDERS.has(r.id) && await ensureLake()?`kansai/${r.id}-lake-remainder.json.gz`:undefined;
       const results=await Promise.allSettled([loadRegionalBuildings(r),
-        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file),forestBits(r.lines.file,Boolean(lakeRemainder))] as const);
+        withoutTunnels(loadLines(lakeRemainder,r.lines.file,r.lines.box,r.lines.q)),loadRegionalPhoto(r),coverageFor(r.buildings.file),forestBits(r.lines.file,r.id==='yamashina' && Boolean(lakeRemainder))] as const);
       const [b,l,p,coverage,forest]=results;
       let livePhoto=p.status==='fulfilled'?p.value.photo:null;
       const upgradeFile=p.status==='fulfilled'?p.value.upgradeFile:null;
@@ -1386,7 +1387,7 @@ export function createHero(
     env.uMoonLight.value.setRGB(0.5, 0.58, 0.78).multiplyScalar(0.07 * moon.illumination * moonUp * dark);
     // Keep Three.js PBR lights (used by Expo 3D Tiles and regional GLB landmarks) evenly balanced across all angles.
     landmarkLights.sun.color.copy(env.uSunLight.value).add(env.uMoonLight.value);
-    landmarkLights.sun.position.copy(env.uCity.value > .8 ? env.uMoonDir.value : env.uSunDir.value);
+    landmarkLights.sun.position.copy(directSun > 0 ? env.uSunDir.value : env.uMoonDir.value);
     landmarkLights.sky.color.copy(env.uMid.value).lerp(env.uHorizon.value, .45);
     landmarkLights.sky.groundColor.copy(env.uHorizon.value).multiplyScalar(.55);
     // moonlight brightens much faster than the lit fraction grows (a full moon is ~10× a half
