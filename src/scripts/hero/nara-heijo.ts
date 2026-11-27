@@ -150,8 +150,10 @@ function addParts(b: LandmarkBuilder, parts: Part[], f: LocalSite, style = 0) {
       const n = new THREE.Vector3().subVectors(c, a).cross(new THREE.Vector3().subVectors(e, a)).normalize();
       if (!Number.isFinite(n.x)) continue;
       const world: Vec3 = [n.x * f.c - n.z * f.s, n.y, n.x * f.s + n.z * f.c];
+      // Posts and walls take the warm floodlighting of the evening light-ups.
+      const lit = color === VERMILION || color === WHITE;
       pushTri(b, at(f, a.x, a.y, a.z), at(f, c.x, c.y, c.z), at(f, e.x, e.y, e.z), world, rgb,
-        (glow ?? .2) * .35, 0, roofTone ? 4 : style);
+        (glow ?? .2) * (lit ? 1.1 : .35), 0, roofTone || lit ? 4 : style);
     }
     geo.dispose();
   }

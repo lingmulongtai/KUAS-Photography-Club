@@ -379,7 +379,8 @@ export function finalizeLandmarkGroup(b: LandmarkBuilder, env: Env, name: string
           lit += uSunLight * sh * pow(max(dot(rn, uSunDir), 0.), 64.) * .48 * vGlass * win;
         }
         vec3 emitTint = st == 3. ? pow(vColor, vec3(1.5)) * .62
-                      : st == 2. ? mix(vec3(.56, .78, .98), vec3(1.0, .82, .52), step(.6, vColor.r - vColor.b))
+                      // Warm-toned glazing reads as lamplit rooms, cool-toned as glass atria and observatories.
+                      : st == 2. ? mix(vec3(.56, .78, .98), vec3(1.0, .82, .52), step(vColor.b + .015, vColor.r))
                       : st == 4. ? mix(vec3(1.0, .74, .42), pow(vColor, vec3(1.4)), .35)
                       : mix(vec3(.68, .82, .98), vec3(.98, .76, .46), warmRoom);
         float emitScale = st == 3. ? .64 : st == 2. ? .40 : st == 4. ? .32 : .30;

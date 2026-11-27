@@ -40,7 +40,7 @@ export function buildAbenoHarukas(b: LandmarkBuilder, ground: GroundFn) {
     }
     if (i > 0) {
       // Three-storey voids at the setback: the floors above appear to float over dark glass.
-      block(b, f, k.x0 + 3, x1 - 3, k.y0, k.y0 + 12, k.z0 + 3, z1 - 3, VOID, { glass: .5, style: 2, emit: .55 });
+      block(b, f, k.x0 + 3, x1 - 3, k.y0, k.y0 + 12, k.z0 + 3, z1 - 3, VOID, { glass: .5, style: 2, emit: .35 });
       // Sky gardens on the terrace left by the block below.
       const below = blocks[i - 1];
       block(b, f, below.x0 + 1.5, x1 - 1.5, k.y0, k.y0 + .8, below.z0 + 1.5, k.z0 - .2, GREEN, { style: 4 });

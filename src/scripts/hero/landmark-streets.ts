@@ -31,7 +31,7 @@ export interface Facade {
 }
 
 const SHOPFRONT: RGB = [.20, .18, .16];
-const PANE: RGB = [.16, .17, .19];
+const PANE: RGB = [.19, .17, .15];
 
 /**
  * A row of themed buildings facing a street polyline on one side (`side` ±1: right/left of travel),
