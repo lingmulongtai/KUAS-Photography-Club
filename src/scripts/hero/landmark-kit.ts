@@ -138,9 +138,11 @@ export function at(f: LocalSite, x: number, y: number, z: number): Vec3 {
 export interface CoasterWay { layer: number; points: readonly number[] }
 
 /**
- * Coaster track from OSM centrelines. OSM gives only `layer`, so heights are spread along the
- * connected network: every node starts at its ways' layer height and is relaxed towards its
- * neighbours, which turns steps between ways into ramps and drops. Stations (layer −1) stay low.
+ * Coaster track from OSM centrelines. OSM gives only `layer`: crossings and stations, not the
+ * profile. Ways keep their layer order (stations low, overpasses above underpasses), the
+ * highest way rises to the lift-hill peak at the end nearest the station and decays in a
+ * series of camel-back hills, and every node is then relaxed towards its neighbours so steps
+ * between ways become ramps.
  */
 export function coaster(b: LandmarkBuilder, ground: GroundFn, ways: readonly CoasterWay[], opts: {
   peak: number; rail: RGB; spine: RGB; support: RGB; gauge?: number; glow?: RGB; supportEvery?: number;
@@ -148,23 +150,44 @@ export function coaster(b: LandmarkBuilder, ground: GroundFn, ways: readonly Coa
   const key = (lat: number, lon: number) => `${lat.toFixed(7)},${lon.toFixed(7)}`;
   type Node = { p: XZ; h: number; pinned: boolean; next: Set<Node> };
   const nodes = new Map<string, Node>();
-  const layerHeight = (layer: number) => layer < 0 ? 1.6 : [5, .42, .7, 1][Math.min(layer, 3)] * (layer ? opts.peak : 1);
+  const top = Math.max(...ways.map(w => w.layer));
+  const layerHeight = (layer: number) => layer < 0 ? 1.6 : layer === 0 ? 4 : opts.peak * [0, .3, .55, .8][Math.min(layer, 3)];
+  const stations: XZ[] = [];
   const paths: Node[][] = [];
   for (const way of ways) {
     const path: Node[] = [];
     for (let i = 0; i < way.points.length; i += 2) {
       const k = key(way.points[i], way.points[i + 1]);
       let n = nodes.get(k);
-      const h = layerHeight(way.layer);
-      if (!n) nodes.set(k, n = { p: toLocal(way.points[i], way.points[i + 1]), h, pinned: way.layer < 0, next: new Set() });
-      else { n.h = Math.max(n.h, h); n.pinned ||= way.layer < 0; }
+      if (!n) nodes.set(k, n = { p: toLocal(way.points[i], way.points[i + 1]), h: layerHeight(way.layer), pinned: way.layer < 0, next: new Set() });
+      else n.pinned ||= way.layer < 0;
+      if (way.layer < 0) stations.push(n.p);
       const prev = path[path.length - 1];
       if (prev && prev !== n) { prev.next.add(n); n.next.add(prev); }
       path.push(n);
     }
     paths.push(path);
   }
-  for (let it = 0; it < 40; it++) {
+  const station = stations.length
+    ? { x: stations.reduce((a, p) => a + p.x, 0) / stations.length, z: stations.reduce((a, p) => a + p.z, 0) / stations.length }
+    : paths[0][0].p;
+  ways.forEach((way, w) => {
+    if (way.layer !== top || top < 1) return;
+    const path = paths[w];
+    const first = path[0].p, last = path[path.length - 1].p;
+    const ordered = Math.hypot(first.x - station.x, first.z - station.z) <= Math.hypot(last.x - station.x, last.z - station.z)
+      ? path : [...path].reverse();
+    const total = ordered.reduce((acc, n, i) => i ? acc + Math.hypot(n.p.x - ordered[i - 1].p.x, n.p.z - ordered[i - 1].p.z) : 0, 0);
+    let s = 0;
+    ordered.forEach((n, i) => {
+      if (i) s += Math.hypot(n.p.x - ordered[i - 1].p.x, n.p.z - ordered[i - 1].p.z);
+      const lift = Math.min(1, s / Math.max(30, total * .18));
+      const decay = .4 + .6 * Math.exp(-Math.max(0, s - total * .18) / (total * .35));
+      const hills = .82 + .18 * Math.cos(Math.max(0, s - total * .18) / 34);
+      n.h = Math.max(n.h * (1 - lift), opts.peak * lift * decay * hills);
+    });
+  });
+  for (let it = 0; it < 30; it++) {
     for (const n of nodes.values()) {
       if (n.pinned || !n.next.size) continue;
       let sum = 0, w = 0;
@@ -172,11 +195,11 @@ export function coaster(b: LandmarkBuilder, ground: GroundFn, ways: readonly Coa
         const d = Math.max(4, Math.hypot(m.p.x - n.p.x, m.p.z - n.p.z));
         sum += m.h / d; w += 1 / d;
       }
-      n.h = n.h * .45 + (sum / w) * .55;
+      n.h = n.h * .6 + (sum / w) * .4;
     }
   }
   const gauge = opts.gauge ?? .62;
-  const every = opts.supportEvery ?? 13;
+  const every = opts.supportEvery ?? 18;
   for (const path of paths) {
     if (path.length < 2) continue;
     // Resample at ~2 m with linear height between nodes, then smooth the centreline.
@@ -215,7 +238,7 @@ export function coaster(b: LandmarkBuilder, ground: GroundFn, ways: readonly Coa
         travelled = 0;
         const g = ground(a[0], a[2]);
         if (a[1] - g > 2.5) {
-          addStrut(b, [a[0], g, a[2]], [a[0], a[1] - .2, a[2]], .42, .3, 6, opts.support);
+          addStrut(b, [a[0], g, a[2]], [a[0], a[1] - .2, a[2]], .3, .2, 6, opts.support);
           if (opts.glow) addLight(b, [a[0], a[1] + .8, a[2]], opts.glow, 1.1);
         }
       }

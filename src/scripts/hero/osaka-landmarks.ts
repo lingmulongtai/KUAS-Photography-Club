@@ -8,23 +8,23 @@ import { OUTLINES } from './landmark-outlines';
 import { inRing, inset, ringOf } from './landmark-kit';
 import { buildAbenoHarukas } from './abeno-harukas';
 import { buildTsutenkaku } from './tsutenkaku-tower';
-import { USJ_BUILDING_MASKS, USJ_TREE_MASKS, buildUsj } from './osaka-usj';
+import { buildUsj, inUsjClearing, inUsjModel } from './osaka-usj';
 import { HEIJO_BUILDING_MASKS, HEIJO_TREE_MASKS, buildHeijoPalace } from './nara-heijo';
 
 // Generic survey buildings inside these outlines give way to the bespoke models.
 const MODELLED = [OUTLINES.harukasTower, OUTLINES.harukasWing, OUTLINES.tsutenkaku].map(o => inset(ringOf(o), -3));
 
-const EXTRA_BUILDING_MASKS: MaskShape[] = [...USJ_BUILDING_MASKS, ...HEIJO_BUILDING_MASKS];
-const EXTRA_TREE_MASKS: MaskShape[] = [...USJ_TREE_MASKS, ...HEIJO_TREE_MASKS];
+const EXTRA_BUILDING_MASKS: MaskShape[] = [...HEIJO_BUILDING_MASKS];
+const EXTRA_TREE_MASKS: MaskShape[] = [...HEIJO_TREE_MASKS];
 
 /** True when a generic skyline/regional building sits inside any bespoke Kansai landmark footprint. */
 export function inOsakaLandmarkMask(x: number, z: number): boolean {
-  return MODELLED.some(r => inRing(r, x, z)) || inMaskShapes(EXTRA_BUILDING_MASKS, x, z);
+  return MODELLED.some(r => inRing(r, x, z)) || inUsjModel(x, z) || inMaskShapes(EXTRA_BUILDING_MASKS, x, z);
 }
 
 /** True when wild procedural trees should yield to landscaped plazas, water basins, or palace gravel courts. */
 export function inLandmarkTreeExclusion(x: number, z: number): boolean {
-  return inMaskShapes(EXTRA_TREE_MASKS, x, z);
+  return inUsjClearing(x, z) || inMaskShapes(EXTRA_TREE_MASKS, x, z);
 }
 
 export function buildOsakaLandmarks(

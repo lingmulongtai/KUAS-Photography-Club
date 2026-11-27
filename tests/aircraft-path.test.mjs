@@ -153,21 +153,21 @@ test('B787-8 airliner, helicopters, airports, Osaka landmarks and Biwa bridges b
   assert.ok(osakaIcons.children.length >= 2, 'Osaka & Nara landmarks group contains meshes and beacons');
   const meshVerts = osakaIcons.children[0].geometry.getAttribute('position').count;
   assert.ok(meshVerts > 15000, `combined Osaka/USJ/Heijo landmark mesh built cleanly (${meshVerts} verts)`);
-  // Verify exact oriented footprint & tree clearing masks cover Umeda, USJ and Heijo Palace
+  // Generic survey buildings give way under the modelled Osaka, USJ and Heijo Palace landmarks.
   for (const [label, lat, lon] of [
-    ['JR Osaka Station', 34.70240, 135.49595],
-    ['HEP FIVE', 34.70232, 135.50028],
+    ['Abeno Harukas', 34.64610, 135.51345],
+    ['Tsutenkaku', 34.65254, 135.50630],
     ['USJ Hogwarts', 34.66878, 135.43145],
-    ['USJ Super Nintendo World', 34.66835, 135.43310],
+    ['USJ Bowser castle', 34.66805, 135.42992],
     ['Heijo Daigokuden', 34.69395, 135.79415],
     ['Heijo Suzakumon', 34.68705, 135.79430],
   ]) {
     const p = toLocal(lat, lon);
     assert.equal(inOsakaLandmarkMask(p.x, p.z), true, `building mask covers ${label}`);
   }
-  const umekita = toLocal(34.70415, 135.49265);
+  const lagoon = toLocal(34.6648, 135.4318);
   const heijoCourt = toLocal(34.69295, 135.79415);
-  assert.equal(inLandmarkTreeExclusion(umekita.x, umekita.z), true, 'tree clearing covers Umekita Park');
+  assert.equal(inLandmarkTreeExclusion(lagoon.x, lagoon.z), true, 'trees stay off the USJ lagoon');
   assert.equal(inLandmarkTreeExclusion(heijoCourt.x, heijoCourt.z), true, 'tree clearing covers Heijo Palace court');
   const biwaBridges = buildBiwaBridges(env);
   assert.ok(biwaBridges.geometry.getAttribute('position').count > 200, 'Biwa bridges geometry built');
