@@ -100,6 +100,7 @@ const EXTRA_PIN_STYLE: Record<(typeof EXTRA_LANDMARKS)[number]['id'], { rank: nu
   hiei: { rank: 2, above: 45 },
   todaiji: { rank: 2, above: 54 },
   kasuga: { rank: 3, above: 24 },
+  heijoPalace: { rank: 1, above: 40 },
   kix: { rank: 1, above: 86 },
   itami: { rank: 1, above: 54 },
   kobeAirport: { rank: 1, above: 52 },
