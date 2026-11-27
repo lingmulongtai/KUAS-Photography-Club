@@ -37,28 +37,40 @@ const USJ_WATER_POLYGONS: readonly { outer: readonly number[]; holes: readonly (
   },
 ];
 
-/** Exact oriented footprint masks replacing generic regional buildings inside USJ's sculpted lands. */
+/** Surgical per-land masks so bespoke USJ icons replace generic blocks without leaving bare backlot gaps. */
 export const USJ_BUILDING_MASKS: readonly MaskShape[] = [
-  // Core theme park grounds (Hollywood, Wizarding World, Super Nintendo World, Jurassic Park, NY/Minion Waterfront)
-  makeObbMask(34.6660, 135.4322, 0.22, 315, 325),
+  // Universal Globe Plaza + Entrance Arch + Hollywood Cruciform Glass Canopy & Coaster
+  makeObbMask(34.66665, 135.43475, 0.14, 96, 130),
+  // Wizarding World of Harry Potter (Hogwarts Castle + Hogsmeade + Forbidden Journey show building)
+  makeObbMask(34.66855, 135.43145, 0.12, 92, 118),
+  // Super Nintendo World (Mt. Beanpole, Peach's Castle, Bowser's Castle + Mario Kart block)
+  makeObbMask(34.66835, 135.43315, 0.14, 78, 86),
+  // Universal Wonderland pastel carnival zone
+  makeObbMask(34.66705, 135.43255, 0.14, 62, 68),
+  // WaterWorld curved amphitheater & Jurassic Park (Discovery Restaurant + Flying Dinosaur)
+  makeObbMask(34.66685, 135.42965, 0.12, 62, 56),
+  makeObbMask(34.66525, 135.43015, 0.12, 110, 92),
+  // Central Lagoon + New York / San Francisco / Minion Park waterfront facades
+  makeObbMask(34.66445, 135.43255, 0.12, 175, 108),
 ];
 
 export const USJ_TREE_MASKS: readonly MaskShape[] = [
-  makeObbMask(34.6660, 135.4322, 0.22, 330, 340),
+  makeObbMask(34.6663, 135.4325, 0.16, 345, 345),
 ];
 
 /**
- * Build Universal Studios Japan (USJ) aligned to GSI z17 orthophoto:
+ * Build Universal Studios Japan (USJ) aligned 1:1 to GSI z17 orthophoto:
  * - Surveyed Central Lagoon, Amity Harbor / Black Lake, Jurassic River & Hogwarts Lake
- * - Universal Globe Plaza (sapphire globe + tilted golden orbital ring) & Entrance Arch
- * - Hollywood Grand Glass Canopy + Art-Deco facades + Hollywood Dream – The Ride white coaster
- * - The Wizarding World of Harry Potter (rocky crag + Hogwarts Castle + snowy Hogsmeade Village)
- * - Super Nintendo World (Mt. Beanpole, Peach's Castle, Bowser's Castle, Warp Pipes, Question Blocks)
- * - Jurassic Park (Discovery Restaurant verdigris dome + The Flying Dinosaur emerald coaster)
- * - New York / San Francisco / Minion Park waterfront facades
+ * - Universal Globe Plaza (sapphire globe + golden orbital ring) & Entrance Arch (34.6675, 135.4352)
+ * - Hollywood Grand Cruciform Glass Canopy (34.66635, 135.43475) + Art-Deco storefronts + white Hollywood Dream coaster
+ * - The Wizarding World of Harry Potter (34.66878, 135.43145): rocky crag + Hogwarts Castle + snowy Hogsmeade Village
+ * - Super Nintendo World (34.66835, 135.43310): Mt. Beanpole, Peach's Castle, Bowser's Castle, Warp Pipes, Question Blocks
+ * - Universal Wonderland pastel carousel & pavilions (34.66705, 135.43255)
+ * - WaterWorld curved amphitheater (34.66685, 135.42965) + Jurassic Park Discovery dome & emerald Flying Dinosaur coaster
+ * - Architectural New York / San Francisco / Minion Park waterfront streetscapes with warm nighttime windows
  */
 export function buildUsj(b: LandmarkBuilder, ground: GroundFn) {
-  // 1. Surveyed park water surfaces (Central Lagoon, Black Lake, Jurassic River, Hogwarts Lake)
+  // 1. Surveyed park water surfaces (Central Lagoon, Amity/Black Lake, Jurassic River, Hogwarts Lake)
   const lagoonY = ground(-29890, 37565) + 0.42;
   for (const poly of USJ_WATER_POLYGONS) {
     addWaterPolygon(b, poly.outer, lagoonY, [0.05, 0.22, 0.34], poly.holes);
@@ -66,95 +78,84 @@ export function buildUsj(b: LandmarkBuilder, ground: GroundFn) {
 
   const white: RGB = [0.92, 0.93, 0.95];
   const cream: RGB = [0.89, 0.84, 0.75];
-  const gold: RGB = [0.96, 0.78, 0.28];
-  const castleStone: RGB = [0.64, 0.60, 0.54];
-  const spireBlue: RGB = [0.20, 0.28, 0.38];
+  const gold: RGB = [0.98, 0.80, 0.28];
+  const castleStone: RGB = [0.66, 0.61, 0.54];
+  const spireBlue: RGB = [0.20, 0.29, 0.42];
   const rockGrey: RGB = [0.34, 0.33, 0.31];
   const lushGreen: RGB = [0.16, 0.38, 0.14];
 
   // =========================================================================
-  // 2. Universal Globe Plaza & Entrance Archway (34.66735, 135.43515)
+  // 2. Universal Globe Plaza & Entrance Archway (34.66745, 135.43520)
   // =========================================================================
   {
-    const g = makeSite(34.66735, 135.43515, ground, 0.72, 0.4);
-    // Tiered stone & water fountain pedestal
-    addFrustum(b, g, 0, 0, 0, 12.5, 12.0, 1.4, 24, [0.76, 0.74, 0.70], { style: 4 });
-    addFrustum(b, g, 0, 1.4, 0, 10.6, 10.6, 0.35, 24, [0.08, 0.30, 0.48], { style: 5, glass: 0.96, emit: 0.35 });
-    addFrustum(b, g, 0, 1.5, 0, 3.6, 2.2, 4.2, 16, [0.68, 0.70, 0.74], { emit: 0.25 });
-    // Iconic deep-sapphire Universal Globe (Ø11.2 m sphere!)
-    addDome(b, g, 0, 11.2, 0, 5.6, 5.6, 5.6, 8, 20, [0.08, 0.32, 0.78], { latMin: -Math.PI * 0.5, latMax: Math.PI * 0.5, emit: 0.62, glass: 0.82, style: 2 });
-    // Continents sculpted subtle golden-amber relief patches + tilted golden "UNIVERSAL" orbital ring!
+    const g = makeSite(34.66745, 135.43520, ground, 0.65, 0.4);
+    addFrustum(b, g, 0, 0, 0, 14.0, 13.4, 1.5, 24, [0.78, 0.76, 0.72], { style: 4 });
+    addFrustum(b, g, 0, 1.5, 0, 11.8, 11.8, 0.35, 24, [0.08, 0.32, 0.52], { style: 5, glass: 0.96, emit: 0.42 });
+    addFrustum(b, g, 0, 1.6, 0, 3.8, 2.4, 4.6, 16, [0.72, 0.74, 0.78], { emit: 0.30 });
+    // Iconic deep-sapphire Universal Globe (Ø12.8 m glowing sphere + golden equatorial ring)
+    addDome(b, g, 0, 12.6, 0, 6.4, 6.4, 6.4, 8, 20, [0.08, 0.34, 0.84], { latMin: -Math.PI * 0.5, latMax: Math.PI * 0.5, emit: 0.72, glass: 0.84, style: 2 });
     const ringPts: Vec3[] = [];
     for (let i = 0; i <= 24; i++) {
       const a = (i / 24) * Math.PI * 2;
-      const rx = Math.cos(a) * 7.8;
-      const rz = Math.sin(a) * 7.8;
-      const ry = 11.2 + Math.sin(a) * 2.4;
-      ringPts.push(sitePt(g, rx, ry, rz));
+      ringPts.push(sitePt(g, Math.cos(a) * 8.8, 12.6 + Math.sin(a) * 2.7, Math.sin(a) * 8.8));
     }
-    addTubeSpline(b, ringPts, 0.52, 6, 1, gold, { emit: 0.95, style: 3, closed: true });
-    addLight(b, sitePt(g, 0, 11.2, 0), [0.38, 0.74, 1.0], 5.6, 0);
+    addTubeSpline(b, ringPts, 0.62, 6, 1, gold, { emit: 0.98, style: 3, closed: true });
+    addLight(b, sitePt(g, 0, 12.6, 0), [0.38, 0.76, 1.0], 6.0, 0);
 
     // Grand White Universal Studios Entrance Arch Gate just SW of the Globe
-    const arch = makeSite(34.66692, 135.43468, ground, 0.72, 0.4);
-    for (const sx of [-18, -9, 9, 18]) {
-      addBox(b, arch, sx, 0, 0, 3.2, 14.5, 3.6, white, { style: 0, emit: 0.45 });
+    const arch = makeSite(34.66698, 135.43482, ground, 0.14, 0.4);
+    for (const sx of [-20, -10, 10, 20]) {
+      addBox(b, arch, sx, 0, 0, 3.4, 15.0, 3.8, white, { style: 0, emit: 0.52 });
     }
-    addBox(b, arch, 0, 13.8, 0, 42, 4.2, 4.2, white, { emit: 0.62, style: 0 });
-    addBox(b, arch, 0, 17.8, 0, 26, 2.2, 4.6, gold, { emit: 0.85, style: 3 });
-    // Semicircular central triumphal arch crown
-    addDome(b, arch, 0, 18.0, 0, 8.5, 5.5, 2.6, 5, 16, white, { emit: 0.55, style: 0 });
+    addBox(b, arch, 0, 14.2, 0, 46, 4.4, 4.4, white, { emit: 0.68, style: 0 });
+    addBox(b, arch, 0, 18.4, 0, 28, 2.2, 4.8, gold, { emit: 0.90, style: 3 });
+    addDome(b, arch, 0, 18.6, 0, 9.0, 5.8, 2.8, 5, 16, white, { emit: 0.62, style: 0 });
   }
 
   // =========================================================================
-  // 3. Hollywood Area Grand Cruciform Glass Canopy & Art-Deco Streetscape
+  // 3. Hollywood Grand Cruciform Glass Canopy & Art-Deco Streetscape (34.66635, 135.43475)
   // =========================================================================
   {
-    const hw = makeSite(34.66638, 135.43415, ground, 0.72, 0.5);
-    // Main cruciform translucent white steel-truss arcade roof (96 m × 22 m + 56 m × 20 m)
-    const roofH = 16.5;
-    addBox(b, hw, 0, roofH, 0, 22, 1.2, 92, [0.88, 0.92, 0.96], { emit: 0.52, glass: 0.78, style: 2, includeBottom: true });
-    addBox(b, hw, 0, roofH, 8, 56, 1.2, 20, [0.88, 0.92, 0.96], { emit: 0.52, glass: 0.78, style: 2, includeBottom: true });
-    // Central domed glass skylight intersection crowning Hollywood Boulevard
-    addDome(b, hw, 0, roofH + 1.0, 8, 12.5, 5.8, 12.5, 5, 16, [0.86, 0.92, 0.98], { emit: 0.65, glass: 0.88, style: 2 });
-    // Arched white steel roof ribs along the arcade
+    const hw = makeSite(34.66635, 135.43475, ground, 0.14, 0.5);
+    const roofH = 16.8;
+    addBox(b, hw, 0, roofH, 0, 24, 1.2, 92, [0.88, 0.92, 0.97], { emit: 0.58, glass: 0.80, style: 2, includeBottom: true });
+    addBox(b, hw, 0, roofH, 6, 62, 1.2, 22, [0.88, 0.92, 0.97], { emit: 0.58, glass: 0.80, style: 2, includeBottom: true });
+    addDome(b, hw, 0, roofH + 1.0, 6, 13.5, 6.2, 13.5, 5, 16, [0.88, 0.94, 1.0], { emit: 0.74, glass: 0.90, style: 2 });
     for (let z = -42; z <= 42; z += 12) {
-      addBox(b, hw, 0, roofH + 1.1, z, 23, 0.7, 0.8, white, { emit: 0.45 });
+      addBox(b, hw, 0, roofH + 1.1, z, 25, 0.7, 0.85, white, { emit: 0.52 });
     }
-    // Colorful Art-Deco pastel Hollywood storefronts flanking both sides of the grand canopy
     const storefronts: [number, number, number, number, number, RGB][] = [
-      [-18, -28, 14, 15, 28, [0.92, 0.82, 0.68]],
-      [-18, 28, 14, 14, 26, [0.88, 0.66, 0.64]],
-      [18, -26, 15, 16, 30, [0.76, 0.84, 0.88]],
-      [18, 28, 15, 15, 26, [0.94, 0.86, 0.64]],
-      [-34, 8, 16, 13, 18, [0.82, 0.78, 0.72]],
-      [34, 8, 16, 14, 20, [0.88, 0.76, 0.66]],
+      [-20, -26, 16, 15, 28, [0.92, 0.82, 0.68]],
+      [-20, 30, 16, 14, 28, [0.88, 0.66, 0.64]],
+      [20, -24, 16, 16, 30, [0.76, 0.84, 0.88]],
+      [20, 30, 16, 15, 28, [0.94, 0.86, 0.64]],
+      [-38, 6, 18, 14, 22, [0.82, 0.78, 0.72]],
+      [38, 6, 18, 15, 22, [0.88, 0.76, 0.66]],
     ];
     for (const [lx, lz, w, h, d, col] of storefronts) {
-      addBox(b, hw, lx, 0, lz, w, h, d, col, { topRgb: [0.56, 0.54, 0.50], emit: 0.55, style: 4 });
-      addBox(b, hw, lx, h - 0.6, lz, w + 0.8, 0.8, d + 0.8, gold, { emit: 0.75, style: 3 });
+      addBox(b, hw, lx, 0, lz, w, h, d, col, { topRgb: [0.56, 0.54, 0.50], emit: 0.58, glass: 0.35, style: 1 });
+      addBox(b, hw, lx, h - 0.6, lz, w + 0.8, 0.85, d + 0.8, gold, { emit: 0.85, style: 3 });
     }
-    // Hollywood Dream – The Ride: flowing pure-white 3D spline roller coaster (43 m lift hill + camelbacks!)
+    // Hollywood Dream – The Ride: flowing pure-white 3D spline roller coaster (43 m lift hill!)
     const hdCtrl: [number, number, number][] = [
-      [34.66605, 135.43455, 14],
-      [34.66665, 135.43510, 28],
-      [34.66735, 135.43565, 43],
-      [34.66750, 135.43525, 36],
-      [34.66700, 135.43475, 15],
-      [34.66645, 135.43485, 33],
-      [34.66580, 135.43495, 16],
-      [34.66520, 135.43475, 29],
-      [34.66505, 135.43415, 22],
-      [34.66545, 135.43395, 12],
-      [34.66590, 135.43425, 24],
-      [34.66625, 135.43455, 14],
+      [34.66605, 135.43495, 14],
+      [34.66670, 135.43540, 29],
+      [34.66735, 135.43578, 44],
+      [34.66752, 135.43538, 36],
+      [34.66698, 135.43500, 15],
+      [34.66640, 135.43525, 34],
+      [34.66575, 135.43530, 16],
+      [34.66518, 135.43505, 30],
+      [34.66502, 135.43440, 22],
+      [34.66548, 135.43420, 12],
+      [34.66595, 135.43455, 25],
+      [34.66625, 135.43485, 14],
     ];
     const hdPts: Vec3[] = hdCtrl.map(([la, lo, h]) => {
       const s = makeSite(la, lo, ground, 0, 0);
       return [s.ox, s.oy + h, s.oz];
     });
-    addTubeSpline(b, hdPts, 0.95, 8, 5, [0.95, 0.96, 0.98], { emit: 0.72, style: 3, closed: true });
-    // White steel support columns anchoring the coaster hills to the ground
+    addTubeSpline(b, hdPts, 0.95, 8, 5, [0.95, 0.96, 0.99], { emit: 0.78, style: 3, closed: true });
     for (const p of hdPts) {
       const gy = ground(p[0], p[2]) - 0.5;
       addStrut(b, [p[0], gy, p[2]], [p[0], p[1] - 0.6, p[2]], 0.58, 0.42, 6, [0.84, 0.86, 0.89], 0.14);
@@ -162,124 +163,149 @@ export function buildUsj(b: LandmarkBuilder, ground: GroundFn) {
   }
 
   // =========================================================================
-  // 4. The Wizarding World of Harry Potter (Hogwarts Castle + Hogsmeade Village)
+  // 4. The Wizarding World of Harry Potter (Hogwarts Castle at exact 34.66878, 135.43145!)
   // =========================================================================
   {
-    const hc = makeSite(34.66715, 135.42955, ground, -0.35, 1.5);
-    // Dramatic dark-grey sculpted rocky crag rising above Black Lake (0–18 m)
-    addFrustum(b, hc, 0, 0, 0, 34, 24, 15, 10, rockGrey, { topRgb: [0.28, 0.30, 0.25], style: 4 });
-    addFrustum(b, hc, -14, 0, 8, 22, 14, 12, 8, rockGrey, { style: 4 });
-    addFrustum(b, hc, 16, 0, -6, 20, 13, 13, 8, rockGrey, { style: 4 });
+    const hc = makeSite(34.66878, 135.43145, ground, -0.22, 1.5);
+    // Dramatic dark-grey sculpted rocky cliff crag overlooking Hogwarts Lake (0–18 m)
+    addFrustum(b, hc, 0, 0, 0, 38, 26, 16, 10, rockGrey, { topRgb: [0.26, 0.29, 0.23], style: 4 });
+    addFrustum(b, hc, -16, 0, 8, 24, 16, 13, 8, rockGrey, { style: 4 });
+    addFrustum(b, hc, 18, 0, -6, 22, 14, 14, 8, rockGrey, { style: 4 });
 
-    // Hogwarts Great Hall & Stone Wing (y = 14..32 m) with steeply pitched slate roof & glowing gothic windows!
-    addBox(b, hc, -10, 14, 4, 26, 13, 15, castleStone, { topRgb: spireBlue, emit: 0.48, style: 4 });
-    addBox(b, hc, -10, 18, 11.7, 18, 6.5, 0.5, [1.0, 0.80, 0.42], { emit: 0.86, glass: 0.7, style: 2 });
-    addBox(b, hc, 6, 14, -2, 24, 15, 18, castleStone, { topRgb: spireBlue, emit: 0.42, style: 4 });
-    // Steeply pitched slate roof over Great Hall
-    addFrustum(b, hc, -10, 27, 4, 11.5, 0.5, 9.5, 4, spireBlue, { phase: Math.PI / 4, style: 4, emit: 0.12 });
+    // Hogwarts Great Hall & Stone Wings with warm golden glowing gothic windows!
+    addBox(b, hc, -11, 15, 5, 28, 14, 16, castleStone, { topRgb: spireBlue, emit: 0.62, style: 4 });
+    addBox(b, hc, -11, 19, 13.2, 20, 7.2, 0.5, [1.0, 0.82, 0.44], { emit: 0.95, glass: 0.75, style: 2 });
+    addBox(b, hc, 7, 15, -3, 28, 16, 20, castleStone, { topRgb: spireBlue, emit: 0.56, style: 4 });
+    addBox(b, hc, 7, 20, 7.2, 18, 6.0, 0.5, [1.0, 0.80, 0.40], { emit: 0.90, glass: 0.7, style: 2 });
+    addFrustum(b, hc, -11, 29, 5, 12.2, 0.5, 10.5, 4, spireBlue, { phase: Math.PI / 4, style: 4, emit: 0.18 });
 
-    // Cluster of Iconic Hogwarts Towers & Sharp Slate-Blue Conical Spires!
+    // Cluster of Iconic Hogwarts Stone Towers & Sharp Slate-Blue Conical Spires!
     const towers: [number, number, number, number, number, number][] = [
-      // [lx, lz, baseY, radius, shaftH, spireH]
-      [8, -4, 15, 6.2, 21, 14],    // Grand Astronomy / Main Keep Tower (top ~50 m!)
-      [-2, -9, 15, 4.4, 17, 11],   // Gryffindor / Defence Tower
-      [18, 4, 13, 4.0, 15, 10],    // Clock / Bell Tower
-      [-18, -3, 13, 3.6, 14, 9.5], // West Turret
-      [14, -12, 13, 3.2, 13, 9],   // North Turret
-      [-6, 12, 14, 3.0, 11, 8],    // Great Hall Entry Turret
+      [8, -5, 16, 6.8, 24, 16],    // Grand Astronomy / Main Keep Tower (~56 m!)
+      [-3, -10, 16, 4.8, 19, 12.5], // Gryffindor / Defence Tower
+      [20, 4, 14, 4.4, 17, 11],    // Clock / Bell Tower
+      [-20, -3, 14, 4.0, 15, 10],  // West Turret
+      [15, -14, 14, 3.6, 14, 9.5], // North Turret
+      [-6, 14, 15, 3.4, 12, 8.5],  // Great Hall Entry Turret
     ];
     for (const [tx, tz, y0, r, sh, sph] of towers) {
-      addFrustum(b, hc, tx, y0, tz, r, r * 0.94, sh, 12, castleStone, { emit: 0.45, style: 4 });
-      // Corbelled stone parapet collar
-      addFrustum(b, hc, tx, y0 + sh - 1.2, tz, r * 1.06, r * 1.08, 1.4, 12, [0.56, 0.52, 0.46], { style: 4, emit: 0.35 });
-      // Sharp iconic slate-blue Hogwarts conical roof spire!
-      addFrustum(b, hc, tx, y0 + sh, tz, r * 1.12, 0.16, sph, 12, spireBlue, { style: 4, emit: 0.14 });
+      addFrustum(b, hc, tx, y0, tz, r, r * 0.94, sh, 12, castleStone, { emit: 0.60, style: 4 });
+      addFrustum(b, hc, tx, y0 + sh - 1.2, tz, r * 1.07, r * 1.09, 1.5, 12, [0.58, 0.54, 0.48], { style: 4, emit: 0.48 });
+      addFrustum(b, hc, tx, y0 + sh, tz, r * 1.14, 0.16, sph, 12, spireBlue, { style: 4, emit: 0.22 });
     }
-    addLight(b, sitePt(hc, 6, 38, -2), [1.0, 0.80, 0.48], 5.4, 0);
+    // Misty dark-slate Forbidden Forest hills screening the northern backlot behind Hogwarts
+    for (const [fx, fz, r, h] of [[-22, -30, 16, 18], [0, -36, 20, 22], [24, -30, 18, 19]] as const) {
+      addDome(b, hc, fx, 0, fz, r, h, r * 0.85, 4, 10, [0.12, 0.26, 0.14], { style: 4 });
+    }
+    addLight(b, sitePt(hc, 6, 42, 0), [1.0, 0.82, 0.48], 6.4, 0);
+    addLight(b, sitePt(hc, -10, 24, 12), [1.0, 0.78, 0.38], 5.2, 0);
 
-    // Hogsmeade Village: charming snow-capped steep Tudor cottages lining the approach lane
-    const hm = makeSite(34.66735, 135.43095, ground, 0.25, 0.8);
-    const snowRoof: RGB = [0.90, 0.93, 0.96];
-    const timberWall: RGB = [0.58, 0.50, 0.42];
+    // Hogsmeade Village: snow-capped steep Tudor cottages lining the South approach lane (34.66785, 135.43135)
+    const hm = makeSite(34.66785, 135.43135, ground, 0.15, 0.8);
+    const snowRoof: RGB = [0.91, 0.94, 0.98];
+    const timberWall: RGB = [0.60, 0.51, 0.42];
     for (const [hx, hz, w, d, h] of [
-      [-28, -10, 14, 11, 8], [-10, -12, 16, 12, 9], [10, -11, 15, 12, 8.5], [28, -9, 14, 11, 8],
-      [-24, 12, 15, 11, 8], [-4, 13, 14, 12, 9.5], [16, 12, 16, 11, 8.5],
+      [-14, -24, 13, 15, 8.5], [-16, -4, 14, 16, 9.5], [-15, 16, 13, 15, 8.5],
+      [14, -22, 14, 15, 9.0], [15, -2, 14, 16, 9.5], [14, 18, 14, 15, 8.5],
     ] as const) {
-      addBox(b, hm, hx, 0, hz, w, h, d, timberWall, { emit: 0.56, style: 4 });
-      addFrustum(b, hm, hx, h, hz, Math.max(w, d) * 0.62, 0.4, 6.2, 4, snowRoof, { phase: Math.PI / 4, emit: 0.22, style: 4 });
+      addBox(b, hm, hx, 0, hz, w, h, d, timberWall, { emit: 0.68, glass: 0.3, style: 1 });
+      addFrustum(b, hm, hx, h, hz, Math.max(w, d) * 0.64, 0.4, 6.4, 4, snowRoof, { phase: Math.PI / 4, emit: 0.28, style: 4 });
     }
   }
 
   // =========================================================================
-  // 5. Super Nintendo World (Mt. Beanpole, Peach's Castle, Bowser's Castle, Warp Pipes!)
+  // 5. Super Nintendo World (exact NE terrace at 34.66835, 135.43310!)
   // =========================================================================
   {
-    const nw = makeSite(34.66845, 135.43175, ground, 0.20, 0.8);
-    const beanGreen: RGB = [0.18, 0.66, 0.22];
-    const beanTop: RGB = [0.28, 0.78, 0.24];
-    const pipeGreen: RGB = [0.10, 0.68, 0.24];
-    const qYellow: RGB = [0.98, 0.82, 0.14];
-    const peachRed: RGB = [0.88, 0.18, 0.22];
-    const bowserDark: RGB = [0.22, 0.20, 0.24];
+    const nw = makeSite(34.66835, 135.43310, ground, 0.14, 0.8);
+    const beanGreen: RGB = [0.18, 0.68, 0.22];
+    const beanTop: RGB = [0.30, 0.80, 0.24];
+    const pipeGreen: RGB = [0.10, 0.70, 0.24];
+    const qYellow: RGB = [0.98, 0.84, 0.14];
+    const peachRed: RGB = [0.90, 0.18, 0.22];
+    const bowserDark: RGB = [0.22, 0.20, 0.25];
 
     // Iconic tiered emerald-green Mt. Beanpole terraced hills + yellow victory flagpole!
     const tiers: [number, number, number, number, number][] = [
-      [-10, -8, 0, 26, 11],
-      [-12, -10, 11, 19, 10],
-      [-14, -12, 21, 13, 9],
-      [14, -6, 0, 20, 10],
-      [16, -8, 10, 14, 9],
-      [-28, 8, 0, 15, 9],
+      [-10, -8, 0, 28, 12],
+      [-12, -10, 12, 20, 11],
+      [-14, -12, 23, 14, 10],
+      [14, -6, 0, 22, 11],
+      [16, -8, 11, 15, 10],
+      [-28, 10, 0, 16, 10],
     ];
     for (const [mx, mz, y0, r, h] of tiers) {
-      addFrustum(b, nw, mx, y0, mz, r, r * 0.94, h, 14, beanGreen, { topRgb: beanTop, style: 4, emit: 0.24 });
+      addFrustum(b, nw, mx, y0, mz, r, r * 0.94, h, 14, beanGreen, { topRgb: beanTop, style: 4, emit: 0.34 });
     }
     // Tall victory Flagpole atop Mt. Beanpole!
-    addFrustum(b, nw, -14, 30, -12, 0.35, 0.25, 11, 8, [0.92, 0.94, 0.96], { emit: 0.6, style: 3 });
-    addDome(b, nw, -14, 41.4, -12, 1.1, 1.1, 1.1, 4, 10, qYellow, { latMin: -Math.PI * 0.5, latMax: Math.PI * 0.5, emit: 0.9, style: 3 });
-    addBox(b, nw, -11.5, 37.5, -12, 4.8, 2.8, 0.3, peachRed, { emit: 0.8, style: 3 });
+    addFrustum(b, nw, -14, 33, -12, 0.38, 0.28, 12, 8, [0.94, 0.95, 0.97], { emit: 0.70, style: 3 });
+    addDome(b, nw, -14, 45.4, -12, 1.25, 1.25, 1.25, 4, 10, qYellow, { latMin: -Math.PI * 0.5, latMax: Math.PI * 0.5, emit: 0.95, style: 3 });
+    addBox(b, nw, -11.2, 41.2, -12, 5.2, 3.0, 0.35, peachRed, { emit: 0.85, style: 3 });
 
-    // Fairytale Peach's Castle (white stone walls + bright crimson conical spire + golden medallion)
-    addBox(b, nw, -24, 0, 22, 18, 12, 14, white, { topRgb: peachRed, emit: 0.55, style: 4 });
-    addFrustum(b, nw, -24, 12, 22, 5.2, 4.8, 9, 12, white, { emit: 0.55, style: 4 });
-    addFrustum(b, nw, -24, 21, 22, 5.8, 0.2, 10.5, 12, peachRed, { emit: 0.45, style: 3 });
-    for (const sx of [-9, 9]) {
-      addFrustum(b, nw, -24 + sx, 0, 22, 3.2, 3.0, 15, 10, white, { emit: 0.5, style: 4 });
-      addFrustum(b, nw, -24 + sx, 15, 22, 3.6, 0.2, 7, 10, peachRed, { emit: 0.45, style: 3 });
+    // Fairytale Peach's Castle (white walls + bright crimson spires + golden stained-glass medallion)
+    addBox(b, nw, -24, 0, 24, 20, 13, 15, white, { topRgb: peachRed, emit: 0.68, style: 4 });
+    addFrustum(b, nw, -24, 13, 24, 5.6, 5.2, 10, 12, white, { emit: 0.68, style: 4 });
+    addFrustum(b, nw, -24, 23, 24, 6.2, 0.2, 11.5, 12, peachRed, { emit: 0.56, style: 3 });
+    for (const sx of [-10, 10]) {
+      addFrustum(b, nw, -24 + sx, 0, 24, 3.5, 3.2, 16, 10, white, { emit: 0.62, style: 4 });
+      addFrustum(b, nw, -24 + sx, 16, 24, 3.9, 0.2, 7.5, 10, peachRed, { emit: 0.56, style: 3 });
     }
-    addDome(b, nw, -24, 15.5, 29.2, 2.2, 2.6, 0.5, 4, 12, qYellow, { emit: 0.9, style: 3 });
+    addDome(b, nw, -24, 17.0, 31.8, 2.4, 2.8, 0.5, 4, 12, qYellow, { emit: 0.95, style: 3 });
 
-    // Volcanic dark-stone Bowser's Castle with fiery amber glow on the North-East rampart!
-    addBox(b, nw, 28, 0, -14, 28, 22, 24, bowserDark, { topRgb: [0.16, 0.14, 0.16], emit: 0.32, style: 4 });
-    for (const [bx, bz] of [[16, -24], [40, -24], [16, -4], [40, -4]] as const) {
-      addFrustum(b, nw, bx, 0, bz, 4.4, 3.8, 27, 8, bowserDark, { emit: 0.28, style: 4 });
-      addFrustum(b, nw, bx, 27, bz, 4.4, 0.3, 6.5, 8, [0.58, 0.16, 0.12], { emit: 0.65, style: 3 });
+    // Volcanic dark-stone Bowser's Castle with fiery amber glow on the East rampart!
+    addBox(b, nw, 28, 0, -14, 30, 24, 26, bowserDark, { topRgb: [0.16, 0.14, 0.17], emit: 0.42, style: 4 });
+    for (const [bx, bz] of [[15, -25], [41, -25], [15, -3], [41, -3]] as const) {
+      addFrustum(b, nw, bx, 0, bz, 4.6, 4.0, 29, 8, bowserDark, { emit: 0.36, style: 4 });
+      addFrustum(b, nw, bx, 29, bz, 4.6, 0.3, 7.0, 8, [0.64, 0.16, 0.12], { emit: 0.78, style: 3 });
     }
-    addBox(b, nw, 28, 12, -1.8, 10, 6.5, 0.6, [1.0, 0.42, 0.10], { emit: 0.96, style: 3 });
+    addBox(b, nw, 28, 13, -0.8, 11, 7.0, 0.6, [1.0, 0.45, 0.10], { emit: 1.0, style: 3 });
 
     // Giant iconic green Warp Pipes & yellow Question Blocks!
-    for (const [px, pz, ph] of [[-12, 18, 6.2], [4, 14, 5.4], [16, 12, 7.0]] as const) {
-      addFrustum(b, nw, px, 0, pz, 2.2, 2.2, ph, 12, pipeGreen, { emit: 0.42, style: 4 });
-      addFrustum(b, nw, px, ph - 1.2, pz, 2.7, 2.7, 1.4, 12, pipeGreen, { topRgb: [0.04, 0.12, 0.06], emit: 0.45, style: 4 });
+    for (const [px, pz, ph] of [[-12, 20, 6.8], [4, 16, 5.8], [18, 14, 7.4]] as const) {
+      addFrustum(b, nw, px, 0, pz, 2.4, 2.4, ph, 12, pipeGreen, { emit: 0.52, style: 4 });
+      addFrustum(b, nw, px, ph - 1.2, pz, 2.9, 2.9, 1.5, 12, pipeGreen, { topRgb: [0.04, 0.12, 0.06], emit: 0.55, style: 4 });
     }
-    for (const [qx, qy, qz] of [[-4, 11, 6], [2, 13, 4], [8, 11, 8]] as const) {
-      addBox(b, nw, qx, qy, qz, 3.0, 3.0, 3.0, qYellow, { emit: 0.88, style: 3 });
+    for (const [qx, qy, qz] of [[-4, 12, 8], [2, 14, 6], [8, 12, 10]] as const) {
+      addBox(b, nw, qx, qy, qz, 3.2, 3.2, 3.2, qYellow, { emit: 0.94, style: 3 });
     }
-    addLight(b, sitePt(nw, 0, 26, 0), [1.0, 0.88, 0.38], 5.4, 0);
+    addLight(b, sitePt(nw, 0, 28, 0), [1.0, 0.88, 0.38], 5.8, 0);
   }
 
   // =========================================================================
-  // 6. Jurassic Park (Discovery Restaurant Dome + The Flying Dinosaur Coaster!)
+  // 6. Universal Wonderland Pastel Carnival (34.66705, 135.43255) & WaterWorld (34.66685, 135.42965)
   // =========================================================================
   {
-    const jp = makeSite(34.66525, 135.43065, ground, 0.12, 0.8);
+    // Universal Wonderland: bright pastel carousel dome & whimsical Snoopy/Hello Kitty pavilions
+    const wl = makeSite(34.66705, 135.43255, ground, 0.14, 0.5);
+    addFrustum(b, wl, 0, 0, 0, 14.5, 14.5, 4.5, 16, [0.96, 0.84, 0.88], { emit: 0.62, style: 4 });
+    addFrustum(b, wl, 0, 4.5, 0, 15.5, 0.8, 7.5, 16, [0.95, 0.52, 0.62], { emit: 0.72, style: 3 });
+    addBox(b, wl, -26, 0, -14, 22, 12, 18, [0.84, 0.90, 0.96], { topRgb: [0.92, 0.72, 0.78], emit: 0.56, glass: 0.3, style: 1 });
+    addBox(b, wl, 24, 0, 12, 20, 11, 16, [0.96, 0.90, 0.72], { topRgb: [0.70, 0.86, 0.80], emit: 0.56, glass: 0.3, style: 1 });
+    addLight(b, sitePt(wl, 0, 13, 0), [1.0, 0.74, 0.86], 4.8, 0);
+
+    // WaterWorld Curved Stadium Grandstand & Rusty Steel Atoll (exact z17 yellow curve at 34.66685, 135.42965)
+    const ww = makeSite(34.66685, 135.42965, ground, 0.18, 0.6);
+    for (let i = 0; i < 10; i++) {
+      const a0 = -Math.PI * 0.15 + (i / 10) * Math.PI * 1.15;
+      const a1 = -Math.PI * 0.15 + ((i + 1) / 10) * Math.PI * 1.15;
+      const am = (a0 + a1) * 0.5;
+      addBox(b, ww, Math.cos(am) * 28, 0, Math.sin(am) * 28, 12, 13, 12, [0.82, 0.78, 0.68], { topRgb: [0.88, 0.84, 0.70], style: 4, emit: 0.25 });
+    }
+    addFrustum(b, ww, 0, 0, -4, 18, 18, 0.8, 18, [0.06, 0.26, 0.38], { style: 5, glass: 0.96, emit: 0.22 });
+    addFrustum(b, ww, 2, 0.8, -14, 5.0, 2.4, 13.5, 8, [0.56, 0.36, 0.24], { style: 4, emit: 0.20 });
+  }
+
+  // =========================================================================
+  // 7. Jurassic Park (Discovery Restaurant Dome + The Flying Dinosaur Coaster!)
+  // =========================================================================
+  {
+    const jp = makeSite(34.66525, 135.43072, ground, 0.12, 0.8);
     // Iconic Discovery Restaurant with ribbed verdigris-green copper dome overlooking the Central Lagoon
-    addBox(b, jp, 0, 0, 0, 34, 10, 28, [0.76, 0.66, 0.50], { style: 4, emit: 0.45 });
-    addDome(b, jp, 0, 10, 0, 13.5, 9.2, 13.5, 6, 16, [0.24, 0.56, 0.46], { style: 4, emit: 0.32 });
-    // Jurassic Park – The Ride lush jungle show building & waterfall rock mountain
+    addBox(b, jp, 0, 0, 0, 34, 10.5, 28, [0.78, 0.68, 0.52], { style: 1, glass: 0.35, emit: 0.56 });
+    addDome(b, jp, 0, 10.5, 0, 14.0, 9.8, 14.0, 6, 16, [0.22, 0.58, 0.48], { style: 4, emit: 0.42 });
     const ride = makeSite(34.66525, 135.42925, ground, 0.12, 0.8);
-    addBox(b, ride, 0, 0, 0, 48, 22, 42, [0.28, 0.34, 0.24], { topRgb: lushGreen, style: 4, emit: 0.14 });
-    addFrustum(b, ride, 14, 0, 16, 18, 9, 25, 8, [0.36, 0.34, 0.28], { topRgb: lushGreen, style: 4 });
+    addBox(b, ride, 0, 0, 0, 48, 22, 42, [0.26, 0.34, 0.22], { topRgb: lushGreen, style: 4, emit: 0.16 });
+    addFrustum(b, ride, 14, 0, 16, 19, 9.5, 26, 8, [0.36, 0.34, 0.28], { topRgb: lushGreen, style: 4 });
 
     // The Flying Dinosaur: soaring dark-emerald tubular coaster track (46 m crest + pretzel loop!)
     const fdCtrl: [number, number, number][] = [
@@ -297,7 +323,7 @@ export function buildUsj(b: LandmarkBuilder, ground: GroundFn) {
       const s = makeSite(la, lo, ground, 0, 0);
       return [s.ox, s.oy + h, s.oz];
     });
-    addTubeSpline(b, fdPts, 0.95, 8, 5, [0.12, 0.42, 0.24], { emit: 0.26, style: 0, closed: true });
+    addTubeSpline(b, fdPts, 0.95, 8, 5, [0.12, 0.46, 0.26], { emit: 0.34, style: 0, closed: true });
     for (const p of fdPts) {
       const gy = ground(p[0], p[2]) - 0.5;
       addStrut(b, [p[0], gy, p[2]], [p[0], p[1] - 0.6, p[2]], 0.62, 0.45, 6, [0.26, 0.32, 0.22], 0.08);
@@ -305,25 +331,34 @@ export function buildUsj(b: LandmarkBuilder, ground: GroundFn) {
   }
 
   // =========================================================================
-  // 7. New York / San Francisco / Minion Park Waterfront lining the South Lagoon Shore
+  // 8. Architectural New York / San Francisco / Minion Park Waterfront (with lit windows!)
   // =========================================================================
   {
-    const ny = makeSite(34.66395, 135.43255, ground, 0.22, 0.8);
-    const waterfront: [number, number, number, number, number, RGB][] = [
-      [-68, -14, 34, 15, 22, [0.68, 0.36, 0.28]], // San Francisco Wharf brick
-      [-28, -4, 32, 19, 24, [0.78, 0.56, 0.42]],  // New York Avenue brownstone
-      [14, -8, 36, 22, 26, [0.72, 0.66, 0.58]],   // New York Grand Theater & Library
-      [56, -2, 34, 16, 24, [0.96, 0.84, 0.28]],   // Minion Park vibrant yellow plaza!
-      [60, 26, 30, 14, 22, [0.28, 0.56, 0.84]],   // Minion Park blue facade
-      [-10, 28, 42, 18, 28, [0.64, 0.42, 0.34]],  // Spider-Man / NY backlot block
+    const ny = makeSite(34.66415, 135.43255, ground, 0.14, 0.8);
+    const waterfront: [number, number, number, number, number, RGB, RGB][] = [
+      // San Francisco Wharf red-brick warehouses & peaked clerestories
+      [-86, -16, 32, 15, 22, [0.64, 0.34, 0.26], [0.42, 0.38, 0.36]],
+      [-48, -12, 28, 17, 22, [0.70, 0.46, 0.34], [0.48, 0.44, 0.42]],
+      // New York Brownstones, Delancey Street & Grand Library Theater
+      [-14, -8, 30, 21, 24, [0.76, 0.58, 0.46], [0.50, 0.48, 0.46]],
+      [22, -10, 34, 24, 26, [0.78, 0.72, 0.64], [0.54, 0.52, 0.50]],
+      [-28, 28, 38, 19, 26, [0.66, 0.46, 0.38], [0.46, 0.44, 0.42]],
+      [18, 30, 44, 20, 28, [0.68, 0.62, 0.56], [0.48, 0.46, 0.44]],
+      // Minion Park vibrant yellow & sky-blue Art-Deco pavilions (East waterfront)
+      [68, -28, 32, 17, 24, [0.96, 0.84, 0.28], [0.84, 0.66, 0.24]],
+      [74, 4, 34, 16, 24, [0.34, 0.60, 0.86], [0.52, 0.62, 0.72]],
+      [108, -14, 30, 15, 22, [0.92, 0.74, 0.56], [0.54, 0.50, 0.48]],
     ];
-    for (const [lx, lz, w, h, d, col] of waterfront) {
-      addBox(b, ny, lx, 0, lz, w, h, d, col, { topRgb: [0.48, 0.46, 0.44], emit: 0.52, style: 4 });
-      addBox(b, ny, lx, h - 0.6, lz, w + 0.6, 0.7, d + 0.6, cream, { emit: 0.38 });
+    for (const [lx, lz, w, h, d, col, top] of waterfront) {
+      // Curtain-wall / architectural window style=1 so every facade has rich daytime depth & lively warm night windows!
+      addBox(b, ny, lx, 0, lz, w, h, d, col, { topRgb: top, emit: 0.58, glass: 0.42, style: 1 });
+      // Stepped classical cornice crown & rooftop parapet penthouse
+      addBox(b, ny, lx, h - 0.8, lz, w + 1.2, 1.1, d + 1.2, cream, { emit: 0.42 });
+      addBox(b, ny, lx, h + 0.3, lz, w * 0.58, 2.6, d * 0.52, top, { emit: 0.22, style: 4 });
     }
-    // Floating Lagoon Night Show Stage Ring in the Central Lagoon!
-    const stg = makeSite(34.66475, 135.43195, ground, 0, 0);
-    addAnnulusRing(b, stg, 0, 0.45, 0, 7.0, 11.5, 1.4, 20, [0.26, 0.34, 0.46], { topRgb: gold, emit: 0.85, style: 3 });
-    addLight(b, sitePt(stg, 0, 8, 0), [0.46, 0.82, 1.0], 5.2, 0);
+    // Floating Lagoon Night Show Stage Ring & luminous beacon fountain!
+    const stg = makeSite(34.66478, 135.43195, ground, 0, 0);
+    addAnnulusRing(b, stg, 0, 0.45, 0, 7.2, 12.0, 1.5, 20, [0.26, 0.34, 0.48], { topRgb: gold, emit: 0.92, style: 3 });
+    addLight(b, sitePt(stg, 0, 9, 0), [0.46, 0.84, 1.0], 5.8, 0);
   }
 }

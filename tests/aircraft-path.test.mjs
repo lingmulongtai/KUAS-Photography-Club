@@ -157,7 +157,8 @@ test('B787-8 airliner, helicopters, airports, Osaka landmarks and Biwa bridges b
   for (const [label, lat, lon] of [
     ['JR Osaka Station', 34.70240, 135.49595],
     ['HEP FIVE', 34.70232, 135.50028],
-    ['USJ Hogwarts', 34.66715, 135.42955],
+    ['USJ Hogwarts', 34.66878, 135.43145],
+    ['USJ Super Nintendo World', 34.66835, 135.43310],
     ['Heijo Daigokuden', 34.69395, 135.79415],
     ['Heijo Suzakumon', 34.68705, 135.79430],
   ]) {

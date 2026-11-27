@@ -97,31 +97,31 @@ export function buildHeijoPalace(b: LandmarkBuilder, ground: GroundFn) {
     }
 
     // Lower Hall Core (white plaster walls, green renji-mado lattice windows, vermilion colonnade, y = 3.4..11.2 m)
-    addBox(b, st, 0, 3.4, 0, 42, 7.8, 17, whitePlaster, { style: 4, emit: 0.42 });
+    addBox(b, st, 0, 3.4, 0, 42, 7.8, 17, whitePlaster, { style: 4, emit: 0.62 });
     // Vermilion front & rear bay columns (9 bays × 4 bays)
     for (let i = -4; i <= 4; i++) {
       const cx = i * 4.9;
-      addFrustum(b, st, cx, 3.4, 9.2, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.36 });
-      addFrustum(b, st, cx, 3.4, -9.2, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.36 });
+      addFrustum(b, st, cx, 3.4, 9.2, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.58 });
+      addFrustum(b, st, cx, 3.4, -9.2, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.58 });
       if (i < 4) {
-        addBox(b, st, cx + 2.45, 5.2, 8.65, 2.6, 3.4, 0.35, latticeGreen, { style: 4, emit: 0.32 });
+        addBox(b, st, cx + 2.45, 5.2, 8.65, 2.6, 3.4, 0.35, latticeGreen, { style: 4, emit: 0.46 });
       }
     }
     for (const cz of [-4.6, 0, 4.6]) {
-      addFrustum(b, st, -21.8, 3.4, cz, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.36 });
-      addFrustum(b, st, 21.8, 3.4, cz, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.36 });
+      addFrustum(b, st, -21.8, 3.4, cz, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.58 });
+      addFrustum(b, st, 21.8, 3.4, cz, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.58 });
     }
     // Lower skirt pent roof (裳階 / lower tier eave, y = 10.6..14.6 m)
-    addIrimoyaRoof(b, st, 0, 10.6, 0, 51.0, 25.0, 4.4, tileDark, { ridgeRatio: 0.72, gableRatio: 0.65, emit: 0.14 });
+    addIrimoyaRoof(b, st, 0, 10.6, 0, 51.0, 25.0, 4.4, tileDark, { ridgeRatio: 0.72, gableRatio: 0.65, emit: 0.24 });
 
     // Upper Clerestory Hall (y = 13.6..19.2 m, vermilion brackets & white plaster upper bays)
-    addBox(b, st, 0, 13.6, 0, 35, 5.6, 13.5, whitePlaster, { style: 4, emit: 0.46 });
+    addBox(b, st, 0, 13.6, 0, 35, 5.6, 13.5, whitePlaster, { style: 4, emit: 0.66 });
     for (let i = -4; i <= 4; i++) {
-      addFrustum(b, st, i * 4.2, 13.6, 7.0, 0.38, 0.36, 5.6, 8, vermilion, { style: 4, emit: 0.38 });
-      addFrustum(b, st, i * 4.2, 13.6, -7.0, 0.38, 0.36, 5.6, 8, vermilion, { style: 4, emit: 0.38 });
+      addFrustum(b, st, i * 4.2, 13.6, 7.0, 0.38, 0.36, 5.6, 8, vermilion, { style: 4, emit: 0.60 });
+      addFrustum(b, st, i * 4.2, 13.6, -7.0, 0.38, 0.36, 5.6, 8, vermilion, { style: 4, emit: 0.60 });
     }
     // Bracket complex cornice belt (組物) under main eaves
-    addBox(b, st, 0, 18.6, 0, 37.5, 1.3, 15.8, vermilionDeep, { style: 4, emit: 0.40 });
+    addBox(b, st, 0, 18.6, 0, 37.5, 1.3, 15.8, vermilionDeep, { style: 4, emit: 0.56 });
 
     // Grand Upper Irimoya Tile Roof with Twin Gleaming Golden Shibi Finials (y = 19.6..27.4 m!)
     addIrimoyaRoof(b, st, 0, 19.6, 0, 48.0, 23.0, 7.8, tileDark, {
@@ -129,10 +129,12 @@ export function buildHeijoPalace(b: LandmarkBuilder, ground: GroundFn) {
       gableRatio: 0.44,
       whiteTrim: whitePlaster,
       shibiRgb: goldShibi,
-      shibiSize: 1.55,
-      emit: 0.16,
+      shibiSize: 1.65,
+      emit: 0.26,
     });
-    addLight(b, sitePt(st, 0, 16, 12), [1.0, 0.76, 0.42], 5.6, 0);
+    addLight(b, sitePt(st, -14, 15, 14), [1.0, 0.78, 0.42], 6.0, 0);
+    addLight(b, sitePt(st, 14, 15, 14), [1.0, 0.78, 0.42], 6.0, 0);
+    addLight(b, sitePt(st, 0, 26, 0), [1.0, 0.82, 0.46], 5.6, 0);
   }
 
   // =========================================================================
@@ -175,11 +177,22 @@ export function buildHeijoPalace(b: LandmarkBuilder, ground: GroundFn) {
       // Corner Watchtower Pavilion (東楼・西楼) at ±62 m
       const tx = side * 62;
       addBox(b, gm, tx, 0, 0, 13, 1.8, 13, stonePodium, { style: 4 });
-      addBox(b, gm, tx, 1.8, 0, 10.5, 8.2, 10.5, whitePlaster, { style: 4, emit: 0.38 });
-      addBox(b, gm, tx, 5.5, 0, 11.2, 0.9, 11.2, vermilion, { style: 4, emit: 0.32 });
-      addIrimoyaRoof(b, gm, tx, 9.8, 0, 14.5, 14.5, 4.2, tileDark, { ridgeRatio: 0.45, whiteTrim: whitePlaster, emit: 0.12 });
+      addBox(b, gm, tx, 1.8, 0, 10.5, 8.2, 10.5, whitePlaster, { style: 4, emit: 0.56 });
+      addBox(b, gm, tx, 5.5, 0, 11.2, 0.9, 11.2, vermilion, { style: 4, emit: 0.50 });
+      addIrimoyaRoof(b, gm, tx, 9.8, 0, 14.5, 14.5, 4.2, tileDark, { ridgeRatio: 0.45, whiteTrim: whitePlaster, emit: 0.20 });
+      // North-running East & West Cloister Return Walls enclosing First Daigokuden's ceremonial court
+      addBox(b, gm, tx, 0, -112, 4.2, 1.0, 212, stonePodium, { style: 4 });
+      addBox(b, gm, tx, 1.0, -112, 2.4, 4.2, 212, whitePlaster, { style: 4, emit: 0.34 });
+      for (let kz = -208; kz <= -12; kz += 14) {
+        addBox(b, gm, tx, 1.0, kz, 2.7, 4.2, 0.45, vermilion, { style: 4, emit: 0.36 });
+      }
+      addIrimoyaRoof(b, gm, tx, 5.0, -112, 5.2, 214, 1.6, tileDark, { ridgeRatio: 0.96, emit: 0.14 });
     }
-    addLight(b, sitePt(gm, 0, 12, 8), [1.0, 0.74, 0.40], 4.8, 0);
+    // Second Daigokuden / Former Imperial Audience Hall elevated stone podium (第二次大極殿基壇) East of court
+    const d2 = makeSite(34.69260, 135.79770, ground, 0, 0.4);
+    addBox(b, d2, 0, 0, 0, 56, 2.2, 28, stonePodium, { topRgb: gravelPale, style: 4, emit: 0.14 });
+    addBox(b, d2, 0, 2.2, 0, 48, 0.9, 22, stoneTrim, { topRgb: stoneTrim, style: 4, emit: 0.16 });
+    addLight(b, sitePt(gm, 0, 13, 8), [1.0, 0.76, 0.40], 5.6, 0);
   }
 
   // =========================================================================
@@ -197,22 +210,22 @@ export function buildHeijoPalace(b: LandmarkBuilder, ground: GroundFn) {
       addBox(b, sz, sx, 0, -8.2, 4.2, 1.9, 3.2, stoneTrim, { style: 4, emit: 0.14 });
     }
     // Lower Story (5 bays × 2 bays, massive vermilion pillars + recessed triple imperial red portal doors!)
-    addBox(b, sz, 0, 2.2, 0, 23, 6.8, 9.0, whitePlaster, { style: 4, emit: 0.44 });
+    addBox(b, sz, 0, 2.2, 0, 23, 6.8, 9.0, whitePlaster, { style: 4, emit: 0.64 });
     for (const dx of [-6.4, 0, 6.4]) {
-      addBox(b, sz, dx, 2.2, 4.6, 3.6, 5.6, 0.5, vermilionDeep, { style: 4, emit: 0.38 });
+      addBox(b, sz, dx, 2.2, 4.6, 3.6, 5.6, 0.5, vermilionDeep, { style: 4, emit: 0.56 });
     }
     for (let i = -3; i <= 3; i++) {
-      addFrustum(b, sz, i * 3.8, 2.2, 5.0, 0.44, 0.40, 6.8, 8, vermilion, { style: 4, emit: 0.42 });
-      addFrustum(b, sz, i * 3.8, 2.2, -5.0, 0.44, 0.40, 6.8, 8, vermilion, { style: 4, emit: 0.42 });
+      addFrustum(b, sz, i * 3.8, 2.2, 5.0, 0.44, 0.40, 6.8, 8, vermilion, { style: 4, emit: 0.62 });
+      addFrustum(b, sz, i * 3.8, 2.2, -5.0, 0.44, 0.40, 6.8, 8, vermilion, { style: 4, emit: 0.62 });
     }
     // Lower flared eaves (y = 8.8..12.2 m)
-    addIrimoyaRoof(b, sz, 0, 8.8, 0, 30.5, 16.0, 3.4, tileDark, { ridgeRatio: 0.68, emit: 0.14 });
+    addIrimoyaRoof(b, sz, 0, 8.8, 0, 30.5, 16.0, 3.4, tileDark, { ridgeRatio: 0.68, emit: 0.24 });
 
     // Upper Gallery Story with vermilion balcony balustrade & lattice windows (y = 11.6..16.2 m)
-    addBox(b, sz, 0, 11.6, 0, 20.5, 4.6, 8.0, whitePlaster, { style: 4, emit: 0.48 });
-    addBox(b, sz, 0, 11.8, 4.5, 22.0, 1.1, 0.4, vermilion, { style: 4, emit: 0.42 });
-    addBox(b, sz, 0, 11.8, -4.5, 22.0, 1.1, 0.4, vermilion, { style: 4, emit: 0.42 });
-    addBox(b, sz, 0, 15.8, 0, 22.2, 1.0, 9.2, vermilionDeep, { style: 4, emit: 0.40 });
+    addBox(b, sz, 0, 11.6, 0, 20.5, 4.6, 8.0, whitePlaster, { style: 4, emit: 0.68 });
+    addBox(b, sz, 0, 11.8, 4.5, 22.0, 1.1, 0.4, vermilion, { style: 4, emit: 0.62 });
+    addBox(b, sz, 0, 11.8, -4.5, 22.0, 1.1, 0.4, vermilion, { style: 4, emit: 0.62 });
+    addBox(b, sz, 0, 15.8, 0, 22.2, 1.0, 9.2, vermilionDeep, { style: 4, emit: 0.58 });
 
     // Iconic Sweeping Upper Irimoya Tile Roof with Twin Golden Shibi Finials (y = 16.5..22.4 m!)
     addIrimoyaRoof(b, sz, 0, 16.5, 0, 29.0, 15.2, 5.9, tileDark, {
@@ -220,21 +233,22 @@ export function buildHeijoPalace(b: LandmarkBuilder, ground: GroundFn) {
       gableRatio: 0.44,
       whiteTrim: whitePlaster,
       shibiRgb: goldShibi,
-      shibiSize: 1.25,
-      emit: 0.16,
+      shibiSize: 1.35,
+      emit: 0.26,
     });
 
     // Grand White-and-Vermilion Tile-Capped Palace Perimeter Walls (築地大垣) stretching 115 m East & West!
     for (const side of [-1, 1]) {
       const wx = side * 72;
       addBox(b, sz, wx, 0, 0, 114, 1.0, 3.6, stonePodium, { style: 4 });
-      addBox(b, sz, wx, 1.0, 0, 114, 4.4, 2.2, whitePlaster, { style: 4, emit: 0.24 });
+      addBox(b, sz, wx, 1.0, 0, 114, 4.4, 2.2, whitePlaster, { style: 4, emit: 0.40 });
       for (let k = -52; k <= 52; k += 8) {
-        addBox(b, sz, wx + k, 1.0, 0, 0.45, 4.4, 2.45, vermilion, { style: 4, emit: 0.22 });
+        addBox(b, sz, wx + k, 1.0, 0, 0.45, 4.4, 2.45, vermilion, { style: 4, emit: 0.40 });
       }
-      addIrimoyaRoof(b, sz, wx, 5.2, 0, 116, 4.6, 1.6, tileDark, { ridgeRatio: 0.96, emit: 0.08 });
+      addIrimoyaRoof(b, sz, wx, 5.2, 0, 116, 4.6, 1.6, tileDark, { ridgeRatio: 0.96, emit: 0.16 });
     }
-    addLight(b, sitePt(sz, 0, 13, 9), [1.0, 0.72, 0.36], 5.6, 0);
+    addLight(b, sitePt(sz, -8, 13, 9), [1.0, 0.74, 0.36], 6.0, 0);
+    addLight(b, sitePt(sz, 8, 13, 9), [1.0, 0.74, 0.36], 6.0, 0);
   }
 
   // =========================================================================
