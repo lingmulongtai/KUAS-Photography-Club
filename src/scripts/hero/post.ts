@@ -1,10 +1,35 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { Pass } from 'three/addons/postprocessing/Pass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { HASH } from '../gl/shaders';
+
+/** Alpha-blends depth-aware clouds onto composer.readBuffer after sceneTarget resolves its depth texture. */
+class CloudOverlayPass extends Pass {
+  private readonly cloudScene: THREE.Scene;
+  private readonly camera: THREE.Camera;
+  constructor(cloudMesh: THREE.Mesh, camera: THREE.Camera) {
+    super();
+    this.needsSwap = false;
+    this.cloudScene = new THREE.Scene();
+    // Match main scene light counts so Three's program cache reuses the precompiled cloud programs.
+    this.cloudScene.add(cloudMesh, new THREE.DirectionalLight(0), new THREE.HemisphereLight(0, 0));
+    this.camera = camera;
+  }
+  override render(renderer: THREE.WebGLRenderer, _writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget) {
+    const prevAuto = renderer.autoClear;
+    renderer.setRenderTarget(this.renderToScreen ? null : readBuffer);
+    renderer.autoClear = false;
+    try {
+      renderer.render(this.cloudScene, this.camera);
+    } finally {
+      renderer.autoClear = prevAuto;
+    }
+  }
+}
 
 /** Finish applied after tone mapping: very fine grain and a gentle vignette. */
 const FinishShader = {
@@ -148,10 +173,16 @@ const BrightPassShader = {
  * HDR pipeline: the scene renders into a multisampled half-float target (4× MSAA, so building
  * edges and power lines of light stay clean), then bloom, ACES tone mapping and the finish.
  */
-export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, samples = 4) {
+export function createPost(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  samples = 4,
+  cloudOverlay?: THREE.Mesh,
+) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
-    type: THREE.HalfFloatType, samples, resolveDepthBuffer: false, storeMultisampledDepthBuffer: false,
+    type: THREE.HalfFloatType, samples, resolveDepthBuffer: true, storeMultisampledDepthBuffer: true,
     depthTexture: new THREE.DepthTexture(1, 1),
   });
   const scenePass = new RenderPass(scene, camera);
@@ -162,6 +193,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const sanitize = new ShaderPass(SanitizeShader);
   sanitize.uniforms.sceneHDR.value = sceneTarget.texture;
   composer.addPass(sanitize);
+  if (cloudOverlay) composer.addPass(new CloudOverlayPass(cloudOverlay, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.7, 0.5, 0.85);
   const bright = new THREE.ShaderMaterial(BrightPassShader);
   bright.uniforms.uDepth.value = sceneTarget.depthTexture;
@@ -193,9 +225,26 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const finish = new ShaderPass(FinishShader);
   composer.addPass(finish);
 
+  const renderScene = () => {
+    // Always resolve depth when depth-aware clouds or nocturnal bright-pass read sceneTarget.depthTexture.
+    const needsDepth = Boolean(cloudOverlay) || bright.uniforms.uWhole.value < 1;
+    sceneTarget.resolveDepthBuffer = needsDepth;
+    sceneTarget.storeMultisampledDepthBuffer = needsDepth;
+    const previous = renderer.getRenderTarget();
+    try { scenePass.render(renderer, sceneTarget, sceneTarget, 0, false); }
+    finally { renderer.setRenderTarget(previous); }
+  };
+  const compose = (time: number) => {
+    finish.uniforms.uTime.value = time;
+    composer.render();
+  };
+
   return {
     composer,
     bloom,
+    depthTexture: sceneTarget.depthTexture,
+    get width() { return sceneTarget.width; },
+    get height() { return sceneTarget.height; },
     async prepare(object: THREE.Object3D) {
       if (!renderer.extensions.has('KHR_parallel_shader_compile')) return;
       // RenderPass uses a linear HDR target. Compiling against the canvas would cache a
@@ -219,17 +268,11 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
       composer.setSize(w, h);
       finish.uniforms.uRes.value.set(w * dpr, h * dpr);
     },
+    renderScene,
+    compose,
     render(time: number) {
-      finish.uniforms.uTime.value = time;
-      // Only the nocturnal bright pass samples depth. Retain its resolved
-      // attachment through the blur; the daylight pass can discard it.
-      const needsDepth = bright.uniforms.uWhole.value < 1;
-      sceneTarget.resolveDepthBuffer = needsDepth;
-      sceneTarget.storeMultisampledDepthBuffer = needsDepth;
-      const previous = renderer.getRenderTarget();
-      try { scenePass.render(renderer, sceneTarget, sceneTarget, 0, false); }
-      finally { renderer.setRenderTarget(previous); }
-      composer.render();
+      renderScene();
+      compose(time);
     },
   };
 }

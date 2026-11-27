@@ -184,8 +184,8 @@ export function createHero(
   renderer.domElement.addEventListener('webglcontextrestored', clouds.restored);
   renderer.domElement.addEventListener('webglcontextrestored', cloudBlur.restored);
   renderer.domElement.addEventListener('webglcontextrestored', cloudHistory.restored);
-  scene.add(sky.mesh, celestial.group, meteors.group, clouds.mesh);
-  const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2);
+  scene.add(sky.mesh, celestial.group, meteors.group);
+  const post = createPost(renderer, scene, camera, opts.quality > 0.75 ? 4 : 2, clouds.mesh);
   const frameQueue = createFrameQueue(renderer.getContext());
   renderer.domElement.addEventListener('webglcontextrestored', frameQueue.restored);
   const shadow = createSunShadow(renderer, scene, env, opts.quality > 0.75 ? 4096 : 2048);
@@ -1701,8 +1701,7 @@ export function createHero(
     }
     sky.mesh.position.copy(camera.position);
     celestial.group.position.copy(camera.position);
-    clouds.mesh.position.x = camera.position.x;
-    clouds.mesh.position.z = camera.position.z;
+    clouds.mesh.position.copy(camera.position);
     let roofsChanged = false;
     const panorama = mode === 'city' && view === 'shogunzuka' && !flight && !exploring && camera.fov >= baseFov * .82;
     for (const c of cityLods) {
@@ -1819,22 +1818,29 @@ export function createHero(
       const az = Math.atan2(forward.x, -forward.z);
       const top = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1)) + camera.fov * RAD / 2;
       meteors.update(t, dt, camera.position, { az, half, top }, Math.min(1, env.uStars.value), pxPerM);
-      const renderScene = () => post.render(t);
-      const draw = () => {
+      const drawScene = () => {
         // An unusually wide view can clip a nearby occluder at the corners of the near plane.
         const nearCorner = camera.near * Math.hypot(1, 1 / camera.projectionMatrix.elements[0], 1 / camera.projectionMatrix.elements[5]);
         if (panoramaCity && mode === 'city' && view === 'shogunzuka' && !flight && !exploring && nearCorner < 100)
-          panoramaCity.render(camera, renderScene);
-        else renderScene();
+          panoramaCity.render(camera, post.renderScene);
+        else post.renderScene();
       };
+      // Render opaque scene + resolve depth first so clouds raymarch & composite against live scene depth without feedback loops.
+      drawScene();
+      clouds.uniforms.uSceneDepth.value = post.depthTexture;
+      clouds.uniforms.uViewFromClip.value.copy(camera.projectionMatrixInverse);
+      clouds.uniforms.uDepthRes.value.set(post.width, post.height);
+      clouds.uniforms.uUseDepth.value = true;
+      const compose = () => post.compose(t);
       const steadySky = mode === 'city' && !flight &&
-        cloudFrame.blur[0] === 0 && cloudFrame.blur[1] === 0;
+        cloudFrame.blur[0] === 0 && cloudFrame.blur[1] === 0 &&
+        camera.position.y < clouds.weather.base - 150 && clouds.weather.base > 1050;
       const fullPanorama = steadySky && view === 'shogunzuka' && !exploring;
       const cloudRatio = pixelRatio * (fullPanorama ? 1 : cloudVolumeScale(opts.quality));
       if (!steadySky) cloudHistory.invalidate();
       if (!steadySky || !cloudHistory.render(Math.round(width * cloudRatio), Math.round(height * cloudRatio),
-        clouds.weather, travel, date.getTime(), draw, dt)) {
-        cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, draw);
+        clouds.weather, travel, date.getTime(), compose, dt)) {
+        cloudBlur.render(cloudFrame.blur, width, height, pixelRatio, compose);
       }
       frameQueue.submitted();
       opts.onFrameSubmitted?.();

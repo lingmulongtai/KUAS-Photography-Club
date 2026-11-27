@@ -1,15 +1,13 @@
 import * as THREE from 'three';
 import { ENV_GLSL, type Env } from './env';
-import { cloudWeather, LOWEST_CLOUD_BASE } from './cloud-weather';
+import { cloudWeather } from './cloud-weather';
 import { CLOUD_COLUMN_LOOKUP, createCloudColumns, WEATHER_SCALE } from './cloud-columns.ts';
 import { cloudNoiseTexture } from './cloud-noise.ts';
 import type { Climate } from './seasons';
-import { CIRRUS_Y, HIGH_CLOUD_GLSL } from './high-clouds.ts';
+import { CLOUD_DEPTH_GLSL, HIGH_CLOUD_GLSL } from './high-clouds.ts';
 
 /** Clouds fade out into the haze before this distance. */
 const FAR = 44000;
-/** Radius of the drum the clouds are drawn on: beyond FAR and distant mountains, inside the camera's far plane. */
-const DRUM = 115000;
 
 /**
  * Volumetric 3D clouds sculpted with tileable Perlin-Worley + multi-octave Worley FBM noise,
@@ -34,6 +32,10 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
     uAlto: { value: weather.alto },
     uOffset: { value: new THREE.Vector2(...weather.offset) },
     uWind: { value: new THREE.Vector2() },
+    uSceneDepth: { value: null as THREE.Texture | null },
+    uViewFromClip: { value: new THREE.Matrix4() },
+    uDepthRes: { value: new THREE.Vector2(1, 1) },
+    uUseDepth: { value: false },
   };
   const columns = createCloudColumns(uniforms);
   const material = new THREE.ShaderMaterial({
@@ -50,6 +52,7 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
     fragmentShader: /* glsl */ `
       ${ENV_GLSL}
       ${CLOUD_COLUMN_LOOKUP}
+      ${CLOUD_DEPTH_GLSL}
       uniform mediump sampler3D uCloudNoise;
       uniform float uBase;
       uniform float uTop;
@@ -164,8 +167,9 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
         float T = 1.;
         float distSum = 0., wSum = 0.;
 
-        // Ray interval inside the low-cloud slab.
-        float t0 = 0., t1 = ${FAR.toFixed(1)};
+        // Ray interval inside the low-cloud slab, clamped to the nearest opaque scene surface.
+        float sceneDist = cloudSceneDist();
+        float t0 = 0., t1 = min(${FAR.toFixed(1)}, sceneDist);
         if (abs(rd.y) > 1e-7) {
           float baseHit = (uBase - ro.y) / rd.y, topHit = (uTop - ro.y) / rd.y;
           t0 = max(0., min(baseHit, topHit));
@@ -264,7 +268,11 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
               continue;
             }
             emptyFine = 0;
-            float d = density(pos, t + dt * .5, envVal);
+            float sampleDist = t + dt * .5;
+            float d = density(pos, sampleDist, envVal);
+            if (uUseDepth && sceneDist < 1e8) {
+              d *= smoothstep(0., 45., sceneDist - sampleDist);
+            }
             if (d <= .0008) {
               t += dt;
               continue;
@@ -342,19 +350,21 @@ export function buildClouds(env: Env, seed = Math.floor(Math.random() * 42949672
           L *= fade;
           lowA *= fade;
         }
-        // Behind the low clouds: altocumulus, then feathered cirrus.
-        vec4 high = uVolumeOnly ? vec4(0.) : highClouds(ro, rd);
+        // Behind the low clouds: altocumulus, then feathered cirrus (occluded by closer peaks).
+        vec4 high = uVolumeOnly ? vec4(0.) : highClouds(ro, rd, sceneDist);
         vec3 C = L + high.rgb * (1. - lowA);
         float A = lowA + high.a * (1. - lowA);
         gl_FragColor = vec4(A > .0005 ? C / A : vec3(0.), A);
       }
     `,
     transparent: true,
+    depthTest: false,
     depthWrite: false,
     side: THREE.BackSide,
   });
-  const bottom = LOWEST_CLOUD_BASE;
-  const geometry = new THREE.CylinderGeometry(DRUM, DRUM, CIRRUS_Y + 400 - bottom, 96, 1).translate(0, (CIRRUS_Y + 400 + bottom) / 2, 0);
+  // Camera-centred enclosing box covers every view direction at any altitude; scene depth occlusion
+  // is evaluated analytically from the resolved depth buffer instead of a fixed-altitude drum cap.
+  const geometry = new THREE.BoxGeometry(10000, 10000, 10000);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 2;
   mesh.frustumCulled = false;

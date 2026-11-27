@@ -74,3 +74,17 @@ test('shader failure redraws sharp clouds and restores the previous error handle
   assert.equal(h.counts().offscreen,2);
   h.blur.dispose();
 });
+
+test('depth-aware cloud blur scales uDepthRes for offscreen volume sampling and restores full resolution for compositing',()=>{
+  const h=setup(1);
+  h.original.uniforms.uDepthRes={value:new THREE.Vector2(1200,800)};
+  let offscreenRes=null,compositeRes=null;
+  h.renderer.render=()=>{offscreenRes=h.original.uniforms.uDepthRes.value.toArray();};
+  h.blur.render([0,0],1200,800,1,()=>{
+    compositeRes=h.original.uniforms.uDepthRes.value.toArray();
+    assert.equal(h.mesh.material.depthTest,false);
+  });
+  assert.deepEqual(offscreenRes,[750,500]);
+  assert.deepEqual(compositeRes,[1200,800]);
+  h.blur.dispose();
+});
