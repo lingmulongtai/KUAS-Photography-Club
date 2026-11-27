@@ -38,6 +38,17 @@ OUTLINES = {
     'toinPond3': (919973837, None),
     'toinPond4': (919973851, None),
 }
+# Park streets that the themed facades line, as polylines.
+STREETS = {
+    'hogsmeade': [859964629],
+    'hollywood': [41957094, 1302390500, 1302390501, 1315463942],
+    'brighton': [41956821, 1302390498],
+    'amity': [131281586, 687516813],
+    'newYork': [687505203, 727851553, 128749921, 311357485],
+    'waterfront': [687504886, 687516812, 128750082, 687504885],
+    'sanFrancisco': [687504887, 131281590],
+}
+USJ_BOX = (34.6600, 135.4270, 34.6705, 135.4390)
 COASTER_BOXES = {
     # Clusters of connected `roller_coaster=track` ways, by the area each ride occupies.
     'hollywoodDream': (34.6650, 135.4320, 34.6678, 135.4366),
@@ -75,8 +86,11 @@ def main():
     if args.cache:
         args.cache.mkdir(parents=True, exist_ok=True)
     ids = ','.join(str(i) for i, _ in OUTLINES.values())
-    query = (f'[out:json][timeout:120];(way(id:{ids});way["roller_coaster"="track"]'
-             '(34.660,135.425,34.671,135.440););out body;>;out skel qt;')
+    streets = ','.join(str(i) for ids_ in STREETS.values() for i in ids_)
+    south, west, north, east = USJ_BOX
+    query = (f'[out:json][timeout:120];(way(id:{ids});way(id:{streets});way["roller_coaster"="track"]'
+             f'(34.660,135.425,34.671,135.440);way["natural"="water"]({south},{west},{north},{east}););'
+             'out body;>;out skel qt;')
     data = overpass(query, args.cache, 'landmark-outlines')
     nodes = {e['id']: (e['lat'], e['lon']) for e in data['elements'] if e['type'] == 'node'}
     ways = {e['id']: e for e in data['elements'] if e['type'] == 'way'}
@@ -90,7 +104,19 @@ def main():
             raise ValueError(f'OSM way {way_id} is no longer {name}')
         flat = [round(v, 7) for n in way['nodes'] for v in nodes[n]]
         lines.append(f'  {key}: {json.dumps(flat)}, // way {way_id}')
-    lines += ['} as const;', '',
+    lines += ['} as const;', '', '/** Theme-park streets as polylines, [lat, lon, …] per way. */', 'export const STREETS = {']
+    for key, way_ids in STREETS.items():
+        parts = [json.dumps([round(v, 7) for n in ways[i]['nodes'] for v in nodes[n]]) for i in way_ids]
+        lines.append(f'  {key}: [{", ".join(parts)}], // ways {", ".join(map(str, way_ids))}')
+    lines += ['} as const;', '', '/** Every mapped water body inside Universal Studios Japan. */', 'export const USJ_WATER = [']
+    for way in sorted(ways.values(), key=lambda w: w['id']):
+        if way.get('tags', {}).get('natural') != 'water' or way['nodes'][0] != way['nodes'][-1]:
+            continue
+        pts = [nodes[n] for n in way['nodes']]
+        if not all(south <= p[0] <= north and west <= p[1] <= east for p in pts):
+            continue
+        lines.append(f'  {json.dumps([round(v, 7) for p in pts for v in p])}, // way {way["id"]}')
+    lines += ['] as const;', '',
               '/** Coaster centrelines: each way as [lat, lon, …] with its OSM layer. */',
               'export const COASTERS = {']
     tracks = [w for w in ways.values() if w.get('tags', {}).get('roller_coaster') == 'track']
