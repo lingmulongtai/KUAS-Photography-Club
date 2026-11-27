@@ -1081,14 +1081,15 @@ export function createHero(
     let lastAreaRequest:{id:string|null;retry?:ReturnType<typeof setTimeout>}|undefined;
     let lastPhotoX=0,lastPhotoZ=0,lastCloseArea:string|null=null;
     ensureCityRegion=(center,bearing)=>{
-      let region=bearing===undefined?regionAt(regionManifest.regions,center):regionInView(regionManifest.regions,center,bearing);
+      const activeRegions=regional?regionManifest.regions.filter(r=>r.id!=='osaka'):regionManifest.regions;
+      let region=bearing===undefined?regionAt(activeRegions,center):regionInView(activeRegions,center,bearing);
       if(region?.id==='kameoka'&&meta.kameokaCampus&&Math.hypot(center.x-KAMEOKA_CENTER.x,center.z-KAMEOKA_CENTER.z)<1300)
         region={...region,id:'kameoka-campus',photo:meta.kameokaCampus};
       if(region?.id==='uji'&&meta.byodoin&&Math.hypot(center.x-BYODOIN_CENTER.x,center.z-BYODOIN_CENTER.z)<2000)
         region={...region,id:'uji-detail',photo:meta.byodoin};
       const id=region?.id??null;
       const changed=lastAreaRequest?.id!==id;
-      const closeArea=meta.otokuni&&containsPhoto(meta.otokuni.box,center)?'otokuni':id==='osaka'?'osaka':null;
+      const closeArea=meta.otokuni&&containsPhoto(meta.otokuni.box,center)?'otokuni':(id==='osaka'&&!regional)?'osaka':null;
       if(changed || closeArea!==lastCloseArea || bearing===undefined || (closeArea && Math.hypot(center.x-lastPhotoX,center.z-lastPhotoZ)>=600)){
         sharedSlot?.select(id==='tennozan');
         void closePhotos.update(closeArea?center:null);
@@ -1114,10 +1115,13 @@ export function createHero(
       return attempt();
     };
     prefetchCityRegion=(center)=>{
-      const next=regionAt(regionManifest.regions,center);
+      const activeRegions=regional?regionManifest.regions.filter(r=>r.id!=='osaka'):regionManifest.regions;
+      const next=regionAt(activeRegions,center);
       if(next)regionLoader.prefetch(next);
-      if(next?.id==='osaka'||(meta.otokuni&&containsPhoto(meta.otokuni.box,center)))void closePhotos.prefetch(center);
+      if((next?.id==='osaka'&&!regional)||(meta.otokuni&&containsPhoto(meta.otokuni.box,center)))void closePhotos.prefetch(center);
     };
+    const osakaOverviewRemovers: (() => void)[] = [];
+    let regionalCityReady = false;
     let southSampleRemove: (() => void) | undefined;
     let southOuterRemove: (() => void) | undefined;
     let southOuterBuildings: OverviewBuilding[] | undefined;
@@ -1243,10 +1247,11 @@ export function createHero(
             terrain.setPhoto(0,backdrop?.photo??null,backdrop?.box);
           }
           regionalPhoto=detail??base;sharedSlot?.setOverride(regionalPhoto??localPhoto);
-        },prepare,(photo,needed)=>uploadPhoto(renderer,photo,needed));
+        },prepare,(photo,needed)=>uploadPhoto(renderer,photo,needed),shadow.invalidate);
       })
       .then(result=>{
         regional=result;
+        if(regionLoader.id==='osaka')void regionLoader.request(null);
         biwaMesh?.refit(result.ground);
         aircraft.setGround(result.ground);
         void osakaWaterSurface(env,terrain.uniforms,result.ground).then(async osakaWater=>{
@@ -1256,7 +1261,7 @@ export function createHero(
         const airports=buildKansaiAirports(env,result.ground);
         void prepare(airports).then(()=>{scene.add(airports);});
         const osakaIcons=buildOsakaLandmarks(env,result.ground);
-        void prepare(osakaIcons).then(()=>{scene.add(osakaIcons);});
+        void prepare(osakaIcons).then(()=>{scene.add(osakaIcons);casts(osakaIcons);shadow.invalidate();});
         void import('./regional-fireworks').then(({regionalFireworks})=>{
           updateFireworks=regionalFireworks(scene,env,result.ground,!!opts.reducedMotion,prepare);
         }).catch(error=>console.warn('Regional fireworks unavailable',error));
@@ -1268,9 +1273,11 @@ export function createHero(
         terrain.uniforms.uTerrainBounds.value.set(...result.bounds);
         terrain.uniforms.uSurveyOn.value=1;
         void Promise.all([cityRegions,import('./regional-city')]).then(([index,module])=>
-          module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.map(r=>r.box)],lite,prepare,shadow.invalidate)
+          module.regionalCity(scene,env,landmarkLights,result.ground,[BUILDINGS_BOX,...index.regions.filter(r=>r.id!=='osaka').map(r=>r.box)],lite,prepare,shadow.invalidate)
         ).then(city=>{
           regionalCity=city;
+          regionalCityReady=true;
+          while(osakaOverviewRemovers.length)osakaOverviewRemovers.pop()?.();
           const p=camera.position;
           const insideCore=p.x>=BUILDINGS_BOX[0]&&p.x<=BUILDINGS_BOX[2]&&p.z>=BUILDINGS_BOX[1]&&p.z<=BUILDINGS_BOX[3];
           if(!insideCore)refreshForest();
@@ -1310,13 +1317,19 @@ export function createHero(
           }
           return;
         }
+        if(area==='osaka' && regionalCityReady)return;
         const overview=await buildSouthOverview(env,data.buildings,(x,z)=>hf.height(x,z));
         overview.mesh.name=`${area}-overview`;
-        installOverview(overview);
+        const removeOverview=installOverview(overview);
+        if(area==='osaka')osakaOverviewRemovers.push(removeOverview);
         if(data.towers){
           // Osaka's tallest measured towers exceed the detailed city's height encoding.
           const skyline=await buildSouthOverview(env,data.towers,(x,z)=>hf.height(x,z));
           scene.add(skyline.mesh);
+          if(area==='osaka')osakaOverviewRemovers.push(()=>{scene.remove(skyline.mesh);disposeGroup(skyline.mesh);});
+        }
+        if(area==='osaka' && regionalCityReady){
+          while(osakaOverviewRemovers.length)osakaOverviewRemovers.pop()?.();
         }
       } catch(error){console.warn(`City overview unavailable: ${area}`,error);}
     }

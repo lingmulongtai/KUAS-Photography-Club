@@ -8,6 +8,7 @@ import {regionalPhoto,type RegionalPhoto} from './regional-photo';
 import {Grid,type Heightfield} from './heightfield';
 import {districtImagery,districtSampling,type District} from './regional-districts';
 import {regionalBudgetForTier,type RegionalQualityBudget} from './adaptive-quality';
+import {SHADOW_LAYER} from './shadow';
 
 interface Patch {box: Box; file: string}
 interface GroundSurvey {grid: GridMeta; patches: Patch[]}
@@ -194,7 +195,13 @@ const fragmentShader = `
     float kix2Across = dot(kix2D, vec2(.632, .775));
     bool onKix2 = kix2Along > -2420. && kix2Along < 2620. && kix2Across > -360. && kix2Across < 1120.;
     bool onKixOffshore = vWorld.x < -43500. && vWorld.z > 58000.;
-    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500. && !onKobeIsland && !onKixOffshore;
+    // Restrict sea-level fallback strictly to outer harbor waters around Yumeshima & Kobe Port
+    // where prefecture borders extend over sea; inland western Osaka zero-metre wards stay dry
+    // and rely on surveyed osaka-water.bin for canals, rivers and harbor basins.
+    bool inBayZone = !onKobeIsland && !onKixOffshore && (
+      (vWorld.x < -33200. && vWorld.z > 34500.) ||
+      (vWorld.x < -41000. && vWorld.z > 31000.)
+    );
     if (inBayZone && vWorld.y <= .16) {
       // Open bay water at sea level (including bright white/silver sun-glare sea tiles around Kobe Airport)
       // has neutral/cool RGB (b >= r * 0.86), whereas reclaimed sand/earth is warm (r >> b).
@@ -253,7 +260,7 @@ const fragmentShader = `
     gl_FragColor=vec4(fadeHorizon(applyHaze(lit,emit,vWorld),vWorld),1.);
   }`;
 
-export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture,needed:()=>boolean)=>Promise<void>) {
+export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture,needed:()=>boolean)=>Promise<void>,onShadowDirty?:()=>void) {
   const [{grid,patches},surveys]=await Promise.all([loadJSON<GroundSurvey>('kansai/ground.json'),loadJSON<District[]>('kansai/districts/index.json')]);
   const [heights,boundary,cover,fine]=await Promise.all([
     loadGrid(grid),boundaryUniforms().then(async uniforms=>{
@@ -366,6 +373,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
         state.mesh.material.uniforms.uPhoto.value.dispose();
         state.mesh.material.dispose();
         state.mesh=null;
+        onShadowDirty?.();
       }
     }
     for(const state of states.sort((a,b)=>a.distance-b.distance)){
@@ -379,11 +387,13 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
         if(!geometry){photo.dispose();return;}
         const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uMidPhoto,uMidPhotoBox,uMidPhotoMatch,uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox,uKyotoBox},vertexShader,fragmentShader,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
         const mesh=new THREE.Mesh(geometry,material);
+        mesh.layers.enable(SHADOW_LAYER);
         await (shaderReady??=prepare(mesh));
         if(state.distance>activeUnload){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
         mesh.name='regional-ground';
         state.mesh=mesh;
         scene.add(mesh);
+        onShadowDirty?.();
       }).catch(()=>{state.retry=last+10;}).finally(()=>{state.pending=false;running--;});
     }
   }

@@ -420,10 +420,14 @@ export function buildTerrain(env: Env, hf: Heightfield, center: { x: number; z: 
         // Discard after screen derivatives and shadows, so shoreline pixels keep
         // valid derivatives. Physical bridge decks cover the river independently.
         if(river.r>.5)discard;
-        float basinEdge=boxInset(uOuterBox,p);
-        if(uSurveyOn*uOuterOn>.5 && basinEdge<1400.){
-          vec3 albedoAtEdge=seasonalSurface(surveyedGroundAlbedo(surveyPhoto),n,vWorld);
-          col=mix(shade(albedoAtEdge,n,vWorld,1.),col,smoothstep(0.,1400.,basinEdge));
+        if(uSurveyOn*uOuterOn>.5){
+          // Outside Kyoto's inner aerialWideBox (Osaka, Mt. Ikoma, Nara, Otsu), match regional-ground's
+          // exact surveyedGroundAlbedo and live sunShadow so z=36000 shows zero color or shadow seam.
+          float outerBlend=1.-inside(uAerialWideBox,p,1200.);
+          if(outerBlend>0.){
+            vec3 albedoOuter=seasonalSurface(surveyedGroundAlbedo(surveyPhoto),n,vWorld);
+            col=mix(col,shade(albedoOuter,n,vWorld,sh),outerBlend);
+          }
         }
         vec3 ground = applyHaze(col, emit, vWorld);
         float inset = boxInset(uTerrainBounds, p);
