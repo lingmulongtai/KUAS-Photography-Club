@@ -1,334 +1,253 @@
-import {
-  addBox,
-  addFrustum,
-  addIrimoyaRoof,
-  addLight,
-  addStrut,
-  addWaterPolygon,
-  makeObbMask,
-  makeSite,
-  sitePt,
-  type GroundFn,
-  type LandmarkBuilder,
-  type MaskShape,
-  type RGB,
-  type Vec3,
-} from './landmark-builder';
-
-/** Surveyed z15 Heijo Palace water basins (Kentoshi Ship reflecting pool & East Palace Garden pond) in local home metres. */
-const HEIJO_WATER_POLYGONS: readonly { name: string; outer: readonly number[] }[] = [
-  {
-    name: 'kentoshi-pool',
-    outer: [3359.2, 35285.5, 3354.8, 35285.5, 3354.8, 35299.2, 3379.3, 35300.5, 3379.8, 35250.3, 3370.2, 35189.1, 3318.8, 35189.4, 3318.8, 35209.4, 3359.2, 35209.4],
-  },
-  {
-    name: 'east-garden',
-    outer: [3913.5, 34822.8, 3910.4, 34827.2, 3914.5, 34828.2, 3914.0, 34830.2, 3910.4, 34829.9, 3909.1, 34827.2, 3904.7, 34829.0, 3902.0, 34825.3, 3890.3, 34824.1, 3889.1, 34831.7, 3894.7, 34840.7, 3888.8, 34845.4, 3888.6, 34850.5, 3892.2, 34852.0, 3895.7, 34848.3, 3899.8, 34852.2, 3905.0, 34851.0, 3906.7, 34852.5, 3910.6, 34850.0, 3915.3, 34851.0, 3916.5, 34849.0, 3914.5, 34845.8, 3917.2, 34841.9, 3921.6, 34842.2, 3920.4, 34849.3, 3922.1, 34851.5, 3925.3, 34852.7, 3934.6, 34851.2, 3934.6, 34835.6, 3929.2, 34833.9, 3926.5, 34829.5, 3928.0, 34826.5, 3934.1, 34825.3, 3933.9, 34816.5, 3929.0, 34814.0, 3927.7, 34811.1, 3930.2, 34806.5, 3936.6, 34803.8, 3936.8, 34794.0, 3927.0, 34794.5, 3923.8, 34799.4, 3916.7, 34795.7, 3910.1, 34796.7, 3913.3, 34812.1, 3922.6, 34812.6, 3922.1, 34822.6],
-  },
-];
-
-/** Exact masks suppressing generic regional blocks inside reconstructed Heijo Palace monuments. */
-export const HEIJO_BUILDING_MASKS: readonly MaskShape[] = [
-  // First Daigokuden + Daigokumon + Cloister court
-  makeObbMask(34.69395, 135.79415, 0, 52, 32),
-  makeObbMask(34.69195, 135.79415, 0, 76, 34),
-  // Suzakumon + Great Palace Walls
-  makeObbMask(34.68705, 135.79430, 0, 128, 22),
-  // Suzaku-oji Plaza (Kentoshi Ship + Guidance Hall + Tenpyo Pavilions)
-  makeObbMask(34.68595, 135.79595, 0, 72, 46),
-  makeObbMask(34.68595, 135.79295, 0, 48, 44),
-  // East Palace Garden (東院庭園)
-  makeObbMask(34.68967, 135.80240, 0, 56, 54),
-];
-
-/** Clear wild procedural trees from Heijo Palace's broad open imperial gravel courts & Suzaku-oji plaza. */
-export const HEIJO_TREE_MASKS: readonly MaskShape[] = [
-  makeObbMask(34.69295, 135.79415, 0, 82, 165),
-  makeObbMask(34.68940, 135.79425, 0, 72, 220),
-  makeObbMask(34.68650, 135.79440, 0, 145, 76),
-  makeObbMask(34.68967, 135.80240, 0, 52, 48),
-];
+import * as THREE from 'three';
+import { addLight, pushTri, type GroundFn, type LandmarkBuilder, type LocalSite, type RGB, type Vec3 } from './landmark-builder';
+import type { Part } from './landmarks';
+import { OUTLINES } from './landmark-outlines';
+import { at, block, centroid, dominantAngle, frame, inRing, inset, localBounds, ringOf, type XZ } from './landmark-kit';
+import { water } from './landmark-streets';
+import { roof } from './temple-models';
 
 /**
- * Build UNESCO World Heritage Heijo Palace Site (平城宮跡, Nara) aligned to GSI z17 aerial:
- * - First Daigokuden (第一次大極殿): two-tier white stone podium, triple stairs, vermilion colonnade,
- *   double-tiered authentic irimoya tile roof & twin gleaming golden shibi finials
- * - Daigokuden-in South Gate (大極門 / 南門) + East/West vermilion cloister corridors & corner towers
- * - Suzakumon (朱雀門): grand 2-story vermilion palace main gate + 240 m tile-capped Great Palace Walls (築地大垣)
- * - Kentoshi Envoy Ship (遣唐使船) floating in its surveyed reflecting basin + Guidance Hall (平城宮いざない館)
- * - East Palace Garden (東院庭園): surveyed Nara-era meandering pond, lakeside pavilions & arched vermilion bridge
+ * Heijo Palace site, Nara: the First Imperial Audience Hall (Daigokuden, 2010) on its stone
+ * terrace, the Daigokumon gate (2022) with the East Tower and the West Tower works, Suzakumon
+ * (1998) with the earthen walls either side, the Kentoshi ship replica, and the East Palace
+ * garden ponds. Footprints from OSM; elevations are approximations of the published
+ * reconstructions: vermilion posts, white walls, green lattice windows and grey tile.
  */
+type Color = Part['color'];
+const VERMILION: Color = [.50, .095, .035], WHITE: Color = [.62, .60, .55], LATTICE: Color = [.045, .16, .10];
+const TILE: Color = [.034, .038, .044], GOLD: Color = [.67, .45, .09], STONE: Color = [.30, .29, .26], DARK: Color = [.03, .025, .02];
+const box = (parts: Part[], w: number, h: number, d: number, x: number, y: number, z: number, color: Color, glow = .25) => {
+  const geo = new THREE.BoxGeometry(w, h, d); geo.translate(x, y, z); parts.push({ geo, color, glow });
+};
+
+const outline = (key: keyof typeof OUTLINES) => {
+  const ring = ringOf(OUTLINES[key]);
+  const c = centroid(ring);
+  // Fold the long-edge direction so local x runs east–west and +z south.
+  let angle = dominantAngle(ring);
+  if (angle > Math.PI / 4) angle -= Math.PI / 2;
+  return { ring, c, angle };
+};
+const HALL = outline('daigokuden'), GATE = outline('daigokumon'), EAST = outline('toro'), WEST = outline('seiro');
+const COURT = outline('daigokudenIn'), SUZAKU = outline('suzakumon'), SHIP = outline('kentoshiShip');
+const PONDS = (['toinPond1', 'toinPond2', 'toinPond3', 'toinPond4'] as const).map(k => ringOf(OUTLINES[k]));
+
+const BUILT = [HALL, GATE, EAST, WEST, SUZAKU, SHIP].map(o => inset(o.ring, -4));
+// The earthen walls run 120 m either side of Suzakumon.
+const WALL_HALF = 120;
+
+/** Generic survey buildings give way to the reconstructions and the walls. */
+export function inHeijoModel(x: number, z: number) {
+  if (Math.abs(x - 3400) > 1200 || Math.abs(z - 34800) > 800) return false;
+  if (BUILT.some(r => inRing(r, x, z))) return true;
+  const d = toLocal2(SUZAKU, x, z);
+  return Math.abs(d.x) < WALL_HALF + 4 && Math.abs(d.z) < 6;
+}
+
+/** The gravel court, the garden ponds and the Suzakumon plaza stay clear of trees. */
+export function inHeijoClearing(x: number, z: number) {
+  if (Math.abs(x - 3400) > 1200 || Math.abs(z - 34800) > 800) return false;
+  if (inHeijoModel(x, z) || inRing(COURT.ring, x, z) || PONDS.some(r => inRing(inset(r, -2), x, z))) return true;
+  const d = toLocal2(SUZAKU, x, z);
+  return Math.abs(d.x) < 60 && d.z > -60 && d.z < 0;
+}
+
+function toLocal2(o: { c: XZ; angle: number }, x: number, z: number) {
+  const dx = x - o.c.x, dz = z - o.c.z, c = Math.cos(o.angle), s = Math.sin(o.angle);
+  return { x: dx * c + dz * s, z: -dx * s + dz * c };
+}
+
+/** Bays of posts with white upper walls, lattice windows and central doors on all four sides. */
+function body(parts: Part[], w: number, d: number, y: number, h: number, bays: number, depthBays: number, open = false) {
+  for (const side of [-1, 1]) {
+    for (let i = 0; i <= bays; i++) {
+      const x = (i / bays - .5) * w;
+      box(parts, .62, h, .62, x, y + h / 2, side * d / 2, VERMILION, .6);
+      if (i === bays) continue;
+      const cx = x + w / bays / 2, bw = w / bays - .62;
+      const centre = Math.abs(i - (bays - 1) / 2) < 1.01;
+      if (open) continue;
+      // Upper white wall, then a green lattice window or vermilion double doors.
+      box(parts, bw, h * .26, .3, cx, y + h * .84, side * d / 2, WHITE, .5);
+      if (centre) box(parts, bw * .9, h * .68, .26, cx, y + h * .37, side * d / 2, VERMILION, .7);
+      else {
+        box(parts, bw, h * .22, .3, cx, y + h * .11, side * d / 2, WHITE, .4);
+        box(parts, bw * .92, h * .44, .22, cx, y + h * .46, side * d / 2, LATTICE, .9);
+        for (let k = 1; k < 8; k++) box(parts, .08, h * .44, .26, cx - bw * .46 + k * bw * .115, y + h * .46, side * d / 2, VERMILION, .3);
+      }
+    }
+    for (let i = 0; i <= depthBays; i++) {
+      const z = (i / depthBays - .5) * d;
+      box(parts, .62, h, .62, side * w / 2, y + h / 2, z, VERMILION, .6);
+      if (i < depthBays && !open) {
+        const cz = z + d / depthBays / 2, bd = d / depthBays - .62;
+        box(parts, .3, h * .26, bd, side * w / 2, y + h * .84, cz, WHITE, .5);
+        box(parts, .22, h * .44, bd * .92, side * w / 2, y + h * .46, cz, LATTICE, .9);
+        box(parts, .3, h * .22, bd, side * w / 2, y + h * .11, cz, WHITE, .4);
+      }
+    }
+  }
+  // Head beams and the bracket course carrying the eaves.
+  box(parts, w + .8, .45, d + .8, 0, y + h + .2, 0, VERMILION, .5);
+  box(parts, w + 2.2, .5, d + 2.2, 0, y + h + .7, 0, [.42, .40, .34], .35);
+  if (!open) box(parts, w - .4, h, d - .4, 0, y + h / 2, 0, [.20, .17, .13], .2);
+}
+
+/** Irimoya: hipped eaves with a gable in the upper roof and gilded shibi on the ridge ends. */
+function irimoya(parts: Part[], w: number, d: number, y: number, h: number, shibi = 0) {
+  roof(parts, w, d, h, y, 0, TILE);
+  const gy = y + h * .62;
+  for (const side of [-1, 1]) {
+    const geo = new THREE.BufferGeometry();
+    const x = side * w * .27, half = d * .2;
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([x, gy, -half, x, gy, half, x, y + h, 0], 3));
+    geo.computeVertexNormals();
+    parts.push({ geo, color: WHITE, glow: .4 });
+    if (shibi) {
+      box(parts, shibi * .5, shibi, shibi * .35, side * w * .15, y + h + shibi * .5, 0, GOLD, .9);
+      box(parts, shibi * .3, shibi * .45, shibi * .3, side * (w * .15 - shibi * .3), y + h + shibi * .85, 0, GOLD, .9);
+    }
+  }
+  box(parts, w * .32, .55, .7, 0, y + h + .1, 0, TILE, .3);
+}
+
+function terrace(parts: Part[], w: number, d: number, h: number, stairs: number[]) {
+  box(parts, w, h, d, 0, h / 2, 0, STONE, .35);
+  box(parts, w + .4, .3, d + .4, 0, h - .15, 0, [.36, .35, .32], .3);
+  for (const x of stairs) for (let i = 0; i < 6; i++) {
+    box(parts, 5, h * (6 - i) / 6, 1, x, h * (6 - i) / 12, d / 2 + .5 + i, STONE, .3);
+  }
+}
+
+/** Two-storey gate: an open lower storey with doors, a skirt roof, a balcony and the main roof. */
+function gate(parts: Part[], w: number, d: number, height: number) {
+  terrace(parts, w + 3, d + 3, 1.3, [0]);
+  const lower = height * .3;
+  body(parts, w, d, 1.3, lower, 5, 2, true);
+  for (const x of [-w * .2, 0, w * .2]) box(parts, w / 5 - .8, lower * .85, .25, x, 1.3 + lower * .42, 0, VERMILION, .7);
+  for (const side of [-1, 1]) box(parts, w * .2 - .6, lower * .8, .3, side * w * .4, 1.3 + lower * .4, 0, WHITE, .5);
+  const skirtY = 1.3 + lower + 1;
+  roof(parts, w * 1.42, d * 1.62, height * .1, skirtY, 0, TILE);
+  const upperY = skirtY + height * .1;
+  box(parts, w * 1.04, .35, d * 1.08, 0, upperY + .9, 0, VERMILION, .5);
+  for (let i = 0; i <= 10; i++) box(parts, .14, .9, .14, (i / 10 - .5) * w * 1.04, upperY + .45, d * .54, VERMILION, .4);
+  body(parts, w * .92, d * .9, upperY, height * .24, 5, 2);
+  irimoya(parts, w * 1.5, d * 1.7, upperY + height * .24 + 1.2, height - (upperY + height * .24 + 1.2), 1.9);
+}
+
+/** Convert Kyoto-style parts (linear colours, local metres) into the landmark builder. */
+function addParts(b: LandmarkBuilder, parts: Part[], f: LocalSite, style = 0) {
+  const a = new THREE.Vector3(), c = new THREE.Vector3(), e = new THREE.Vector3();
+  for (const { geo, color, glow } of parts) {
+    const rgb = color.map(v => Math.pow(v, 1 / 2.2)) as RGB;
+    const roofTone = color === TILE;
+    const pos = geo.getAttribute('position');
+    const index = geo.getIndex();
+    const count = index ? index.count : pos.count;
+    for (let i = 0; i < count; i += 3) {
+      const ia = index ? index.getX(i) : i, ib = index ? index.getX(i + 1) : i + 1, ic = index ? index.getX(i + 2) : i + 2;
+      a.fromBufferAttribute(pos, ia); c.fromBufferAttribute(pos, ib); e.fromBufferAttribute(pos, ic);
+      const n = new THREE.Vector3().subVectors(c, a).cross(new THREE.Vector3().subVectors(e, a)).normalize();
+      if (!Number.isFinite(n.x)) continue;
+      const world: Vec3 = [n.x * f.c - n.z * f.s, n.y, n.x * f.s + n.z * f.c];
+      pushTri(b, at(f, a.x, a.y, a.z), at(f, c.x, c.y, c.z), at(f, e.x, e.y, e.z), world, rgb,
+        (glow ?? .2) * .35, 0, roofTone ? 4 : style);
+    }
+    geo.dispose();
+  }
+}
+
+function site(o: { c: XZ; angle: number }, ground: GroundFn, lift = 0): LocalSite {
+  return frame(o.c.x, o.c.z, ground(o.c.x, o.c.z) - .4 + lift, o.angle);
+}
+
 export function buildHeijoPalace(b: LandmarkBuilder, ground: GroundFn) {
-  const vermilion: RGB = [0.76, 0.19, 0.12];
-  const vermilionDeep: RGB = [0.62, 0.14, 0.09];
-  const whitePlaster: RGB = [0.91, 0.89, 0.84];
-  const stonePodium: RGB = [0.76, 0.74, 0.69];
-  const stoneTrim: RGB = [0.84, 0.82, 0.77];
-  const gravelPale: RGB = [0.80, 0.76, 0.68];
-  const tileDark: RGB = [0.24, 0.25, 0.28];
-  const goldShibi: RGB = [0.98, 0.80, 0.22];
-  const timberDark: RGB = [0.36, 0.24, 0.16];
-  const latticeGreen: RGB = [0.22, 0.42, 0.26];
-
-  // =========================================================================
-  // 1. First Daigokuden (第一次大極殿 — 34.69395, 135.79415, facing due South)
-  // =========================================================================
+  // Daigokuden: a double-roofed hall of 9 × 4 bays on a stone terrace.
   {
-    const st = makeSite(34.69395, 135.79415, ground, 0, 0.6);
-    // Two-tier carved white stone ceremonial podium (基壇: 54 m × 26 m × 3.4 m)
-    addBox(b, st, 0, 0, 0, 56, 2.0, 28, stonePodium, { topRgb: stoneTrim, style: 4, emit: 0.16 });
-    addBox(b, st, 0, 2.0, 0, 52, 1.4, 24, stoneTrim, { topRgb: stoneTrim, style: 4, emit: 0.18 });
-    // Triple grand South stone staircases + central North staircase with vermilion railings
-    for (const sx of [-15, 0, 15]) {
-      const sw = sx === 0 ? 8.2 : 5.4;
-      addBox(b, st, sx, 0, 14.5, sw, 1.8, 4.2, stonePodium, { style: 4, emit: 0.14 });
-      addBox(b, st, sx, 1.8, 13.0, sw, 1.4, 2.4, stoneTrim, { style: 4, emit: 0.16 });
-      for (const side of [-1, 1]) {
-        addBox(b, st, sx + side * (sw * 0.5 + 0.25), 0.8, 14.5, 0.45, 2.6, 4.6, vermilion, { style: 4, emit: 0.24 });
-      }
-    }
-    // Perimeter vermilion balustrade (高欄) around the upper stone podium
-    for (const sz of [-11.8, 11.8]) {
-      addBox(b, st, -18, 3.4, sz, 15, 1.1, 0.4, vermilion, { style: 4, emit: 0.24 });
-      addBox(b, st, 18, 3.4, sz, 15, 1.1, 0.4, vermilion, { style: 4, emit: 0.24 });
-    }
-    for (const sx of [-25.8, 25.8]) {
-      addBox(b, st, sx, 3.4, 0, 0.4, 1.1, 24, vermilion, { style: 4, emit: 0.24 });
-    }
-
-    // Lower Hall Core (white plaster walls, green renji-mado lattice windows, vermilion colonnade, y = 3.4..11.2 m)
-    addBox(b, st, 0, 3.4, 0, 42, 7.8, 17, whitePlaster, { style: 4, emit: 0.62 });
-    // Vermilion front & rear bay columns (9 bays × 4 bays)
-    for (let i = -4; i <= 4; i++) {
-      const cx = i * 4.9;
-      addFrustum(b, st, cx, 3.4, 9.2, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.58 });
-      addFrustum(b, st, cx, 3.4, -9.2, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.58 });
-      if (i < 4) {
-        addBox(b, st, cx + 2.45, 5.2, 8.65, 2.6, 3.4, 0.35, latticeGreen, { style: 4, emit: 0.46 });
-      }
-    }
-    for (const cz of [-4.6, 0, 4.6]) {
-      addFrustum(b, st, -21.8, 3.4, cz, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.58 });
-      addFrustum(b, st, 21.8, 3.4, cz, 0.46, 0.42, 7.8, 8, vermilion, { style: 4, emit: 0.58 });
-    }
-    // Lower skirt pent roof (裳階 / lower tier eave, y = 10.6..14.6 m)
-    addIrimoyaRoof(b, st, 0, 10.6, 0, 51.0, 25.0, 4.4, tileDark, { ridgeRatio: 0.72, gableRatio: 0.65, emit: 0.24 });
-
-    // Upper Clerestory Hall (y = 13.6..19.2 m, vermilion brackets & white plaster upper bays)
-    addBox(b, st, 0, 13.6, 0, 35, 5.6, 13.5, whitePlaster, { style: 4, emit: 0.66 });
-    for (let i = -4; i <= 4; i++) {
-      addFrustum(b, st, i * 4.2, 13.6, 7.0, 0.38, 0.36, 5.6, 8, vermilion, { style: 4, emit: 0.60 });
-      addFrustum(b, st, i * 4.2, 13.6, -7.0, 0.38, 0.36, 5.6, 8, vermilion, { style: 4, emit: 0.60 });
-    }
-    // Bracket complex cornice belt (組物) under main eaves
-    addBox(b, st, 0, 18.6, 0, 37.5, 1.3, 15.8, vermilionDeep, { style: 4, emit: 0.56 });
-
-    // Grand Upper Irimoya Tile Roof with Twin Gleaming Golden Shibi Finials (y = 19.6..27.4 m!)
-    addIrimoyaRoof(b, st, 0, 19.6, 0, 48.0, 23.0, 7.8, tileDark, {
-      ridgeRatio: 0.56,
-      gableRatio: 0.44,
-      whiteTrim: whitePlaster,
-      shibiRgb: goldShibi,
-      shibiSize: 1.65,
-      emit: 0.26,
-    });
-    addLight(b, sitePt(st, -14, 15, 14), [1.0, 0.78, 0.42], 6.0, 0);
-    addLight(b, sitePt(st, 14, 15, 14), [1.0, 0.78, 0.42], 6.0, 0);
-    addLight(b, sitePt(st, 0, 26, 0), [1.0, 0.82, 0.46], 5.6, 0);
+    const f = site(HALL, ground), box2 = localBounds(f, HALL.ring);
+    const W = box2.x1 - box2.x0, D = box2.z1 - box2.z0, parts: Part[] = [];
+    terrace(parts, W, D, 2.4, [-W * .25, 0, W * .25]);
+    const w = W * .78, d = D * .62, h = 7.4;
+    body(parts, w, d, 2.4, h, 9, 4);
+    roof(parts, w * 1.28, d * 1.5, 2.6, 2.4 + h + .9, 0, TILE);
+    body(parts, w * .72, d * .62, 2.4 + h + 3.4, 4.2, 7, 2);
+    irimoya(parts, w * 1.22, d * 1.36, 2.4 + h + 7.9, 9.6, 2.6);
+    addParts(b, parts, f);
+    for (const x of [-W * .45, W * .45]) addLight(b, at(f, x, 1, -D * .55), [1, .78, .5], 2.2);
   }
-
-  // =========================================================================
-  // 2. Daigokuden-in South Gate (大極門 / 南門, 2022) & Vermilion Cloisters (回廊)
-  // =========================================================================
+  // Daigokumon with its corridor wings and the East Tower; the West Tower is still under a works shed.
   {
-    const gm = makeSite(34.69195, 135.79415, ground, 0, 0.5);
-    // Luminous pale gravel ceremonial plaza stretching between Daigokumon and First Daigokuden
-    addBox(b, gm, 0, 0, -108, 124, 0.55, 196, gravelPale, { topRgb: gravelPale, style: 4 });
-
-    // Daigokumon stone podium + 2-story vermilion gate (22 m × 10 m × 18.5 m)
-    addBox(b, gm, 0, 0, 0, 26, 2.0, 13, stonePodium, { topRgb: stoneTrim, style: 4, emit: 0.14 });
-    addBox(b, gm, 0, 2.0, 0, 20, 6.2, 8.6, whitePlaster, { style: 4, emit: 0.38 });
-    for (let i = -3; i <= 3; i++) {
-      addFrustum(b, gm, i * 3.2, 2.0, 4.6, 0.38, 0.35, 6.2, 8, vermilion, { style: 4, emit: 0.34 });
-      addFrustum(b, gm, i * 3.2, 2.0, -4.6, 0.38, 0.35, 6.2, 8, vermilion, { style: 4, emit: 0.34 });
-    }
-    // Lower skirt eave + upper story + authentic irimoya roof with golden shibi
-    addIrimoyaRoof(b, gm, 0, 7.8, 0, 26, 13.5, 2.8, tileDark, { ridgeRatio: 0.68, emit: 0.12 });
-    addBox(b, gm, 0, 10.2, 0, 17, 3.6, 7.2, whitePlaster, { style: 4, emit: 0.42 });
-    addBox(b, gm, 0, 13.4, 0, 18.2, 0.9, 8.2, vermilionDeep, { style: 4, emit: 0.36 });
-    addIrimoyaRoof(b, gm, 0, 14.1, 0, 24.5, 12.6, 4.8, tileDark, {
-      ridgeRatio: 0.55,
-      whiteTrim: whitePlaster,
-      shibiRgb: goldShibi,
-      shibiSize: 1.0,
-      emit: 0.14,
-    });
-
-    // Flanking East & West Vermilion Cloister Wing Corridors (築地回廊) + Corner Watchtowers (東楼・西楼)
+    const f = site(GATE, ground), g = localBounds(f, GATE.ring), parts: Part[] = [];
+    gate(parts, (g.x1 - g.x0) * .8, (g.z1 - g.z0) * .55, 22);
+    addParts(b, parts, f);
+    const court = site(COURT, ground), cb = localBounds(court, COURT.ring);
+    const southZ = cb.z1 - 4;
+    // Roofed south cloister from the gate to each tower.
     for (const side of [-1, 1]) {
-      const wx = side * 36;
-      addBox(b, gm, wx, 0, 0, 48, 1.2, 7.6, stonePodium, { style: 4 });
-      addBox(b, gm, wx, 1.2, 0, 48, 4.4, 6.0, whitePlaster, { style: 4, emit: 0.30 });
-      for (let k = -20; k <= 20; k += 5) {
-        addFrustum(b, gm, wx + k, 1.2, 3.2, 0.28, 0.26, 4.4, 6, vermilion, { style: 4, emit: 0.28 });
-        addFrustum(b, gm, wx + k, 1.2, -3.2, 0.28, 0.26, 4.4, 6, vermilion, { style: 4, emit: 0.28 });
+      const x0 = side * 9, x1 = side * 34, cl: Part[] = [];
+      const len = Math.abs(x1 - x0), mid = (x0 + x1) / 2;
+      for (let i = 0; i <= 8; i++) {
+        const x = mid - len / 2 + i * len / 8;
+        for (const z of [-2.2, 2.2]) box(cl, .45, 4.2, .45, x, 2.1, z, VERMILION, .5);
       }
-      addIrimoyaRoof(b, gm, wx, 5.4, 0, 50, 8.8, 2.6, tileDark, { ridgeRatio: 0.90, emit: 0.10 });
-      // Corner Watchtower Pavilion (東楼・西楼) at ±62 m
-      const tx = side * 62;
-      addBox(b, gm, tx, 0, 0, 13, 1.8, 13, stonePodium, { style: 4 });
-      addBox(b, gm, tx, 1.8, 0, 10.5, 8.2, 10.5, whitePlaster, { style: 4, emit: 0.56 });
-      addBox(b, gm, tx, 5.5, 0, 11.2, 0.9, 11.2, vermilion, { style: 4, emit: 0.50 });
-      addIrimoyaRoof(b, gm, tx, 9.8, 0, 14.5, 14.5, 4.2, tileDark, { ridgeRatio: 0.45, whiteTrim: whitePlaster, emit: 0.20 });
-      // North-running East & West Cloister Return Walls enclosing First Daigokuden's ceremonial court
-      addBox(b, gm, tx, 0, -112, 4.2, 1.0, 212, stonePodium, { style: 4 });
-      addBox(b, gm, tx, 1.0, -112, 2.4, 4.2, 212, whitePlaster, { style: 4, emit: 0.34 });
-      for (let kz = -208; kz <= -12; kz += 14) {
-        addBox(b, gm, tx, 1.0, kz, 2.7, 4.2, 0.45, vermilion, { style: 4, emit: 0.36 });
-      }
-      addIrimoyaRoof(b, gm, tx, 5.0, -112, 5.2, 214, 1.6, tileDark, { ridgeRatio: 0.96, emit: 0.14 });
+      box(cl, len, 3.2, .35, mid, 2.6, 0, WHITE, .4);
+      roof(cl, len + 1, 7.4, 2.2, 4.3, 0, TILE);
+      const south = at(court, 0, 0, southZ);
+      addParts(b, cl, frame(south[0], south[2], f.oy, COURT.angle));
     }
-    // Second Daigokuden / Former Imperial Audience Hall elevated stone podium (第二次大極殿基壇) East of court
-    const d2 = makeSite(34.69260, 135.79770, ground, 0, 0.4);
-    addBox(b, d2, 0, 0, 0, 56, 2.2, 28, stonePodium, { topRgb: gravelPale, style: 4, emit: 0.14 });
-    addBox(b, d2, 0, 2.2, 0, 48, 0.9, 22, stoneTrim, { topRgb: stoneTrim, style: 4, emit: 0.16 });
-    addLight(b, sitePt(gm, 0, 13, 8), [1.0, 0.76, 0.40], 5.6, 0);
+    const e = site(EAST, ground), eb = localBounds(e, EAST.ring), tower: Part[] = [];
+    const tw = Math.min(18, (eb.x1 - eb.x0) * .6), td = Math.min(11, (eb.z1 - eb.z0) * .6);
+    terrace(tower, tw + 3, td + 3, 1.2, []);
+    body(tower, tw, td, 1.2, 5.5, 5, 3);
+    roof(tower, tw * 1.4, td * 1.6, 1.8, 8, 0, TILE);
+    body(tower, tw * .86, td * .8, 9.8, 4.2, 5, 3);
+    irimoya(tower, tw * 1.45, td * 1.7, 14.5, 6.2, 1.4);
+    addParts(b, tower, e);
+    const w = site(WEST, ground), wb = localBounds(w, WEST.ring);
+    block(b, w, wb.x0 + 3, wb.x1 - 3, 0, 24, wb.z0 + 3, wb.z1 - 3, [.74, .75, .74], { style: 0, topRgb: [.62, .64, .66] });
   }
-
-  // =========================================================================
-  // 3. Suzakumon (朱雀門 — 34.68705, 135.79430) & Great Palace Walls (築地大垣)
-  // =========================================================================
+  // Suzakumon and the earthen walls with their tiled copings.
   {
-    const sz = makeSite(34.68705, 135.79430, ground, 0, 0.6);
-    // Broad pale-gravel Suzaku-oji ceremonial forecourt south of Suzakumon
-    addBox(b, sz, 0, 0, 48, 72, 0.55, 86, gravelPale, { topRgb: gravelPale, style: 4 });
-
-    // Suzakumon elevated two-tier white stone base (28 m × 14 m × 2.2 m) + triple wooden stair flights
-    addBox(b, sz, 0, 0, 0, 29, 2.2, 14.5, stonePodium, { topRgb: stoneTrim, style: 4, emit: 0.16 });
-    for (const sx of [-7, 0, 7]) {
-      addBox(b, sz, sx, 0, 8.2, 4.2, 1.9, 3.2, stoneTrim, { style: 4, emit: 0.14 });
-      addBox(b, sz, sx, 0, -8.2, 4.2, 1.9, 3.2, stoneTrim, { style: 4, emit: 0.14 });
-    }
-    // Lower Story (5 bays × 2 bays, massive vermilion pillars + recessed triple imperial red portal doors!)
-    addBox(b, sz, 0, 2.2, 0, 23, 6.8, 9.0, whitePlaster, { style: 4, emit: 0.64 });
-    for (const dx of [-6.4, 0, 6.4]) {
-      addBox(b, sz, dx, 2.2, 4.6, 3.6, 5.6, 0.5, vermilionDeep, { style: 4, emit: 0.56 });
-    }
-    for (let i = -3; i <= 3; i++) {
-      addFrustum(b, sz, i * 3.8, 2.2, 5.0, 0.44, 0.40, 6.8, 8, vermilion, { style: 4, emit: 0.62 });
-      addFrustum(b, sz, i * 3.8, 2.2, -5.0, 0.44, 0.40, 6.8, 8, vermilion, { style: 4, emit: 0.62 });
-    }
-    // Lower flared eaves (y = 8.8..12.2 m)
-    addIrimoyaRoof(b, sz, 0, 8.8, 0, 30.5, 16.0, 3.4, tileDark, { ridgeRatio: 0.68, emit: 0.24 });
-
-    // Upper Gallery Story with vermilion balcony balustrade & lattice windows (y = 11.6..16.2 m)
-    addBox(b, sz, 0, 11.6, 0, 20.5, 4.6, 8.0, whitePlaster, { style: 4, emit: 0.68 });
-    addBox(b, sz, 0, 11.8, 4.5, 22.0, 1.1, 0.4, vermilion, { style: 4, emit: 0.62 });
-    addBox(b, sz, 0, 11.8, -4.5, 22.0, 1.1, 0.4, vermilion, { style: 4, emit: 0.62 });
-    addBox(b, sz, 0, 15.8, 0, 22.2, 1.0, 9.2, vermilionDeep, { style: 4, emit: 0.58 });
-
-    // Iconic Sweeping Upper Irimoya Tile Roof with Twin Golden Shibi Finials (y = 16.5..22.4 m!)
-    addIrimoyaRoof(b, sz, 0, 16.5, 0, 29.0, 15.2, 5.9, tileDark, {
-      ridgeRatio: 0.56,
-      gableRatio: 0.44,
-      whiteTrim: whitePlaster,
-      shibiRgb: goldShibi,
-      shibiSize: 1.35,
-      emit: 0.26,
-    });
-
-    // Grand White-and-Vermilion Tile-Capped Palace Perimeter Walls (築地大垣) stretching 115 m East & West!
+    const f = site(SUZAKU, ground), s = localBounds(f, SUZAKU.ring), parts: Part[] = [];
+    gate(parts, (s.x1 - s.x0) * .74, (s.z1 - s.z0) * .55, 22);
     for (const side of [-1, 1]) {
-      const wx = side * 72;
-      addBox(b, sz, wx, 0, 0, 114, 1.0, 3.6, stonePodium, { style: 4 });
-      addBox(b, sz, wx, 1.0, 0, 114, 4.4, 2.2, whitePlaster, { style: 4, emit: 0.40 });
-      for (let k = -52; k <= 52; k += 8) {
-        addBox(b, sz, wx + k, 1.0, 0, 0.45, 4.4, 2.45, vermilion, { style: 4, emit: 0.40 });
-      }
-      addIrimoyaRoof(b, sz, wx, 5.2, 0, 116, 4.6, 1.6, tileDark, { ridgeRatio: 0.96, emit: 0.16 });
+      const x = side * (WALL_HALF / 2 + 14);
+      box(parts, WALL_HALF - 12, 5.2, 2.6, x, 2.6, 0, [.44, .37, .26], .3);
+      roof(parts, WALL_HALF - 10, 4, 1.1, 5.2, 0, TILE);
     }
-    addLight(b, sitePt(sz, -8, 13, 9), [1.0, 0.74, 0.36], 6.0, 0);
-    addLight(b, sitePt(sz, 8, 13, 9), [1.0, 0.74, 0.36], 6.0, 0);
+    addParts(b, parts, f);
+    for (const x of [-9, 9]) addLight(b, at(f, x, 1, -8), [1, .8, .55], 2);
   }
-
-  // =========================================================================
-  // 4. Kentoshi Envoy Ship (遣唐使船) & Suzaku-oji Plaza Pavilions (34.68595, 135.79595)
-  // =========================================================================
+  // Kentoshi ship: a flat-bottomed hull, deckhouse, two masts with matting sails.
   {
-    const poolBaseY = ground(3350, 35245) + 0.35;
-    const poolPoly = HEIJO_WATER_POLYGONS.find((p) => p.name === 'kentoshi-pool');
-    if (poolPoly) addWaterPolygon(b, poolPoly.outer, poolBaseY, [0.06, 0.22, 0.30]);
-
-    // Full-size Reconstructed Tang-Era Kentoshi Envoy Ship (30 m long, vermilion & white wooden hull + twin masts!)
-    const ship = makeSite(34.68592, 135.79595, ground, 0.04, 0.2);
-    // Lower dark-timber hull & curved red-and-white bulwarks
-    addBox(b, ship, 0, 0.5, 0, 7.6, 2.8, 22, vermilion, { topRgb: [0.68, 0.52, 0.34], style: 4, emit: 0.35 });
-    // Swept high prow (South) & stern (North) hull extensions
-    addBox(b, ship, 0, 1.8, 12.8, 6.2, 3.0, 5.2, vermilion, { topRgb: whitePlaster, style: 4, emit: 0.38 });
-    addBox(b, ship, 0, 1.8, -12.8, 6.4, 3.2, 5.2, vermilion, { topRgb: whitePlaster, style: 4, emit: 0.38 });
-    addBox(b, ship, 0, 3.2, 0, 7.8, 0.55, 22.4, whitePlaster, { style: 4, emit: 0.42 });
-    // Central Tang-style white-and-red deckhouse cabin
-    addBox(b, ship, 0, 3.3, -1.5, 5.2, 2.8, 10.5, whitePlaster, { style: 4, emit: 0.48 });
-    addIrimoyaRoof(b, ship, 0, 6.0, -1.5, 6.4, 12.0, 1.8, vermilionDeep, { ridgeRatio: 0.80, emit: 0.30 });
-    // Twin tall wooden masts & horizontal bamboo-lath yardarms
-    for (const [mz, mh] of [[-5.5, 16.5], [5.8, 14.5]] as const) {
-      addFrustum(b, ship, 0, 3.3, mz, 0.34, 0.20, mh, 8, timberDark, { style: 4, emit: 0.20 });
-      addStrut(b, sitePt(ship, -5.6, 3.3 + mh * 0.72, mz), sitePt(ship, 5.6, 3.3 + mh * 0.72, mz), 0.16, 0.16, 6, timberDark, 0.16);
+    const f = site(SHIP, ground, 1.2), parts: Part[] = [];
+    const L = 26, B = 8.6;
+    for (let i = 0; i < 12; i++) {
+      const t = (i + .5) / 12, beam = B * Math.sqrt(Math.max(.08, 1 - Math.pow(2 * t - 1, 6)));
+      box(parts, L / 12 + .02, 2.6 - .8 * Math.abs(2 * t - 1), beam, -L / 2 + t * L, 1.3, 0, [.26, .15, .08], .3);
     }
-    addLight(b, sitePt(ship, 0, 9.5, 0), [1.0, 0.76, 0.40], 4.6, 0);
-
-    // Heijo Palace Guidance Hall (平城宮いざない館) & Tenpyo Plaza Pavilions flanking Suzaku-oji
-    const plaza = makeSite(34.68595, 135.79505, ground, 0, 0.5);
-    addBox(b, plaza, 0, 0, 0, 32, 8.2, 48, [0.46, 0.44, 0.42], { topRgb: tileDark, style: 4, emit: 0.38 });
-    addIrimoyaRoof(b, plaza, 0, 8.0, 0, 35, 51, 3.8, tileDark, { ridgeRatio: 0.75, emit: 0.10 });
-    const westPlaza = makeSite(34.68595, 135.79295, ground, 0, 0.5);
-    for (const [wx, wz, ww, wd] of [[-14, 0, 18, 42], [16, -6, 16, 26], [16, 18, 16, 16]] as const) {
-      addBox(b, westPlaza, wx, 0, wz, ww, 6.8, wd, [0.54, 0.50, 0.46], { style: 4, emit: 0.36 });
-      addIrimoyaRoof(b, westPlaza, wx, 6.6, wz, ww + 2.4, wd + 2.4, 2.8, tileDark, { ridgeRatio: 0.76, emit: 0.10 });
+    box(parts, L * .96, .3, B * .9, 0, 2.7, 0, [.42, .28, .16], .3);
+    box(parts, L * .98, .5, .25, 0, 3.1, B * .46, VERMILION, .5);
+    box(parts, L * .98, .5, .25, 0, 3.1, -B * .46, VERMILION, .5);
+    box(parts, 7, 2.6, 5.4, -3, 4.1, 0, VERMILION, .6);
+    roof(parts, 8.6, 6.6, 1.4, 5.4, 0, [.28, .2, .14]);
+    box(parts, 4.5, 2, 4, L * .36, 3.9, 0, VERMILION, .6);
+    for (const [x, h, sw] of [[3.5, 15, 7.5], [-8.5, 11, 5.5]] as const) {
+      const mast = new THREE.CylinderGeometry(.18, .28, h, 8); mast.translate(x, 2.8 + h / 2, 0);
+      parts.push({ geo: mast, color: [.30, .20, .12], glow: .3 });
+      box(parts, .18, h * .6, sw, x + .3, 2.8 + h * .58, 0, [.52, .40, .24], .3);
     }
+    addParts(b, parts, f);
   }
-
-  // =========================================================================
-  // 5. East Palace Garden (東院庭園 — 34.68967, 135.80240)
-  // =========================================================================
+  // East Palace garden: the ponds and a vermilion bridge.
+  for (const pond of PONDS) {
+    const c = centroid(pond);
+    water(b, pond, ground(c.x, c.z) - .25, [.06, .22, .24]);
+  }
   {
-    const pondY = ground(3915, 34830) + 0.35;
-    const pondPoly = HEIJO_WATER_POLYGONS.find((p) => p.name === 'east-garden');
-    if (pondPoly) addWaterPolygon(b, pondPoly.outer, pondY, [0.05, 0.20, 0.24]);
-
-    const eg = makeSite(34.68967, 135.80240, ground, 0, 0.4);
-    // Central Lakeside Pavilion (中央建物) jutting out over the calm imperial pond!
-    addBox(b, eg, -14, 0.2, 0, 15, 1.4, 10, stonePodium, { style: 4 });
-    addBox(b, eg, -14, 1.6, 0, 13, 4.4, 8, whitePlaster, { style: 4, emit: 0.40 });
-    for (let x = -19; x <= -9; x += 3.3) {
-      addFrustum(b, eg, x, 1.6, 4.2, 0.26, 0.24, 4.4, 6, vermilion, { style: 4, emit: 0.35 });
-      addFrustum(b, eg, x, 1.6, -4.2, 0.26, 0.24, 4.4, 6, vermilion, { style: 4, emit: 0.35 });
-    }
-    addIrimoyaRoof(b, eg, -14, 5.8, 0, 17, 11.5, 3.2, tileDark, { ridgeRatio: 0.58, whiteTrim: whitePlaster, emit: 0.12 });
-
-    // South-East Corner Lookout Pavilion (隅楼) + North Imperial Banquet Hall
-    addBox(b, eg, 24, 0, 16, 11, 6.2, 11, whitePlaster, { style: 4, emit: 0.36 });
-    addIrimoyaRoof(b, eg, 24, 6.0, 16, 14, 14, 3.4, tileDark, { ridgeRatio: 0.42, emit: 0.12 });
-    addBox(b, eg, 4, 0, -28, 22, 5.4, 10, whitePlaster, { style: 4, emit: 0.34 });
-    addIrimoyaRoof(b, eg, 4, 5.2, -28, 26, 13, 3.2, tileDark, { ridgeRatio: 0.62, emit: 0.12 });
-
-    // Arched Vermilion-Railed Timber Garden Bridge arching gracefully across the pond!
-    const segs = 8;
-    let prevL: Vec3 | null = null, prevR: Vec3 | null = null;
-    for (let i = 0; i <= segs; i++) {
-      const t = i / segs;
-      const bx = -4 + t * 18;
-      const by = 1.0 + Math.sin(t * Math.PI) * 1.9;
-      const pL = sitePt(eg, bx, by, -1.3);
-      const pR = sitePt(eg, bx, by, 1.3);
-      if (prevL && prevR) {
-        addStrut(b, prevL, pL, 0.30, 0.30, 4, vermilion, 0.34);
-        addStrut(b, prevR, pR, 0.30, 0.30, 4, vermilion, 0.34);
-        addStrut(b, sitePt(eg, bx - 1.1, by - 0.35, 0), sitePt(eg, bx + 1.1, by - 0.35, 0), 1.2, 1.2, 4, timberDark, 0.18);
-      }
-      prevL = pL;
-      prevR = pR;
-    }
-    addLight(b, sitePt(eg, -6, 6.5, 0), [1.0, 0.78, 0.44], 4.2, 0);
+    const p = centroid(PONDS[0]), f = frame(p.x, p.z, ground(p.x, p.z) - .2, 1.1), parts: Part[] = [];
+    box(parts, 10, .3, 2.2, 0, .9, 0, VERMILION, .5);
+    for (const z of [-1, 1]) for (let i = 0; i <= 5; i++) box(parts, .12, .8, .12, -5 + i * 2, 1.45, z, VERMILION, .4);
+    addParts(b, parts, f);
   }
 }

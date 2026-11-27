@@ -160,7 +160,7 @@ test('B787-8 airliner, helicopters, airports, Osaka landmarks and Biwa bridges b
     ['USJ Hogwarts', 34.66878, 135.43145],
     ['USJ Bowser castle', 34.66805, 135.42992],
     ['Heijo Daigokuden', 34.69395, 135.79415],
-    ['Heijo Suzakumon', 34.68705, 135.79430],
+    ['Heijo Suzakumon', 34.68693, 135.79428],
   ]) {
     const p = toLocal(lat, lon);
     assert.equal(inOsakaLandmarkMask(p.x, p.z), true, `building mask covers ${label}`);
