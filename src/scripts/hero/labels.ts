@@ -103,6 +103,7 @@ const EXTRA_PIN_STYLE: Record<(typeof EXTRA_LANDMARKS)[number]['id'], { rank: nu
   kix: { rank: 1, above: 86 },
   itami: { rank: 1, above: 54 },
   kobeAirport: { rank: 1, above: 52 },
+  osakaStation: { rank: 1, above: 76 },
   abenoHarukas: { rank: 1, above: 306 },
   umedaSky: { rank: 1, above: 178 },
   tsutenkaku: { rank: 2, above: 112 },
