@@ -5,6 +5,7 @@ import { LINE, type LineFeature } from './lines-data';
 import { ROAD_GLSL } from './roads';
 import {refineWaterSurfaceSteps} from './water-surface';
 import {toLocal} from './geo';
+import {tidalWeight} from './osaka-tidal';
 import {loadBinary} from './data';
 import {yieldTask} from './task-yield';
 import type {KamoChannel} from './kamo-channel';
@@ -98,20 +99,22 @@ export function waterProfile(ring:readonly {x:number;y:number}[],attr:number):[n
 }
 
 export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceClearance=false){
-  return new THREE.ShaderMaterial({
+  const material = new THREE.ShaderMaterial({
     uniforms: { ...env, ...roads, uWaterBias:{value:bias}, uClearance:{value:surfaceClearance?1:0} },
     vertexShader: /* glsl */ `
       attribute float aStable;
       attribute vec3 aWater;
+      attribute float aTidal;
       uniform float uWaterBias;
       uniform float uClearance;
       varying float vStable;
       varying vec3 vWater;
       varying vec3 vWorld;
+      varying float vTidal;
       void main(){
         vec3 p = position;
         vWorld = p;
-        vStable=aStable;vWater=aWater;
+        vStable=aStable;vWater=aWater;vTidal=aTidal;
         vec3 toCam = cameraPosition - p;
         float dist = length(toCam);
         float pull;
@@ -137,6 +140,7 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
       varying vec3 vWorld;
       varying float vStable;
       varying vec3 vWater;
+      varying float vTidal;
 
       // Multi-octave rotated organic wave height (zero periodic grid regularity).
       float waveHeight(vec2 p, vec2 drift, float fine, float med, float broad){
@@ -197,6 +201,59 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
         return mix(sky, landCol, sill * reflStrength);
       }
 
+      // Open-sea surface. Matches regional-ground.ts renderSea() bit-for-bit so Osaka Bay harbours,
+      // the open sea and the tidal river reaches join with no visible seam.
+      vec3 seaSurface(vec2 q, float footprint){
+        const mat2 R1 = mat2(.80, -.60, .60, .80);
+        const mat2 R2 = mat2(.54, .84, -.84, .54);
+        float broad = 1. - smoothstep(2., 16., footprint);
+        float med = 1. - smoothstep(.4, 4.5, footprint);
+        vec2 drift = vec2(uTime * .38, uTime * .26);
+        float eps = max(.55, footprint * .5);
+        vec2 wp0 = vec2(vnoise(q * .022 + drift * .22), vnoise(q * .022 - drift * .19 + 13.7)) - .5;
+        vec2 q0 = q + wp0 * 7.5;
+        vec2 qx = q + vec2(eps, 0.) + (vec2(vnoise((q + vec2(eps, 0.)) * .022 + drift * .22), vnoise((q + vec2(eps, 0.)) * .022 - drift * .19 + 13.7)) - .5) * 7.5;
+        vec2 qy = q + vec2(0., eps) + (vec2(vnoise((q + vec2(0., eps)) * .022 + drift * .22), vnoise((q + vec2(0., eps)) * .022 - drift * .19 + 13.7)) - .5) * 7.5;
+        float h0 = ((vnoise(R1 * (q0 * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (q0 * .082) - drift * .46 + 9.4) - .5) * .65) * broad
+                 + (vnoise(R1 * (q0 * .19) + drift * .78 + 24.1) - .5) * .38 * med;
+        float hx = ((vnoise(R1 * (qx * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (qx * .082) - drift * .46 + 9.4) - .5) * .65) * broad
+                 + (vnoise(R1 * (qx * .19) + drift * .78 + 24.1) - .5) * .38 * med;
+        float hy = ((vnoise(R1 * (qy * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (qy * .082) - drift * .46 + 9.4) - .5) * .65) * broad
+                 + (vnoise(R1 * (qy * .19) + drift * .78 + 24.1) - .5) * .38 * med;
+        float gust = .58 + .68 * vnoise(q * .0012 + vec2(uTime * .014, -uTime * .01));
+        vec2 slope = vec2(hx - h0, hy - h0) / eps * .11 * gust;
+        vec3 n = normalize(vec3(slope.x, 1., slope.y));
+        vec3 view = normalize(vWorld - cameraPosition);
+        vec3 r = reflect(view, n);
+        r.y = clamp(abs(r.y) + .02, .015, 1.);
+        vec3 rn = normalize(r);
+        float facing = clamp(dot(-view, n), 0., 1.);
+        float fres = .045 + .88 * pow(1. - facing, 4.5);
+        vec3 sky = skyColor(rn);
+        if (rn.y > .04) {
+          vec2 cloudUv = q * .000035 + rn.xz / max(rn.y + .18, .22) * .75 + vec2(uTime * .0014, 0.);
+          float cMask = smoothstep(.46, .78, fbm(cloudUv * 2.1)) * smoothstep(.04, .28, rn.y) * (1. - smoothstep(.55, .95, rn.y));
+          vec3 cCol = mix(uCloudLight * .88 + uHorizon * .25, uHorizon * .45, uCity);
+          sky = mix(sky, cCol, cMask * .4);
+        }
+        float az = atan(rn.x, rn.z);
+        float ridge = .04 + .035 * vnoise(vec2(az * 3.2 + q.x * .00003, q.y * .00003 + 3.7));
+        float sill = 1. - smoothstep(ridge * .6, ridge * 1.15 + .015, rn.y);
+        vec3 shoreCol = vec3(.09, .10, .11) * (skyLight(vec3(0., .7, .7)) + uSunLight * max(uSunDir.y, 0.) * .5);
+        if (uCity > .01) {
+          float glow = exp(-rn.y * 16.) * (.45 + .55 * vnoise(vec2(az * 12. + q.x * .0003, q.y * .0003)));
+          shoreCol += vec3(1., .64, .32) * glow * uCity * .24;
+        }
+        vec3 envRefl = mix(sky, shoreCol, sill * .48);
+        vec3 ambient = skyLight(vec3(0., 1., 0.)) + uSunLight * max(uSunDir.y, 0.);
+        vec3 col = mix(vec3(.009, .031, .047) * ambient, envRefl, fres);
+        float sunDot = max(dot(rn, uSunDir), 0.);
+        float moonDot = max(dot(rn, uMoonDir), 0.);
+        col += uSunLight * (pow(sunDot, 170.) * .55 + pow(sunDot, 24.) * .065);
+        col += uMoonLight * (pow(moonDot, 170.) * 2.8 + pow(moonDot, 24.) * .28);
+        return col;
+      }
+
       void main(){
         vec2 q = vWorld.xz;
         float footprint=max(length(dFdx(q)),length(dFdy(q)));
@@ -206,56 +263,7 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
         bool lake = vWater.x > 1.5 && !baySea;
         bool river = vWater.x > .5 && !lake && !baySea;
         if (baySea) {
-          // Match regional-ground.ts renderSea() bit-for-bit so Osaka Bay harbors and open sea
-          // join with zero visible tile seam around Yumeshima, Kobe Port and Sakishima.
-          const mat2 R1 = mat2(.80, -.60, .60, .80);
-          const mat2 R2 = mat2(.54, .84, -.84, .54);
-          float broad = 1. - smoothstep(2., 16., footprint);
-          float med = 1. - smoothstep(.4, 4.5, footprint);
-          vec2 drift = vec2(uTime * .38, uTime * .26);
-          float eps = max(.55, footprint * .5);
-          vec2 wp0 = vec2(vnoise(q * .022 + drift * .22), vnoise(q * .022 - drift * .19 + 13.7)) - .5;
-          vec2 q0 = q + wp0 * 7.5;
-          vec2 qx = q + vec2(eps, 0.) + (vec2(vnoise((q + vec2(eps, 0.)) * .022 + drift * .22), vnoise((q + vec2(eps, 0.)) * .022 - drift * .19 + 13.7)) - .5) * 7.5;
-          vec2 qy = q + vec2(0., eps) + (vec2(vnoise((q + vec2(0., eps)) * .022 + drift * .22), vnoise((q + vec2(0., eps)) * .022 - drift * .19 + 13.7)) - .5) * 7.5;
-          float h0 = ((vnoise(R1 * (q0 * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (q0 * .082) - drift * .46 + 9.4) - .5) * .65) * broad
-                   + (vnoise(R1 * (q0 * .19) + drift * .78 + 24.1) - .5) * .38 * med;
-          float hx = ((vnoise(R1 * (qx * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (qx * .082) - drift * .46 + 9.4) - .5) * .65) * broad
-                   + (vnoise(R1 * (qx * .19) + drift * .78 + 24.1) - .5) * .38 * med;
-          float hy = ((vnoise(R1 * (qy * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (qy * .082) - drift * .46 + 9.4) - .5) * .65) * broad
-                   + (vnoise(R1 * (qy * .19) + drift * .78 + 24.1) - .5) * .38 * med;
-          float gust = .58 + .68 * vnoise(q * .0012 + vec2(uTime * .014, -uTime * .01));
-          vec2 slope = vec2(hx - h0, hy - h0) / eps * .11 * gust;
-          vec3 n = normalize(vec3(slope.x, 1., slope.y));
-          vec3 view = normalize(vWorld - cameraPosition);
-          vec3 r = reflect(view, n);
-          r.y = clamp(abs(r.y) + .02, .015, 1.);
-          vec3 rn = normalize(r);
-          float facing = clamp(dot(-view, n), 0., 1.);
-          float fres = .045 + .88 * pow(1. - facing, 4.5);
-          vec3 sky = skyColor(rn);
-          if (rn.y > .04) {
-            vec2 cloudUv = q * .000035 + rn.xz / max(rn.y + .18, .22) * .75 + vec2(uTime * .0014, 0.);
-            float cMask = smoothstep(.46, .78, fbm(cloudUv * 2.1)) * smoothstep(.04, .28, rn.y) * (1. - smoothstep(.55, .95, rn.y));
-            vec3 cCol = mix(uCloudLight * .88 + uHorizon * .25, uHorizon * .45, uCity);
-            sky = mix(sky, cCol, cMask * .4);
-          }
-          float az = atan(rn.x, rn.z);
-          float ridge = .04 + .035 * vnoise(vec2(az * 3.2 + q.x * .00003, q.y * .00003 + 3.7));
-          float sill = 1. - smoothstep(ridge * .6, ridge * 1.15 + .015, rn.y);
-          vec3 shoreCol = vec3(.09, .10, .11) * (skyLight(vec3(0., .7, .7)) + uSunLight * max(uSunDir.y, 0.) * .5);
-          if (uCity > .01) {
-            float glow = exp(-rn.y * 16.) * (.45 + .55 * vnoise(vec2(az * 12. + q.x * .0003, q.y * .0003)));
-            shoreCol += vec3(1., .64, .32) * glow * uCity * .24;
-          }
-          vec3 envRefl = mix(sky, shoreCol, sill * .48);
-          vec3 ambient = skyLight(vec3(0., 1., 0.)) + uSunLight * max(uSunDir.y, 0.);
-          vec3 col = mix(vec3(.009, .031, .047) * ambient, envRefl, fres);
-          float sunDot = max(dot(rn, uSunDir), 0.);
-          float moonDot = max(dot(rn, uMoonDir), 0.);
-          col += uSunLight * (pow(sunDot, 170.) * .55 + pow(sunDot, 24.) * .065);
-          col += uMoonLight * (pow(moonDot, 170.) * 2.8 + pow(moonDot, 24.) * .28);
-          gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
+          gl_FragColor = vec4(applyHaze(seaSurface(q, footprint), vec3(0.), vWorld), 1.);
           return;
         }
         vec2 axis=normalize(vWater.yz),crosswind=vec2(-axis.y,axis.x);
@@ -314,10 +322,14 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
         float broadGloss = lake ? 26. : river ? 20. : 38.;
         col += uSunLight * (pow(sunDot, tight) * .55 + pow(sunDot, broadGloss) * .065);
         col += uMoonLight * (pow(moonDot, tight) * 2.8 + pow(moonDot, broadGloss) * .28);
+        // Tidal reaches take on the sea's surface towards their mouths.
+        if (vTidal > .001) col = mix(col, seaSurface(q, footprint), vTidal);
         gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
       }
     `,
   });
+  Object.assign(material.defaultAttributeValues, { aTidal: [0] });
+  return material;
 }
 
 export type BiwaSurface = THREE.Group & { refit: (ground: (x: number, z: number) => number) => void };
@@ -556,6 +568,7 @@ export async function osakaWaterSurface(env:Env,roads:WaterRoads,initialGround?:
   if(riverVerts>0){
     const positions=new Float32Array(riverVerts*3);
     const profiles=new Float32Array(riverVerts*3);
+    const tidal=new Float32Array(riverVerts);
     const dirOffset=8+bayVerts*8+riverVerts*8;
     for(let n=0;n<riverVerts;n++){
       positions[n*3]=view.getFloat32(offset,true);
@@ -568,10 +581,12 @@ export async function osakaWaterSurface(env:Env,roads:WaterRoads,initialGround?:
       profiles[n*3]=1;
       profiles[n*3+1]=fx/len;
       profiles[n*3+2]=fz/len;
+      tidal[n]=tidalWeight(positions[n*3],positions[n*3+2]);
     }
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
     geometry.setAttribute('aWater',new THREE.BufferAttribute(profiles,3));
+    geometry.setAttribute('aTidal',new THREE.BufferAttribute(tidal,1));
     geometry.computeBoundingSphere();
     const material=waterMaterial(env,roads,1.2,false);
     material.polygonOffset=true;
