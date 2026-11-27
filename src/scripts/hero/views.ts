@@ -46,6 +46,7 @@ const ABENO_HARUKAS=toLocal(34.646181,135.513396); // あべのハルカス (300
 const UMEDA_SKY=toLocal(34.705244,135.490177); // 梅田スカイビル (173 m)
 const TSUTENKAKU=toLocal(34.652540,135.506305); // 通天閣 (108 m)
 const OSAKA_STATION=toLocal(34.70240,135.49595); // 大阪駅・梅田（大阪ステーションシティ・HEP FIVE・うめきた）
+const USJ=toLocal(34.66580,135.43230); // ユニバーサル・スタジオ・ジャパン (USJ)
 
 export const EXTRA_LANDMARKS = [
   { id: 'hikone', ja: '彦根城', en: 'Hikone Castle', lat: 35.27645, lon: 136.25184 },
@@ -57,6 +58,7 @@ export const EXTRA_LANDMARKS = [
   { id: 'itami', ja: '伊丹空港（大阪国際空港）', en: 'Itami Airport (Osaka Intl)', lat: 34.7868, lon: 135.4408 },
   { id: 'kobeAirport', ja: '神戸空港', en: 'Kobe Airport', lat: 34.6335, lon: 135.2242 },
   { id: 'osakaStation', ja: '大阪駅・梅田', en: 'Osaka Station · Umeda', lat: 34.70240, lon: 135.49595 },
+  { id: 'usj', ja: 'ユニバーサル・スタジオ・ジャパン', en: 'Universal Studios Japan', lat: 34.66580, lon: 135.43230 },
   { id: 'abenoHarukas', ja: 'あべのハルカス', en: 'Abeno Harukas', lat: 34.646181, lon: 135.513396 },
   { id: 'umedaSky', ja: '梅田スカイビル', en: 'Umeda Sky Building', lat: 34.705244, lon: 135.490177 },
   { id: 'tsutenkaku', ja: '通天閣', en: 'Tsutenkaku', lat: 34.652540, lon: 135.506305 },
@@ -133,6 +135,7 @@ export const VIEWS = {
   itami:{ja:'伊丹空港（大阪国際空港）',en:'Itami Airport',eye:ahead(ITAMI,140,1650),ref:ITAMI,above:340,bearing:320,pitch:-12,orbit:{center:ITAMI,targetHeight:18}},
   kobeAirport:{ja:'神戸空港',en:'Kobe Airport',eye:ahead(KOBE_AIRPORT,165,1650),ref:KOBE_AIRPORT,above:340,bearing:345,pitch:-12,orbit:{center:KOBE_AIRPORT,targetHeight:18}},
   osakaStation:{ja:'大阪駅・梅田',en:'Osaka Station · Umeda',eye:ahead(OSAKA_STATION,155,700),ref:OSAKA_STATION,above:250,bearing:335,pitch:-14,orbit:{center:OSAKA_STATION,targetHeight:65}},
+  usj:{ja:'ユニバーサル・スタジオ・ジャパン',en:'Universal Studios Japan',eye:ahead(USJ,135,680),ref:USJ,above:230,bearing:315,pitch:-16,orbit:{center:USJ,targetHeight:24}},
   abenoHarukas:{ja:'あべのハルカス',en:'Abeno Harukas',eye:ahead(ABENO_HARUKAS,220,760),ref:ABENO_HARUKAS,above:250,bearing:40,pitch:-10,orbit:{center:ABENO_HARUKAS,targetHeight:150}},
   umedaSky:{ja:'梅田スカイビル',en:'Umeda Sky Building',eye:ahead(UMEDA_SKY,188,480),ref:UMEDA_SKY,above:185,bearing:8,pitch:-10,orbit:{center:UMEDA_SKY,targetHeight:95}},
   tsutenkaku:{ja:'通天閣',en:'Tsutenkaku',eye:ahead(TSUTENKAKU,200,320),ref:TSUTENKAKU,above:105,bearing:20,pitch:-11,orbit:{center:TSUTENKAKU,targetHeight:58}},

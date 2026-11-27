@@ -1554,7 +1554,7 @@ export function createHero(
     const request=++flightRequest;
     const needsRegional = target.startsWith('region-') || target === 'hikone' || target === 'yogo' || target === 'todaiji' || target === 'kasuga'
       || target === 'kix' || target === 'itami' || target === 'kobeAirport'
-      || target === 'abenoHarukas' || target === 'umedaSky' || target === 'tsutenkaku' || target === 'osakaStation';
+      || target === 'abenoHarukas' || target === 'umedaSky' || target === 'tsutenkaku' || target === 'osakaStation' || target === 'usj';
     if(needsRegional && !regional && ensureRegionalGround){
       opts.onAreaLoading?.(true);
       void ensureRegionalGround().then(()=>{

@@ -26,6 +26,7 @@ import {
   type Vec3,
 } from './landmark-builder';
 import { UMEDA_BUILDING_MASKS, UMEDA_TREE_MASKS, buildOsakaUmeda } from './osaka-umeda';
+import { USJ_BUILDING_MASKS, USJ_TREE_MASKS, buildUsj } from './osaka-usj';
 
 /** Exact GSI z17 surveyed positions of Osaka's signature skyline landmarks. */
 export const OSAKA_SKYLINE_SITES = {
@@ -44,8 +45,8 @@ const CORE_OSAKA_MASKS: MaskShape[] = [
   makeCircleMask(34.652540, 135.506305, 25),
 ];
 
-const EXTRA_BUILDING_MASKS: MaskShape[] = [...UMEDA_BUILDING_MASKS];
-const EXTRA_TREE_MASKS: MaskShape[] = [...UMEDA_TREE_MASKS];
+const EXTRA_BUILDING_MASKS: MaskShape[] = [...UMEDA_BUILDING_MASKS, ...USJ_BUILDING_MASKS];
+const EXTRA_TREE_MASKS: MaskShape[] = [...UMEDA_TREE_MASKS, ...USJ_TREE_MASKS];
 
 /** Register additional bespoke district building & tree masks (Umeda, USJ, Heijo Palace). */
 export function registerLandmarkMasks(buildings: readonly MaskShape[], trees: readonly MaskShape[] = []) {
@@ -541,6 +542,7 @@ export function buildOsakaLandmarks(
   buildUmedaSkyBuilding(b, ground);
   buildTsutenkaku(b, ground);
   buildOsakaUmeda(b, ground);
+  buildUsj(b, ground);
   for (const addEnsemble of extras) addEnsemble(b, ground);
   return finalizeLandmarkGroup(b, env, 'osaka-skyline-landmarks');
 }
