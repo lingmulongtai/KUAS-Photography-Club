@@ -25,14 +25,12 @@ import {
   type RGB,
   type Vec3,
 } from './landmark-builder';
-import { UMEDA_BUILDING_MASKS, UMEDA_TREE_MASKS, buildOsakaUmeda } from './osaka-umeda';
 import { USJ_BUILDING_MASKS, USJ_TREE_MASKS, buildUsj } from './osaka-usj';
 import { HEIJO_BUILDING_MASKS, HEIJO_TREE_MASKS, buildHeijoPalace } from './nara-heijo';
 
 /** Exact GSI z17 surveyed positions of Osaka's signature skyline landmarks. */
 export const OSAKA_SKYLINE_SITES = {
   abenoHarukas: { lat: 34.646181, lon: 135.513396, rotY: 0.284, maskRadius: 68 },
-  umedaSky: { lat: 34.705244, lon: 135.490177, rotY: 0.072, maskRadius: 76 },
   tsutenkaku: { lat: 34.652540, lon: 135.506305, rotY: 0.273, maskRadius: 26 },
 } as const;
 
@@ -40,14 +38,12 @@ const CORE_OSAKA_MASKS: MaskShape[] = [
   // Abeno Harukas Tower + Kintetsu Wing Building (oriented +0.284 rad)
   makeObbMask(34.646181, 135.513396, 0.284, 52, 42),
   makeObbMask(34.64596, 135.51425, 0.284, 44, 34),
-  // Umeda Sky Building + Shin-Umeda City plaza (oriented +0.072 rad)
-  makeObbMask(34.705244, 135.490177, 0.072, 60, 36),
   // Tsutenkaku Tower (oriented +0.273 rad)
   makeCircleMask(34.652540, 135.506305, 25),
 ];
 
-const EXTRA_BUILDING_MASKS: MaskShape[] = [...UMEDA_BUILDING_MASKS, ...USJ_BUILDING_MASKS, ...HEIJO_BUILDING_MASKS];
-const EXTRA_TREE_MASKS: MaskShape[] = [...UMEDA_TREE_MASKS, ...USJ_TREE_MASKS, ...HEIJO_TREE_MASKS];
+const EXTRA_BUILDING_MASKS: MaskShape[] = [...USJ_BUILDING_MASKS, ...HEIJO_BUILDING_MASKS];
+const EXTRA_TREE_MASKS: MaskShape[] = [...USJ_TREE_MASKS, ...HEIJO_TREE_MASKS];
 
 /** Register additional bespoke district building & tree masks (Umeda, USJ, Heijo Palace). */
 export function registerLandmarkMasks(buildings: readonly MaskShape[], trees: readonly MaskShape[] = []) {
@@ -222,141 +218,6 @@ function buildAbenoHarukas(b: LandmarkBuilder, ground: GroundFn) {
     addStrut(b, pIn, pOut, 2.2, 2.2, 4, bridgeWhite, 0.32);
     addFrustum(b, bridgeSite, ca * 20, 0, sa * 20, 1.2, 1.0, 7.2, 8, [0.68, 0.70, 0.72]);
   }
-}
-
-/** Build Umeda Sky Building (173 m) + 22F Sky Bridge + Space-Frame Truss + Chushizen-no-Mori. */
-function buildUmedaSkyBuilding(b: LandmarkBuilder, ground: GroundFn) {
-  const st = makeSite(
-    OSAKA_SKYLINE_SITES.umedaSky.lat,
-    OSAKA_SKYLINE_SITES.umedaSky.lon,
-    ground,
-    OSAKA_SKYLINE_SITES.umedaSky.rotY,
-    2.0,
-  );
-  const skyGlass: RGB = [0.27, 0.42, 0.55];
-  const deepGlass: RGB = [0.16, 0.28, 0.40];
-  const silverMetal: RGB = [0.78, 0.82, 0.87];
-  const brightSilver: RGB = [0.89, 0.92, 0.95];
-  const darkSteel: RGB = [0.20, 0.24, 0.29];
-  const atriumGlow: RGB = [0.64, 0.86, 1.0];
-  const forestGreen: RGB = [0.14, 0.31, 0.13];
-  const lushGreen: RGB = [0.19, 0.38, 0.16];
-  const plazaStone: RGB = [0.50, 0.52, 0.55];
-
-  // --- Shin-Umeda City Plaza & Chushizen-no-Mori (中自然の森) woodland + stream immediately South ---
-  addBox(b, st, 0, 0, 0, 108, 2.4, 58, plazaStone, { topRgb: plazaStone, style: 4 });
-  addBox(b, st, 0, 2.4, -22, 36, 1.2, 12, lushGreen, { topRgb: lushGreen, style: 4 });
-  // Chushizen-no-Mori terraced woodland grove & water court on South side (z = +26..+54)
-  addBox(b, st, 0, 0.5, 40, 88, 1.8, 26, forestGreen, { topRgb: forestGreen, style: 4 });
-  addBox(b, st, 0, 2.35, 38, 52, 0.3, 9, [0.06, 0.22, 0.30], { topRgb: [0.06, 0.22, 0.30], style: 5, glass: 0.95, emit: 0.18 });
-  for (const [gx, gz, r] of [[-28, 34, 6.5], [-16, 46, 7.2], [18, 45, 7.0], [30, 34, 6.0], [0, 48, 6.2]] as const) {
-    addDome(b, st, gx, 2.0, gz, r, r * 0.72, r, 4, 10, lushGreen, { style: 4 });
-  }
-
-  // Glazed base lobby wings
-  for (const side of [-1, 1]) {
-    const tx = side * 34;
-    addBox(b, st, tx, 2.4, 0, 36, 9.6, 44, deepGlass, { emit: 0.62, glass: 0.92, style: 2 });
-    addBox(b, st, tx, 11.6, 0, 37.6, 1.4, 45.6, silverMetal, { emit: 0.18, includeBottom: true });
-  }
-
-  // --- Twin Articulated Stepped-Corner Towers (Tower East & Tower West, 12–152 m) ---
-  for (const side of [-1, 1]) {
-    const tx = side * 34;
-    addBox(b, st, tx, 12, 0, 31, 140, 36, skyGlass, { topRgb: silverMetal, emit: 0.56, glass: 0.95, style: 1 });
-    addBox(b, st, tx, 12, 0, 21, 140, 42, skyGlass, { topRgb: silverMetal, emit: 0.58, glass: 0.96, style: 1 });
-    addBox(b, st, tx + side * 2.2, 12, 0, 33, 140, 23, skyGlass, { topRgb: silverMetal, emit: 0.54, glass: 0.94, style: 1 });
-    for (const fx of [-15.6, 15.6]) for (const fz of [-18.2, 18.2]) {
-      addBox(b, st, tx + fx, 12, fz, 1.7, 141, 1.7, brightSilver, { emit: 0.15 });
-    }
-    for (const fx of [-10.6, 10.6]) for (const fz of [-21.1, 21.1]) {
-      addBox(b, st, tx + fx, 12, fz, 1.15, 141, 1.15, silverMetal, { emit: 0.12 });
-    }
-    for (const by of [46, 82, 118]) {
-      addBox(b, st, tx, by, 0, 32.4, 3.2, 37.4, darkSteel, { emit: 0.06 });
-      addBox(b, st, tx, by - 0.6, 0, 33.2, 0.8, 38.2, brightSilver, { emit: 0.14 });
-      addBox(b, st, tx, by + 3.0, 0, 33.2, 0.8, 38.2, brightSilver, { emit: 0.14 });
-    }
-    addBox(b, st, tx, 145, 0, 33.5, 7, 39.5, darkSteel, { emit: 0.12 });
-  }
-
-  // --- Authentic 22F Mid-Air Connecting Sky Bridge (空中連絡橋, y = 89–95 m) ---
-  addBox(b, st, 0, 89.2, 0, 38, 1.2, 10.5, brightSilver, { emit: 0.25, includeBottom: true });
-  addBox(b, st, 0, 90.4, 0, 38, 4.2, 9.6, atriumGlow, { emit: 0.72, glass: 0.94, style: 2 });
-  addBox(b, st, 0, 94.6, 0, 38, 1.0, 10.5, brightSilver, { emit: 0.25 });
-
-  // --- Central 16-Sided Cylindrical Glass Elevator Shaft (2–154 m) ---
-  addFrustum(b, st, 0, 2, 0, 6.2, 6.2, 151, 16, atriumGlow, { topRgb: silverMetal, emit: 0.68, glass: 0.94, style: 2 });
-  for (let ry = 16; ry <= 144; ry += 14) {
-    addFrustum(b, st, 0, ry, 0, 6.55, 6.55, 0.85, 16, brightSilver, { emit: 0.16, capTop: true, capBottom: true });
-  }
-  for (let k = 0; k < 4; k++) {
-    const a = k * Math.PI * 0.5 + Math.PI * 0.25;
-    addBox(b, st, Math.cos(a) * 6.3, 2, Math.sin(a) * 6.3, 0.8, 151, 0.8, silverMetal, { emit: 0.12 });
-  }
-
-  // --- Exposed 3D Diagonal Space-Frame Steel Trusses supporting the Floating Garden (142–152 m) ---
-  for (const zSign of [-1, 1]) {
-    const z = zSign * 19.5;
-    addStrut(b, sitePt(st, -19, 142, z), sitePt(st, -10, 152.5, z), 0.78, 0.78, 6, darkSteel, 0.08);
-    addStrut(b, sitePt(st, 19, 142, z), sitePt(st, 10, 152.5, z), 0.78, 0.78, 6, darkSteel, 0.08);
-    addStrut(b, sitePt(st, -10, 152.5, z), sitePt(st, 0, 145, z), 0.55, 0.55, 6, darkSteel, 0.08);
-    addStrut(b, sitePt(st, 10, 152.5, z), sitePt(st, 0, 145, z), 0.55, 0.55, 6, darkSteel, 0.08);
-    addStrut(b, sitePt(st, -19, 152, z), sitePt(st, 19, 152, z), 0.88, 0.88, 6, silverMetal, 0.14);
-  }
-  // Cross-bracing ribs beneath the Floating Garden deck
-  for (let gx = -18; gx <= 18; gx += 9) {
-    addStrut(b, sitePt(st, gx, 151.8, -24), sitePt(st, gx, 151.8, 24), 0.45, 0.45, 4, darkSteel, 0.06);
-  }
-
-  // --- Iconic Floating Garden Observatory (空中庭園展望台, 152–173 m, smooth 32-segment Ø26 m aperture!) ---
-  addRectWithCircularAperture(b, st, 152.0, 3.6, 51.0, 28.0, 13.6, 8, darkSteel, brightSilver, darkSteel, {
-    emit: 0.18, innerEmit: 0.50, glass: 0.20, innerGlass: 0.42, style: 0, innerStyle: 3, bottomRgb: [0.18, 0.21, 0.25],
-  });
-  addRectWithCircularAperture(b, st, 155.6, 12.0, 51.2, 28.2, 13.4, 8, skyGlass, atriumGlow, [0.80, 0.84, 0.88], {
-    emit: 0.62, innerEmit: 0.90, glass: 0.92, innerGlass: 0.95, style: 1, innerStyle: 2,
-  });
-  addRectWithCircularAperture(b, st, 167.6, 2.4, 52.2, 29.2, 13.2, 8, brightSilver, atriumGlow, [0.82, 0.86, 0.90], {
-    emit: 0.36, innerEmit: 0.94, glass: 0.38, innerGlass: 0.62, style: 0, innerStyle: 3,
-  });
-  // Open-Air Rooftop "Lumi Sky Walk" Circular Starry Promenade & Glass Guardrails (170–173 m)
-  addAnnulusRing(b, st, 0, 170.0, 0, 13.4, 21.8, 1.1, 32, brightSilver, {
-    topRgb: [0.54, 0.74, 0.92], innerRgb: atriumGlow, emit: 0.48, innerEmit: 0.95, topEmit: 0.62, style: 0, innerStyle: 3,
-  });
-  addAnnulusRing(b, st, 0, 171.1, 0, 21.3, 21.8, 1.9, 32, glassCrown(atriumGlow), {
-    topRgb: brightSilver, emit: 0.38, glass: 0.90, style: 2,
-  });
-  addAnnulusRing(b, st, 0, 171.1, 0, 13.2, 13.65, 1.8, 32, atriumGlow, {
-    topRgb: brightSilver, emit: 0.74, innerEmit: 0.86, glass: 0.90, style: 2, innerStyle: 3,
-  });
-
-  // --- Crossed X-Shape Transparent Cylindrical Escalator Tubes with Underside Truss Girders (128 -> 153.5 m) ---
-  const tubes: [Vec3, Vec3][] = [
-    [sitePt(st, -19.0, 128, -4.4), sitePt(st, 19.0, 153.5, 4.4)],
-    [sitePt(st, 19.0, 128, 4.4), sitePt(st, -19.0, 153.5, -4.4)],
-  ];
-  for (const [p0, p1] of tubes) {
-    addStrut(b, p0, p1, 1.90, 1.90, 12, atriumGlow, 0.92, 0.94, 2);
-    // Dark steel underside box girder supporting each floating escalator
-    const g0: Vec3 = [p0[0], p0[1] - 1.95, p0[2]];
-    const g1: Vec3 = [p1[0], p1[1] - 1.95, p1[2]];
-    addStrut(b, g0, g1, 0.65, 0.65, 4, darkSteel, 0.14);
-    for (let k = 1; k < 8; k++) {
-      const t = k / 8;
-      const lerp = (u: number): Vec3 => [
-        p0[0] + (p1[0] - p0[0]) * u,
-        p0[1] + (p1[1] - p0[1]) * u,
-        p0[2] + (p1[2] - p0[2]) * u,
-      ];
-      addStrut(b, lerp(Math.max(0, t - 0.01)), lerp(Math.min(1, t + 0.01)), 2.18, 2.18, 12, brightSilver, 0.28, 0.25, 0);
-    }
-  }
-
-  for (const [bx, bz] of [[-49.5, -26.5], [49.5, 26.5]] as const) {
-    addBox(b, st, bx, 170.0, bz, 0.4, 3.0, 0.4, brightSilver);
-    addLight(b, sitePt(st, bx, 173.4, bz), [1.0, 0.10, 0.05], 4.2, 1.4);
-  }
-  addLight(b, sitePt(st, 0, 166, 0), [0.62, 0.88, 1.0], 5.6, 0);
 }
 
 /**
@@ -540,9 +401,7 @@ export function buildOsakaLandmarks(
 ): THREE.Group {
   const b = createLandmarkBuilder();
   buildAbenoHarukas(b, ground);
-  buildUmedaSkyBuilding(b, ground);
   buildTsutenkaku(b, ground);
-  buildOsakaUmeda(b, ground);
   buildUsj(b, ground);
   buildHeijoPalace(b, ground);
   for (const addEnsemble of extras) addEnsemble(b, ground);
