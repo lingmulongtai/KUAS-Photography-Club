@@ -171,7 +171,9 @@ const fragmentShader = `
     int prefectureCode=owner(vWorld.xz);
     bool insideKyoto=vWorld.x>=uKyotoBox.x && vWorld.z>=uKyotoBox.y && vWorld.x<=uKyotoBox.z && vWorld.z<=uKyotoBox.w;
     // Inside Osaka Bay every prefectureCode==0 pixel is sea; never discard along coarse 50 m ground-patch
-    // alpha fringes around KIX, Kobe Airport, Port Island, or Yumeshima seawalls.
+    // alpha fringes around KIX, Kobe Airport, Port Island, or Yumeshima seawalls. Harbour basins inside
+    // municipal limits come from osaka-water.bin. A sea-level height test is not used: the DEM over
+    // water interpolates across each triangle, so it drew the triangles as a saw-tooth of sea and photo.
     bool inOsakaBay=vWorld.x>-72000. && vWorld.x<-19500. && vWorld.z>28500. && vWorld.z<76000.;
     if(prefectureCode==0 && (inOsakaBay || (photo.a>=.18 && (photo.a<.62 || insideKyoto)))){
       gl_FragColor=vec4(renderSea(vWorld,groundFp),1.);
@@ -199,26 +201,6 @@ const fragmentShader = `
     float kix2Along = dot(kix2D, vec2(.775, -.632));
     float kix2Across = dot(kix2D, vec2(.632, .775));
     bool onKix2 = kix2Along > -2420. && kix2Along < 2620. && kix2Across > -360. && kix2Across < 1120.;
-    bool onKixOffshore = vWorld.x < -43500. && vWorld.z > 58000.;
-    // Restrict sea-level fallback strictly to outer harbor waters around Yumeshima & Kobe Port
-    // where prefecture borders extend over sea; inland western Osaka zero-metre wards stay dry
-    // and rely on surveyed osaka-water.bin for canals, rivers and harbor basins.
-    bool inBayZone = !onKobeIsland && !onKixOffshore && (
-      (vWorld.x < -33200. && vWorld.z > 34500.) ||
-      (vWorld.x < -41000. && vWorld.z > 31000.)
-    );
-    if (inBayZone && vWorld.y <= .16) {
-      // Open bay water at sea level (including bright white/silver sun-glare sea tiles around Kobe Airport)
-      // has neutral/cool RGB (b >= r * 0.86), whereas reclaimed sand/earth is warm (r >> b).
-      float coolOrNeutral = smoothstep(.82, .91, photo.b / max(photo.r, .01));
-      float seaBlue = smoothstep(-.01, .025, photo.b - photo.r * .94) * (1. - smoothstep(.20, .38, photo.r));
-      float darkWater = (1. - smoothstep(.10, .22, max(photo.r, max(photo.g, photo.b)))) * step(photo.r, photo.b * 1.15);
-      bool flatOpenSea = vWorld.y <= .06 && coolOrNeutral > .55;
-      if (flatOpenSea || max(seaBlue, darkWater) > .32) {
-        gl_FragColor = vec4(renderSea(vWorld, groundFp), 1.);
-        return;
-      }
-    }
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
     vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sh);
     vec3 emit=vec3(0.);
