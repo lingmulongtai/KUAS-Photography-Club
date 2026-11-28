@@ -1,6 +1,38 @@
 /** Upper-cloud lighting and shape, shared by direct rendering and the full-resolution composite. */
 export const CIRRUS_Y = 8200;
 const ALTO_Y = 4600;
+
+/**
+ * Shared GLSL helpers for analytic scene-depth occlusion in volumetric & composite cloud passes.
+ * Reconstructs linear camera ray distance to the nearest opaque surface so distant mountains stay
+ * behind foreground clouds while closer ridges cleanly occlude clouds behind them.
+ */
+export const CLOUD_DEPTH_GLSL = /* glsl */ `
+  uniform sampler2D uSceneDepth;
+  uniform mat4 uViewFromClip;
+  uniform vec2 uDepthRes;
+  uniform bool uUseDepth;
+
+  float cloudSceneDist(){
+    if (!uUseDepth) return 1e9;
+    vec2 uv = clamp(gl_FragCoord.xy / max(uDepthRes, vec2(1.)), vec2(.0001), vec2(.9999));
+    float raw = textureLod(uSceneDepth, uv, 0.).r;
+    if (raw >= .99999) return 1e9;
+    vec4 vp = uViewFromClip * vec4(uv * 2. - 1., raw * 2. - 1., 1.);
+    return length(vp.xyz) / max(abs(vp.w), 1e-6);
+  }
+
+  float cloudSlabEntry(vec3 ro, vec3 rd, float baseY, float topY){
+    if (abs(rd.y) > 1e-7) {
+      float bHit = (baseY - ro.y) / rd.y;
+      float tHit = (topY - ro.y) / rd.y;
+      if (max(bHit, tHit) <= 0.) return 1e9;
+      return max(0., min(bHit, tHit));
+    }
+    return (ro.y >= baseY && ro.y <= topY) ? 0. : 1e9;
+  }
+`;
+
 export const HIGH_CLOUD_GLSL = /* glsl */ `
   uniform float uCirrus, uAlto;
   uniform vec2 uOffset, uWind;
@@ -29,9 +61,10 @@ export const HIGH_CLOUD_GLSL = /* glsl */ `
   }
 
   /** One of the thin high layers at height y, premultiplied colour + alpha. */
-  vec4 highLayer(vec3 ro, vec3 rd, float y, bool cirrus){
+  vec4 highLayer(vec3 ro, vec3 rd, float y, bool cirrus, float maxDist){
     if (rd.y < .002 || ro.y > y || (cirrus ? uCirrus : uAlto) <= 0.) return vec4(0.);
     float t = (y - ro.y) / rd.y;
+    if (t >= maxDist) return vec4(0.);
     vec3 pos = ro + rd * t;
     float dist = length(pos.xz - ro.xz);
     if (dist > 70000.) return vec4(0.);
@@ -69,8 +102,12 @@ export const HIGH_CLOUD_GLSL = /* glsl */ `
     return vec4(col * a, a);
   }
 
+  vec4 highClouds(vec3 ro, vec3 rd, float maxDist){
+    vec4 alto = highLayer(ro, rd, ${ALTO_Y.toFixed(1)}, false, maxDist);
+    return alto + highLayer(ro, rd, ${CIRRUS_Y.toFixed(1)}, true, maxDist) * (1. - alto.a);
+  }
+
   vec4 highClouds(vec3 ro, vec3 rd){
-    vec4 alto = highLayer(ro, rd, ${ALTO_Y.toFixed(1)}, false);
-    return alto + highLayer(ro, rd, ${CIRRUS_Y.toFixed(1)}, true) * (1. - alto.a);
+    return highClouds(ro, rd, 1e9);
   }
 `;

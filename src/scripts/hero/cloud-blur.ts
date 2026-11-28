@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ENV_GLSL } from './env.ts';
-import { HIGH_CLOUD_GLSL } from './high-clouds.ts';
+import { CLOUD_DEPTH_GLSL, HIGH_CLOUD_GLSL } from './high-clouds.ts';
 import { WEATHER_SCALE } from './cloud-columns.ts';
 
 export const cloudVolumeScale = (quality: number) => quality > .75 ? .625 : .5;
@@ -15,6 +15,12 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
   // Match main scene light counts so Three's program cache reuses the precompiled CLOUDS program.
   isolated.add(proxy, new THREE.DirectionalLight(0), new THREE.HemisphereLight(0, 0));
   const uniforms = {
+    uSceneDepth: { value: null as THREE.Texture | null },
+    uViewFromClip: { value: new THREE.Matrix4() },
+    uDepthRes: { value: new THREE.Vector2(1, 1) },
+    uUseDepth: { value: false },
+    uBase: { value: 850 },
+    uTop: { value: 2600 },
     ...original.uniforms,
     uCloud: { value: target.texture },
     uResolution: { value: new THREE.Vector2(1, 1) },
@@ -28,33 +34,43 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       uniform sampler2D uCloud;
       uniform vec2 uResolution;
       uniform vec2 uStep;
+      uniform float uBase;
+      uniform float uTop;
       ${ENV_GLSL}
+      ${CLOUD_DEPTH_GLSL}
       const float K = ${WEATHER_SCALE};
       ${HIGH_CLOUD_GLSL}
       uniform bool uFullResHigh;
       varying vec3 vWorld;
       void main(){
         vec2 uv = gl_FragCoord.xy / uResolution;
+        vec3 rd = normalize(vWorld - cameraPosition);
+        float sceneDist = cloudSceneDist();
+        float t0 = cloudSlabEntry(cameraPosition, rd, uBase, uTop);
+        float slabVis = uUseDepth ? smoothstep(t0, t0 + 40., sceneDist) : 1.;
         vec4 c;
         if (uFullResHigh) {
-          c = texture2D(uCloud, uv);
-          vec4 high = highClouds(cameraPosition, normalize(vWorld-cameraPosition));
+          c = texture2D(uCloud, uv) * slabVis;
+          vec4 high = highClouds(cameraPosition, rd, sceneDist);
           c += (1.-c.a)*high;
         } else {
           c = texture2D(uCloud, uv) * .375;
           c += (texture2D(uCloud, uv + uStep) + texture2D(uCloud, uv - uStep)) * .25;
           c += (texture2D(uCloud, uv + 2. * uStep) + texture2D(uCloud, uv - 2. * uStep)) * .0625;
+          c *= slabVis;
         }
         gl_FragColor = vec4(c.a > .0005 ? c.rgb / c.a : vec3(0.), c.a);
       }
     `,
     transparent: true,
+    depthTest: false,
     depthWrite: false,
     side: THREE.BackSide,
   });
   const clearColor = new THREE.Color();
   const localWind = new THREE.Vector3();
   const viewRotation = new THREE.Matrix3();
+  const savedDepthRes = new THREE.Vector2();
   let failed = false, verified = false;
   return {
     compositeMesh:new THREE.Mesh(clouds.geometry,material),
@@ -80,6 +96,8 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       const previousTarget = renderer.getRenderTarget();
       renderer.getClearColor(clearColor);
       const clearAlpha = renderer.getClearAlpha();
+      const depthRes = original.uniforms.uDepthRes?.value as THREE.Vector2 | undefined;
+      if (depthRes) savedDepthRes.copy(depthRes);
       try {
         renderer.setRenderTarget(target);
         const gl = renderer.getContext();
@@ -87,6 +105,7 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
         renderer.setClearColor(0, 0);
         renderer.clear(true, false, false);
         original.uniforms.uVolumeOnly.value = !moving;
+        depthRes?.set(tw, th);
         renderer.render(isolated, camera);
         const pixels = moving ? Math.min(1, (strength - .0015) / .0285) * lateral * 4 * dpr / screenLength : 0;
         uniforms.uFullResHigh.value = !moving;
@@ -97,6 +116,7 @@ export function createCloudBlur(renderer: THREE.WebGLRenderer, camera: THREE.Cam
         console.warn('Cloud motion blur unavailable', error);
       } finally {
         original.uniforms.uVolumeOnly.value = false;
+        if (depthRes) depthRes.copy(savedDepthRes);
         renderer.setRenderTarget(previousTarget);
         renderer.setClearColor(clearColor, clearAlpha);
       }

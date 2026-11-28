@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import {decodeTreeCover} from './tree-cover';
 import {loadBinary,loadGrid, loadJSON, loadTexture, type GridMeta} from './data';
 import {ENV_GLSL,SHADOW_GLSL,type Env} from './env';
-import type {Box} from './geo';
+import {BAY_HANDOFF,type Box} from './geo';
 import {boundaryUniforms,HOME_BOUNDARY} from './regional-boundary';
 import {regionalPhoto,type RegionalPhoto} from './regional-photo';
 import {Grid,type Heightfield} from './heightfield';
 import {districtImagery,districtSampling,type District} from './regional-districts';
 import {regionalBudgetForTier,type RegionalQualityBudget} from './adaptive-quality';
+import {SHADOW_LAYER} from './shadow';
+import {applyYogoLakebed,YOGO_REFINE_BOX} from './yogo-shoreline';
 
 interface Patch {box: Box; file: string}
 interface GroundSurvey {grid: GridMeta; patches: Patch[]}
@@ -17,20 +19,24 @@ export function boxDistance(x:number,z:number,b:Box) {
   return Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]));
 }
 
-function patchAxis(lo:number,hi:number,edge0:number,edge1:number,step:number,fine:number[][]) {
+function patchAxis(lo:number,hi:number,edges:readonly number[],step:number,fine:readonly (readonly [number,number,number])[]) {
   const values = new Set([lo,hi]);
   for(let n=lo+step;n<hi;n+=step)values.add(n);
-  for(const [start,end] of fine){
-    for(let n=Math.max(lo,start);n<Math.min(hi,end);n+=40)values.add(n);
+  for(const [start,end,fineStep] of fine){
+    for(let n=Math.max(lo,start);n<Math.min(hi,end);n+=fineStep)values.add(n);
   }
-  for(const edge of [edge0,edge1])if(edge>lo && edge<hi)values.add(edge);
+  for(const edge of edges)if(edge>lo && edge<hi)values.add(edge);
   return [...values].sort((a,b)=>a-b);
 }
 
 async function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[],current:()=>boolean) {
-  const overlap=fine.map(g=>g.meta.box).filter(b=>b[0]<box[2] && b[2]>box[0] && b[1]<box[3] && b[3]>box[1]);
-  const xs=patchAxis(box[0],box[2],kyoto[0],kyoto[2],200,overlap.map(b=>[b[0],b[2]]));
-  const zs=patchAxis(box[1],box[3],kyoto[1],kyoto[3],200,overlap.map(b=>[b[1],b[3]]));
+  const refineBoxes: {box:readonly [number,number,number,number];step:number}[] = [
+    ...fine.map(g=>({box:g.meta.box,step:40})),
+    {box:YOGO_REFINE_BOX,step:25},
+  ];
+  const overlap=refineBoxes.filter(({box:b})=>b[0]<box[2] && b[2]>box[0] && b[1]<box[3] && b[3]>box[1]);
+  const xs=patchAxis(box[0],box[2],[kyoto[0],kyoto[2],BAY_HANDOFF.x],200,overlap.map(({box:b,step})=>[b[0],b[2],step] as const));
+  const zs=patchAxis(box[1],box[3],[kyoto[1],kyoto[3],BAY_HANDOFF.z],200,overlap.map(({box:b,step})=>[b[1],b[3],step] as const));
   const pos=new Float32Array(xs.length*zs.length*3),uv=new Float32Array(xs.length*zs.length*2);
   const columns=xs.length,rows=zs.length,vertices=rows*columns;
   const indices=vertices>65535?new Uint32Array(6*(columns-1)*(rows-1)):new Uint16Array(6*(columns-1)*(rows-1));
@@ -50,7 +56,7 @@ async function patchGeometry(box:Box, kyoto:Box, ground:Ground,fine:Grid[],curre
       if(i+1===columns || j+1===rows)continue;
       const inKyoto=x>=kyoto[0] && xs[i+1]<=kyoto[2] && z>=kyoto[1] && zs[j+1]<=kyoto[3];
       // Keep the SW corner inside Kyoto's outer bounds where Osaka Bay enters, so sea water continues seamlessly across z=36000.
-      const osakaBayOverlap=xs[i+1]<-20500 && zs[j+1]>27500;
+      const osakaBayOverlap=xs[i+1]<=BAY_HANDOFF.x && zs[j]>=BAY_HANDOFF.z;
       if(inKyoto && !osakaBayOverlap)continue;
       indices.set([k,k+columns,k+1,k+1,k+columns,k+columns+1],offset);offset+=6;
     }
@@ -163,11 +169,16 @@ const fragmentShader = `
     float groundFp=max(length(dFdx(vWorld.xz)),length(dFdy(vWorld.xz)));
     vec4 photo=texture2D(uPhoto,vUv);
     int prefectureCode=owner(vWorld.xz);
-    bool insideKyoto=vWorld.x>=uKyotoBox.x && vWorld.z>=uKyotoBox.y && vWorld.x<=uKyotoBox.z && vWorld.z<=uKyotoBox.w;
+    // South-west of the bay handoff this ground replaces Kyoto's terrain outright, land and sea alike.
+    bool handoff=vWorld.x<${BAY_HANDOFF.x}. && vWorld.z>${BAY_HANDOFF.z}.;
+    bool insideKyoto=!handoff && vWorld.x>=uKyotoBox.x && vWorld.z>=uKyotoBox.y && vWorld.x<=uKyotoBox.z && vWorld.z<=uKyotoBox.w;
     // Inside Osaka Bay every prefectureCode==0 pixel is sea; never discard along coarse 50 m ground-patch
-    // alpha fringes around KIX, Kobe Airport, Port Island, or Yumeshima seawalls.
+    // alpha fringes around KIX, Kobe Airport, Port Island, or Yumeshima seawalls. Harbour basins inside
+    // municipal limits come from osaka-water.bin. A sea-level height test is not used: the DEM over
+    // water interpolates across each triangle, so it drew the triangles as a saw-tooth of sea and photo.
     bool inOsakaBay=vWorld.x>-72000. && vWorld.x<-19500. && vWorld.z>28500. && vWorld.z<76000.;
-    if(prefectureCode==0 && (inOsakaBay || (photo.a>=.18 && (photo.a<.62 || insideKyoto)))){
+    bool sea=prefectureCode==0 && (inOsakaBay || (photo.a>=.18 && (photo.a<.62 || insideKyoto)));
+    if(sea){
       gl_FragColor=vec4(renderSea(vWorld,groundFp),1.);
       return;
     }
@@ -193,20 +204,6 @@ const fragmentShader = `
     float kix2Along = dot(kix2D, vec2(.775, -.632));
     float kix2Across = dot(kix2D, vec2(.632, .775));
     bool onKix2 = kix2Along > -2420. && kix2Along < 2620. && kix2Across > -360. && kix2Across < 1120.;
-    bool onKixOffshore = vWorld.x < -43500. && vWorld.z > 58000.;
-    bool inBayZone = vWorld.x < -19500. && vWorld.z > 28500. && !onKobeIsland && !onKixOffshore;
-    if (inBayZone && vWorld.y <= .16) {
-      // Open bay water at sea level (including bright white/silver sun-glare sea tiles around Kobe Airport)
-      // has neutral/cool RGB (b >= r * 0.86), whereas reclaimed sand/earth is warm (r >> b).
-      float coolOrNeutral = smoothstep(.82, .91, photo.b / max(photo.r, .01));
-      float seaBlue = smoothstep(-.01, .025, photo.b - photo.r * .94) * (1. - smoothstep(.20, .38, photo.r));
-      float darkWater = (1. - smoothstep(.10, .22, max(photo.r, max(photo.g, photo.b)))) * step(photo.r, photo.b * 1.15);
-      bool flatOpenSea = vWorld.y <= .06 && coolOrNeutral > .55;
-      if (flatOpenSea || max(seaBlue, darkWater) > .32) {
-        gl_FragColor = vec4(renderSea(vWorld, groundFp), 1.);
-        return;
-      }
-    }
     vec3 albedo=surveyedGroundAlbedo(photo.rgb);
     vec3 lit=shade(seasonalSurface(albedo,n,vWorld),n,vWorld,sh);
     vec3 emit=vec3(0.);
@@ -253,7 +250,7 @@ const fragmentShader = `
     gl_FragColor=vec4(fadeHorizon(applyHaze(lit,emit,vWorld),vWorld),1.);
   }`;
 
-export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture,needed:()=>boolean)=>Promise<void>) {
+export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,aniso:number,legacy:Box[],onPhoto:(base:RegionalPhoto|null,detail:RegionalPhoto|null)=>void,prepare:(model:THREE.Object3D)=>Promise<unknown>,upload:(photo:THREE.Texture,needed:()=>boolean)=>Promise<void>,onShadowDirty?:()=>void) {
   const [{grid,patches},surveys]=await Promise.all([loadJSON<GroundSurvey>('kansai/ground.json'),loadJSON<District[]>('kansai/districts/index.json')]);
   const [heights,boundary,cover,fine]=await Promise.all([
     loadGrid(grid),boundaryUniforms().then(async uniforms=>{
@@ -285,6 +282,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
       const [w,n,e,s]=g.meta.box,edge=Math.min(x-w,e-x,z-n,s-z);
       if(edge>0)h=THREE.MathUtils.lerp(h,g.sample(x,z),THREE.MathUtils.smoothstep(edge,0,320));
     }
+    h=applyYogoLakebed(x,z,h);
     if(d>=600)return h;
     const rim=hf.height(THREE.MathUtils.clamp(x,kyoto[0],kyoto[2]),THREE.MathUtils.clamp(z,kyoto[1],kyoto[3]));
     return THREE.MathUtils.lerp(rim,h,THREE.MathUtils.smoothstep(d,0,600));
@@ -366,6 +364,7 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
         state.mesh.material.uniforms.uPhoto.value.dispose();
         state.mesh.material.dispose();
         state.mesh=null;
+        onShadowDirty?.();
       }
     }
     for(const state of states.sort((a,b)=>a.distance-b.distance)){
@@ -379,13 +378,18 @@ export async function regionalGround(scene:THREE.Scene,env:Env,hf:Heightfield,an
         if(!geometry){photo.dispose();return;}
         const material=new THREE.ShaderMaterial({uniforms:{...env,...boundary,uPhoto:{value:photo},uMidPhoto,uMidPhotoBox,uMidPhotoMatch,uClose,uCloseBox,uCloseMatch,uGroundFar,uDistrict,uDistrictBox,uInset,uInsetBox,uKyotoBox},vertexShader,fragmentShader,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
         const mesh=new THREE.Mesh(geometry,material);
+        mesh.layers.enable(SHADOW_LAYER);
         await (shaderReady??=prepare(mesh));
         if(state.distance>activeUnload){mesh.geometry.dispose();material.dispose();photo.dispose();return;}
         mesh.name='regional-ground';
         state.mesh=mesh;
         scene.add(mesh);
+        onShadowDirty?.();
       }).catch(()=>{state.retry=last+10;}).finally(()=>{state.pending=false;running--;});
     }
   }
-  return {bounds:grid.box,ground,canopy,update,imagery:{uDistrict,uDistrictBox,uInset,uInsetBox}};
+  // Every patch that overlaps Kyoto's terrain south-west of BAY_HANDOFF is on screen.
+  const handoff=states.filter(({patch:{box:b}})=>b[0]<BAY_HANDOFF.x && b[2]>kyoto[0] && b[3]>BAY_HANDOFF.z && b[1]<kyoto[3]);
+  const bayHandoffReady=()=>handoff.length>0 && handoff.every(s=>s.mesh);
+  return {bounds:grid.box,ground,canopy,update,bayHandoffReady,imagery:{uDistrict,uDistrictBox,uInset,uInsetBox}};
 }

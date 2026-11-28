@@ -39,12 +39,15 @@ const YOGO=toLocal(35.52405,136.19357); // 余呉湖（鏡湖・滋賀県長浜�
 const HIEI=toLocal(35.0616,135.8414); // 比叡山 山頂付近（京都・びわ湖を一望）
 const TODAIJI=toLocal(34.6889931,135.83987322); // 東大寺 大仏殿 (public/kansai/landmarks/index.json todaiji)
 const KASUGA=toLocal(34.6815749,135.8485364); // 春日大社 本殿 (public/kansai/landmarks/index.json kasuga-honden-1)
+const HEIJO_PALACE=toLocal(34.69120,135.79425); // 平城宮跡（第一次大極殿・大極門・朱雀門・遣唐使船・東院庭園）
 const KIX=toLocal(34.4347,135.2440); // 関西国際空港 第1ターミナル・滑走路
 const ITAMI=toLocal(34.7868,135.4408); // 大阪国際空港（伊丹空港）ターミナル・32L/32R
 const KOBE_AIRPORT=toLocal(34.6335,135.2242); // 神戸空港 ターミナル・滑走路
 const ABENO_HARUKAS=toLocal(34.646181,135.513396); // あべのハルカス (300 m)
 const UMEDA_SKY=toLocal(34.705244,135.490177); // 梅田スカイビル (173 m)
 const TSUTENKAKU=toLocal(34.652540,135.506305); // 通天閣 (108 m)
+const OSAKA_STATION=toLocal(34.70240,135.49595); // 大阪駅・梅田（大阪ステーションシティ・HEP FIVE・うめきた）
+const USJ=toLocal(34.66580,135.43230); // ユニバーサル・スタジオ・ジャパン (USJ)
 
 export const EXTRA_LANDMARKS = [
   { id: 'hikone', ja: '彦根城', en: 'Hikone Castle', lat: 35.27645, lon: 136.25184 },
@@ -52,9 +55,12 @@ export const EXTRA_LANDMARKS = [
   { id: 'hiei', ja: '比叡山', en: 'Mt. Hiei', lat: 35.0616, lon: 135.8414 },
   { id: 'todaiji', ja: '東大寺', en: 'Todai-ji', lat: 34.6889931, lon: 135.83987322 },
   { id: 'kasuga', ja: '春日大社', en: 'Kasuga Taisha', lat: 34.6815749, lon: 135.8485364 },
+  { id: 'heijoPalace', ja: '平城宮跡', en: 'Heijo Palace Site', lat: 34.69120, lon: 135.79425 },
   { id: 'kix', ja: '関西国際空港', en: 'Kansai International Airport', lat: 34.4347, lon: 135.2440 },
   { id: 'itami', ja: '伊丹空港（大阪国際空港）', en: 'Itami Airport (Osaka Intl)', lat: 34.7868, lon: 135.4408 },
   { id: 'kobeAirport', ja: '神戸空港', en: 'Kobe Airport', lat: 34.6335, lon: 135.2242 },
+  { id: 'osakaStation', ja: '大阪駅・梅田', en: 'Osaka Station · Umeda', lat: 34.70240, lon: 135.49595 },
+  { id: 'usj', ja: 'ユニバーサル・スタジオ・ジャパン', en: 'Universal Studios Japan', lat: 34.66580, lon: 135.43230 },
   { id: 'abenoHarukas', ja: 'あべのハルカス', en: 'Abeno Harukas', lat: 34.646181, lon: 135.513396 },
   { id: 'umedaSky', ja: '梅田スカイビル', en: 'Umeda Sky Building', lat: 34.705244, lon: 135.490177 },
   { id: 'tsutenkaku', ja: '通天閣', en: 'Tsutenkaku', lat: 34.652540, lon: 135.506305 },
@@ -127,9 +133,12 @@ export const VIEWS = {
   hiei:{ja:'比叡山',en:'Mt. Hiei',eye:ahead(HIEI,110,900),ref:HIEI,above:320,bearing:290,pitch:-16,orbit:{center:HIEI,targetHeight:12}},
   todaiji:{ja:'東大寺',en:'Todai-ji',eye:ahead(TODAIJI,185,340),ref:TODAIJI,above:120,bearing:5,pitch:-16,orbit:{center:TODAIJI,targetHeight:28}},
   kasuga:{ja:'春日大社',en:'Kasuga Taisha',eye:ahead(KASUGA,240,260),ref:KASUGA,above:95,bearing:60,pitch:-17,orbit:{center:KASUGA,targetHeight:10}},
+  heijoPalace:{ja:'平城宮跡',en:'Heijo Palace Site',eye:ahead(HEIJO_PALACE,152,620),ref:HEIJO_PALACE,above:165,bearing:332,pitch:-14,orbit:{center:HEIJO_PALACE,targetHeight:18}},
   kix:{ja:'関西国際空港',en:'Kansai International Airport',eye:ahead(KIX,145,2150),ref:KIX,above:480,bearing:325,pitch:-13,orbit:{center:KIX,targetHeight:24}},
   itami:{ja:'伊丹空港（大阪国際空港）',en:'Itami Airport',eye:ahead(ITAMI,140,1650),ref:ITAMI,above:340,bearing:320,pitch:-12,orbit:{center:ITAMI,targetHeight:18}},
   kobeAirport:{ja:'神戸空港',en:'Kobe Airport',eye:ahead(KOBE_AIRPORT,165,1650),ref:KOBE_AIRPORT,above:340,bearing:345,pitch:-12,orbit:{center:KOBE_AIRPORT,targetHeight:18}},
+  osakaStation:{ja:'大阪駅・梅田',en:'Osaka Station · Umeda',eye:ahead(OSAKA_STATION,118,820),ref:OSAKA_STATION,above:290,bearing:298,pitch:-16,orbit:{center:OSAKA_STATION,targetHeight:62}},
+  usj:{ja:'ユニバーサル・スタジオ・ジャパン',en:'Universal Studios Japan',eye:ahead(USJ,148,700),ref:USJ,above:245,bearing:328,pitch:-17,orbit:{center:USJ,targetHeight:24}},
   abenoHarukas:{ja:'あべのハルカス',en:'Abeno Harukas',eye:ahead(ABENO_HARUKAS,220,760),ref:ABENO_HARUKAS,above:250,bearing:40,pitch:-10,orbit:{center:ABENO_HARUKAS,targetHeight:150}},
   umedaSky:{ja:'梅田スカイビル',en:'Umeda Sky Building',eye:ahead(UMEDA_SKY,188,480),ref:UMEDA_SKY,above:185,bearing:8,pitch:-10,orbit:{center:UMEDA_SKY,targetHeight:95}},
   tsutenkaku:{ja:'通天閣',en:'Tsutenkaku',eye:ahead(TSUTENKAKU,200,320),ref:TSUTENKAKU,above:105,bearing:20,pitch:-11,orbit:{center:TSUTENKAKU,targetHeight:58}},

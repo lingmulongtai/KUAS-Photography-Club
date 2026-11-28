@@ -6,6 +6,7 @@ import {landmarkClearings} from './landmark-clearings';
 import {json} from '../kansai/sources';
 import {toLocal} from './geo';
 import type {Env} from './env';
+import {SURVEY_DISTRICTS,surveyFacadeMaterial} from './survey-facade';
 
 interface Record {id:string;lon:number;lat:number;file:string;rings:Ring[];approaches?:Ring[]}
 // These structures already use Kyoto's bespoke materials or its station cutout.
@@ -22,6 +23,7 @@ function dispose(group:THREE.Object3D){
   for(const g of geometry)g.dispose();
   for(const m of materials){
     for(const value of Object.values(m))if(value instanceof THREE.Texture)textures.add(value);
+    if(m instanceof THREE.ShaderMaterial)for(const u of Object.values(m.uniforms))if(u.value instanceof THREE.Texture)textures.add(u.value);
     m.dispose();
   }
   const images=new Set<ImageBitmap>();
@@ -51,6 +53,19 @@ function nightGlowFor(id: string): NightGlow {
   if (id.startsWith('kasuga-')) return { color: 0xffa648, intensity: 0.15 };
   if (id.startsWith('maya-cable-')) return { color: 0xffdca8, intensity: 0.16 };
   return { color: 0xffd69c, intensity: 0.09 };
+}
+
+/** Replace glTF materials on PLATEAU districts that need facades for their untextured walls. */
+function useSurveyFacades(model:THREE.Object3D,env:Env,groundY:number){
+  const made=new Map<THREE.Material,THREE.ShaderMaterial>();
+  model.traverse(obj=>{
+    if(!(obj instanceof THREE.Mesh)||!(obj.material instanceof THREE.MeshStandardMaterial))return;
+    const source=obj.material;
+    let material=made.get(source);
+    if(!material){material=surveyFacadeMaterial(source,env,groundY);made.set(source,material);}
+    obj.material=material;
+  });
+  for(const source of made.keys())source.dispose();
 }
 
 function applyLandmarkNight(model: THREE.Object3D, id: string, city: number) {
@@ -96,7 +111,8 @@ export async function regionalLandmarks(scene:THREE.Scene,env:Env,_lights:{sun:T
       if(r.group || r.pending || r.retry>now)continue;
       r.pending=true;pending++;
       void loader.loadAsync(r.file).then(async({scene:model})=>{
-        applyLandmarkNight(model, r.id, env.uCity.value);
+        if(SURVEY_DISTRICTS.has(r.id))useSurveyFacades(model,env,ground(r.x,r.z));
+        else applyLandmarkNight(model, r.id, env.uCity.value);
         await prepare(model);
         if(r.distance>6200){dispose(model);return;}
         model.position.set(r.x,ground(r.x,r.z),r.z);

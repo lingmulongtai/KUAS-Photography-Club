@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ENV_GLSL } from './env.ts';
-import { HIGH_CLOUD_GLSL } from './high-clouds.ts';
+import { CLOUD_DEPTH_GLSL, HIGH_CLOUD_GLSL } from './high-clouds.ts';
 import { WEATHER_SCALE } from './cloud-columns.ts';
 
 // Update vertical strips so every frame gets a similar share of the expensive sky rays.
@@ -29,12 +29,18 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
   scene.add(proxy, new THREE.DirectionalLight(0), new THREE.HemisphereLight(0, 0));
   const images = [skyImage(), skyImage(), skyImage()];
   const uniforms = {
+    uSceneDepth: { value: null as THREE.Texture | null },
+    uViewFromClip: { value: new THREE.Matrix4() },
+    uDepthRes: { value: new THREE.Vector2(1, 1) },
+    uUseDepth: { value: false },
+    uBase: { value: 850 },
+    uTop: { value: 2600 },
     ...original.uniforms,
     uCloudPast: { value: images[0].target.texture }, uCloudPresent: { value: images[0].target.texture },
     uPastClip: { value: images[0].clip }, uPresentClip: { value: images[0].clip }, uCloudMix: { value: 0 },
   };
   const composite = new THREE.ShaderMaterial({
-    uniforms, side: THREE.BackSide, transparent: true, depthWrite: false,
+    uniforms, side: THREE.BackSide, transparent: true, depthTest: false, depthWrite: false,
     vertexShader: /* glsl */ `
       uniform mat4 uPastClip, uPresentClip;
       varying vec3 vPast, vPresent;
@@ -51,18 +57,24 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
     fragmentShader: /* glsl */ `
       uniform sampler2D uCloudPast, uCloudPresent;
       uniform float uCloudMix;
+      uniform float uBase, uTop;
       varying vec3 vPast, vPresent;
       varying vec3 vRay;
       ${ENV_GLSL}
+      ${CLOUD_DEPTH_GLSL}
       const float K = ${WEATHER_SCALE};
       ${HIGH_CLOUD_GLSL}
       void main(){
+        vec3 rd = normalize(vRay);
+        float sceneDist = cloudSceneDist();
+        float t0 = cloudSlabEntry(cameraPosition, rd, uBase, uTop);
+        float slabVis = uUseDepth ? smoothstep(t0, t0 + 40., sceneDist) : 1.;
         vec2 past = vPast.xy / vPast.z;
         vec4 a = texture2D(uCloudPast, .5 + .5 * past);
         vec4 b = texture2D(uCloudPresent, .5 + .5 * vPresent.xy / vPresent.z);
         float edge = smoothstep(.96, .995, max(abs(past.x), abs(past.y)));
-        vec4 c = mix(a, b, max(uCloudMix, edge));
-        c += (1.-c.a) * highClouds(cameraPosition, normalize(vRay));
+        vec4 c = mix(a, b, max(uCloudMix, edge)) * slabVis;
+        c += (1.-c.a) * highClouds(cameraPosition, rd, sceneDist);
         gl_FragColor = vec4(c.a > .00001 ? c.rgb / c.a : vec3(0.), c.a);
       }
     `,
@@ -120,6 +132,7 @@ export function createCloudHistory(renderer: THREE.WebGLRenderer, camera: THREE.
       else dest.value = value;
     }
     frozen.uniforms.uVolumeOnly.value = true;
+    if (frozen.uniforms.uUseDepth) frozen.uniforms.uUseDepth.value = false;
   }
 
   function capture(image: SkyImage, part: number, count: number) {

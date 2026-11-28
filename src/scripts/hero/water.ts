@@ -5,9 +5,11 @@ import { LINE, type LineFeature } from './lines-data';
 import { ROAD_GLSL } from './roads';
 import {refineWaterSurfaceSteps} from './water-surface';
 import {toLocal} from './geo';
+import {tidalWeight} from './osaka-tidal';
 import {loadBinary} from './data';
 import {yieldTask} from './task-yield';
 import type {KamoChannel} from './kamo-channel';
+import {LAKE_YOGO_HOLES,LAKE_YOGO_OUTER,YOGO_WATER_LEVEL} from './yogo-shoreline';
 
 const senkoji=toLocal(35.0157751,135.6655983);
 
@@ -97,20 +99,22 @@ export function waterProfile(ring:readonly {x:number;y:number}[],attr:number):[n
 }
 
 export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceClearance=false){
-  return new THREE.ShaderMaterial({
+  const material = new THREE.ShaderMaterial({
     uniforms: { ...env, ...roads, uWaterBias:{value:bias}, uClearance:{value:surfaceClearance?1:0} },
     vertexShader: /* glsl */ `
       attribute float aStable;
       attribute vec3 aWater;
+      attribute float aTidal;
       uniform float uWaterBias;
       uniform float uClearance;
       varying float vStable;
       varying vec3 vWater;
       varying vec3 vWorld;
+      varying float vTidal;
       void main(){
         vec3 p = position;
         vWorld = p;
-        vStable=aStable;vWater=aWater;
+        vStable=aStable;vWater=aWater;vTidal=aTidal;
         vec3 toCam = cameraPosition - p;
         float dist = length(toCam);
         float pull;
@@ -136,6 +140,7 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
       varying vec3 vWorld;
       varying float vStable;
       varying vec3 vWater;
+      varying float vTidal;
 
       // Multi-octave rotated organic wave height (zero periodic grid regularity).
       float waveHeight(vec2 p, vec2 drift, float fine, float med, float broad){
@@ -196,6 +201,59 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
         return mix(sky, landCol, sill * reflStrength);
       }
 
+      // Open-sea surface. Matches regional-ground.ts renderSea() bit-for-bit so Osaka Bay harbours,
+      // the open sea and the tidal river reaches join with no visible seam.
+      vec3 seaSurface(vec2 q, float footprint){
+        const mat2 R1 = mat2(.80, -.60, .60, .80);
+        const mat2 R2 = mat2(.54, .84, -.84, .54);
+        float broad = 1. - smoothstep(2., 16., footprint);
+        float med = 1. - smoothstep(.4, 4.5, footprint);
+        vec2 drift = vec2(uTime * .38, uTime * .26);
+        float eps = max(.55, footprint * .5);
+        vec2 wp0 = vec2(vnoise(q * .022 + drift * .22), vnoise(q * .022 - drift * .19 + 13.7)) - .5;
+        vec2 q0 = q + wp0 * 7.5;
+        vec2 qx = q + vec2(eps, 0.) + (vec2(vnoise((q + vec2(eps, 0.)) * .022 + drift * .22), vnoise((q + vec2(eps, 0.)) * .022 - drift * .19 + 13.7)) - .5) * 7.5;
+        vec2 qy = q + vec2(0., eps) + (vec2(vnoise((q + vec2(0., eps)) * .022 + drift * .22), vnoise((q + vec2(0., eps)) * .022 - drift * .19 + 13.7)) - .5) * 7.5;
+        float h0 = ((vnoise(R1 * (q0 * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (q0 * .082) - drift * .46 + 9.4) - .5) * .65) * broad
+                 + (vnoise(R1 * (q0 * .19) + drift * .78 + 24.1) - .5) * .38 * med;
+        float hx = ((vnoise(R1 * (qx * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (qx * .082) - drift * .46 + 9.4) - .5) * .65) * broad
+                 + (vnoise(R1 * (qx * .19) + drift * .78 + 24.1) - .5) * .38 * med;
+        float hy = ((vnoise(R1 * (qy * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (qy * .082) - drift * .46 + 9.4) - .5) * .65) * broad
+                 + (vnoise(R1 * (qy * .19) + drift * .78 + 24.1) - .5) * .38 * med;
+        float gust = .58 + .68 * vnoise(q * .0012 + vec2(uTime * .014, -uTime * .01));
+        vec2 slope = vec2(hx - h0, hy - h0) / eps * .11 * gust;
+        vec3 n = normalize(vec3(slope.x, 1., slope.y));
+        vec3 view = normalize(vWorld - cameraPosition);
+        vec3 r = reflect(view, n);
+        r.y = clamp(abs(r.y) + .02, .015, 1.);
+        vec3 rn = normalize(r);
+        float facing = clamp(dot(-view, n), 0., 1.);
+        float fres = .045 + .88 * pow(1. - facing, 4.5);
+        vec3 sky = skyColor(rn);
+        if (rn.y > .04) {
+          vec2 cloudUv = q * .000035 + rn.xz / max(rn.y + .18, .22) * .75 + vec2(uTime * .0014, 0.);
+          float cMask = smoothstep(.46, .78, fbm(cloudUv * 2.1)) * smoothstep(.04, .28, rn.y) * (1. - smoothstep(.55, .95, rn.y));
+          vec3 cCol = mix(uCloudLight * .88 + uHorizon * .25, uHorizon * .45, uCity);
+          sky = mix(sky, cCol, cMask * .4);
+        }
+        float az = atan(rn.x, rn.z);
+        float ridge = .04 + .035 * vnoise(vec2(az * 3.2 + q.x * .00003, q.y * .00003 + 3.7));
+        float sill = 1. - smoothstep(ridge * .6, ridge * 1.15 + .015, rn.y);
+        vec3 shoreCol = vec3(.09, .10, .11) * (skyLight(vec3(0., .7, .7)) + uSunLight * max(uSunDir.y, 0.) * .5);
+        if (uCity > .01) {
+          float glow = exp(-rn.y * 16.) * (.45 + .55 * vnoise(vec2(az * 12. + q.x * .0003, q.y * .0003)));
+          shoreCol += vec3(1., .64, .32) * glow * uCity * .24;
+        }
+        vec3 envRefl = mix(sky, shoreCol, sill * .48);
+        vec3 ambient = skyLight(vec3(0., 1., 0.)) + uSunLight * max(uSunDir.y, 0.);
+        vec3 col = mix(vec3(.009, .031, .047) * ambient, envRefl, fres);
+        float sunDot = max(dot(rn, uSunDir), 0.);
+        float moonDot = max(dot(rn, uMoonDir), 0.);
+        col += uSunLight * (pow(sunDot, 170.) * .55 + pow(sunDot, 24.) * .065);
+        col += uMoonLight * (pow(moonDot, 170.) * 2.8 + pow(moonDot, 24.) * .28);
+        return col;
+      }
+
       void main(){
         vec2 q = vWorld.xz;
         float footprint=max(length(dFdx(q)),length(dFdy(q)));
@@ -205,56 +263,7 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
         bool lake = vWater.x > 1.5 && !baySea;
         bool river = vWater.x > .5 && !lake && !baySea;
         if (baySea) {
-          // Match regional-ground.ts renderSea() bit-for-bit so Osaka Bay harbors and open sea
-          // join with zero visible tile seam around Yumeshima, Kobe Port and Sakishima.
-          const mat2 R1 = mat2(.80, -.60, .60, .80);
-          const mat2 R2 = mat2(.54, .84, -.84, .54);
-          float broad = 1. - smoothstep(2., 16., footprint);
-          float med = 1. - smoothstep(.4, 4.5, footprint);
-          vec2 drift = vec2(uTime * .38, uTime * .26);
-          float eps = max(.55, footprint * .5);
-          vec2 wp0 = vec2(vnoise(q * .022 + drift * .22), vnoise(q * .022 - drift * .19 + 13.7)) - .5;
-          vec2 q0 = q + wp0 * 7.5;
-          vec2 qx = q + vec2(eps, 0.) + (vec2(vnoise((q + vec2(eps, 0.)) * .022 + drift * .22), vnoise((q + vec2(eps, 0.)) * .022 - drift * .19 + 13.7)) - .5) * 7.5;
-          vec2 qy = q + vec2(0., eps) + (vec2(vnoise((q + vec2(0., eps)) * .022 + drift * .22), vnoise((q + vec2(0., eps)) * .022 - drift * .19 + 13.7)) - .5) * 7.5;
-          float h0 = ((vnoise(R1 * (q0 * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (q0 * .082) - drift * .46 + 9.4) - .5) * .65) * broad
-                   + (vnoise(R1 * (q0 * .19) + drift * .78 + 24.1) - .5) * .38 * med;
-          float hx = ((vnoise(R1 * (qx * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (qx * .082) - drift * .46 + 9.4) - .5) * .65) * broad
-                   + (vnoise(R1 * (qx * .19) + drift * .78 + 24.1) - .5) * .38 * med;
-          float hy = ((vnoise(R1 * (qy * .038) + drift * .35) - .5) * 1.2 + (vnoise(R2 * (qy * .082) - drift * .46 + 9.4) - .5) * .65) * broad
-                   + (vnoise(R1 * (qy * .19) + drift * .78 + 24.1) - .5) * .38 * med;
-          float gust = .58 + .68 * vnoise(q * .0012 + vec2(uTime * .014, -uTime * .01));
-          vec2 slope = vec2(hx - h0, hy - h0) / eps * .11 * gust;
-          vec3 n = normalize(vec3(slope.x, 1., slope.y));
-          vec3 view = normalize(vWorld - cameraPosition);
-          vec3 r = reflect(view, n);
-          r.y = clamp(abs(r.y) + .02, .015, 1.);
-          vec3 rn = normalize(r);
-          float facing = clamp(dot(-view, n), 0., 1.);
-          float fres = .045 + .88 * pow(1. - facing, 4.5);
-          vec3 sky = skyColor(rn);
-          if (rn.y > .04) {
-            vec2 cloudUv = q * .000035 + rn.xz / max(rn.y + .18, .22) * .75 + vec2(uTime * .0014, 0.);
-            float cMask = smoothstep(.46, .78, fbm(cloudUv * 2.1)) * smoothstep(.04, .28, rn.y) * (1. - smoothstep(.55, .95, rn.y));
-            vec3 cCol = mix(uCloudLight * .88 + uHorizon * .25, uHorizon * .45, uCity);
-            sky = mix(sky, cCol, cMask * .4);
-          }
-          float az = atan(rn.x, rn.z);
-          float ridge = .04 + .035 * vnoise(vec2(az * 3.2 + q.x * .00003, q.y * .00003 + 3.7));
-          float sill = 1. - smoothstep(ridge * .6, ridge * 1.15 + .015, rn.y);
-          vec3 shoreCol = vec3(.09, .10, .11) * (skyLight(vec3(0., .7, .7)) + uSunLight * max(uSunDir.y, 0.) * .5);
-          if (uCity > .01) {
-            float glow = exp(-rn.y * 16.) * (.45 + .55 * vnoise(vec2(az * 12. + q.x * .0003, q.y * .0003)));
-            shoreCol += vec3(1., .64, .32) * glow * uCity * .24;
-          }
-          vec3 envRefl = mix(sky, shoreCol, sill * .48);
-          vec3 ambient = skyLight(vec3(0., 1., 0.)) + uSunLight * max(uSunDir.y, 0.);
-          vec3 col = mix(vec3(.009, .031, .047) * ambient, envRefl, fres);
-          float sunDot = max(dot(rn, uSunDir), 0.);
-          float moonDot = max(dot(rn, uMoonDir), 0.);
-          col += uSunLight * (pow(sunDot, 170.) * .55 + pow(sunDot, 24.) * .065);
-          col += uMoonLight * (pow(moonDot, 170.) * 2.8 + pow(moonDot, 24.) * .28);
-          gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
+          gl_FragColor = vec4(applyHaze(seaSurface(q, footprint), vec3(0.), vWorld), 1.);
           return;
         }
         vec2 axis=normalize(vWater.yz),crosswind=vec2(-axis.y,axis.x);
@@ -313,10 +322,14 @@ export function waterMaterial(env:Env,roads:WaterRoads,bias:number,surfaceCleara
         float broadGloss = lake ? 26. : river ? 20. : 38.;
         col += uSunLight * (pow(sunDot, tight) * .55 + pow(sunDot, broadGloss) * .065);
         col += uMoonLight * (pow(moonDot, tight) * 2.8 + pow(moonDot, broadGloss) * .28);
+        // Tidal reaches take on the sea's surface towards their mouths.
+        if (vTidal > .001) col = mix(col, seaSurface(q, footprint), vTidal);
         gl_FragColor = vec4(applyHaze(col, vec3(0.), vWorld), 1.);
       }
     `,
   });
+  Object.assign(material.defaultAttributeValues, { aTidal: [0] });
+  return material;
 }
 
 export type BiwaSurface = THREE.Group & { refit: (ground: (x: number, z: number) => number) => void };
@@ -354,54 +367,30 @@ function subdivideWaterTriangles(raw: Float32Array, maxEdge: number | ((x: numbe
   return new Float32Array(out);
 }
 
-// Surveyed Lake Yogo (余呉湖 / 鏡湖, Nagahama, Shiga) shoreline from GSI experimental_bvmap waterarea (13/7195/3230).
-const LAKE_YOGO_RING: readonly [number, number][] = [
-  [35.53257,136.19193],[35.53243,136.1922],[35.532,136.19242],[35.53148,136.19315],[35.53152,136.19356],
-  [35.53138,136.19401],[35.53143,136.19502],[35.53142,136.19543],[35.53124,136.1957],[35.53117,136.19625],
-  [35.531,136.19657],[35.53122,136.19684],[35.5311,136.19713],[35.53085,136.19757],[35.53063,136.19777],
-  [35.53048,136.1982],[35.53033,136.19875],[35.53024,136.19922],[35.53021,136.19968],[35.53016,136.20025],
-  [35.53001,136.20079],[35.52975,136.20101],[35.52934,136.2013],[35.52893,136.20128],[35.52868,136.20117],
-  [35.52816,136.20094],[35.52765,136.20062],[35.52724,136.20027],[35.52656,136.20017],[35.52617,136.19996],
-  [35.52548,136.19916],[35.5251,136.19904],[35.52467,136.19914],[35.52382,136.19901],[35.52307,136.19914],
-  [35.52276,136.19904],[35.52233,136.19886],[35.52208,136.19861],[35.52168,136.19855],[35.52119,136.19884],
-  [35.52042,136.19858],[35.51998,136.19854],[35.51971,136.19856],[35.51927,136.19887],[35.51881,136.19883],
-  [35.51759,136.19915],[35.51731,136.199],[35.51707,136.19869],[35.51687,136.19826],[35.51645,136.19769],
-  [35.51619,136.19731],[35.51592,136.19716],[35.5155,136.19706],[35.51493,136.19644],[35.51467,136.19633],
-  [35.51433,136.1963],[35.51361,136.19565],[35.51334,136.19525],[35.51333,136.1947],[35.51345,136.1938],
-  [35.51337,136.19345],[35.51299,136.19265],[35.513,136.19216],[35.51317,136.19135],[35.51337,136.19105],
-  [35.51351,136.19072],[35.51359,136.19039],[35.51388,136.18971],[35.51412,136.1895],[35.51453,136.18953],
-  [35.51492,136.18966],[35.51546,136.18968],[35.51591,136.18972],[35.51617,136.18992],[35.51637,136.19031],
-  [35.51681,136.19055],[35.51707,136.19042],[35.51733,136.18984],[35.51757,136.18945],[35.51778,136.18917],
-  [35.51818,136.18906],[35.51874,136.18901],[35.51903,136.18886],[35.51945,136.1888],[35.51986,136.18911],
-  [35.52017,136.18919],[35.52071,136.18891],[35.52105,136.18863],[35.52129,136.18871],[35.52137,136.18941],
-  [35.52143,136.18984],[35.5216,136.19018],[35.52187,136.19028],[35.52233,136.18975],[35.52285,136.18971],
-  [35.52318,136.18966],[35.52352,136.18938],[35.52388,136.18911],[35.52419,136.18862],[35.52438,136.1884],
-  [35.52469,136.18829],[35.52507,136.18832],[35.52548,136.1882],[35.52599,136.18815],[35.5267,136.18827],
-  [35.52695,136.18828],[35.52725,136.18828],[35.52764,136.1883],[35.52793,136.18836],[35.52816,136.18867],
-  [35.52835,136.18898],[35.52868,136.18932],[35.52894,136.18932],[35.52931,136.18955],[35.52979,136.18948],
-  [35.53016,136.18956],[35.53037,136.18973],[35.53105,136.18981],[35.53179,136.18987],[35.53205,136.19],
-  [35.53223,136.19035],[35.53223,136.19084],[35.53214,136.19128],
-];
+function flatRingToVec2(ring: readonly number[]): THREE.Vector2[] {
+  const out: THREE.Vector2[] = [];
+  for (let i = 0; i < ring.length; i += 2) out.push(new THREE.Vector2(ring[i], ring[i + 1]));
+  return out;
+}
 
 function lakeYogoPositions(): Float32Array<ArrayBuffer> {
-  const contour = LAKE_YOGO_RING.map(([lat, lon]) => {
-    const p = toLocal(lat, lon);
-    return new THREE.Vector2(p.x, p.z);
-  });
-  const tris = THREE.ShapeUtils.triangulateShape(contour, []);
+  const contour = flatRingToVec2(LAKE_YOGO_OUTER);
+  const holes = LAKE_YOGO_HOLES.map(flatRingToVec2);
+  const allPts = [contour, ...holes].flat();
+  const tris = THREE.ShapeUtils.triangulateShape(contour, holes);
   const raw = new Float32Array(tris.length * 9);
   let k = 0;
   for (const [i0, i1, i2] of tris) {
-    const a = contour[i0], b = contour[i1], c = contour[i2];
+    const a = allPts[i0], b = allPts[i1], c = allPts[i2];
     // Guarantee upward (+Y) CCW winding in XZ (negative 2D cross product (b-a)x(c-a) yields +Y normal)
     const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     const p1 = cross > 0 ? c : b;
     const p2 = cross > 0 ? b : c;
-    raw[k++] = a.x; raw[k++] = 132.8; raw[k++] = a.y;
-    raw[k++] = p1.x; raw[k++] = 132.8; raw[k++] = p1.y;
-    raw[k++] = p2.x; raw[k++] = 132.8; raw[k++] = p2.y;
+    raw[k++] = a.x; raw[k++] = YOGO_WATER_LEVEL; raw[k++] = a.y;
+    raw[k++] = p1.x; raw[k++] = YOGO_WATER_LEVEL; raw[k++] = p1.y;
+    raw[k++] = p2.x; raw[k++] = YOGO_WATER_LEVEL; raw[k++] = p2.y;
   }
-  return subdivideWaterTriangles(raw, 48, 132.8);
+  return subdivideWaterTriangles(raw, 24, YOGO_WATER_LEVEL);
 }
 
 // The lake and the Seta reach above the weir share a surveyed 84.6 m surface, plus Lake Yogo (132.8 m).
@@ -477,9 +466,9 @@ export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:num
     geometry.computeBoundingSphere();
     const material=waterMaterial(env,roads,.35,true);
     material.polygonOffset=true;
-    material.polygonOffsetFactor=-3;
-    material.polygonOffsetUnits=-10;
-    Object.assign(material.defaultAttributeValues,{aStable:[0.98],aWater:[2,.83,.56]});
+    material.polygonOffsetFactor=-2;
+    material.polygonOffsetUnits=-6;
+    Object.assign(material.defaultAttributeValues,{aStable:[0.92],aWater:[2,.83,.56]});
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name='lake-yogo';
     group.add(mesh);
@@ -516,9 +505,9 @@ export async function biwaSurface(env:Env,roads:WaterRoads,initialGround?:(x:num
           arr[i+1]=y;
         }
       }else{
-        const base=kind==='yogo'?132.8:85;
-        const cap=kind==='yogo'?134.8:86.2;
-        const lift=kind==='yogo'?0.55:.25;
+        const base=kind==='yogo'?YOGO_WATER_LEVEL:85;
+        const cap=kind==='yogo'?YOGO_WATER_LEVEL+0.45:86.2;
+        const lift=kind==='yogo'?0.35:.25;
         for(let i=0;i<arr.length;i+=3){
           const g=ground(arr[i],arr[i+2]);
           arr[i+1]=Math.min(cap,Math.max(base,g+lift));
@@ -579,6 +568,7 @@ export async function osakaWaterSurface(env:Env,roads:WaterRoads,initialGround?:
   if(riverVerts>0){
     const positions=new Float32Array(riverVerts*3);
     const profiles=new Float32Array(riverVerts*3);
+    const tidal=new Float32Array(riverVerts);
     const dirOffset=8+bayVerts*8+riverVerts*8;
     for(let n=0;n<riverVerts;n++){
       positions[n*3]=view.getFloat32(offset,true);
@@ -591,10 +581,12 @@ export async function osakaWaterSurface(env:Env,roads:WaterRoads,initialGround?:
       profiles[n*3]=1;
       profiles[n*3+1]=fx/len;
       profiles[n*3+2]=fz/len;
+      tidal[n]=tidalWeight(positions[n*3],positions[n*3+2]);
     }
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
     geometry.setAttribute('aWater',new THREE.BufferAttribute(profiles,3));
+    geometry.setAttribute('aTidal',new THREE.BufferAttribute(tidal,1));
     geometry.computeBoundingSphere();
     const material=waterMaterial(env,roads,1.2,false);
     material.polygonOffset=true;

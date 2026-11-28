@@ -173,6 +173,8 @@ async function nearMesh(tile:CompiledTile,materials:THREE.Material[],sacredMat:T
   }
   const sacredBySite=new Map<Site,NonNullable<CompiledTile['sacred']>>();
   for(const s of tile.sacred??[]){
+    const lp=toLocal(s.lat,s.lon);
+    if(inOsakaLandmarkMask(lp.x,lp.z)||inAirportBuildingMask(lp.x,lp.z))continue;
     const site=architecture.siteAt([s.lon,s.lat]);
     let list=sacredBySite.get(site);
     if(!list){list=[];sacredBySite.set(site,list);}

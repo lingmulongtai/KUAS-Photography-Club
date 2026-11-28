@@ -15,6 +15,10 @@ export type Box = [number, number, number, number];
 
 export const BUILDINGS_BOX: Box = [-9000, -7000, 4600, 6200];
 
+/** South-west of this corner the regional ground also covers Kyoto's outer terrain box, so Osaka Bay
+ * reads as one sea across z=36000. Kyoto's terrain steps aside there once those patches are drawn. */
+export const BAY_HANDOFF = { x: -20500, z: 27500 } as const;
+
 /** Where things are, from OpenStreetMap / Nominatim (checked against the GSI aerial photos). */
 export const PLACES = {
   shogunzuka: toLocal(35.0022428, 135.7874304), // 将軍塚青龍殿 大舞台

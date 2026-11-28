@@ -117,9 +117,10 @@ test('B787-8 airliner, helicopters, airports, Osaka landmarks and Biwa bridges b
       contents: `
         export { buildAircraft } from './src/scripts/hero/aircraft.ts';
         export { buildKansaiAirports } from './src/scripts/hero/airports.ts';
-        export { buildOsakaLandmarks } from './src/scripts/hero/osaka-landmarks.ts';
+        export { buildOsakaLandmarks, inOsakaLandmarkMask, inLandmarkTreeExclusion } from './src/scripts/hero/osaka-landmarks.ts';
         export { buildBiwaBridges } from './src/scripts/hero/biwa-bridges.ts';
         export { createEnv } from './src/scripts/hero/env.ts';
+        export { toLocal } from './src/scripts/hero/geo.ts';
       `,
     },
     bundle: true,
@@ -132,7 +133,7 @@ test('B787-8 airliner, helicopters, airports, Osaka landmarks and Biwa bridges b
   mod.filename = import.meta.filename;
   mod.paths = require.resolve.paths('three') ?? [];
   mod._compile(result.outputFiles[0].text, import.meta.filename);
-  const { buildAircraft, buildKansaiAirports, buildOsakaLandmarks, buildBiwaBridges, createEnv } = mod.exports;
+  const { buildAircraft, buildKansaiAirports, buildOsakaLandmarks, inOsakaLandmarkMask, inLandmarkTreeExclusion, buildBiwaBridges, createEnv, toLocal } = mod.exports;
 
   const env = createEnv();
   const built = buildAircraft(env, flatGround);
@@ -149,7 +150,25 @@ test('B787-8 airliner, helicopters, airports, Osaka landmarks and Biwa bridges b
   const airports = buildKansaiAirports(env, flatGround);
   assert.ok(airports.children.length >= 2, 'airports group contains meshes and airfield lighting');
   const osakaIcons = buildOsakaLandmarks(env, flatGround);
-  assert.ok(osakaIcons.children.length >= 2, 'Osaka landmarks group contains meshes and beacons');
+  assert.ok(osakaIcons.children.length >= 2, 'Osaka & Nara landmarks group contains meshes and beacons');
+  const meshVerts = osakaIcons.children[0].geometry.getAttribute('position').count;
+  assert.ok(meshVerts > 15000, `combined Osaka/USJ/Heijo landmark mesh built cleanly (${meshVerts} verts)`);
+  // Generic survey buildings give way under the modelled Osaka, USJ and Heijo Palace landmarks.
+  for (const [label, lat, lon] of [
+    ['Abeno Harukas', 34.64610, 135.51345],
+    ['Tsutenkaku', 34.65254, 135.50630],
+    ['USJ Hogwarts', 34.66878, 135.43145],
+    ['USJ Bowser castle', 34.66805, 135.42992],
+    ['Heijo Daigokuden', 34.69395, 135.79415],
+    ['Heijo Suzakumon', 34.68693, 135.79428],
+  ]) {
+    const p = toLocal(lat, lon);
+    assert.equal(inOsakaLandmarkMask(p.x, p.z), true, `building mask covers ${label}`);
+  }
+  const lagoon = toLocal(34.6648, 135.4318);
+  const heijoCourt = toLocal(34.69295, 135.79415);
+  assert.equal(inLandmarkTreeExclusion(lagoon.x, lagoon.z), true, 'trees stay off the USJ lagoon');
+  assert.equal(inLandmarkTreeExclusion(heijoCourt.x, heijoCourt.z), true, 'tree clearing covers Heijo Palace court');
   const biwaBridges = buildBiwaBridges(env);
   assert.ok(biwaBridges.geometry.getAttribute('position').count > 200, 'Biwa bridges geometry built');
 });
